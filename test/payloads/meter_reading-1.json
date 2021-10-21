@@ -1,0 +1,10 @@
+{
+  "type": "meter_reading",
+  "register_value": 2201.02,
+  "qualifier": "a-plus",
+  "obis_value": 2201.02,
+  "meter_id":   60251504,
+  "medium": "electricity_kwh",
+  "header_version": 1,
+  "1-0:1.8.0":  2201.02
+}

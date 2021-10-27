@@ -91,28 +91,63 @@ target/release/streams-author-tool -f "test/payloads/meter_reading-1.json" "test
 ## Todos
 
 ### One application per workflow
-Provide one application for each different workflow used for streams channel management and data transmission in the SUSEE project.
-Following workflows will exist for each channel. Every sensor uses one single channel:
+Provide one application for each service being part in the different workflows used for
+streams channel management and data transmission in the SUSEE project. These services are 
+* *Sensor*<br>
+  Running on the smart meter device
+* *Management Console*<br>
+  Running at the energy provider
+* *Tangle Proxy*<br>
+  Running in the application server or as part of the initialization software at the energy provider
+ 
+These applications can be run in three shells in parallel so that the applications can react to new lorawan or tangle
+messages. Lorawan and other inter process communication is simulated using binary input and output files. Each transfered 
+package will be written into a separate file.
 
-* Initialization<br>
-  Limitations of lorawan don't apply.
-  * Initial handshake (announcement/subscription/keyload) between sensor and the channel author.
-  * Removing / Adding subscribers.
+The services are characterized by following properties/aspects:
+
+* *Sensor*
+  * Online access:
+    * *Initialization*: Wifi or wired using peripherals (e.g. usb)
+    * *Sensor Processing*: Wireless via lorawan
+    * *Add/Remove Subscriber*: Wireless via lorawan
+  * Low processing capabilities<br>
+    Following applies to all workflows (*Initialization*, *Sensor Processing*, *Add/Remove Subscriber*):
+    Due to the low processing capabilities the sensor does not send the streams packages to the tangle directly but sends
+    the packages to the *Tangle Proxy*. This way it does not need to process the adaptive POW.<br>
+    Streams packages coming from the tangle are also received via the *Tangle Proxy*.
+  * `no_std` is needed for Rust implementation. A specialized new delete operator may be needed for the C++ implementation.
+    FreeRTOS will most probably be available (e.g. [ESP-IDF FreeRTOS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-guides/freertos-smp.html)).
+
+ * *Management Console*<br>
+   Software needed for *Initialization* of the sensor, monitoring of *Sensor Processing* and managing the 
+   *Add/Remove Subscriber* workflow. No Hardware or performance restrictions. 
+
+ * *Tangle Proxy*
+   * Is used in the 
+     * Application Server for *Sensor Processing* and *Add/Remove Subscriber* workflows
+     * Initialization software as part of the *Management Console* for the *Initialization* of the sensor
+   * Fast online access
+   * Connected to the *Sensor* via
+     * lorawan for *Sensor Processing* and *Add/Remove Subscriber* workflows
+     * Wifi or wired for the *Initialization* workflow
+   * Receives prepared iota streams packages from the *Sensor* and sends these packages to the tangle performing the adaptive POW.
+   * Listens to new tangle messages and sends the encrypted streams packages to the sensor:
+     * Announcement Messages: Used in the *Initialization* workflow 
+     * Keyload Messages: Used in the *Add/Remove Subscriber* and *Initialization* workflows              
+
+Following workflows will exist for each channel. Every sensor uses its own exclusive channel:
+
+* *Initialization*
+  * Limitations of lorawan don't apply. Sensor is connected via Wifi or wired using peripherals (e.g. usb).
+  * Performs the initial handshake (announcement/subscription/keyload) between sensor and the channel author (*Management Console*)
+    via the *Tangle Proxy*.
+ 
+* *Add/Remove Subscriber*<br>
+  Adding or removing subscribers from the channel. Here lorawan is also used for a back channel from application server
+  to the *Sensor*.
   
-* Sensor Processing<br>
-  `no_std` is needed.
-  * Create encrypted streams packages for the smart meter messages to be send via lorawan.
-    Lorawan is  simulated using binary files.
-  * React to new keyload messages when the subscribers are removed or added.
+* *Sensor Processing*<br>
+  Smart meter messages are created and encrypted in streams packages by the *Sensor*. The packages are send via lorawan
+  to the application server.
   
-* Application Server Processing<br>
-  Limitations of lorawan don't apply.
-  * Receive encrypted streams packages via lorawan (simulated using binary files) and send them to iota tangle.
-
-Notes:
-* Currently the author is the publisher. First step is to separate author and publisher roles.
-* Applications for *Sensor Processing* and *Application Server Processing* can be run in two shells in parallel
-  so that the applications can react to new lorawan messages (simulated using binary files).
-
-### Use preshared keys for author and sensor
-Currently, no pre shared keys are used.

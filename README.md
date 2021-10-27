@@ -138,16 +138,18 @@ The services are characterized by following properties/aspects:
 
 Following workflows will exist for each channel. Every sensor uses its own exclusive channel:
 
-* *Initialization*
+#### Initialization
   * Limitations of lorawan don't apply. Sensor is connected via Wifi or wired using peripherals (e.g. usb).
   * Performs the initial handshake (announcement/subscription/keyload) between sensor and the channel author (*Management Console*)
     via the *Tangle Proxy*.
- 
-* *Add/Remove Subscriber*<br>
+<img src="workflow_initialization.png" alt="drawing" width="650"/>
+
+#### Add/Remove Subscriber
   Adding or removing subscribers from the channel. Here lorawan is also used for a back channel from application server
   to the *Sensor*.
+<img src="workflow_add_remove_subscriber.png" alt="drawing" width="800"/>
   
-* *Sensor Processing*<br>
-  Smart meter messages are created and encrypted in streams packages by the *Sensor*. The packages are send via lorawan
-  to the application server.
+#### Sensor Processing
+  Smart meter messages are created and encrypted in streams packages by the *Sensor*. The packages are send via lorawan to the application server.
+<img src="workflow_sensor_processing.png" alt="drawing" width="800" class="center"/>
   

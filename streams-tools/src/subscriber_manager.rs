@@ -6,8 +6,8 @@ use iota_streams::{
 };
 
 use crate::{
-    helpers::create_seed,
-    capture_client::CaptureClient
+    CaptureClient,
+    helpers::*
 };
 
 type Subscriber = iota_streams::app_channels::api::tangle::Subscriber<CaptureClient>;

@@ -1120,6 +1120,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "management-console"
+version = "0.1.2"
+dependencies = [
+ "streams-tools",
+]
+
+[[package]]
 name = "matches"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1720,6 +1727,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sensor"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "clap",
+ "iota-streams",
+ "streams-tools",
+ "tokio",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1816,14 +1834,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "streams-author-tool"
+name = "streams-tools"
 version = "0.1.2"
 dependencies = [
  "anyhow",
- "clap",
  "iota-streams",
  "rand 0.7.3",
- "tokio",
 ]
 
 [[package]]
@@ -1853,6 +1869,13 @@ dependencies = [
  "quote",
  "syn",
  "unicode-xid",
+]
+
+[[package]]
+name = "tangle-proxy"
+version = "0.1.2"
+dependencies = [
+ "streams-tools",
 ]
 
 [[package]]

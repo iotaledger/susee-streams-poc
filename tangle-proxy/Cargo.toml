@@ -1,0 +1,10 @@
+[package]
+name = "tangle-proxy"
+version = "0.1.2"
+edition = "2018"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+streams-tools = { version = "0.1.2", path = "../streams-tools" }

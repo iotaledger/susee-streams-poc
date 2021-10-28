@@ -4,11 +4,10 @@ use iota_streams::{
 };
 
 use crate::{
-    helpers::create_seed,
-    capture_client::{
-        CaptureClient
-    }
+    CaptureClient,
+    helpers::*
 };
+
 
 type Author = iota_streams::app_channels::api::tangle::Author<CaptureClient>;
 

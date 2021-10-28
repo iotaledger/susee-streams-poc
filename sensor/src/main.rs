@@ -2,14 +2,13 @@
 
 use anyhow::Result;
 
-mod channel_manager;
-mod subscriber_manager;
-mod helpers;
-mod capture_client;
 mod cli;
 
-use channel_manager::ChannelManager;
-use subscriber_manager::SubscriberManager;
+use streams_tools:: {
+    ChannelManager,
+    SubscriberManager
+};
+
 use cli::{
     Cli,
     get_arg_matches,
@@ -52,7 +51,7 @@ async fn main() -> Result<()> {
         }
     }
     let mut channel = ChannelManager::new(cli.node);
-    
+
     let announcement_link = channel.create_announcement().await?;
     let ann_link_string = announcement_link.to_string();
 

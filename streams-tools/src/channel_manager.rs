@@ -3,35 +3,66 @@ use iota_streams::{
     core::Result,
 };
 
-use crate::{
-    CaptureClient,
-    helpers::*
+use crate::{CaptureClient, plain_text_wallet::PlainTextWallet, SimpleWallet};
+use std::path::Path;
+use std::fs::{
+    write,
+    read,
 };
 
+use iota_streams::app::futures::executor::block_on;
 
-type Author = iota_streams::app_channels::api::tangle::Author<CaptureClient>;
+pub type Author = iota_streams::app_channels::api::tangle::Author<CaptureClient>;
 
-pub struct ChannelManager {
+pub struct ChannelManager<WalletT: SimpleWallet> {
     client: CaptureClient,
-    seed: String,
-    author: Option<Author>,
+    wallet: WalletT,
+    serialization_file: Option<String>,
+    pub author: Option<Author>,
     pub announcement_link: Option<Address>,
     pub keyload_link: Option<Address>,
     pub seq_link:  Option<Address>,
     pub prev_msg_link:  Option<Address>,
 }
 
-impl ChannelManager {
-    pub fn new(node_url: &str) -> Self {
-        Self {
-            seed: create_seed(),
+async fn import_from_serialization_file<WalletT: SimpleWallet>(file_name: &str, ret_val: &mut ChannelManager<WalletT>) -> Result<()> {
+    let buffer = read(file_name).expect(format!("Try to open channel state file '{}'", file_name).as_str());
+    let author = Author::import(
+        &buffer,
+        ret_val.wallet.get_serialization_password(),
+        ret_val.client.clone()
+    ).await?;
+    if let Some(link) = author.announcement_link() {
+        ret_val.announcement_link = Some(link.clone());
+    }
+    ret_val.author = Some(author);
+
+    Ok(())
+}
+
+impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
+    // TOGO CGE: This async new fn should be rewritten as syncronous normal new function.
+    //           Problem: Usage of block_on() her results in panic because of the usage of tokio.
+    pub async fn new(node_url: &str, wallet: WalletT, serialization_file: Option<String>) -> Self {
+        let mut ret_val = Self {
+            wallet,
+            serialization_file: serialization_file.clone(),
             client: CaptureClient::new_from_url(node_url),
             author: None,
             announcement_link: None,
             keyload_link: None,
             seq_link: None,
             prev_msg_link: None,
+        };
+
+        if let Some(serial_file_name) = serialization_file {
+            if Path::new(serial_file_name.as_str()).exists(){
+                import_from_serialization_file(serial_file_name.as_str(), &mut ret_val).await
+                    .expect("Successful import of channel state from serialization file");
+            }
         }
+
+        ret_val
     }
 
     pub async fn create_announcement(&mut self) -> Result<Address> {
@@ -39,7 +70,7 @@ impl ChannelManager {
             panic!("This channel already has been announced")
         }
         let mut author = Author::new(
-            self.seed.as_str(),
+            self.wallet.get_seed(),
             ChannelType::SingleBranch,
             self.client.clone(),
         );
@@ -80,4 +111,23 @@ impl ChannelManager {
         self.prev_msg_link = Some(msg_link);
         Ok(msg_link)
     }
+
+    async fn export_to_serialization_file(&mut self, file_name: &str) -> Result<()> {
+        if let Some(author) = &self.author {
+            let buffer = author.export( self.wallet.get_serialization_password()).await?;
+            write(file_name, &buffer).expect(format!("Try to write channel state file '{}'", file_name).as_str());
+        }
+        Ok(())
+    }
 }
+
+impl<WalletT: SimpleWallet> Drop for ChannelManager<WalletT> {
+    fn drop(&mut self) {
+        if let Some(serial_file_name) = self.serialization_file.clone() {
+            block_on(self.export_to_serialization_file(serial_file_name.as_str()))
+                .expect("Try to export channel state into serialization file");
+        }
+    }
+}
+
+pub type ChannelManagerPlainTextWallet = ChannelManager<PlainTextWallet>;

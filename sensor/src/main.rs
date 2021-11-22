@@ -4,13 +4,15 @@ use anyhow::Result;
 
 mod cli;
 
-use streams_tools:: {
-    ChannelManager,
-    SubscriberManager
+use streams_tools::{
+    ChannelManagerPlainTextWallet,
+    SubscriberManager,
+    FileStreamClient,
 };
 
 use cli::{
-    Cli,
+    SensorCli,
+    ARG_KEYS,
     get_arg_matches,
 };
 
@@ -25,8 +27,10 @@ use std::{
         BufReader
     }
 };
+use iota_streams::app_channels::api::DefaultF;
+use susee_tools::{SUSEE_CONST_SECRET_PASSWORD, get_wallet};
 
-async fn send_file_content_as_msg(msg_file: &str, channel: &mut ChannelManager) -> Result<Address>{
+async fn send_file_content_as_msg(msg_file: &str, channel: &mut ChannelManagerPlainTextWallet) -> Result<Address>{
     let f = File::open(msg_file)?;
     let mut reader = BufReader::new(f);
     let mut buffer = Vec::new();
@@ -40,27 +44,37 @@ async fn send_file_content_as_msg(msg_file: &str, channel: &mut ChannelManager) 
 async fn main() -> Result<()> {
 
     let arg_matches = get_arg_matches();
-    let cli = Cli::new(&arg_matches) ;
+    let cli = SensorCli::new(&arg_matches, &ARG_KEYS) ;
     let files_to_send = cli.matches.values_of(cli.arg_keys.files_to_send).unwrap();
+    let wallet = get_wallet(
+        &cli.matches,
+        SUSEE_CONST_SECRET_PASSWORD,
+        cli.arg_keys.base.wallet_file,
+        "wallet-management-console.txt"
+    )?;
 
-    println!("[Main] Using node '{}' for tangle connection", cli.node);
+    println!("[Sensor] Using node '{}' for tangle connection", cli.node);
 
     for msg_file in files_to_send.clone() {
         if !Path::new(msg_file).exists(){
             panic!("Can not find message file '{}'", msg_file);
         }
     }
-    let mut channel = ChannelManager::new(cli.node);
+    let mut channel = ChannelManagerPlainTextWallet::new(
+        cli.node,
+        wallet,
+        Some(String::from("sensor-state-management-console.bin"))
+    ).await;
 
-    let announcement_link = channel.create_announcement().await?;
-    let ann_link_string = announcement_link.to_string();
+    // let announcement_link = channel.create_announcement().await?;
+    let ann_link_string = "TODO read from cli"; // announcement_link.to_string();
 
-    println!(
-        "[Main] Announcement Link: {}\n       Tangle Index: {:#}\n",
-        ann_link_string, announcement_link.to_msg_index()
-    );
+    // println!(
+    //     "[Main] Announcement Link: {}\n       Tangle Index: {:#}\n",
+    //     ann_link_string, announcement_link.to_msg_index()
+    // );
 
-    let mut subscriber_a: SubscriberManager = SubscriberManager::new(cli.node);
+    let mut subscriber_a: SubscriberManager<FileStreamClient<DefaultF>> = SubscriberManager::new(cli.node);
 
     // In a real world use a subscriber would receive the announcement_link as a text from a website
     // api, email or similar

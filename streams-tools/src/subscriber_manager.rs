@@ -1,29 +1,38 @@
 use iota_streams::{
     app_channels::api::tangle::{
-        Address
+        Address,
+        Message,
     },
     core::Result,
+    app::transport::{
+        Transport,
+        TransportDetails,
+        TransportOptions,
+    }
 };
 
 use crate::{
-    CaptureClient,
-    helpers::*
+    file_stream_client::WrappedClient,
+    plain_text_wallet::create_seed,
 };
 
-type Subscriber = iota_streams::app_channels::api::tangle::Subscriber<CaptureClient>;
+type Subscriber<ClientT> = iota_streams::app_channels::api::tangle::Subscriber<ClientT>;
 
-pub struct SubscriberManager {
-    client: CaptureClient,
+pub struct SubscriberManager<ClientT> {
+    client: ClientT,
     seed: String,
-    subscriber: Option<Subscriber>,
+    subscriber: Option<Subscriber<ClientT>>,
     subscription_link: Option<Address>,
 }
 
-impl SubscriberManager {
+impl<ClientT> SubscriberManager<ClientT>
+    where
+        ClientT: WrappedClient + Clone + TransportOptions + Transport<Address, Message> + TransportDetails<Address>
+{
     pub fn new(node_url: &str) -> Self {
         Self {
             seed: create_seed(),
-            client: CaptureClient::new_from_url(node_url),
+            client: ClientT::new_from_url(node_url),
             subscriber: None,
             subscription_link: None,
         }

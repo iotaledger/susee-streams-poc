@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 iota-streams = { git = "https://github.com/iotaledger/streams", branch = "develop" }
 streams-tools = { version = "0.1.2", path = "../streams-tools" }
+susee-tools = { version = "0.1.2", path = "../susee-tools" }
 anyhow = "1.0.40"
 tokio = {version = "1.5"}
 

@@ -3,7 +3,8 @@ members = [
     "management-console",
     "sensor",
     "tangle-proxy",
-    "streams-tools"
+    "streams-tools",
+    "susee-tools",
 ]
 
 [profile.release]

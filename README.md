@@ -1,10 +1,19 @@
 # Streams Author Tool
 
 ## About
-This is a tiny test application providing a command line interface (CLI) to evaluate iota streams functionality for the
-SUSEE project. All encrypted messages that are send or received to/from the tangle are loged to the console. 
+This project contains three tiny test applications providing command line interfaces (CLI) to evaluate the iota streams functionality for the
+SUSEE project. All encrypted messages that are send or received to/from the tangle are loged to the console or written to binary files that are used to imitate a lorawan connection.
 
-Channel specific aspects for the SUSEE project are:
+Following test applications are contained. For more details please see below in the <a href="#applications-and-workflows">Applications and workflows</a> section:
+* *Sensor*<br>
+  Imitates the processes running in the smart meter (a.k.a. *Sensor*)
+ * *Management Console*<br>
+  Imitates the processes needed for *Initialization* of the sensor, monitoring of *Sensor Processing* and managing the 
+  *Add/Remove Subscriber* workflow
+ * *Tangle Proxy*<br>
+   Imitates processes in the Application Server and used by the initialization software performing the *Initialization* of the sensor.
+
+The Channel used for the SUSEE project generally can be described as follows:
 * One single branch per sensor
 * Sensor will be a subscriber and will be the only publishing actor in the single branch
 * Energy provider will be the author
@@ -14,13 +23,8 @@ Channel specific aspects for the SUSEE project are:
     a sensor is installed in a home, which means for the inital handshake the limitations of lorawan don't apply
   * If anything changes in the single branch channel setup, e.g. the addition of a new reading subscriber, the sensor
     will have to be able to receive new keyload information downstream via lorawan
-    
-The current implementation can only be used to evaluate encrypted streams package sizes for specified payload messages.
-The above given aspects are currently not taken into account. The <a href="#todos">Todos Section</a> describes future
-behaviour of this test tool in more detail. 
-
 ## Prerequisites
-To build this application, you need the following:
+To build the applications, you need the following:
 - [Rust](https://www.rust-lang.org/tools/install)
 - (Optional) An IDE that supports Rust autocompletion. We recommend [Visual Studio Code](https://code.visualstudio.com/Download) with the [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer) extension
 
@@ -32,46 +36,65 @@ rustup update stable
 
 ## Build
 
-Build as usual using `build` or `run` with or without `--release` 
+Build as usual using `build` or `run` with or without `--release`.
+
+In the project root folder:
 ```bash
 cargo build
 ```
-The main.rs file does not support `no_std`. If cargo nightly is used you can use `no_std` to build all other files 
-combined with your own `no_std` conform main.js.
+
+Every application has its own crate so you might want to build only one application like this:
+
+In the project root folder:
+```bash
+cargo build --package management-console  # alternatively 'sensor' or "tangle-proxy"
+```
 
 ## CLI API reference
 
-Using the --help option of the build streams-author-tool will show following help text
+Using the --help option of the applications will show following help text
 
 ```bash
-target/release/streams-author-tool --help
+target/release/management-console --help # alternatively 'sensor' or "tangle-proxy"
 ```
 
-            Test tool to evaluate iota streams functionality for the SUSEE project.
-            
+            Management console for streams channels used in the SUSEE project
+
             USAGE:
-                streams-author-tool [OPTIONS]
-            
+                management-console [OPTIONS]
+
             OPTIONS:
-                -f <FILES_TO_SEND>...        List of message files that will be encryped and send using the
-                                             streams channel.
-                                              [default: test/payloads/meter_reading-1-compact.json]
-                -h, --help                   Print help information
-                -n <NODE>                    The url of the iota node to connect to.
-                                             Use 'https://chrysalis-nodes.iota.org' for the mainnet.
-                                             
-                                             As there are several testnets have a look at
-                                                 https://wiki.iota.org/learn/networks/testnets
-                                             for alternative testnet urls.
-                                             
-                                             Example:
-                                                 The iota chrysalis devnet: https://api.lb-0.h.chrysalis-
-                                             devnet.iota.cafe
-                                              [default: https://chrysalis-nodes.iota.org]
-                -V, --version                Print version information
-
-
+                -c                                  Use this option to create (announce) the channel.
+                                                    The announcement link will be logged to the console.
+                -h, --help                          Print help information
+                -k <SUBSCRIPTION_PUB_KEY>           Public key of the sensor subscriber.
+                                                    Will be logged to console by the sensor app.
+                -l <SUBSCRIPTION_LINK>              Subscription message link for the sensor subscriber.
+                                                    Will be logged to console by the sensor app.
+                -n <NODE_URL>                       The url of the iota node to connect to.
+                                                    Use 'https://chrysalis-nodes.iota.org' for the mainnet.
+                                                    
+                                                    As there are several testnets have a look at
+                                                        https://wiki.iota.org/learn/networks/testnets
+                                                    for alternative testnet urls.
+                                                    
+                                                    Example:
+                                                        The iota chrysalis devnet:
+                                                        https://api.lb-0.h.chrysalis-devnet.iota.cafe
+                                                    [default: https://chrysalis-nodes.iota.org]
+                -s <SEED_FILE_PATH_AND_NAME>        Specifies the seed file to use.
+                                                    Set this to path and name of the seed file.
+                                                    If this option is not used:
+                                                    * A file 'channel-seed.txt' is used if existing
+                                                    * If 'channel-seed.txt' does not exist:
+                                                      A new seed is created and written into a new file
+                                                      'channel-seed.txt'.
+                -V, --version                       Print version information
 ## Examples
+
+******************************************************************************************
+TODO ******************** Examples for the new applications ******************************
+******************************************************************************************
 
 Without any cli arguments just using the default options as described in the help text:
 ```bash
@@ -88,11 +111,10 @@ Send two messages instead of the default message:
 target/release/streams-author-tool -f "test/payloads/meter_reading-1.json" "test/payloads/meter_reading-1-compact.json"
 ```
 
-## Todos
-
-### One application per workflow
-Provide one application for each service being part in the different workflows used for
-streams channel management and data transmission in the SUSEE project. These services are 
+## Applications and workflows 
+### Applications
+For each service being part in the different workflows a console application is provided to test the
+streams channel management and data transmission in the SUSEE project. These services (or apps) are 
 * *Sensor*<br>
   Running on the smart meter device
 * *Management Console*<br>
@@ -100,8 +122,8 @@ streams channel management and data transmission in the SUSEE project. These ser
 * *Tangle Proxy*<br>
   Running in the application server or as part of the initialization software at the energy provider
  
-These applications can be run in three shells in parallel so that the applications can react to new lorawan or tangle
-messages. Lorawan and other inter process communication is simulated using binary input and output files. Each transfered 
+Lorawan and other inter process communication is simulated using binary input and output files. The applications can be run in three shells in parallel so that the applications can react to new lorawan or tangle
+messages. Each transfered 
 package will be written into a separate file.
 
 The services are characterized by following properties/aspects:

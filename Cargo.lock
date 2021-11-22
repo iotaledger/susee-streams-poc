@@ -1123,7 +1123,12 @@ dependencies = [
 name = "management-console"
 version = "0.1.2"
 dependencies = [
+ "anyhow",
+ "clap",
+ "iota-streams",
  "streams-tools",
+ "susee-tools",
+ "tokio",
 ]
 
 [[package]]
@@ -1734,6 +1739,7 @@ dependencies = [
  "clap",
  "iota-streams",
  "streams-tools",
+ "susee-tools",
  "tokio",
 ]
 
@@ -1849,6 +1855,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
+name = "susee-tools"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "clap",
+ "streams-tools",
+]
+
+[[package]]
 name = "syn"
 version = "1.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1875,7 +1890,12 @@ dependencies = [
 name = "tangle-proxy"
 version = "0.1.2"
 dependencies = [
+ "anyhow",
+ "clap",
+ "iota-streams",
  "streams-tools",
+ "susee-tools",
+ "tokio",
 ]
 
 [[package]]

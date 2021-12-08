@@ -1,16 +1,22 @@
 use iota_streams::{
-    app::transport::{
-        Transport,
-        TransportDetails,
-        TransportOptions,
-        tangle::{
-            TangleAddress,
-            TangleMessage,
-            client::{
-                Client,
-                Details,
-                SendOptions,
-            }
+    app::{
+        transport::{
+            Transport,
+            TransportDetails,
+            TransportOptions,
+            tangle::{
+                TangleAddress,
+                TangleMessage,
+                client::{
+                    Client,
+                    Details,
+                    SendOptions,
+                }
+            },
+        },
+        message::{
+            BinaryMessage,
+            BinaryBody
         },
     },
     core::{
@@ -23,6 +29,7 @@ use std::{
     fs::{
         File,
         read_dir,
+        create_dir_all,
     },
     path::Path,
     marker::PhantomData,
@@ -34,12 +41,41 @@ use std::{
         BufWriter,
     },
 };
+
 use anyhow::Context;
 
-use iota_streams::app::message::{BinaryMessage, BinaryBody};
+use crate::WrappedClient;
 
-pub trait WrappedClient {
-    fn new_from_url(url: &str) -> Self;
+static SOURCE_INPUT: &str = "input";
+static SOURCE_OUTPUT: &str = "output";
+
+#[derive(Eq, PartialEq)]
+#[derive(Clone)]
+pub enum ClientRole {
+    Source,
+    Proxy,
+}
+
+impl Default for ClientRole {
+    fn default() -> Self { ClientRole::Source }
+}
+
+struct InputOutputFolders {
+    input: &'static str,
+    output: &'static str,
+}
+
+fn get_folder_from_client_role(client_role: ClientRole) -> InputOutputFolders {
+    match client_role.clone() {
+        ClientRole::Source => InputOutputFolders {
+            input: SOURCE_INPUT,
+            output: SOURCE_OUTPUT,
+        },
+        ClientRole::Proxy => InputOutputFolders {
+            input: SOURCE_OUTPUT,
+            output: SOURCE_INPUT,
+        },
+    }
 }
 
 #[derive(Clone)]
@@ -47,6 +83,7 @@ pub struct FileStreamClient<F> {
     phantom: PhantomData<F>,
     client: Client,
     number_of_written_files: u32,
+    pub client_role: ClientRole,
     pub input_folder_path: String,
     pub output_folder_path: String,
 }
@@ -56,12 +93,16 @@ impl<F> WrappedClient for FileStreamClient<F>
         F: 'static + core::marker::Send + core::marker::Sync,
 {
     fn new_from_url(url: &str) -> Self {
+        let client_role = ClientRole::default();
+        let folders = get_folder_from_client_role(client_role.clone());
+
         Self {
             phantom: PhantomData,
             client: Client::new_from_url(url),
             number_of_written_files: 0,
-            input_folder_path: String::from(""),
-            output_folder_path: String::from(""),
+            client_role,
+            input_folder_path: String::from(folders.input),
+            output_folder_path: String::from(folders.output),
         }
     }
 }
@@ -71,8 +112,15 @@ impl<F> FileStreamClient<F>
         F: 'static + core::marker::Send + core::marker::Sync,
 {
     fn create_output_file(&mut self, link: &TangleAddress) -> Result<File> {
+        let path_out_dir = Path::new(self.output_folder_path.as_str());
+        if !path_out_dir.exists() {
+            create_dir_all(self.output_folder_path.as_str())?;
+        }
+        if !path_out_dir.is_dir() {
+            panic!("[FileStreamClient.create_output_file] Output loder path '{}' is not a directory.", self.output_folder_path);
+        }
         let file_path_and_name = String::from(format!("{}/msg_{:04}-{}",
-                                                      self.input_folder_path,
+                                                      self.output_folder_path,
                                                       self.number_of_written_files,
                                                       link.to_string()
         ));
@@ -103,10 +151,10 @@ impl<F> FileStreamClient<F>
                     return Ok(file_result);
                 }
             } else {
-                println!("[CaptureClient.send_message] Could not find file name");
+                println!("[FileStreamClient.send_message] Could not find file name");
             }
         }
-        panic!("Could not find message file for address {}", link.to_string());
+        panic!("[FileStreamClient.send_message] Could not find message file for address {}", link.to_string());
     }
 
     fn read_message_from_file(&mut self, link: &TangleAddress) -> Result<TangleMessage<F>> {
@@ -119,6 +167,19 @@ impl<F> FileStreamClient<F>
         let binary_msg = BinaryMessage::new(empty_address, *link, BinaryBody::from(buffer));
         Ok(TangleMessage::new(binary_msg))
     }
+
+    fn set_client_role(&mut self, client_role: ClientRole) {
+        if self.client_role != client_role {
+            let folders = get_folder_from_client_role(client_role.clone());
+            self.input_folder_path = String::from(folders.input);
+            self.output_folder_path = String::from(folders.output);
+        }
+        self.client_role = client_role;
+    }
+
+    fn get_client_role(&self) -> ClientRole {
+        self.client_role.clone()
+    }
 }
 
 #[async_trait(?Send)]
@@ -127,7 +188,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for FileStreamClient<F>
         F: 'static + core::marker::Send + core::marker::Sync,
 {
     async fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
-        println!("[CaptureClient.send_message] Sending message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string());
+        println!("[FileStreamClient.send_message] Sending message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string());
         self.write_message_to_file(msg)
     }
 
@@ -136,7 +197,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for FileStreamClient<F>
         match ret_val.as_ref() {
             Ok(msg_vec) => {
                 for (idx, msg) in msg_vec.iter().enumerate() {
-                    println!("[CaptureClient.recv_messages] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, msg.binary.body.bytes.len(), msg.binary.to_string())
+                    println!("[FileStreamClient.recv_messages] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, msg.binary.body.bytes.len(), msg.binary.to_string())
                 }
             },
             _ => ()
@@ -147,7 +208,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for FileStreamClient<F>
     async fn recv_message(&mut self, link: &TangleAddress) -> Result<TangleMessage<F>> {
         let ret_val = self.read_message_from_file(link);
         match ret_val.as_ref() {
-            Ok(msg) => println!("[CaptureClient.recv_message] Receiving message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string()),
+            Ok(msg) => println!("[FileStreamClient.recv_message] Receiving message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string()),
             _ => ()
         }
         ret_val

@@ -1,23 +1,22 @@
 pub mod helpers;
-pub mod channel_manager;
-pub mod subscriber_manager;
-pub mod capture_client;
-pub mod file_stream_client;
+pub mod client;
 pub mod plain_text_wallet;
+pub mod user_manager;
+pub mod dummy_wallet;
 
 pub use {
-    channel_manager::{
-        ChannelManager,
-        ChannelManagerPlainTextWallet,
-        Author,
+    user_manager::*,
+    client::{
+        *,
+        http::{
+            response_cache::ResponseCache
+        }
     },
-    subscriber_manager::SubscriberManager,
-    capture_client::CaptureClient,
-    file_stream_client::FileStreamClient,
     plain_text_wallet::{
         PlainTextWallet,
         SimpleWallet,
     },
+    dummy_wallet::DummyWallet,
 };
 
 #[cfg(test)]

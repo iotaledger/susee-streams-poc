@@ -1,15 +1,26 @@
+#![feature(once_cell)]
+
 use anyhow::Result;
 
 mod cli;
 
 use streams_tools::{
-    ChannelManagerPlainTextWallet,
-    SubscriberManager,
-    FileStreamClient
+    STREAMS_TOOLS_CONST_HTTP_PROXY_PORT,
+    HttpClientProxy,
+    ResponseCache,
 };
-use susee_tools::{
-    get_wallet,
-    SUSEE_CONST_SECRET_PASSWORD
+
+use hyper::{
+    Server,
+    service::{
+        make_service_fn,
+        service_fn,
+    },
+    Body,
+    http::{
+        Request,
+        Response
+    }
 };
 
 use cli::{
@@ -18,63 +29,76 @@ use cli::{
     get_arg_matches,
 };
 
-use iota_streams::app_channels::api::tangle::{Address};
-use core::str::FromStr;
+use std::{
+    lazy::SyncLazy,
+    net::SocketAddr,
+    sync::{
+        Arc,
+        Mutex
+    },
+};
+use hyper::server::conn::AddrStream;
+use iota_streams::app::futures::executor::block_on;
+use iota_streams::app::transport::tangle::client::Client;
 
-use iota_streams::app_channels::api::DefaultF;
+type HttpClientProxyThreadSafe = Arc<Mutex<HttpClientProxy>>;
+
+fn handle_request(client: HttpClientProxyThreadSafe, request: Request<Body>)
+    -> Result<Response<Body>, hyper::http::Error>
+{
+    println!("[Tangle Proxy] Handling request {}", request.uri().to_string());
+    let mut guard = client.lock().unwrap(); // unwrap poisoned Mutexes
+    block_on(guard.handle_request(request))
+}
+
+
+static REQUEST_CACHE: SyncLazy<ResponseCache> = SyncLazy::new(|| {
+    ResponseCache::default()
+});
 
 #[tokio::main]
 async fn main() -> Result<()> {
 
     let arg_matches = get_arg_matches();
     let cli = TangleProxyCli::new(&arg_matches, &ARG_KEYS) ;
-    let wallet = get_wallet(
-        &cli.matches,
-        SUSEE_CONST_SECRET_PASSWORD,
-        cli.arg_keys.base.wallet_file,
-        "wallet-management-console.txt"
-    )?;
+    println!("[Tangle Proxy] Using node '{}' for tangle connection", cli.node);
 
-    println!("[Main] Using node '{}' for tangle connection", cli.node);
+    let client: HttpClientProxyThreadSafe = Arc::new(Mutex::new(
+        HttpClientProxy::new_from_url(cli.node, &REQUEST_CACHE)));
 
-    let mut channel = ChannelManagerPlainTextWallet::new(
-        cli.node,
-        wallet,
-        Some(String::from("sensor-state-management-console.bin"))
-    ).await;
+    let addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_HTTP_PROXY_PORT).into();
 
-    let announcement_link = channel.create_announcement().await?;
-    let ann_link_string = announcement_link.to_string();
+    // Template from https://docs.rs/hyper/0.14.15/hyper/server/index.html
+    // A `MakeService` that produces a `Service` to handle each connection.
+    let make_service = make_service_fn(move |_conn: &AddrStream| {
+        // We have to clone the client to share it with each invocation of
+        // `make_service`. If your data doesn't implement `Clone` consider using
+        // an `std::sync::Arc`.
+        let client_per_connection = client.clone();
 
-    println!(
-        "[Main] Announcement Link: {}\n       Tangle Index: {:#}\n",
-        ann_link_string, announcement_link.to_msg_index()
-    );
+        // Create a `Service` for responding to the request.
+        let service = service_fn(move |req| {
+            let client_per_request = client_per_connection.clone();
+            async {
+                handle_request(client_per_request, req)
+            }
+        });
 
-    let mut subscriber_a: SubscriberManager<FileStreamClient<DefaultF>> = SubscriberManager::new(cli.node);
+        // Return the service to hyper.
+        async move { Ok::<_, hyper::Error>(service) }
+    });
 
-    // In a real world use a subscriber would receive the announcement_link as a text from a website
-    // api, email or similar
-    let ann_address = Address::from_str(&ann_link_string)?;
-    let sub_msg_link_a = subscriber_a.subscribe(&ann_address).await?;
+    let mut client = Client::new_from_url(cli.node);
 
-    let sub_msg_link_a_string = sub_msg_link_a.to_string();
-    println!(
-        "[Main] Subscription message link for subscriber_a: {}\n       Tangle Index: {:#}\n",
-        sub_msg_link_a_string, sub_msg_link_a.to_msg_index()
-    );
+    let _join_worker_loop = REQUEST_CACHE.worker.start_loop(client, &REQUEST_CACHE);
 
-    // The Subscribers will send their subscription messages as a text to the author via website
-    // api, email or similar
-    let subscription_msg_link_a = Address::from_str(&sub_msg_link_a_string)?;
-    let keyload_msg_link = channel.add_subscribers(&vec![
-        &subscription_msg_link_a,
-    ]).await?;
+    let server = Server::bind(&addr).serve(make_service);
 
-    println!(
-        "[Main] Keyload message link: {}\n       Tangle Index: {:#}\n",
-        keyload_msg_link.to_string(), keyload_msg_link.to_msg_index()
-    );
+    println!("Listening on http://{}", addr);
+
+    if let Err(e) = server.await {
+        eprintln!("server error: {}", e);
+    }
 
     Ok(())
 }

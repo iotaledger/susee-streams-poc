@@ -1,5 +1,7 @@
 /target
 /streams-tools/Cargo.lock
 /management-console/src/@rust_panic
-/channel-state-management-console.bin
+/user-state-management-console.bin
 /wallet-management-console.txt
+/test/wallet-*.txt
+/test/user-state-*.bin

@@ -52,63 +52,103 @@ cargo build --package management-console  # alternatively 'sensor' or "tangle-pr
 
 ## CLI API reference
 
-Using the --help option of the applications will show following help text
+### Common CLI options and i/o files
 
+Using the --help option of all three applications will show the app specific help text:
 ```bash
-target/release/management-console --help # alternatively 'sensor' or "tangle-proxy"
+target/release/management-console --help # Use 'sensor' or "tangle-proxy" instead of 'management-console' for the other apps
 ```
 
-            Management console for streams channels used in the SUSEE project
+All three applications provide the following options:
 
-            USAGE:
-                management-console [OPTIONS]
+    -h, --help
+            Print help information
 
-            OPTIONS:
-                -c                                  Use this option to create (announce) the channel.
-                                                    The announcement link will be logged to the console.
-                -h, --help                          Print help information
-                -k <SUBSCRIPTION_PUB_KEY>           Public key of the sensor subscriber.
-                                                    Will be logged to console by the sensor app.
-                -l <SUBSCRIPTION_LINK>              Subscription message link for the sensor subscriber.
-                                                    Will be logged to console by the sensor app.
-                -n <NODE_URL>                       The url of the iota node to connect to.
-                                                    Use 'https://chrysalis-nodes.iota.org' for the mainnet.
-                                                    
-                                                    As there are several testnets have a look at
-                                                        https://wiki.iota.org/learn/networks/testnets
-                                                    for alternative testnet urls.
-                                                    
-                                                    Example:
-                                                        The iota chrysalis devnet:
-                                                        https://api.lb-0.h.chrysalis-devnet.iota.cafe
-                                                    [default: https://chrysalis-nodes.iota.org]
-                -s <SEED_FILE_PATH_AND_NAME>        Specifies the seed file to use.
-                                                    Set this to path and name of the seed file.
-                                                    If this option is not used:
-                                                    * A file 'channel-seed.txt' is used if existing
-                                                    * If 'channel-seed.txt' does not exist:
-                                                      A new seed is created and written into a new file
-                                                      'channel-seed.txt'.
-                -V, --version                       Print version information
-## Examples
+    -n, --node <NODE_URL>
+            The url of the iota node to connect to.
+            Use 'https://chrysalis-nodes.iota.org' for the mainnet.
+            
+            As there are several testnets have a look at
+                https://wiki.iota.org/learn/networks/testnets
+            for alternative testnet urls.
+            
+            Example:
+                The iota chrysalis devnet:
+                https://api.lb-0.h.chrysalis-devnet.iota.cafe
+             [default: https://chrysalis-nodes.iota.org]
 
-******************************************************************************************
-TODO ******************** Examples for the new applications ******************************
-******************************************************************************************
+    -V, --version
+            Print version information
 
-Without any cli arguments just using the default options as described in the help text:
+    -w, --wallet-file <WALLET_FILE_PATH_AND_NAME>
+            Specifies the wallet file to use.
+            Set this to path and name of the wallet file.
+            If this option is not used:
+            * A file 'wallet-<APPLICATION-NAME>.txt' is used if existing
+            * If 'wallet-<APPLICATION-NAME>.txt' does not exist:
+              A new seed is created and written into a new file
+              'wallet-<APPLICATION-NAME>.txt'.
+
+All applications use the following files for persistence
+* Wallet for the user seed<br>
+  The applications are using a plain text wallet that stores the automatically generated seed in a text file.
+  If option '--wallet-file' is not used a default filename 'wallet-<APPLICATION-NAME>.txt' is used.
+  If the file does not exist a new seed is created and stored in a new wallet file. Otherwise the seed stored
+  in the wallet file is used.<br>
+  As the wallet file contains the plain text seed (not encrypted) make absolutely sure to<br>
+  **DO NOT USE THIS WALLET FOR PRODUCTION PURPOSES**<br>
+  Instead implement the [SimpleWallet trait](streams-tools/src/plain_text_wallet.rs)
+  using a secure wallet library like [stronghold](https://github.com/iotaledger/stronghold.rs). 
+
+* User state<br>
+  On application start the current user state is loaded from a file named 'user-state-<APPLICATION-NAME>.bin'.
+  On application exit the current user state is written into this file.
+
+### Management Console CLI
+
+    -c, --create-channel
+            Use this option to create (announce) the channel.
+            The announcement link will be logged to the console.
+
+    -k, --subscription-pub-key <SUBSCRIPTION_PUB_KEY>
+            Public key of the sensor subscriber.
+            Will be logged to console by the sensor app.
+
+    -l, --subscription-link <SUBSCRIPTION_LINK>
+            Subscription message link for the sensor subscriber.
+            Will be logged to console by the sensor app.
+
+
+### Sensor CLI
+
+    -a, --announcement-link-subscribe <ANNOUNCEMENT_LINK_SUBSCRIBE>
+            Subscribe to the channel via the specified announcement link.
+
+    -f, --files-to-send <FILES_TO_SEND>...
+            List of message files that will be encrypted and send using the streams channel.
+             [default: test/payloads/meter_reading-1-compact.json]
+
+### Tangle Proxy CLI
+Currently the Tangle Proxy does not have any CLI options
+
+## Example Workflow
+
+In the /target/debug or release folder:
 ```bash
-target/release/streams-author-tool
+    > ./management-console -c
+    > [Management Console] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
+    > 
+    > [CaptureClient.send_message] Sending message with 151 bytes payload:
+    > @f2dabad30898d63fd0930c507602681cec3df536e714d04ad62157a60a7ea3080000000000000000:575887a0259141091f0ce2a5[000000010400000000000000000000000000f2dabad30898d63fd0930c507602681cec3df536e714d04ad62157a60a7ea3080e000001f2dabad30898d63fd0930c507602681cec3df536e714d04ad62157a60a7ea308006936fc313fd2299863b73105fa1dd1292e60dd4d969b89d64c180847dc506d2bcde2ad07fb41fa463214b161144345cdb7b80123d7480ab32ecff474b97d3c0d]->00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
+    > 
+    > [Management Console] A channel has been created with the following Announcement link:
+    > 
+    >                      Announcement Link: f2dabad30898d63fd0930c507602681cec3df536e714d04ad62157a60a7ea3080000000000000000:575887a0259141091f0ce2a5
+    >                      Tangle Index:      4719e6a57c31973a8bfcd0bb5b1f2984ab7d2dcdb37dfaf4efa71ac4794bac8f
 ```
-
-Use the iota chrysalis devnet:
+The announcement link then can be used to suscribe the sensor
 ```bash
-target/release/streams-author-tool -n https://api.lb-0.h.chrysalis-devnet.iota.cafe
-```
-
-Send two messages instead of the default message:
-```bash
-target/release/streams-author-tool -f "test/payloads/meter_reading-1.json" "test/payloads/meter_reading-1-compact.json"
+    > ./sensor -s "f2dabad30898d63fd0930c507602681cec3df536e714d04ad62157a60a7ea3080000000000000000:575887a0259141091f0ce2a5"
 ```
 
 ## Applications and workflows 

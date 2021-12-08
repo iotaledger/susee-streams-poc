@@ -12,14 +12,16 @@ Example:
     https://api.lb-0.h.chrysalis-devnet.iota.cafe
 ";
 
-static WALLET_FILE_ABOUT: &str = "Specifies the wallet file to use.
+static WALLET_FILE_ABOUT_FMT_STR: &str = "Specifies the wallet file to use.
 Set this to path and name of the wallet file.
 If this option is not used:
-* A file 'wallet.txt' is used if existing
-* If 'wallet.txt' does not exist:
+* A file 'wallet-{}.txt' is used if existing
+* If 'wallet-{}.txt' does not exist:
   A new seed is created and written into a new file
-  'wallet.txt'.
+  'wallet-{}.txt'.
 ";
+
+static mut WALLET_FILE_ABOUT: String = String::new();
 
 pub struct BaseArgKeys {
     pub node: &'static str,
@@ -43,10 +45,22 @@ pub static PROJECT_CONSTANTS: ProjectConstants = ProjectConstants {
     default_node: "https://chrysalis-nodes.iota.org",
 };
 
+pub struct CliOptions {
+    pub use_wallet: bool,
+}
+
+impl Default for CliOptions {
+    fn default() -> Self {
+        Self {
+            use_wallet: true,
+        }
+    }
+}
+
 pub struct Cli<'a, ArgKeysT> {
     pub matches: &'a ArgMatches,
     pub arg_keys: &'a ArgKeysT,
-    pub node: &'a str,
+    pub node: &'a str
 }
 
 impl<'a, ArgKeysT> Cli<'a, ArgKeysT> {
@@ -58,21 +72,33 @@ impl<'a, ArgKeysT> Cli<'a, ArgKeysT> {
         }
     }
 
-    pub fn get_app<'help>(name: &str, about: &'help str ) -> App<'help> {
-        App::new(name)
+    pub fn get_app<'help>(name: &str, about: &'help str, options: Option<CliOptions> ) -> App<'help> {
+        let app_name_lowercase = name.to_lowercase().replace(" ", "-");
+        let options = options.unwrap_or_default();
+        let mut ret_val = App::new(name)
             .version(PROJECT_CONSTANTS.version)
             .author(PROJECT_CONSTANTS.author)
             .about(about)
             .arg(Arg::new(BASE_ARG_KEYS.node)
+                .long(BASE_ARG_KEYS.node)
                 .short('n')
                 .value_name("NODE_URL")
                 .about(NODE_ABOUT)
                 .default_value(PROJECT_CONSTANTS.default_node)
-            )
-            .arg(Arg::new(BASE_ARG_KEYS.wallet_file)
-                .short('w')
-                .value_name("WALLET_FILE_PATH_AND_NAME")
-                .about(WALLET_FILE_ABOUT)
-            )
+            );
+
+        if options.use_wallet {
+            unsafe {
+                WALLET_FILE_ABOUT = String::from(WALLET_FILE_ABOUT_FMT_STR).replace("{}", app_name_lowercase.as_str());
+                ret_val = ret_val.arg(Arg::new(BASE_ARG_KEYS.wallet_file)
+                    .long(BASE_ARG_KEYS.wallet_file)
+                    .short('w')
+                    .value_name("WALLET_FILE_PATH_AND_NAME")
+                    .about(WALLET_FILE_ABOUT.as_str())
+                );
+            }
+        }
+
+        ret_val
     }
 }

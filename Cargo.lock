@@ -1844,8 +1844,10 @@ name = "streams-tools"
 version = "0.1.2"
 dependencies = [
  "anyhow",
+ "hyper",
  "iota-streams",
  "rand 0.7.3",
+ "tokio",
 ]
 
 [[package]]
@@ -1892,6 +1894,7 @@ version = "0.1.2"
 dependencies = [
  "anyhow",
  "clap",
+ "hyper",
  "iota-streams",
  "streams-tools",
  "susee-tools",

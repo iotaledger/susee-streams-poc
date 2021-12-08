@@ -35,7 +35,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for CaptureClient
 {
     /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
     async fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
-        println!("[CaptureClient.send_message] Sending message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string());
+        println!("\n[CaptureClient.send_message] Sending message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string());
         self.0.send_message(msg).await
     }
 

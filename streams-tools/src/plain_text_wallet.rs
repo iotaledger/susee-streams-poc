@@ -62,11 +62,13 @@ impl PlainTextWallet {
 }
 
 pub trait SimpleWallet {
+    const IS_USABLE_WALLET: bool;
     fn get_seed(&self) -> &str;
     fn get_serialization_password(&self) -> &str;
 }
 
 impl SimpleWallet for PlainTextWallet {
+    const IS_USABLE_WALLET: bool = true;
     fn get_seed(&self) -> &str {
         self.seed.as_str()
     }

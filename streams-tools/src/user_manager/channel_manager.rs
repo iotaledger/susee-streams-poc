@@ -1,5 +1,9 @@
 use iota_streams::{
-    app_channels::api::tangle::{Address, ChannelType, Bytes},
+    app_channels::api::tangle::{
+        Address,
+        ChannelType,
+        Bytes,
+    },
     core::Result,
 };
 
@@ -41,8 +45,8 @@ async fn import_from_serialization_file<WalletT: SimpleWallet>(file_name: &str, 
 }
 
 impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
-    // TOGO CGE: This async new fn should be rewritten as syncronous normal new function.
-    //           Problem: Usage of block_on() her results in panic because of the usage of tokio.
+    // TOGO CGE: This async new fn should be rewritten as synchronous normal new function.
+    //           Problem: Usage of block_on() here results in panic because of the usage of tokio.
     pub async fn new(node_url: &str, wallet: WalletT, serialization_file: Option<String>) -> Self {
         let mut ret_val = Self {
             wallet,
@@ -58,7 +62,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
         if let Some(serial_file_name) = serialization_file {
             if Path::new(serial_file_name.as_str()).exists(){
                 import_from_serialization_file(serial_file_name.as_str(), &mut ret_val).await
-                    .expect("Successful import of channel state from serialization file");
+                    .expect("Try to import Author state from serialization file");
             }
         }
 
@@ -103,6 +107,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
         }
 
         let author = self.author.as_mut().unwrap() ;
+        author.sync_state().await;
         let (msg_link, _seq_link) = author.send_signed_packet(
             &self.prev_msg_link.as_ref().unwrap(),
             &Bytes::default(),
@@ -115,7 +120,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
     async fn export_to_serialization_file(&mut self, file_name: &str) -> Result<()> {
         if let Some(author) = &self.author {
             let buffer = author.export( self.wallet.get_serialization_password()).await?;
-            write(file_name, &buffer).expect(format!("Try to write channel state file '{}'", file_name).as_str());
+            write(file_name, &buffer).expect(format!("Try to write Author state file '{}'", file_name).as_str());
         }
         Ok(())
     }
@@ -125,7 +130,7 @@ impl<WalletT: SimpleWallet> Drop for ChannelManager<WalletT> {
     fn drop(&mut self) {
         if let Some(serial_file_name) = self.serialization_file.clone() {
             block_on(self.export_to_serialization_file(serial_file_name.as_str()))
-                .expect("Try to export channel state into serialization file");
+                .expect("Try to export Author state into serialization file");
         }
     }
 }

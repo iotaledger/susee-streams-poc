@@ -4,11 +4,7 @@ use anyhow::Result;
 
 mod cli;
 
-use streams_tools::{
-    ChannelManagerPlainTextWallet,
-    SubscriberManager,
-    FileStreamClient,
-};
+use streams_tools::{SubscriberManagerPlainTextWallet, HttpClient, CaptureClient};
 
 use cli::{
     SensorCli,
@@ -29,15 +25,47 @@ use std::{
 };
 use iota_streams::app_channels::api::DefaultF;
 use susee_tools::{SUSEE_CONST_SECRET_PASSWORD, get_wallet};
+use clap::Values;
 
-async fn send_file_content_as_msg(msg_file: &str, channel: &mut ChannelManagerPlainTextWallet) -> Result<Address>{
+type ClientType = HttpClient<DefaultF>; // CaptureClient; //
+
+type SubscriberManagerPlainTextWalletHttpClient = SubscriberManagerPlainTextWallet<ClientType>;
+
+async fn send_file_content_as_msg(msg_file: &str, subscriber: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<Address>{
     let f = File::open(msg_file)?;
     let mut reader = BufReader::new(f);
     let mut buffer = Vec::new();
     reader.read_to_end(&mut buffer)?;
     println!("[Main] Message file '{}' contains {} bytes payload\n", msg_file, buffer.len());
 
-    channel.send_signed_packet(&Bytes(buffer.clone())).await
+    subscriber.send_signed_packet(&Bytes(buffer.clone())).await
+}
+
+async fn send_messages(files_to_send: Values<'_>, subscriber: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<()>{
+    for msg_file in files_to_send.clone() {
+        if !Path::new(msg_file).exists(){
+            panic!("[Sensor] Can not find message file '{}'", msg_file);
+        }
+    }
+    for msg_file in files_to_send {
+        let msg_link = send_file_content_as_msg(msg_file, subscriber).await?;
+        println!("[Sensor] Sent msg from file '{}': {}, tangle index: {:#}\n", msg_file, msg_link, msg_link.to_msg_index());
+    }
+
+    Ok(())
+}
+
+async fn subscribe_to_channel(announcement_link_str: &str, subscriber: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<()> {
+    let ann_address = Address::from_str(&announcement_link_str)?;
+    let sub_msg_link = subscriber.subscribe(&ann_address).await?;
+
+    let sub_msg_link_string = sub_msg_link.to_string();
+    println!(
+        "[Sensor] Subscription message link for subscriber_a: {}\n       Tangle Index: {:#}\n",
+        sub_msg_link_string, sub_msg_link.to_msg_index()
+    );
+
+    Ok(())
 }
 
 #[tokio::main]
@@ -45,7 +73,6 @@ async fn main() -> Result<()> {
 
     let arg_matches = get_arg_matches();
     let cli = SensorCli::new(&arg_matches, &ARG_KEYS) ;
-    let files_to_send = cli.matches.values_of(cli.arg_keys.files_to_send).unwrap();
     let wallet = get_wallet(
         &cli.matches,
         SUSEE_CONST_SECRET_PASSWORD,
@@ -55,53 +82,22 @@ async fn main() -> Result<()> {
 
     println!("[Sensor] Using node '{}' for tangle connection", cli.node);
 
-    for msg_file in files_to_send.clone() {
-        if !Path::new(msg_file).exists(){
-            panic!("Can not find message file '{}'", msg_file);
-        }
-    }
-    let mut channel = ChannelManagerPlainTextWallet::new(
-        cli.node,
+    //let client = HttpClient::new_from_url(&cli.node, None);
+    let client = ClientType::new_from_url(&cli.node, None); //
+    let mut subscriber= SubscriberManagerPlainTextWalletHttpClient::new(
+        client,
         wallet,
-        Some(String::from("sensor-state-management-console.bin"))
+        Some(String::from("user-state-sensor.bin")),
     ).await;
 
-    // let announcement_link = channel.create_announcement().await?;
-    let ann_link_string = "TODO read from cli"; // announcement_link.to_string();
+    if cli.matches.is_present(cli.arg_keys.subscribe_announcement_link) {
+        let announcement_link_str = cli.matches.value_of(cli.arg_keys.subscribe_announcement_link).unwrap().trim();
+        subscribe_to_channel(announcement_link_str, &mut subscriber).await?
+    }
 
-    // println!(
-    //     "[Main] Announcement Link: {}\n       Tangle Index: {:#}\n",
-    //     ann_link_string, announcement_link.to_msg_index()
-    // );
-
-    let mut subscriber_a: SubscriberManager<FileStreamClient<DefaultF>> = SubscriberManager::new(cli.node);
-
-    // In a real world use a subscriber would receive the announcement_link as a text from a website
-    // api, email or similar
-    let ann_address = Address::from_str(&ann_link_string)?;
-    let sub_msg_link_a = subscriber_a.subscribe(&ann_address).await?;
-
-    let sub_msg_link_a_string = sub_msg_link_a.to_string();
-    println!(
-        "[Main] Subscription message link for subscriber_a: {}\n       Tangle Index: {:#}\n",
-        sub_msg_link_a_string, sub_msg_link_a.to_msg_index()
-    );
-
-    // The Subscribers will send their subscription messages as a text to the author via website
-    // api, email or similar
-    let subscription_msg_link_a = Address::from_str(&sub_msg_link_a_string)?;
-    let keyload_msg_link = channel.add_subscribers(&vec![
-        &subscription_msg_link_a,
-    ]).await?;
-
-    println!(
-        "[Main] Keyload message link: {}\n       Tangle Index: {:#}\n",
-        keyload_msg_link.to_string(), keyload_msg_link.to_msg_index()
-    );
-
-    for msg_file in files_to_send {
-        let msg_link = send_file_content_as_msg(msg_file, &mut channel).await?;
-        println!("[Main] Sent msg from file '{}': {}, tangle index: {:#}\n", msg_file, msg_link, msg_link.to_msg_index());
+    if cli.matches.is_present(cli.arg_keys.files_to_send) {
+        let files_to_send = cli.matches.values_of(cli.arg_keys.files_to_send).unwrap();
+        send_messages(files_to_send, &mut subscriber).await?
     }
 
     Ok(())

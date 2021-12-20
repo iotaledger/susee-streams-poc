@@ -138,7 +138,7 @@ as the *Tangle-Proxy* does not need a wallet:
 
 ### Tangle Proxy CLI
 Currently, the Tangle Proxy does not have any special CLI options except those described in the
-<a href="#common-cli-options-and-i-o-files">Common CLI options section</a>.
+<a href="#common-cli-options-and-io-files">Common CLI options section</a>.
 
 Use the `--node` option to specify the url of the iota node to connect to.
 

@@ -1,6 +1,5 @@
 pub mod http_protocol;
 pub mod http_client_proxy;
-pub mod response_cache;
 pub mod binary_persistence;
 
 pub use {

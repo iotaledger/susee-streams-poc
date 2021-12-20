@@ -18,6 +18,7 @@ use iota_streams::{
     core::{
         async_trait,
         Result,
+        err,
     },
 };
 
@@ -25,7 +26,6 @@ use std::{
     marker::PhantomData,
     clone::Clone,
     time::{
-        Instant,
         Duration,
     },
 };
@@ -33,7 +33,8 @@ use std::{
 use crate::{
     RequestBuilder,
     client_base::STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
-    binary_persistence::BinaryPersist
+    binary_persistence::BinaryPersist,
+    http_protocol::MapStreamsErrors,
 };
 
 use hyper::{
@@ -41,10 +42,10 @@ use hyper::{
     body as hyper_body,
     Body,
     client::HttpConnector,
+    http::StatusCode,
 };
 
 use tokio::time;
-use hyper::http::StatusCode;
 
 pub struct HttpClientOptions<'a> {
     http_url: &'a str,
@@ -96,6 +97,8 @@ impl<F> HttpClient<F>
         let mut response = self.hyper_client.request(
             self.request_builder.receive_message_from_address(link)?
         ).await?;
+        // TODO: This retrials are most probably not needed because they might be handled by hyper
+        //       => Clarify and remove unneeded code
         if response.status() == StatusCode::CONTINUE {
             let mut interval = time::interval(Duration::from_millis(500));
             while response.status() == StatusCode::CONTINUE {
@@ -106,8 +109,12 @@ impl<F> HttpClient<F>
             }
         }
 
-        let bytes = hyper_body::to_bytes(response.into_body()).await?;
-        Ok(<TangleMessage<F> as BinaryPersist>::try_from_bytes(&bytes).unwrap())
+        if response.status() == StatusCode::OK {
+            let bytes = hyper_body::to_bytes(response.into_body()).await?;
+            Ok(<TangleMessage<F> as BinaryPersist>::try_from_bytes(&bytes).unwrap())
+        } else {
+            err!(MapStreamsErrors::from_http_status_codes(response.status(), Some(link.to_string())))
+        }
     }
 }
 
@@ -121,7 +128,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for HttpClient<F>
         self.send_message_via_http(msg).await
     }
 
-    async fn recv_messages(&mut self, link: &TangleAddress) -> Result<Vec<TangleMessage<F>>> {
+    async fn recv_messages(&mut self, _link: &TangleAddress) -> Result<Vec<TangleMessage<F>>> {
         unimplemented!()
     }
 

@@ -1,6 +1,13 @@
-use clap::{ArgMatches, Arg};
+use clap::{
+    ArgMatches,
+    Arg
+};
 
-use susee_tools::{BaseArgKeys, BASE_ARG_KEYS, Cli};
+use susee_tools::{
+    BaseArgKeys,
+    BASE_ARG_KEYS,
+    Cli
+};
 
 pub struct ArgKeys {
     pub base: &'static BaseArgKeys,
@@ -41,20 +48,19 @@ pub fn get_arg_matches() -> ArgMatches {
         .short('l')
         .value_name("SUBSCRIPTION_LINK")
         .about(SUBSCRIPTION_LINK_ABOUT)
-        //.required_unless_present(ARG_KEYS.create_channel)
+        .requires(ARG_KEYS.subscription_pub_key)
     )
     .arg(Arg::new(ARG_KEYS.subscription_pub_key)
         .long(ARG_KEYS.subscription_pub_key)
         .short('k')
         .value_name("SUBSCRIPTION_PUB_KEY")
         .about(SUBSCRIPTION_PUB_KEY_ABOUT)
-        //.required_unless_present(ARG_KEYS.create_channel)
+        .requires(ARG_KEYS.subscription_link)
     )
     .arg(Arg::new(ARG_KEYS.create_channel)
         .long(ARG_KEYS.create_channel)
         .short('c')
         .about(CREATE_CHANNEL_ABOUT)
-       // .required_unless_present(ARG_KEYS.subscription_link)
         .takes_value(false)
     )
     .get_matches()

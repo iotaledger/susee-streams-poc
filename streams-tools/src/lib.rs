@@ -6,12 +6,7 @@ pub mod dummy_wallet;
 
 pub use {
     user_manager::*,
-    client::{
-        *,
-        http::{
-            response_cache::ResponseCache
-        }
-    },
+    client::*,
     plain_text_wallet::{
         PlainTextWallet,
         SimpleWallet,

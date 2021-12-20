@@ -1,7 +1,9 @@
 use iota_streams::app::{
     transport::tangle::{
         TangleMessage,
-        TangleAddress
+        TangleAddress,
+        APPINST_SIZE,
+        MSGID_SIZE,
     },
     message::{
         LinkedMessage,
@@ -16,6 +18,9 @@ use std::{
     ops::Range,
 };
 use anyhow::Result;
+
+pub static TANGLE_ADDRESS_BYTE_LEN: usize = APPINST_SIZE + MSGID_SIZE;
+
 
 // This is a custom binary persistence implementation. Before it can be used on an arbitrary
 // combination of communicating systems (e.g. ESP32 talking to AMD64 architecture) it must be tested
@@ -54,6 +59,8 @@ static USIZE_LEN: usize = 4;
 pub trait BinaryPersist {
     fn needed_size(&self) -> usize;
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize>;
+
+    // static
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized;
 }
 
@@ -68,14 +75,13 @@ impl BinaryPersist for u64 {
     }
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
-        Ok(u64::from_le_bytes(buffer.try_into().expect("slice with incorrect length")))
+        // Ok(u64::from_le_bytes(buffer.try_into().expect("slice with incorrect length")))
+        Ok(u64::from_le_bytes(buffer[0..8].try_into().expect("slice with incorrect length")))
     }
 }
 
 impl BinaryPersist for TangleAddress {
-    fn needed_size(&self) -> usize {
-        HasLink::to_bytes(self).len()
-    }
+    fn needed_size(&self) -> usize { TANGLE_ADDRESS_BYTE_LEN }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
         let needed_size = HasLink::to_bytes(self).len();
@@ -84,7 +90,9 @@ impl BinaryPersist for TangleAddress {
     }
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
-        <TangleAddress as HasLink>::try_from_bytes(buffer)
+        <TangleAddress as HasLink>::try_from_bytes(
+            buffer[0..TANGLE_ADDRESS_BYTE_LEN].try_into().expect("slice with incorrect length")
+        )
     }
 }
 
@@ -145,7 +153,7 @@ impl<F> BinaryPersist for TangleMessage<F> {
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
         // TIMESTAMP
         let mut pos: usize = 0;
-        let timestamp = u64::try_from_bytes(buffer).unwrap();
+        let timestamp = u64::try_from_bytes(buffer[0..8].try_into().expect("slice with incorrect length")).unwrap();
         pos += timestamp.needed_size();
         // LINK
         let link = <TangleAddress as BinaryPersist>::try_from_bytes(&buffer[pos..]).unwrap();

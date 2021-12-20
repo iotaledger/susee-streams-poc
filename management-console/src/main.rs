@@ -1,11 +1,4 @@
-use anyhow::Result;
-
 mod cli;
-
-use streams_tools::{
-    ChannelManagerPlainTextWallet,
-    ChannelManager,
-};
 
 use cli::{
     ManagementConsoleCli,
@@ -13,16 +6,31 @@ use cli::{
     get_arg_matches,
 };
 
-use iota_streams::app_channels::api::tangle::{Address};
+use streams_tools::{
+    ChannelManagerPlainTextWallet,
+    ChannelManager,
+    channel_manager::SubscriberData
+};
+
+use susee_tools::{
+    get_wallet,
+    SUSEE_CONST_SECRET_PASSWORD
+};
+
+use iota_streams::{
+    app_channels::api::tangle::Address,
+    core::prelude::hex,
+};
 
 use core::str::FromStr;
-use susee_tools::{get_wallet, SUSEE_CONST_SECRET_PASSWORD};
+
+use anyhow::Result;
 
 fn println_announcement_link(link: &Address, comment: &str) {
     println!(
-        "[Management Console] {}:\n
+        "[Management Console] {}:
                      Announcement Link: {}
-                     Tangle Index:      {:#}\n",
+                          Tangle Index: {:#}\n",
         comment,
         link.to_string(),
         link.to_msg_index()
@@ -31,7 +39,7 @@ fn println_announcement_link(link: &Address, comment: &str) {
 
 async fn create_channel(channel_manager: &mut ChannelManagerPlainTextWallet) -> Result<()>{
     let announcement_link = channel_manager.create_announcement().await?;
-    println_announcement_link(&announcement_link, "A channel has been created with the following Announcement link");
+    println_announcement_link(&announcement_link, "A channel has been created with the following announcement link");
     Ok(())
 }
 
@@ -54,15 +62,21 @@ async fn println_channel_status<'a> (channel_manager: &mut ChannelManagerPlainTe
 
 async fn send_keyload_message<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>) -> Result<()>
 {
-    let sub_msg_link_a_string = cli.matches.value_of(cli.arg_keys.subscription_link).unwrap();
-    let subscription_msg_link_a = Address::from_str(sub_msg_link_a_string)?;
-    let keyload_msg_link = channel_manager.add_subscribers(&vec![
-        &subscription_msg_link_a,
-    ]).await?;
+    let sub_msg_link_string = cli.matches.value_of(cli.arg_keys.subscription_link).unwrap();
+    let subscription_msg_link = Address::from_str(sub_msg_link_string)?;
+    let pub_key_str = cli.matches.value_of(cli.arg_keys.subscription_pub_key).unwrap();
+    let pub_key = hex::decode(pub_key_str).unwrap();
+    let keyload_msg_link = channel_manager.add_subscribers(&vec![ SubscriberData {
+        subscription_link: & subscription_msg_link,
+        public_key: pub_key.as_slice()
+    }]).await?;
 
     println!(
-        "[Main] Keyload message link: {}\n       Tangle Index: {:#}\n",
-        keyload_msg_link.to_string(), keyload_msg_link.to_msg_index()
+        "\
+[Management Console] A keyload message has been created with the following keyload link:
+                     Keyload link: {}
+                     Tangle Index: {:#}
+", keyload_msg_link.to_string(), keyload_msg_link.to_msg_index()
     );
 
     Ok(())

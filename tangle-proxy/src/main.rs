@@ -1,5 +1,3 @@
-#![feature(once_cell)]
-
 use anyhow::Result;
 
 mod cli;
@@ -7,7 +5,6 @@ mod cli;
 use streams_tools::{
     STREAMS_TOOLS_CONST_HTTP_PROXY_PORT,
     HttpClientProxy,
-    ResponseCache,
 };
 
 use hyper::{
@@ -30,41 +27,36 @@ use cli::{
 };
 
 use std::{
-    lazy::SyncLazy,
     net::SocketAddr,
-    sync::{
-        Arc,
-        Mutex
-    },
 };
 use hyper::server::conn::AddrStream;
-use iota_streams::app::futures::executor::block_on;
-use iota_streams::app::transport::tangle::client::Client;
+use tokio::sync::oneshot;
 
-type HttpClientProxyThreadSafe = Arc<Mutex<HttpClientProxy>>;
-
-fn handle_request(client: HttpClientProxyThreadSafe, request: Request<Body>)
-    -> Result<Response<Body>, hyper::http::Error>
+async fn handle_request(mut client: HttpClientProxy, request: Request<Body>)
+                        -> Result<Response<Body>, hyper::http::Error>
 {
     println!("[Tangle Proxy] Handling request {}", request.uri().to_string());
-    let mut guard = client.lock().unwrap(); // unwrap poisoned Mutexes
-    block_on(guard.handle_request(request))
+    client.handle_request(request).await
 }
 
+fn main() {
 
-static REQUEST_CACHE: SyncLazy<ResponseCache> = SyncLazy::new(|| {
-    ResponseCache::default()
-});
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("build runtime");
 
-#[tokio::main]
-async fn main() -> Result<()> {
+    // Combine it with a `LocalSet,  which means it can spawn !Send futures...
+    let local = tokio::task::LocalSet::new();
+    local.block_on(&rt, run());
+}
 
+async fn run() {
     let arg_matches = get_arg_matches();
     let cli = TangleProxyCli::new(&arg_matches, &ARG_KEYS) ;
     println!("[Tangle Proxy] Using node '{}' for tangle connection", cli.node);
 
-    let client: HttpClientProxyThreadSafe = Arc::new(Mutex::new(
-        HttpClientProxy::new_from_url(cli.node, &REQUEST_CACHE)));
+    let client = HttpClientProxy::new_from_url(cli.node);
 
     let addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_HTTP_PROXY_PORT).into();
 
@@ -79,26 +71,40 @@ async fn main() -> Result<()> {
         // Create a `Service` for responding to the request.
         let service = service_fn(move |req| {
             let client_per_request = client_per_connection.clone();
-            async {
-                handle_request(client_per_request, req)
-            }
+            handle_request(client_per_request, req)
         });
 
         // Return the service to hyper.
         async move { Ok::<_, hyper::Error>(service) }
     });
 
-    let mut client = Client::new_from_url(cli.node);
+    let server = Server::bind(&addr).executor(LocalExec).serve(make_service);
 
-    let _join_worker_loop = REQUEST_CACHE.worker.start_loop(client, &REQUEST_CACHE);
-
-    let server = Server::bind(&addr).serve(make_service);
+    // Just shows that with_graceful_shutdown compiles with !Send,
+    // !Sync HttpBody.
+    let (_tx, rx) = oneshot::channel::<()>();
+    let server = server.with_graceful_shutdown(async move {
+        rx.await.ok();
+    });
 
     println!("Listening on http://{}", addr);
 
     if let Err(e) = server.await {
         eprintln!("server error: {}", e);
     }
+}
 
-    Ok(())
+// Since the Server needs to spawn some background tasks, we needed
+// to configure an Executor that can spawn !Send futures...
+#[derive(Clone, Copy, Debug)]
+struct LocalExec;
+
+impl<F> hyper::rt::Executor<F> for LocalExec
+    where
+        F: std::future::Future + 'static, // not requiring `Send`
+{
+    fn execute(&self, fut: F) {
+        // This will spawn into the currently running `LocalSet`.
+        tokio::task::spawn_local(fut);
+    }
 }

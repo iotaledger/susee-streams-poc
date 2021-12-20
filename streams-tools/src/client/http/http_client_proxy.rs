@@ -13,11 +13,15 @@ use iota_streams::{
     },
     core::{
         async_trait,
+        Errors,
     },
+    app_channels::api::DefaultF,
 };
+
 
 use std::{
     clone::Clone,
+    str::FromStr,
 };
 
 use hyper::{
@@ -26,7 +30,6 @@ use hyper::{
         Request,
         Response,
         Result,
-        StatusCode,
     }
 };
 
@@ -34,47 +37,27 @@ use crate::{
     binary_persistence::BinaryPersist,
     http_protocol::{
         ServerDispatch,
+        MapStreamsErrors,
         dispatch_request,
-    },
-    response_cache::{
-        WorkerReceiveMessageFromAddress,
-        ResponseCache,
-        get_cached_response_status,
-        log_err_and_respond_500,
-        get_http_100_response,
     }
 };
 
-
-use iota_streams::app_channels::api::DefaultF;
-
-use std::thread;
-use std::time::Duration;
-
-use crate::client::http::response_cache::CachedResponseStatus;
-use iota_streams::app::futures::executor::block_on;
-use crate::response_cache::return_cached_response;
-
 #[derive(Clone)]
 pub struct HttpClientProxy {
-    pub client: Client,
-    cache: &'static ResponseCache,
+    client: Client,
 }
 
 impl HttpClientProxy
 {
-    pub fn new_from_url(url: &str, cache: &'static ResponseCache) -> Self {
+    pub fn new_from_url(url: &str) -> Self {
         Self {
             client: Client::new_from_url(url),
-            cache,
         }
     }
 
     pub async fn handle_request(&mut self, req: Request<Body>) -> Result<Response<Body>> {
         dispatch_request(req, self).await
     }
-
-
 }
 
 #[async_trait(?Send)]
@@ -82,34 +65,58 @@ impl ServerDispatch for HttpClientProxy {
     async fn send_message<F: 'static + core::marker::Send + core::marker::Sync>(
         self: &mut Self, message: &TangleMessage<F>) -> Result<Response<Body>>
     {
+        println!("[HttpClientProxy - ServerDispatch - send_message] Incoming TangleMessage");
         let res = self.client.send_message(message).await;
         match res {
             Ok(_) => Ok(Response::new(Default::default())),
-            Err(err) => log_err_and_respond_500(err, "send_message")
+            Err(err) => HttpClientProxy::log_err_and_respond_500(err, "send_message")
         }
     }
 
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
-        match get_cached_response_status(&self.cache.receive_message_from_address, &address_str) {
-            CachedResponseStatus::Uncached => {
-                self.cache.worker.add_worker_receive_message_from_address(
-                    WorkerReceiveMessageFromAddress{
-                        address_str: String::from(address_str),
-                });
-                get_http_100_response()
+        println!("[HttpClientProxy - ServerDispatch - receive_message_from_address] Incoming request for address: {}", address_str);
+        let address = TangleAddress::from_str(address_str).unwrap();
+        let message = Transport::<TangleAddress, TangleMessage<DefaultF>>::
+            recv_message(&mut self.client, &address).await;
+        match message {
+            Ok(msg) => {
+                let mut buffer: Vec<u8> = vec![0;BinaryPersist::needed_size(&msg)];
+                let _size = BinaryPersist::to_bytes(&msg, buffer.as_mut_slice());
+                Ok(Response::new(buffer.into()))
             },
-            CachedResponseStatus::InProcess => get_http_100_response(),
-            CachedResponseStatus::Cached => {
-                return_cached_response(&self.cache.receive_message_from_address, address_str)
-            }
+            Err(err) => HttpClientProxy::log_err_and_respond_500(err, "receive_message_from_address")
         }
     }
 
-    async fn receive_messages_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
+    async fn receive_messages_from_address(self: &mut Self, _address_str: &str) -> Result<Response<Body>> {
         unimplemented!()
     }
 
     async fn fetch_new_commands(self: &mut Self) -> Result<Response<Body>> {
         unimplemented!()
+    }
+}
+
+impl HttpClientProxy {
+    fn log_err_and_respond_500(err: anyhow::Error, fn_name: &str) -> Result<Response<Body>> {
+        println!("[HttpClientProxy - {}] Error: {}", fn_name, err);
+
+        // // Following implementation does not work because currently it is not possible to access
+        // // The streams error value. Instead we expect a MessageLinkNotFoundInTangle error to
+        // // make the susee POC run at all.
+        // // TODO: Check how to access the streams error value and fix the implementation here
+        // let streams_error = &MapStreamsErrors::get_indicator_for_uninitialized();
+        // for cause in err.chain() {
+        //     if let Some(streams_err) = cause.downcast_ref::<Errors>() {
+        //         streams_error = streams_err.clone();
+        //         break;
+        //     }
+        // }
+        // let mut status_code = MapStreamsErrors::to_http_status_codes(&streams_error);
+
+        let status_code = MapStreamsErrors::to_http_status_codes(&Errors::MessageLinkNotFoundInTangle(String::from("")));
+        let builder = Response::builder()
+            .status(status_code);
+        builder.body(Default::default())
     }
 }

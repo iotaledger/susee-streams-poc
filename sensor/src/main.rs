@@ -1,10 +1,6 @@
 // #![no_std]
 
-use anyhow::Result;
-
 mod cli;
-
-use streams_tools::{SubscriberManagerPlainTextWallet, HttpClient, CaptureClient};
 
 use cli::{
     SensorCli,
@@ -12,7 +8,26 @@ use cli::{
     get_arg_matches,
 };
 
-use iota_streams::app_channels::api::tangle::{Address, Bytes};
+use streams_tools::{
+    SubscriberManagerPlainTextWallet,
+    HttpClient,
+    subscriber_manager::get_public_key_str,
+};
+
+use susee_tools::{
+    SUSEE_CONST_SECRET_PASSWORD,
+    get_wallet
+};
+
+use iota_streams::app_channels::api::{
+    DefaultF,
+    tangle::{
+        Address,
+        Bytes,
+        Subscriber,
+    }
+};
+
 use core::str::FromStr;
 
 use std::{
@@ -23,8 +38,9 @@ use std::{
         BufReader
     }
 };
-use iota_streams::app_channels::api::DefaultF;
-use susee_tools::{SUSEE_CONST_SECRET_PASSWORD, get_wallet};
+
+use anyhow::Result;
+
 use clap::Values;
 
 type ClientType = HttpClient<DefaultF>; // CaptureClient; //
@@ -36,7 +52,7 @@ async fn send_file_content_as_msg(msg_file: &str, subscriber: &mut SubscriberMan
     let mut reader = BufReader::new(f);
     let mut buffer = Vec::new();
     reader.read_to_end(&mut buffer)?;
-    println!("[Main] Message file '{}' contains {} bytes payload\n", msg_file, buffer.len());
+    println!("[Sensor] Message file '{}' contains {} bytes payload\n", msg_file, buffer.len());
 
     subscriber.send_signed_packet(&Bytes(buffer.clone())).await
 }
@@ -55,14 +71,61 @@ async fn send_messages(files_to_send: Values<'_>, subscriber: &mut SubscriberMan
     Ok(())
 }
 
-async fn subscribe_to_channel(announcement_link_str: &str, subscriber: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<()> {
-    let ann_address = Address::from_str(&announcement_link_str)?;
-    let sub_msg_link = subscriber.subscribe(&ann_address).await?;
-
-    let sub_msg_link_string = sub_msg_link.to_string();
+fn println_subscription_details(subscriber: &Subscriber<ClientType>, subscription_link: &Address, comment: &str, key_name: &str) {
+    let public_key = get_public_key_str(subscriber);
     println!(
-        "[Sensor] Subscription message link for subscriber_a: {}\n       Tangle Index: {:#}\n",
-        sub_msg_link_string, sub_msg_link.to_msg_index()
+        "[Sensor] {}:
+         {} Link:     {}
+              Tangle Index:     {:#}
+         Subscriber public key: {}\n",
+        comment,
+        key_name,
+        subscription_link.to_string(),
+        subscription_link.to_msg_index(),
+        public_key,
+    );
+}
+
+fn println_subscriber_status<'a> (subscriber_manager: &SubscriberManagerPlainTextWalletHttpClient)
+{
+    let mut subscription_exists = false;
+    if let Some(subscriber) = &subscriber_manager.subscriber {
+        if let Some(subscription_link) = subscriber_manager.subscription_link {
+            println_subscription_details(&subscriber, &subscription_link, "A subscription with the following details has already been created", "Subscription");
+        }
+        subscription_exists = true;
+    }
+    if !subscription_exists {
+        println!("[Sensor] No existing subscription message found.");
+    }
+
+    if let Some(prev_msg_link) = subscriber_manager.prev_msg_link {
+        println!("[Sensor] The last previously used message link is: {}", prev_msg_link);
+    }
+}
+
+async fn subscribe_to_channel(announcement_link_str: &str, subscriber_mngr: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<()> {
+    let ann_address = Address::from_str(&announcement_link_str)?;
+    let sub_msg_link = subscriber_mngr.subscribe(&ann_address).await?;
+
+    println_subscription_details(
+        &subscriber_mngr.subscriber.as_ref().unwrap(),
+        &sub_msg_link,
+        "A subscription with the following details has been created",
+        "Subscription",
+    );
+
+    Ok(())
+}
+async fn register_keyload_msg(keyload_msg_link_str: &str, subscriber_mngr: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<()> {
+    let keyload_msg_link = Address::from_str(&keyload_msg_link_str)?;
+    subscriber_mngr.register_keyload_msg(&keyload_msg_link).expect("[Sensor] Error while registering keyload msg");
+
+    println_subscription_details(
+        &subscriber_mngr.subscriber.as_ref().unwrap(),
+        &keyload_msg_link,
+        "Messages will be send in the branch defined by the following keyload message",
+        "Keyload  msg",
     );
 
     Ok(())
@@ -77,7 +140,7 @@ async fn main() -> Result<()> {
         &cli.matches,
         SUSEE_CONST_SECRET_PASSWORD,
         cli.arg_keys.base.wallet_file,
-        "wallet-management-console.txt"
+        "wallet-sensor.txt"
     )?;
 
     println!("[Sensor] Using node '{}' for tangle connection", cli.node);
@@ -90,8 +153,11 @@ async fn main() -> Result<()> {
         Some(String::from("user-state-sensor.bin")),
     ).await;
 
+    let mut show_subscriber_state = true;
+
     if cli.matches.is_present(cli.arg_keys.subscribe_announcement_link) {
         let announcement_link_str = cli.matches.value_of(cli.arg_keys.subscribe_announcement_link).unwrap().trim();
+        show_subscriber_state = false;
         subscribe_to_channel(announcement_link_str, &mut subscriber).await?
     }
 
@@ -99,6 +165,17 @@ async fn main() -> Result<()> {
         let files_to_send = cli.matches.values_of(cli.arg_keys.files_to_send).unwrap();
         send_messages(files_to_send, &mut subscriber).await?
     }
+
+    if cli.matches.is_present(cli.arg_keys.register_keyload_msg) {
+        let keyload_msg_link_str = cli.matches.value_of(cli.arg_keys.register_keyload_msg).unwrap().trim();
+        show_subscriber_state = false;
+        register_keyload_msg(keyload_msg_link_str, &mut subscriber).await?
+    }
+
+    if show_subscriber_state {
+        println_subscriber_status(&subscriber);
+    }
+
 
     Ok(())
 }

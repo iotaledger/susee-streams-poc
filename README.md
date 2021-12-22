@@ -1,4 +1,4 @@
-# Streams Author Tool
+# Susee Streams POC
 
 ## About
 This project contains three tiny test applications providing command line interfaces (CLI) to evaluate the iota streams functionality for the

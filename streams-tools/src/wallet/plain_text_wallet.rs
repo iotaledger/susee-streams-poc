@@ -7,6 +7,8 @@ use rand::Rng;
 use anyhow::Result;
 use std::string::FromUtf8Error;
 
+use super::simple_wallet::SimpleWallet;
+
 const ALPH9: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ9";
 
 static DEFAULT_FILE_NAME: &str = "channel-seed.txt";
@@ -59,12 +61,6 @@ impl PlainTextWallet {
             serialization_password: String::from(serialization_password),
         }
     }
-}
-
-pub trait SimpleWallet {
-    const IS_USABLE_WALLET: bool;
-    fn get_seed(&self) -> &str;
-    fn get_serialization_password(&self) -> &str;
 }
 
 impl SimpleWallet for PlainTextWallet {

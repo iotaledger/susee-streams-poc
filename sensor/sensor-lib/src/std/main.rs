@@ -1,8 +1,4 @@
-// #![no_std]
-
-mod cli;
-
-use cli::{
+use super::cli::{
     SensorCli,
     ARG_KEYS,
     get_arg_matches,
@@ -43,7 +39,7 @@ use anyhow::Result;
 
 use clap::Values;
 
-type ClientType = HttpClient<DefaultF>; // CaptureClient; //
+type ClientType = HttpClient; // CaptureClient; //
 
 type SubscriberManagerPlainTextWalletHttpClient = SubscriberManagerPlainTextWallet<ClientType>;
 
@@ -131,8 +127,8 @@ async fn register_keyload_msg(keyload_msg_link_str: &str, subscriber_mngr: &mut 
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+
+pub async fn process_main() -> Result<()> {
 
     let arg_matches = get_arg_matches();
     let cli = SensorCli::new(&arg_matches, &ARG_KEYS) ;
@@ -175,7 +171,6 @@ async fn main() -> Result<()> {
     if show_subscriber_state {
         println_subscriber_status(&subscriber);
     }
-
 
     Ok(())
 }

@@ -1,4 +1,4 @@
-use crate::SimpleWallet;
+use super::simple_wallet::SimpleWallet;
 
 pub struct DummyWallet {}
 

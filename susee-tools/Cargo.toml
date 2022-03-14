@@ -13,10 +13,15 @@ crate-type = ["rlib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-streams-tools = { version = "0.1.2", path = "../streams-tools" }
+streams-tools = { version = "0.1.2", path = "../streams-tools", default-features = false }
 anyhow = "1.0.40"
 
 [dependencies.clap]
-version = "3.0.0-beta.5"
+version = "3.0.14"
 default-features = false
 features = ["std"]
+
+[features]
+default = ["std"]
+smol_esp_rs = ["streams-tools/smol_esp_rs"]
+std = ["streams-tools/std"]

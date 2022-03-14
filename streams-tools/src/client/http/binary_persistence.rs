@@ -8,8 +8,7 @@ use iota_streams::app::{
     message::{
         LinkedMessage,
         HasLink,
-        BinaryBody,
-        BinaryMessage,
+        BinaryBody
     }
 };
 
@@ -96,17 +95,17 @@ impl BinaryPersist for TangleAddress {
     }
 }
 
-impl<F> BinaryPersist for BinaryBody<F> {
+impl BinaryPersist for BinaryBody {
     fn needed_size(&self) -> usize {
-        USIZE_LEN + self.bytes.len() // 4 bytes for length + binary data of that length
+        USIZE_LEN + self.as_bytes().len() // 4 bytes for length + binary data of that length
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
-        let needed_size: u32 = self.bytes.len() as u32;
+        let needed_size: u32 = self.as_bytes().len() as u32;
         let mut range: Range<usize> = RangeIterator::new(USIZE_LEN);
         buffer[range.clone()].copy_from_slice(&needed_size.to_le_bytes());
-        range.increment(self.bytes.len());
-        buffer[range.clone()].copy_from_slice(self.bytes.as_slice());
+        range.increment(self.as_bytes().len());
+        buffer[range.clone()].copy_from_slice(self.to_bytes().as_slice());
         Ok(range.end)
     }
 
@@ -116,16 +115,15 @@ impl<F> BinaryPersist for BinaryBody<F> {
         u32buf.clone_from_slice(&buffer[range.clone()]);
         let body_len = u32::from_le_bytes(u32buf);
         range.increment(body_len as usize);
-        Ok(<BinaryBody<F> as From<Vec<u8>>>::from(buffer[range].to_vec()))
+        Ok(<BinaryBody as From<Vec<u8>>>::from(buffer[range].to_vec()))
     }
 }
 
-impl<F> BinaryPersist for TangleMessage<F> {
+impl BinaryPersist for TangleMessage {
     fn needed_size(&self) -> usize {
         let link_bytes_len = self.link().needed_size();
-        let mut len_bytes = self.timestamp.needed_size(); // TIMESTAMP
-        len_bytes += 2 * link_bytes_len;                        // LINK + PREV_LINK
-        len_bytes += self.binary.body.needed_size();            // BINARY_BODY
+        let mut len_bytes = 2 * link_bytes_len;                        // LINK + PREV_LINK
+        len_bytes += self.body.needed_size();            // BINARY_BODY
         len_bytes
     }
 
@@ -134,28 +132,22 @@ impl<F> BinaryPersist for TangleMessage<F> {
             panic!("[BinarySerialize  for TangleMessage] This TangleMessage needs {} bytes but \
                     the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
         }
-        // TIMESTAMP
-        let mut range: Range<usize> = RangeIterator::new(self.timestamp.needed_size());
-        self.timestamp.to_bytes(&mut buffer[range.clone()]).expect("Could not persist message timestamp");
         // LINK
         let link_bytes_len = self.link().needed_size();
-        range.increment(link_bytes_len);
+        let mut range: Range<usize> = RangeIterator::new(link_bytes_len);
         BinaryPersist::to_bytes(self.link(), &mut buffer[range.clone()]).expect("Could not persist message link");
         // PREV_LINK
         range.increment(link_bytes_len);
         BinaryPersist::to_bytes(self.prev_link(), &mut buffer[range.clone()]).expect("Could not persist message prev_link");
         // BINARY_BODY
-        range.increment(self.binary.body.needed_size());
-        BinaryPersist::to_bytes(&self.binary.body, &mut buffer[range.clone()]).expect("Could not persist message binary.body");
+        range.increment(self.body.needed_size());
+        BinaryPersist::to_bytes(&self.body, &mut buffer[range.clone()]).expect("Could not persist message binary.body");
         Ok(range.end)
     }
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
-        // TIMESTAMP
-        let mut pos: usize = 0;
-        let timestamp = u64::try_from_bytes(buffer[0..8].try_into().expect("slice with incorrect length")).unwrap();
-        pos += timestamp.needed_size();
         // LINK
+        let mut pos: usize = 0;
         let link = <TangleAddress as BinaryPersist>::try_from_bytes(&buffer[pos..]).unwrap();
         pos += link.needed_size();
         // PREV_LINK
@@ -165,6 +157,6 @@ impl<F> BinaryPersist for TangleMessage<F> {
         let body = BinaryBody::try_from_bytes(&buffer[pos..]).unwrap();
 
         // TangleMessage
-        Ok(TangleMessage::with_timestamp(BinaryMessage::new(link, prev_link, body), timestamp))
+        Ok(TangleMessage::new(link, prev_link, body))
     }
 }

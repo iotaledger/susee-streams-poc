@@ -13,6 +13,6 @@ anyhow = "1.0.40"
 tokio = {version = "1.5"}
 
 [dependencies.clap]
-version = "3.0.0-beta.5"
+version = "3.0.14"
 default-features = false
 features = ["std"]

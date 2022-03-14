@@ -16,8 +16,7 @@ use iota_streams::{
     {
         transport::tangle::{
             TangleMessage,
-            TangleAddress,
-            client::iota_client::Url,
+            TangleAddress
         },
     },
     app_channels::api::DefaultF,
@@ -27,7 +26,13 @@ use iota_streams::{
     },
 };
 
+#[cfg(feature = "std")]
+use iota_streams::app::transport::tangle::client::iota_client::Url;
+#[cfg(feature = "smol_esp_rs")]
+use url::Url;
+
 use std::ops::Deref;
+
 
 use crate::BinaryPersist;
 
@@ -123,7 +128,7 @@ impl RequestBuilder {
         format!("{}{}", self.uri_prefix, path)
     }
 
-    pub fn send_message<F>(self: &Self, message: &TangleMessage<F>) -> Result<Request<Body>> {
+    pub fn send_message(self: &Self, message: &TangleMessage) -> Result<Request<Body>> {
         let mut buffer: Vec<u8> = vec![0; message.needed_size()];
         message.to_bytes(buffer.as_mut_slice()).expect("Persisting into binary data failed");
 
@@ -162,7 +167,7 @@ impl RequestBuilder {
 #[async_trait(?Send)]
 pub trait ServerDispatch {
     async fn send_message<F: 'static + core::marker::Send + core::marker::Sync>(
-        self: &mut Self, message: &TangleMessage<F>) -> Result<Response<Body>>;
+        self: &mut Self, message: &TangleMessage) -> Result<Response<Body>>;
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>>;
     async fn receive_messages_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>>;
     async fn fetch_new_commands(self: &mut Self) -> Result<Response<Body>>;
@@ -180,8 +185,8 @@ pub async fn dispatch_request(req: Request<Body>, callbacks: &mut impl ServerDis
 
         (&Method::POST, EndpointUris::SEND_MESSAGE) => {
             let bytes = body::to_bytes(req.into_body()).await.unwrap();
-            let tangle_msg: TangleMessage<DefaultF> = TangleMessage::try_from_bytes(bytes.deref()).unwrap();
-            callbacks.send_message(&tangle_msg).await
+            let tangle_msg: TangleMessage = TangleMessage::try_from_bytes(bytes.deref()).unwrap();
+            callbacks.send_message::<DefaultF>(&tangle_msg).await
         },
 
 

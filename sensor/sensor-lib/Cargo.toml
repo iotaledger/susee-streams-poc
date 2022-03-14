@@ -1,0 +1,63 @@
+[package]
+name = "sensor-lib"
+version = "0.1.2"
+edition = "2018"
+license = "All rights reserved"
+keywords = ["iota", "susee"]
+description = "All sensor specific code to be linked in rust or C projects"
+
+[lib]
+name = "sensor_lib"
+crate-type = ["rlib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["std"]
+std = [
+    "tokio",
+    "clap",
+    "streams-tools/std",
+    "susee-tools/std",
+    "iota-streams/client",
+]
+smol_esp_rs = [
+    "esp-idf-sys",
+    "esp-idf-svc",
+    "esp-idf-hal",
+    "embedded-svc",
+    "embedded-hal",
+#    "log",
+    "smol",
+    "streams-tools/smol_esp_rs",
+    "susee-tools/smol_esp_rs",
+]
+
+[dependencies]
+# bindgen = "0.58"
+# cbindgen = "0.19"
+iota-streams = { git = "https://github.com/iotaledger/streams", branch = "develop", default-features = false, features = ["std", "tangle"] }
+streams-tools = { version = "0.1.2", path = "../../streams-tools", default-features = false }
+susee-tools = { version = "0.1.2", path = "../../susee-tools", default-features = false }
+iota-client-types = { version = "0.1.2", path = "../../iota-client-types" }
+
+anyhow = "1.0.40"
+hyper = { version = "0.14", features = ["client", "http1"] }
+
+# smol_esp_rs dependencies
+esp-idf-sys = { version = "0.30.6", optional = true }
+esp-idf-svc = { version = "0.37.2", optional = true }
+esp-idf-hal = { version = "0.33.1", optional = true }
+embedded-svc = { version = "0.17.2", optional = true }
+embedded-hal = { version = "0.2", optional = true }
+# log = { version = "0.4", optional = true }
+smol = { version = "1.2", optional = true}
+
+# std dependencies
+tokio = {version = "1.5", optional = true}
+
+[dependencies.clap]
+version = "3.0.14"
+optional = true
+default-features = false
+features = ["std"]

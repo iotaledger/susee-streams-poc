@@ -14,8 +14,7 @@ use iota_streams::{
     core::{
         async_trait,
         Errors,
-    },
-    app_channels::api::DefaultF,
+    }
 };
 
 
@@ -63,7 +62,7 @@ impl HttpClientProxy
 #[async_trait(?Send)]
 impl ServerDispatch for HttpClientProxy {
     async fn send_message<F: 'static + core::marker::Send + core::marker::Sync>(
-        self: &mut Self, message: &TangleMessage<F>) -> Result<Response<Body>>
+        self: &mut Self, message: &TangleMessage) -> Result<Response<Body>>
     {
         println!("[HttpClientProxy - ServerDispatch - send_message] Incoming TangleMessage");
         let res = self.client.send_message(message).await;
@@ -76,7 +75,7 @@ impl ServerDispatch for HttpClientProxy {
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
         println!("[HttpClientProxy - ServerDispatch - receive_message_from_address] Incoming request for address: {}", address_str);
         let address = TangleAddress::from_str(address_str).unwrap();
-        let message = Transport::<TangleAddress, TangleMessage<DefaultF>>::
+        let message = Transport::<TangleAddress, TangleMessage>::
             recv_message(&mut self.client, &address).await;
         match message {
             Ok(msg) => {

@@ -43,7 +43,7 @@ use anyhow::Result;
 
 use clap::Values;
 
-type ClientType = HttpClient<DefaultF>; // CaptureClient; //
+type ClientType = HttpClient;
 
 type SubscriberManagerPlainTextWalletHttpClient = SubscriberManagerPlainTextWallet<ClientType>;
 

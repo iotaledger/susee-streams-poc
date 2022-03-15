@@ -83,7 +83,7 @@ impl<'a, ArgKeysT> Cli<'a, ArgKeysT> {
                 .long(BASE_ARG_KEYS.node)
                 .short('n')
                 .value_name("NODE_URL")
-                .about(NODE_ABOUT)
+                .help(NODE_ABOUT)
                 .default_value(PROJECT_CONSTANTS.default_node)
             );
 
@@ -94,7 +94,7 @@ impl<'a, ArgKeysT> Cli<'a, ArgKeysT> {
                     .long(BASE_ARG_KEYS.wallet_file)
                     .short('w')
                     .value_name("WALLET_FILE_PATH_AND_NAME")
-                    .about(WALLET_FILE_ABOUT.as_str())
+                    .help(WALLET_FILE_ABOUT.as_str())
                 );
             }
         }

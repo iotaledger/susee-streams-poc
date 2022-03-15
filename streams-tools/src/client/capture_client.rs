@@ -29,23 +29,21 @@ impl CaptureClient {
 }
 
 #[async_trait(?Send)]
-impl<F> Transport<TangleAddress, TangleMessage<F>> for CaptureClient
-    where
-        F: 'static + core::marker::Send + core::marker::Sync,
+impl Transport<TangleAddress, TangleMessage> for CaptureClient
 {
     /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
-    async fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
-        println!("\n[CaptureClient.send_message] Sending message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string());
+    async fn send_message(&mut self, msg: &TangleMessage) -> Result<()> {
+        println!("\n[CaptureClient.send_message] Sending message with {} bytes payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
         self.0.send_message(msg).await
     }
 
     /// Receive a message.
-    async fn recv_messages(&mut self, link: &TangleAddress) -> Result<Vec<TangleMessage<F>>> {
+    async fn recv_messages(&mut self, link: &TangleAddress) -> Result<Vec<TangleMessage>> {
         let ret_val = self.0.recv_messages(link).await;
         match ret_val.as_ref() {
             Ok(msg_vec) => {
                 for (idx, msg) in msg_vec.iter().enumerate() {
-                    println!("[CaptureClient.recv_messages] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, msg.binary.body.bytes.len(), msg.binary.to_string())
+                    println!("[CaptureClient.recv_messages] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, msg.body.as_bytes().len(), msg.body.to_string())
                 }
             },
             _ => ()
@@ -53,10 +51,10 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for CaptureClient
         ret_val
     }
 
-    async fn recv_message(&mut self, link: &TangleAddress) -> Result<TangleMessage<F>> {
+    async fn recv_message(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         let ret_val = self.0.recv_message(link).await;
         match ret_val.as_ref() {
-            Ok(msg) => println!("[CaptureClient.recv_message] Receiving message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string()),
+            Ok(msg) => println!("[CaptureClient.recv_message] Receiving message with {} bytes payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string()),
             _ => ()
         }
         ret_val

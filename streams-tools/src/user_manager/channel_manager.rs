@@ -21,7 +21,7 @@ use std::{
     }
 };
 
-use iota_streams::app::futures::executor::block_on;
+use futures::executor::block_on;
 use iota_streams::app_channels::api::tangle::PublicKey;
 use iota_streams::app::identifier::Identifier;
 

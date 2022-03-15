@@ -14,6 +14,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 iota-streams = { git = "https://github.com/iotaledger/streams", branch = "develop" }
+futures = { version = "0.3.8", default-features = false, features = ["executor"] }
 tokio = {version = "1.5"}
 anyhow = "1.0.40"
 rand = "0.7.3"

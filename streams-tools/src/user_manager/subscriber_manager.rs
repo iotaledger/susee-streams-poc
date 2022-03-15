@@ -33,7 +33,7 @@ use crate::{
     }
 };
 
-use iota_streams::app::futures::executor::block_on;
+use futures::executor::block_on;
 use iota_streams::core::prelude::hex;
 use iota_streams::app::transport::tangle::TangleAddress;
 

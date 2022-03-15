@@ -5,3 +5,5 @@
 /**/user-state-*.bin
 /.embuild/espressif/
 /sensor/main-rust-esp-r/build/CMakeFiles/
+/**/Cargo.lock
+Cargo.lock

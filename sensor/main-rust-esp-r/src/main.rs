@@ -33,6 +33,14 @@ fn main() -> Result<(), EspError> {
     esp_idf_svc::log::EspLogger::initialize_default();
     esp_idf_svc::log::EspLogger.set_target_level("Don't know what for this is used", LevelFilter::Trace);
 
+    unsafe {
+        let free_mem = esp_idf_sys::heap_caps_get_free_size(
+            esp_idf_sys::MALLOC_CAP_8BIT
+        );
+
+        info!("heap_caps_get_free_size(MALLOC_CAP_8BIT): {}", free_mem);
+    }
+
     info!("Starting process_main()");
 
     match smol::block_on(async {

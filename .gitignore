@@ -7,3 +7,4 @@
 /sensor/main-rust-esp-r/build/CMakeFiles/
 /**/Cargo.lock
 Cargo.lock
+/sensor/main-idf/build/

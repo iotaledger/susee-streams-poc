@@ -21,16 +21,21 @@ std = [
     "susee-tools/std",
     "iota-streams/client",
 ]
-smol_esp_rs = [
+smol_rt = [
+    #    "log",
+    "smol",
+    "streams-tools/smol_rt",
+    "susee-tools/smol_rt",
+]
+
+esp_idf = [
     "esp-idf-sys",
     "esp-idf-svc",
     "esp-idf-hal",
     "embedded-svc",
     "embedded-hal",
-#    "log",
-    "smol",
-    "streams-tools/smol_esp_rs",
-    "susee-tools/smol_esp_rs",
+    "streams-tools/esp_idf",
+    "susee-tools/esp_idf",
 ]
 
 [dependencies]
@@ -44,12 +49,14 @@ iota-client-types = { version = "0.1.2", path = "../../iota-client-types" }
 anyhow = "1.0.40"
 hyper = { version = "0.14", features = ["client", "http1"] }
 
-# smol_esp_rs dependencies
+# esp_idf dependencies
 esp-idf-sys = { version = "0.30.6", optional = true }
 esp-idf-svc = { version = "0.37.2", optional = true }
 esp-idf-hal = { version = "0.33.1", optional = true }
 embedded-svc = { version = "0.17.2", optional = true }
 embedded-hal = { version = "0.2", optional = true }
+
+# smol_rt dependencies
 # log = { version = "0.4", optional = true }
 smol = { version = "1.2", optional = true}
 

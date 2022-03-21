@@ -28,7 +28,7 @@ use iota_streams::{
 
 #[cfg(feature = "std")]
 use iota_streams::app::transport::tangle::client::iota_client::Url;
-#[cfg(feature = "smol_esp_rs")]
+#[cfg(not(feature = "std"))]
 use url::Url;
 
 use std::ops::Deref;

@@ -23,5 +23,6 @@ features = ["std"]
 
 [features]
 default = ["std"]
-smol_esp_rs = ["streams-tools/smol_esp_rs"]
+smol_rt = ["streams-tools/smol_rt"]
+esp_idf = ["streams-tools/esp_idf"]
 std = ["streams-tools/std"]

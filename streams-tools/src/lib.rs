@@ -21,9 +21,6 @@ pub use {
     },
 };
 
-#[cfg(feature = "smol_esp_rs")]
-pub use {};
-
 #[cfg(test)]
 mod tests {
     #[test]

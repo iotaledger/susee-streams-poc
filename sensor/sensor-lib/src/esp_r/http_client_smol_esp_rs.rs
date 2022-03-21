@@ -49,6 +49,7 @@ use iota_client_types::{
     SendOptions
 };
 
+#[cfg(feature = "esp_idf")]
 use embedded_svc::{
 //    sys_time::SystemTime,
 //     timer::{
@@ -61,29 +62,31 @@ use embedded_svc::{
         client::{
             Client,
             Request,
-        }
+        },
     },
-    io::Read
+    io::Read,
 };
 
+#[cfg(feature = "esp_idf")]
 use esp_idf_sys::EspError;
 
-// #[cfg(target_os = "espidf")]
+#[cfg(feature = "esp_idf")]
 use esp_idf_svc::{
     http::client::{
         EspHttpClient,
         EspHttpResponse,
     },
-    // timer::{
-    //     EspTimerService,
-    //     EspTimer,
-    // }
+// timer::{
+//     EspTimerService,
+//     EspTimer,
+// }
 };
+
 use anyhow::{
     bail,
 };
 
-// #[cfg(target_os = "espidf")]
+// #[cfg(feature = "esp_idf")]
 // fn getIntervalTimer(duration: Duration, callback: impl FnMut() + Send + 'static) -> Result<EspTimer, EspError> {
 //     let mut interval_timer = EspTimerService::new()?.timer(callback)?;
 //     interval_timer.every(duration)?;
@@ -117,7 +120,7 @@ impl HttpClient
             tangle_client_options: SendOptions::default(),
         }
     }
-
+    #[cfg(feature = "esp_idf")]
     pub fn request<'a>(&mut self, http_client: &'a mut EspHttpClient, req: HyperRequest<Body>) -> Result<EspHttpResponse<'a>> { // Result<EspHttpResponse, EspError> {
         let svc_http_method = match req.method() {
             &Method::POST => embedded_svc::http::Method::Post,
@@ -157,21 +160,31 @@ impl HttpClient
 {
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
         let req = self.request_builder.send_message(msg)?;
-        let mut http_client = EspHttpClient::new_default()?;
-        self.request(&mut http_client, req)?;
+        #[cfg(feature = "esp_idf")]
+            let mut http_client = EspHttpClient::new_default()?;
+        #[cfg(feature = "esp_idf")]
+            self.request(&mut http_client, req)?;
+        #[cfg(not(feature = "esp_idf"))]
+            println!("[HttpClient.send_message_via_http] ***** self.request(&mut http_client, req) ***** ");
         Ok(())
     }
 
     async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         println!("[HttpClient.recv_message_via_http]");
-        let mut http_client = EspHttpClient::new_default()?;
+        #[cfg(feature = "esp_idf")]
+            let mut http_client = EspHttpClient::new_default()?;
         println!("[HttpClient.recv_message_via_http] EspHttpClient created");
-        let response: EspHttpResponse = self.request(
-            &mut http_client,
-            self.request_builder.receive_message_from_address(link)?,
-        )?;
-        // TODO: This retrials are most probably not needed because they might be handled by hyper
-        //       => Clarify and remove unneeded code
+        #[cfg(feature = "esp_idf")]
+                let response: EspHttpResponse = self.request(
+                &mut http_client,
+                self.request_builder.receive_message_from_address(link)?,
+            )?;
+        #[cfg(not(feature = "esp_idf"))]
+            println!("[HttpClient.recv_message_via_http] ***** let response: EspHttpResponse = self.request ***** ");
+
+
+        // TODO: Implement following retrials using EspTimerService
+        #[cfg(feature = "esp_idf")]
         if response.status() == StatusCode::CONTINUE {
             // let periodic = getPeriodicTimer(Duration::from_millis(500), move || {
             //     response = self.request(
@@ -188,6 +201,7 @@ impl HttpClient
             // }
         }
 
+        #[cfg(feature = "esp_idf")]
         if response.status() == StatusCode::OK {
             let mut buffer = Vec::new();
             (&response).do_read(&mut buffer)?;
@@ -198,6 +212,10 @@ impl HttpClient
                  Some(link.to_string())
             ))
         }
+        #[cfg(not(feature = "esp_idf"))]
+            let mut buffer = Vec::new();
+        #[cfg(not(feature = "esp_idf"))]
+            Ok(<TangleMessage as BinaryPersist>::try_from_bytes(&buffer).unwrap())
     }
 }
 

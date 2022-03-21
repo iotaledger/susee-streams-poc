@@ -3,12 +3,18 @@ members = [
     "management-console",
     "sensor/main-rust",
     "sensor/main-rust-esp-r",
+    "sensor/main-rust-pio",
     "sensor/sensor-lib",
     "iota-client-types",
     "tangle-proxy",
     "streams-tools",
     "susee-tools",
 ]
+
+exclude = [
+    "sensor/main-idf/components/rustlib",
+]
+
 resolver = "2"
 
 [profile.release]

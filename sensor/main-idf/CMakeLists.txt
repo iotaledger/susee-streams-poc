@@ -3,4 +3,4 @@
 cmake_minimum_required(VERSION 3.5)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(susee-streams-poc-esp32-sensor)
+project(susee-streams-poc-sensor-main-idf)

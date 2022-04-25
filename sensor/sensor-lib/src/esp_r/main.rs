@@ -1,18 +1,38 @@
 use super::{
-    cli::{
-        ProcessingArgs,
-        ArgKeys,
+    command_fetcher::{
+        CommandFetcher,
     },
     http_client_smol_esp_rs::{
         HttpClient,
         HttpClientOptions,
+    },
+};
+
+#[cfg(feature = "wifi")]
+use super::{
+    wifi_utils::init_wifi,
+};
+
+#[cfg(feature = "esp_idf")]
+use super::{
+    vfs_fat_fs_tools::{
+        setup_vfs_fat_filesystem,
+        drop_vfs_fat_filesystem,
+        BASE_PATH,
     }
 };
 
 use streams_tools::{
     subscriber_manager::get_public_key_str,
+    binary_persist_command::{
+        Command,
+        SubscribeToAnnouncement,
+        RegisterKeyloadMessage,
+        StartSendingMessages,
+    },
     DummyWallet,
-    SubscriberManager
+    SubscriberManager,
+    BinaryPersist
 };
 
 use iota_streams::app_channels::api::{
@@ -23,9 +43,17 @@ use iota_streams::app_channels::api::{
     }
 };
 
+
 use core::str::FromStr;
 
-use anyhow::Result;
+use anyhow::{
+    Result,
+};
+use std::{
+    time::Duration,
+    thread,
+};
+
 
 type ClientType = HttpClient;
 
@@ -102,12 +130,11 @@ async fn register_keyload_msg(keyload_msg_link_str: &str, subscriber_mngr: &mut 
     Ok(())
 }
 
-pub async fn process_main_esp_rs(client_factory: TangleHttpClientFactory) -> Result<()> {
-    println!("[Sensor] process_main() entry");
+async fn process_command(command: Command, buffer: Vec<u8>, client_factory: TangleHttpClientFactory) -> Result<()>{
     let wallet = DummyWallet{};
 
     #[cfg(feature = "esp_idf")]
-        print_heap_info();
+        let vfs_fat_handle = setup_vfs_fat_filesystem()?;
 
     println!("[Sensor] Creating HttpClient");
     let client = client_factory(None);
@@ -115,36 +142,78 @@ pub async fn process_main_esp_rs(client_factory: TangleHttpClientFactory) -> Res
     let mut subscriber= SubscriberManagerDummyWalletHttpClient::new(
         client,
         wallet,
-        Some(String::from("user-state-sensor.bin")),
+        Some(String::from(BASE_PATH) + "/user-state-sensor.bin"),
     ).await;
 
     println!("[Sensor] subscriber created");
-    let mut show_subscriber_state = true;
 
     #[cfg(feature = "esp_idf")]
         print_heap_info();
 
-    println!("[Sensor] subscribe_announcement_link");
-    if ProcessingArgs::contains_key(ArgKeys::SUBSCRIBE_ANNOUNCEMENT_LINK) {
-        let announcement_link_str = ProcessingArgs::get(ArgKeys::SUBSCRIBE_ANNOUNCEMENT_LINK);
-        show_subscriber_state = false;
-        subscribe_to_channel(announcement_link_str, &mut subscriber).await?
+    println!("[Sensor] check for command SUBSCRIBE_TO_ANNOUNCEMENT_LINK");
+    if command != Command::SUBSCRIBE_TO_ANNOUNCEMENT_LINK {
+        let cmd_args = SubscribeToAnnouncement::try_from_bytes(buffer.as_slice())?;
+        println!("[Sensor] SUBSCRIBE_ANNOUNCEMENT_LINK: {}", cmd_args.announcement_link);
+        subscribe_to_channel(cmd_args.announcement_link.as_str(), &mut subscriber).await?
     }
 
-    if ProcessingArgs::contains_key(ArgKeys::CONTENT_TO_SEND) {
-        let content_to_send= ProcessingArgs::get(ArgKeys::CONTENT_TO_SEND);
-        // send_content_as_msg(content_to_send.clone(), &mut subscriber).await?;
+    println!("[Sensor] check for command START_SENDING_MESSAGES");
+    if command != Command::START_SENDING_MESSAGES {
+        let cmd_args = StartSendingMessages::try_from_bytes(buffer.as_slice())?;
+        println!("[Sensor] START_SENDING_MESSAGES: {}", cmd_args.message_template_key);
+        send_content_as_msg(cmd_args.message_template_key.as_str(), &mut subscriber).await?;
     }
 
-    if ProcessingArgs::contains_key(ArgKeys::REGISTER_KEYLOAD_MSG) {
-        let keyload_msg_link_str = ProcessingArgs::get(ArgKeys::REGISTER_KEYLOAD_MSG);
-        show_subscriber_state = false;
-        // register_keyload_msg(keyload_msg_link_str, &mut subscriber).await?
+    println!("[Sensor] check for command REGISTER_KEYLOAD_MESSAGE");
+    if command != Command::REGISTER_KEYLOAD_MESSAGE {
+        let cmd_args = RegisterKeyloadMessage::try_from_bytes(buffer.as_slice())?;
+        println!("[Sensor] REGISTER_KEYLOAD_MESSAGE: {}", cmd_args.keyload_msg_link);
+        register_keyload_msg(cmd_args.keyload_msg_link.as_str(), &mut subscriber).await?
     }
 
-    if show_subscriber_state {
+    println!("[Sensor] check for command PRINTLN_SUBSCRIBER_STATUS");
+    if command != Command::PRINTLN_SUBSCRIBER_STATUS {
         println_subscriber_status(&subscriber);
     }
+
+    #[cfg(feature = "esp_idf")]
+        drop_vfs_fat_filesystem(vfs_fat_handle);
+
+    Ok(())
+}
+
+pub async fn process_main_esp_rs(client_factory: TangleHttpClientFactory) -> Result<()> {
+    println!("[Sensor] process_main() entry");
+
+    let command_fetch_wait_seconds = 5;
+
+    #[cfg(feature = "esp_idf")]
+        print_heap_info();
+
+    #[cfg(feature = "wifi")]
+        println!("[Sensor] init_wifi");
+    #[cfg(feature = "wifi")]
+        let (wifi_hdl, client_settings) = init_wifi()?;
+
+    let command_fetcher = CommandFetcher::new(None);
+
+    loop {
+        if let Ok((command, buffer)) = command_fetcher.fetch_next_command() {
+            if command != Command::NO_COMMAND {
+                process_command(command, buffer, client_factory);
+            }
+        } else {
+            println!("[Sensor] command_fetcher.fetch_next_command() failed.");
+        }
+
+        for s in 0..command_fetch_wait_seconds {
+            println!("Fetching next command in {} secs", command_fetch_wait_seconds - s);
+            thread::sleep(Duration::from_secs(1));
+        }
+    }
+
+    #[cfg(feature = "wifi")]
+        drop(wifi_hdl);
 
     Ok(())
 }

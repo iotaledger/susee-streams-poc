@@ -25,11 +25,11 @@ iota-client-types = { version = "0.1.2", path = "../iota-client-types" }
 smol = { version = "1.2", optional = true }
 
 # esp_idf dependencies
-esp-idf-svc = { version = "=0.37.2", optional = true }
-esp-idf-sys = { version = "0.30.3", optional = true }
-esp-idf-hal = { version = "0.33.1", optional = true }
-embedded-svc = { version = "0.17", optional = true }
-embedded-hal = { version = "0.2", optional = true }
+esp-idf-svc = { version = "0.39.1", optional = true }
+esp-idf-sys = { version = "0.31.0", optional = true }
+# esp-idf-hal = { version = "0.33.1", optional = true }
+embedded-svc = { version = "0.19", optional = true }
+# embedded-hal = { version = "0.2", optional = true }
 
 # std dependencies
 tokio = { version = "1.5", optional = true }
@@ -38,5 +38,5 @@ tokio = { version = "1.5", optional = true }
 [features]
 default = ["std"]
 smol_rt = ["smol"]
-esp_idf = ["embedded-svc", "embedded-hal", "esp-idf-svc", "esp-idf-sys", "esp-idf-hal"]
-std = ["tokio", "iota-streams/client"]
+esp_idf = ["embedded-svc", "esp-idf-svc", "esp-idf-sys"] # , "esp-idf-hal", "embedded-hal"
+std = ["tokio", "iota-streams/client", "iota-streams/std"]

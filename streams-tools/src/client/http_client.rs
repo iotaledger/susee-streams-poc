@@ -30,10 +30,10 @@ use std::{
 };
 
 use crate::{
-    RequestBuilder,
+    RequestBuilderStreams,
     client_base::STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
-    binary_persistence::BinaryPersist,
-    http_protocol::MapStreamsErrors,
+    binary_persist::BinaryPersist,
+    http_protocol_streams::MapStreamsErrors,
 };
 
 use hyper::{
@@ -63,7 +63,7 @@ impl Default for HttpClientOptions<'_> {
 pub struct HttpClient {
     client: Client,
     hyper_client: HyperClient<HttpConnector, Body>,
-    request_builder: RequestBuilder,
+    request_builder: RequestBuilderStreams,
 }
 
 impl HttpClient
@@ -73,7 +73,7 @@ impl HttpClient
         Self {
             client: Client::new_from_url(url),
             hyper_client: HyperClient::new(),
-            request_builder: RequestBuilder::new(options.http_url)
+            request_builder: RequestBuilderStreams::new(options.http_url)
         }
     }
 }

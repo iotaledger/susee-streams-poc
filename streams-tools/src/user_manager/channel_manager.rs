@@ -132,7 +132,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
         }
 
         let author = self.author.as_mut().unwrap() ;
-        author.sync_state().await;
+        author.sync_state().await.expect("Could not sync_state");
         let (msg_link, _seq_link) = author.send_signed_packet(
             &self.prev_msg_link.as_ref().unwrap(),
             &Bytes::default(),

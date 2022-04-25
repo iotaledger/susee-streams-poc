@@ -12,8 +12,8 @@ autobenches = true
 publish = true
 
 [dependencies]
-esp-idf-sys = { version = "0.30.6", features = ["binstart"] }
-esp-idf-svc = "0.37.2"
+esp-idf-sys = { version = "0.31.0", features = ["binstart"] }
+esp-idf-svc = "0.39.1"
 smol = { version = "1.2"}
 iota-streams = { git = "https://github.com/iotaledger/streams", branch = "develop", default-features = false, features = ["std", "tangle"] }
 streams-tools = { version = "0.1.2", path = "../../streams-tools", default-features = false, features=["smol_rt", "esp_idf"] }

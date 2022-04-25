@@ -1,21 +1,49 @@
 {
 	"folders": [
 		{
+			"name": "main",
 			"path": "."
+		},
+		{
+			"name": "sensor-lib",
+			"path": "../sensor-lib"
+		},
+		{
+			"path": "../../streams-tools"
 		}
 	],
 	"launch": {
 		"version": "0.2.0",
 		"configurations": [
-
 			{
-				"name": "GDB Debug",
+				"name": "Launch gdb-cppdbg",
+				"type": "cppdbg",
+				"request": "launch",
+				"miDebuggerPath": "riscv32-esp-elf-gdb",
+				"miDebuggerArgs": "-x ${workspaceFolder:main}/gdbinit",
+				"MIMode": "gdb",
+				"program": "/home/christof/Develop/chrisgitiota/susee-streams-poc/target/riscv32imc-esp-espidf/debug/main-rust-esp-r",
+				"launchCompleteCommand": "None",
+				"externalConsole": false,
+				"cwd": "${workspaceFolder:main}"
+			},
+			{
+				"name": "GDB Debug - attach no exec",
+				"type": "gdb",
+				"request": "attach",
+				"target": ":3333",
+				"remote": true,
+				"cwd": "${workspaceFolder:main}",
+				"gdbpath": "riscv32-esp-elf-gdb",
+				"valuesFormatting": "parseText",
+			},{
+				"name": "GDB Debug - attach",
 				"type": "gdb",
 				"request": "attach",
 				"executable": "../../target/riscv32imc-esp-espidf/release/main-rust-esp-r",
 				"target": ":3333",
 				"remote": true,
-				"cwd": "${workspaceRoot}",
+				"cwd": "${workspaceFolder}",
 				"gdbpath": "riscv32-esp-elf-gdb",
 				"valuesFormatting": "parseText",
 			}

@@ -1,4 +1,4 @@
-# https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-guides/jtag-debugging/using-debugger.html
+file /home/christof/Develop/chrisgitiota/susee-streams-poc/target/riscv32imc-esp-espidf/debug/main-rust-esp-r
 target extended-remote :3333
 set remote hardware-watchpoint-limit 2
 mon reset halt

@@ -33,38 +33,39 @@ use hyper::{
 };
 
 use crate::{
-    binary_persistence::BinaryPersist,
-    http_protocol::{
-        ServerDispatch,
+    binary_persist::BinaryPersist,
+    binary_persist_command::Command,
+    http_protocol_streams::{
+        ServerDispatchStreams,
         MapStreamsErrors,
-        dispatch_request,
-    }
+    },
+    http_protocol_command::{
+        ServerDispatchCommand,
+    },
+    http_server_dispatch::dispatch_request
 };
+use std::collections::VecDeque;
 
 #[derive(Clone)]
-pub struct HttpClientProxy {
+pub struct DispatchStreams {
     client: Client,
 }
 
-impl HttpClientProxy
+impl DispatchStreams
 {
-    pub fn new_from_url(url: &str) -> Self {
+    pub fn new(client: &Client) -> Self {
         Self {
-            client: Client::new_from_url(url),
+            client: client.clone(),
         }
-    }
-
-    pub async fn handle_request(&mut self, req: Request<Body>) -> Result<Response<Body>> {
-        dispatch_request(req, self).await
     }
 }
 
 #[async_trait(?Send)]
-impl ServerDispatch for HttpClientProxy {
+impl ServerDispatchStreams for DispatchStreams {
     async fn send_message<F: 'static + core::marker::Send + core::marker::Sync>(
         self: &mut Self, message: &TangleMessage) -> Result<Response<Body>>
     {
-        println!("[HttpClientProxy - ServerDispatch - send_message] Incoming TangleMessage");
+        println!("[HttpClientProxy - DispatchStreams] send_message() - Incoming TangleMessage");
         let res = self.client.send_message(message).await;
         match res {
             Ok(_) => Ok(Response::new(Default::default())),
@@ -73,7 +74,7 @@ impl ServerDispatch for HttpClientProxy {
     }
 
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
-        println!("[HttpClientProxy - ServerDispatch - receive_message_from_address] Incoming request for address: {}", address_str);
+        println!("[HttpClientProxy - DispatchStreams] receive_message_from_address() - Incoming request for address: {}", address_str);
         let address = TangleAddress::from_str(address_str).unwrap();
         let message = Transport::<TangleAddress, TangleMessage>::
             recv_message(&mut self.client, &address).await;
@@ -83,7 +84,7 @@ impl ServerDispatch for HttpClientProxy {
                 let _size = BinaryPersist::to_bytes(&msg, buffer.as_mut_slice());
                 Ok(Response::new(buffer.into()))
             },
-            Err(err) => HttpClientProxy::log_err_and_respond_500(err, "receive_message_from_address")
+            Err(err) => HttpClientProxy::log_err_and_respond_500(err, "[HttpClientProxy - DispatchStreams] receive_message_from_address()")
         }
     }
 
@@ -91,10 +92,88 @@ impl ServerDispatch for HttpClientProxy {
         unimplemented!()
     }
 
-    async fn fetch_new_commands(self: &mut Self) -> Result<Response<Body>> {
+    async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>> {
         unimplemented!()
     }
 }
+
+#[derive(Clone)]
+pub struct DispatchCommand {
+    client: Client,
+    fifo: VecDeque<Vec<u8>>,
+}
+
+impl DispatchCommand
+{
+    pub fn new(client: &Client) -> Self {
+        Self {
+            client: client.clone(),
+            fifo: VecDeque::<Vec<u8>>::new(),
+        }
+    }
+}
+
+impl DispatchCommand {
+    fn register_remote_command(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>> {
+        self.fifo.push_back(req_body_binary.to_vec());
+        println!("[HttpClientProxy - DispatchCommand] {}() - Receiving command blob. Blob length {}", api_fn_name, req_body_binary.len());
+        Ok(Response::new(Default::default()))
+    }
+}
+
+
+#[async_trait(?Send)]
+impl ServerDispatchCommand for DispatchCommand {
+    async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>> {
+        if let Some(req_body_binary) = self.fifo.pop_front() {
+            println!("[HttpClientProxy - DispatchCommand] fetch_next_command() - Returning command blob. Blob length {}", req_body_binary.len());
+            Ok(Response::new(req_body_binary.into()))
+        } else {
+            println!("[HttpClientProxy - DispatchCommand] fetch_next_command() - No command available. Returning Command::NO_COMMAND.");
+            let mut buffer: [u8; Command::COMMAND_LENGTH_BYTES] = [0; Command::COMMAND_LENGTH_BYTES];
+            Command::NO_COMMAND.to_bytes(&mut buffer)?;
+            Ok(Response::new(buffer.into()))
+        }
+    }
+
+    async fn send_message(self: &mut Self, req_body_binary: &[u8]) -> Result<Response<Body>> {
+        self.register_remote_command(req_body_binary, "send_message")
+    }
+
+    async fn subscribe_to_announcement(self: &mut Self, req_body_binary: &[u8]) -> Result<Response<Body>> {
+        self.register_remote_command(req_body_binary, "subscribe_to_announcement")
+    }
+
+    async fn register_keyload_msg(self: &mut Self, req_body_binary: &[u8]) -> Result<Response<Body>> {
+        self.register_remote_command(req_body_binary, "register_keyload_msg")
+    }
+
+    async fn println_subscriber_status(self: &mut Self, req_body_binary: &[u8]) -> Result<Response<Body>> {
+        self.register_remote_command(req_body_binary, "println_subscriber_status")
+    }
+}
+
+#[derive(Clone)]
+pub struct HttpClientProxy {
+    dispatch_streams: DispatchStreams,
+    dispatch_command: DispatchCommand,
+}
+
+impl HttpClientProxy
+{
+    pub fn new_from_url(url: &str) -> Self {
+        let client = Client::new_from_url(url);
+        Self {
+            dispatch_streams: DispatchStreams::new(&client),
+            dispatch_command: DispatchCommand::new(&client),
+        }
+    }
+
+    pub async fn handle_request(&mut self, req: Request<Body>) -> Result<Response<Body>> {
+        dispatch_request(req, &mut self.dispatch_streams, &mut self.dispatch_command).await
+    }
+}
+
 
 impl HttpClientProxy {
     fn log_err_and_respond_500(err: anyhow::Error, fn_name: &str) -> Result<Response<Body>> {

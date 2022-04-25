@@ -110,6 +110,7 @@ impl BinaryPersist for BinaryBody {
         BinaryPersist::to_bytes(&needed_size, &mut buffer[range.clone()]).expect("Serializing needed_size failed");
         range.increment(self.as_bytes().len());
         buffer[range.clone()].copy_from_slice(self.to_bytes().as_slice());
+        // println!("[BinaryPersist-BinaryBody.to_bytes] buffer: {:02X?}", buffer[range.clone()]);
         Ok(range.end)
     }
 
@@ -147,6 +148,7 @@ impl BinaryPersist for TangleMessage {
         let link_bytes_len = self.link().needed_size();
         let mut range: Range<usize> = RangeIterator::new(link_bytes_len);
         BinaryPersist::to_bytes(self.link(), &mut buffer[range.clone()]).expect("Could not persist message link");
+        // println!("[BinaryPersist-TangleMessage.to_bytes] buffer: {:02X?}", buffer[range.clone()]);
         // PREV_LINK
         range.increment(link_bytes_len);
         BinaryPersist::to_bytes(self.prev_link(), &mut buffer[range.clone()]).expect("Could not persist message prev_link");

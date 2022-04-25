@@ -60,12 +60,33 @@ impl DispatchStreams
     }
 }
 
+static LINK_AND_PREVLINK_LENGTH: usize = 2 * TANGLE_ADDRESS_BYTE_LEN;
+
+fn println_send_message_for_incoming_message(message: &TangleMessage) {
+    println!(
+        "\
+[HttpClientProxy - ServerDispatch - send_message] Incoming Message to attach to tangle with {} bytes payload. Data:
+{}
+", message.body.as_bytes().len() + LINK_AND_PREVLINK_LENGTH, message.to_string()
+    );
+}
+
+fn println_receive_message_from_address_for_received_message(message: &TangleMessage) {
+    println!(
+        "\
+[HttpClientProxy - ServerDispatch - receive_message_from_address] Received Message from tangle with {} bytes payload. Data:
+{}
+", message.body.as_bytes().len() + LINK_AND_PREVLINK_LENGTH, message.to_string()
+    );
+}
+
+
 #[async_trait(?Send)]
 impl ServerDispatchStreams for DispatchStreams {
     async fn send_message<F: 'static + core::marker::Send + core::marker::Sync>(
         self: &mut Self, message: &TangleMessage) -> Result<Response<Body>>
     {
-        println!("[HttpClientProxy - DispatchStreams] send_message() - Incoming TangleMessage");
+        println_send_message_for_incoming_message(message);
         let res = self.client.send_message(message).await;
         match res {
             Ok(_) => Ok(Response::new(Default::default())),
@@ -80,8 +101,11 @@ impl ServerDispatchStreams for DispatchStreams {
             recv_message(&mut self.client, &address).await;
         match message {
             Ok(msg) => {
+                println_receive_message_from_address_for_received_message(&msg);
                 let mut buffer: Vec<u8> = vec![0;BinaryPersist::needed_size(&msg)];
-                let _size = BinaryPersist::to_bytes(&msg, buffer.as_mut_slice());
+                let size = BinaryPersist::to_bytes(&msg, buffer.as_mut_slice());
+                println!("[HttpClientProxy - ServerDispatch - receive_message_from_address] Returning binary data via socket connection. length: {} bytes, data:\n\
+{:02X?}\n", size.unwrap_or_default(), buffer);
                 Ok(Response::new(buffer.into()))
             },
             Err(err) => HttpClientProxy::log_err_and_respond_500(err, "[HttpClientProxy - DispatchStreams] receive_message_from_address()")

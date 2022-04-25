@@ -58,7 +58,11 @@ async fn run() {
 
     let client = HttpClientProxy::new_from_url(cli.node);
 
-    let addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_HTTP_PROXY_PORT).into();
+    let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_HTTP_PROXY_PORT).into();
+    if cli.matches.is_present(cli.arg_keys.listener_ip_address_port) {
+        let addr_str = cli.matches.value_of(cli.arg_keys.listener_ip_address_port).unwrap().trim();
+        addr = addr_str.parse().unwrap();
+    }
 
     // Template from https://docs.rs/hyper/0.14.15/hyper/server/index.html
     // A `MakeService` that produces a `Service` to handle each connection.

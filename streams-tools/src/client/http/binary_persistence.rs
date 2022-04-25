@@ -106,12 +106,13 @@ impl BinaryPersist for BinaryBody {
         buffer[range.clone()].copy_from_slice(&needed_size.to_le_bytes());
         range.increment(self.as_bytes().len());
         buffer[range.clone()].copy_from_slice(self.to_bytes().as_slice());
+        // println!("[BinaryPersist-BinaryBody.to_bytes] buffer: {:02X?}", buffer[range.clone()]);
         Ok(range.end)
     }
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
         let mut range: Range<usize> = RangeIterator::new(USIZE_LEN);
-        let mut u32buf = [0;4];
+        let mut u32buf: [u8;4] = [0;4];
         u32buf.clone_from_slice(&buffer[range.clone()]);
         let body_len = u32::from_le_bytes(u32buf);
         range.increment(body_len as usize);
@@ -136,6 +137,7 @@ impl BinaryPersist for TangleMessage {
         let link_bytes_len = self.link().needed_size();
         let mut range: Range<usize> = RangeIterator::new(link_bytes_len);
         BinaryPersist::to_bytes(self.link(), &mut buffer[range.clone()]).expect("Could not persist message link");
+        // println!("[BinaryPersist-TangleMessage.to_bytes] buffer: {:02X?}", buffer[range.clone()]);
         // PREV_LINK
         range.increment(link_bytes_len);
         BinaryPersist::to_bytes(self.prev_link(), &mut buffer[range.clone()]).expect("Could not persist message prev_link");

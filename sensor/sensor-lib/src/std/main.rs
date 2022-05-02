@@ -11,12 +11,19 @@ use susee_tools::{
 
 use anyhow::Result;
 
-use crate::std::{
-    ClientType,
-    SubscriberManagerPlainTextWalletHttpClient,
-    sensor_manager::SensorManager,
-    remote_manager::RemoteManager,
+use crate::{
+    std::{
+        ClientType,
+        SubscriberManagerPlainTextWalletHttpClient,
+        sensor_manager::SensorManager,
+        remote_manager::{
+            RemoteManager,
+            RemoteManagerOptions,
+        },
+    }
 };
+
+use streams_tools::client::http_client::HttpClientOptions;
 
 pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 
@@ -29,8 +36,14 @@ pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 
     println!("[Sensor] Using node '{}' for tangle connection", cli.node);
 
-    //let client = HttpClient::new_from_url(&cli.node, None);
-    let client = ClientType::new_from_url(&cli.node, None); //
+    let mut http_client_options: Option<HttpClientOptions> = None;
+    if let Some(tangle_proxy_url) = cli.matches.value_of(cli.arg_keys.tangle_proxy_url) {
+        http_client_options = Some(HttpClientOptions{
+            http_url: tangle_proxy_url
+        });
+    }
+
+    let client = ClientType::new_from_url(&cli.node, http_client_options);
     let mut subscriber= SubscriberManagerPlainTextWalletHttpClient::new(
         client,
         wallet,
@@ -56,6 +69,11 @@ pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
         SensorManager::register_keyload_msg(keyload_msg_link_str, &mut subscriber).await?
     }
 
+    if cli.matches.is_present(cli.arg_keys.clear_client_state) {
+        show_subscriber_state = false;
+        SensorManager::clear_client_state(&mut subscriber).await?
+    }
+
     if show_subscriber_state {
         SensorManager::println_subscriber_status(&subscriber);
     }
@@ -65,29 +83,46 @@ pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 
 pub async fn process_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 
-    println!("[Sensor] Sending command to remote sensor using url {}", RemoteManager::get_proxy_url());
+    let mut show_subscriber_state = cli.matches.is_present(cli.arg_keys.println_subscriber_status);
 
-    let mut show_subscriber_state = true;
+    let mut remote_manager_options: Option<RemoteManagerOptions> = None;
+    if let Some(tangle_proxy_url) = cli.matches.value_of(cli.arg_keys.tangle_proxy_url) {
+        remote_manager_options = Some(RemoteManagerOptions{
+            http_url: tangle_proxy_url
+        });
+    }
+
+    let remote_manager = RemoteManager::new(remote_manager_options);
+
+    println!("[Sensor] Acting as remote sensor using {} as tangle-proxy url", remote_manager.get_proxy_url());
 
     if cli.matches.is_present(cli.arg_keys.subscribe_announcement_link) {
         let announcement_link_str = cli.matches.value_of(cli.arg_keys.subscribe_announcement_link).unwrap().trim();
+        println!("[Sensor] Sending subscribe_announcement_link command to remote sensor. announcement_link: {}", announcement_link_str);
         show_subscriber_state = false;
-        RemoteManager::subscribe_to_channel(announcement_link_str).await?
+        remote_manager.subscribe_to_channel(announcement_link_str).await?
     }
 
     if cli.matches.is_present(cli.arg_keys.files_to_send) {
         let files_to_send = cli.matches.values_of(cli.arg_keys.files_to_send).unwrap();
-        RemoteManager::send_messages(files_to_send).await?
+        println!("[Sensor] Sending files_to_send command to remote sensor.");
+        remote_manager.send_messages(files_to_send).await?
     }
 
     if cli.matches.is_present(cli.arg_keys.register_keyload_msg) {
         let keyload_msg_link_str = cli.matches.value_of(cli.arg_keys.register_keyload_msg).unwrap().trim();
+        println!("[Sensor] Sending register_keyload_msg command to remote sensor. keyload_msg_link: {}", keyload_msg_link_str);
         show_subscriber_state = false;
-        RemoteManager::register_keyload_msg(keyload_msg_link_str).await?
+        remote_manager.register_keyload_msg(keyload_msg_link_str).await?
+    }
+
+    if cli.matches.is_present(cli.arg_keys.clear_client_state) {
+        println!("[Sensor] Sending clear_client_state command to remote sensor.");
+        remote_manager.clear_client_state().await?
     }
 
     if show_subscriber_state {
-        RemoteManager::println_subscriber_status().await;
+        remote_manager.println_subscriber_status().await;
     }
 
     Ok(())

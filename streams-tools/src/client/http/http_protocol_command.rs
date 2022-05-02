@@ -50,6 +50,7 @@ impl EndpointUris {
     pub const SUBSCRIBE_TO_ANNOUNCEMENT: &'static str  = "/command/subscribe_to_announcement";
     pub const REGISTER_KEYLOAD_MSG: &'static str  = "/command/register_keyload_msg";
     pub const PRINTLN_SUBSCRIBER_STATUS: &'static str  = "/command/println_subscriber_status";
+    pub const CLEAR_CLIENT_STATE: &'static str  = "/command/clear_client_state";
     pub const SEND_MESSAGES: &'static str  = "/command/send_messages";
 }
 
@@ -84,6 +85,15 @@ impl RequestBuilderCommand {
             .body(Body::empty())
     }
 
+    pub fn clear_client_state(self: &Self) -> Result<Request<Body>> {
+        self.tools.get_request_builder()
+            .method("GET")
+            .uri(self.tools.get_uri(EndpointUris::CLEAR_CLIENT_STATE).as_str())
+            .body(Body::empty())
+    }
+
+
+
     pub fn send_message(self: &Self, message_template_key: &str) -> Result<Request<Body>> {
         self.send_command_with_args(
             StartSendingMessages{
@@ -93,7 +103,6 @@ impl RequestBuilderCommand {
             EndpointUris::SEND_MESSAGES
         )
     }
-
 
     pub fn subscribe_to_announcement(self: &Self, announcement_link_str: &str) -> Result<Request<Body>> {
         self.send_command_with_args(
@@ -123,10 +132,14 @@ impl RequestBuilderCommand {
 #[async_trait(?Send)]
 pub trait ServerDispatchCommand {
     async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>>;
-    async fn println_subscriber_status(self: &mut Self, req_body_binary: &[u8]) -> Result<Response<Body>>;
-    async fn send_message(self: &mut Self, req_body_binary: &[u8] ) -> Result<Response<Body>>;
-    async fn subscribe_to_announcement(self: &mut Self, req_body_binary: &[u8]) -> Result<Response<Body>>;
-    async fn register_keyload_msg(self: &mut Self, req_body_binary: &[u8]) -> Result<Response<Body>>;
+    async fn register_remote_command(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>>;
+}
+
+// Use the the persisted Command::XXXX_XXXX_XXXX instead as Response<Body>
+fn get_body_bytes_from_command(command: &Command) -> Result<[u8; Command::COMMAND_LENGTH_BYTES]> {
+    let mut buffer: [u8; Command::COMMAND_LENGTH_BYTES] = [0; Command::COMMAND_LENGTH_BYTES];
+    command.to_bytes(&mut buffer).unwrap();
+    Ok(buffer)
 }
 
 pub async fn dispatch_request_command(method: &Method, path: &str, body_bytes: &[u8], query_pairs: &Parse<'_>, callbacks: &mut impl ServerDispatchCommand) -> Result<Response<Body>> {
@@ -136,22 +149,25 @@ pub async fn dispatch_request_command(method: &Method, path: &str, body_bytes: &
         },
 
         (&Method::GET, EndpointUris::PRINTLN_SUBSCRIBER_STATUS) => {
-            // Use the the persisted Command::PRINTLN_SUBSCRIBER_STATUS instead of empty request body
-            let mut buffer: [u8; Command::COMMAND_LENGTH_BYTES] = [0; Command::COMMAND_LENGTH_BYTES];
-            Command::PRINTLN_SUBSCRIBER_STATUS.to_bytes(&mut buffer).unwrap();
-            callbacks.println_subscriber_status(&buffer).await
+            let buffer = get_body_bytes_from_command(&Command::PRINTLN_SUBSCRIBER_STATUS)?;
+            callbacks.register_remote_command(&buffer, "println_subscriber_status").await
+        },
+
+        (&Method::GET, EndpointUris::CLEAR_CLIENT_STATE) => {
+            let buffer = get_body_bytes_from_command(&Command::CLEAR_CLIENT_STATE)?;
+            callbacks.register_remote_command(&buffer, "clear_client_state").await
         },
 
         (&Method::POST, EndpointUris::SEND_MESSAGES) => {
-            callbacks.send_message(body_bytes).await
+            callbacks.register_remote_command(body_bytes, "send_message").await
         },
 
         (&Method::POST, EndpointUris::SUBSCRIBE_TO_ANNOUNCEMENT) => {
-            callbacks.subscribe_to_announcement(body_bytes).await
+            callbacks.register_remote_command(body_bytes, "subscribe_to_announcement").await
         },
 
         (&Method::POST, EndpointUris::REGISTER_KEYLOAD_MSG) => {
-            callbacks.register_keyload_msg(body_bytes).await
+            callbacks.register_remote_command(body_bytes, "register_keyload_msg").await
         },
 
         // Return the 404 Not Found for other routes.

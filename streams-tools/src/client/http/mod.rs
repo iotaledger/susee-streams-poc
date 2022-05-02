@@ -20,7 +20,9 @@ pub use {
 
 #[cfg(feature = "std")]
 pub use {
-    http_client_proxy::HttpClientProxy,
+    http_client_proxy::{
+        HttpClientProxy,
+    },
 };
 
 

@@ -32,7 +32,7 @@ use std::{
 use hyper::server::conn::AddrStream;
 use tokio::sync::oneshot;
 
-async fn handle_request(mut client: HttpClientProxy, request: Request<Body>)
+async fn handle_request(mut client: HttpClientProxy<'_>, request: Request<Body>)
                         -> Result<Response<Body>, hyper::http::Error>
 {
     println!("[Tangle Proxy] Handling request {}", request.uri().to_string());

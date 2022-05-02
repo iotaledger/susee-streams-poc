@@ -9,6 +9,7 @@ members = [
     "tangle-proxy",
     "streams-tools",
     "susee-tools",
+    "test/payloads",
 ]
 
 exclude = [
@@ -38,9 +39,11 @@ polling = { git = "https://github.com/esp-rs-compat/polling" }
 esp-idf-svc = { version = "0.39.1", path = "../../esp-rs/esp-idf-svc/" }
 # esp-idf-sys = { version = "0.31.0", path = "../../esp-rs/esp-idf-sys/" }
 esp-idf-sys = { version = "0.31.0", git = "https://github.com/esp-rs/esp-idf-sys.git", rev = "b33f72191701b245f3129f81b2120fac78876694" }
-
-
 time = { version = "=0.3.4", git = "https://github.com/time-rs/time", rev="8ec5f4ef2f63321b3dbbec3b4a6c4001fdf26de6" }
+iota-crypto = { version = "0.9.1", git = "https://github.com/iotaledger/crypto.rs.git", rev="6840d43f98ad1a991571268f7a9543025200ca4f" }
 
-[patch."https://github.com/iotaledger/streams"]
-iota-streams = { version = "0.1.2", path = "../../iotaledger/streams" }
+#[patch."https://github.com/iotaledger/streams"]
+#iota-streams = { version = "0.1.2", path = "../../iotaledger/streams" }
+
+# [patch."https://github.com/iotaledger/crypto.rs"]
+# iota-crypto = { version = "0.9.1", git = "https://github.com/iotaledger//crypto.rs.git", rev="6840d43f98ad1a991571268f7a9543025200ca4f" }

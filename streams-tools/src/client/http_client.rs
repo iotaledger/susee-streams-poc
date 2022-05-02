@@ -45,9 +45,10 @@ use hyper::{
 };
 
 use tokio::time;
+use std::fmt;
 
 pub struct HttpClientOptions<'a> {
-    http_url: &'a str,
+    pub http_url: &'a str,
 }
 
 impl Default for HttpClientOptions<'_> {
@@ -55,6 +56,12 @@ impl Default for HttpClientOptions<'_> {
         Self {
             http_url: STREAMS_TOOLS_CONST_HTTP_PROXY_URL
         }
+    }
+}
+
+impl fmt::Display for HttpClientOptions<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HttpClientOptions: http_url: {}", self.http_url)
     }
 }
 
@@ -70,6 +77,7 @@ impl HttpClient
 {
     pub fn new_from_url(url: &str, options: Option<HttpClientOptions>) -> Self {
         let options = options.unwrap_or_default();
+        println!("[HttpClient.new_from_url()] Initializing instance with options:\n{}\n", options);
         Self {
             client: Client::new_from_url(url),
             hyper_client: HyperClient::new(),

@@ -18,6 +18,7 @@ use std::{
     fs::{
         write,
         read,
+        remove_file,
     }
 };
 
@@ -44,7 +45,9 @@ use iota_streams::{
     app::transport::tangle::TangleAddress,
 };
 
+#[cfg(feature = "std")]
 use futures::executor::block_on;
+
 
 type Subscriber<ClientT> = iota_streams::app_channels::api::tangle::Subscriber<ClientT>;
 
@@ -111,6 +114,7 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
         } else {
         // TODO: When the subscription link is known after import_from_serialization_file
         //      this fn call can be handled more gracefully here
+            println!("[SubscriberManager.subscribe()] - This subscriber has already subscribed. announcement_link: {}", self.announcement_link.unwrap());
             bail!("[SubscriberManager.subscribe()] - This subscriber has already subscribed. announcement_link: {}", self.announcement_link.unwrap())
     }
     println!("[SubscriberManager] returning subscription_link");
@@ -158,26 +162,67 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
         Ok(msg_link)
     }
 
+    pub async fn safe_client_status_to_disk(&mut self) -> Result<()> {
+        if let Some(serial_file_name) = self.serialization_file.clone() {
+            self.export_to_serialization_file(serial_file_name.as_str()).await
+        } else {
+            bail!("[SubscriberManager.safe_client_status_to_disk()] - You need to specify the serialization_file constructor argument before using this function.");
+        }
+    }
+
+    pub async fn clear_client_state(&mut self) -> Result<()> {
+        if let Some(serial_file_name) = self.serialization_file.clone() {
+            println!("[SubscriberManager.clear_client_state()] - START");
+
+            if Path::new(serial_file_name.as_str()).exists(){
+                println!("[SubscriberManager.clear_client_state()] - Removing file {}", serial_file_name);
+                remove_file(serial_file_name)?;
+            } else {
+                println!("[SubscriberManager.clear_client_state()] - Can not remove file {} cause it does not exist.", serial_file_name);
+            }
+
+            println!("[SubscriberManager.clear_client_state()] - Setting all links and subscriber to None");
+            self.prev_msg_link = None;
+            self.subscription_link = None;
+            self.subscriber = None;
+
+            println!("[SubscriberManager.clear_client_state()] - Ok");
+            Ok(())
+        } else {
+            bail!("[SubscriberManager.clear_client_state()] - You need to specify the serialization_file constructor argument before using this function.");
+        }
+    }
+
     async fn export_to_serialization_file(&mut self, file_name: &str) -> Result<()> {
+        println!("[SubscriberManager.export_to_serialization_file()] - START");
         if let Some(subscriber) = &self.subscriber {
+            println!("[SubscriberManager.export_to_serialization_file()] - subscriber available");
             let static_sized_buffer_front_length =
                   TANGLE_ADDRESS_BYTE_LEN               // PREV_MSG_LINK
                 + TANGLE_ADDRESS_BYTE_LEN               // SUBSCRIPTION_LINK
             ;
             let mut buffer: Vec<u8> = vec![0; static_sized_buffer_front_length];
+            println!("[SubscriberManager.export_to_serialization_file()] - buffer.len: {}", buffer.len());
 
             // PREV_MSG_LINK
             let mut range: Range<usize> = RangeIterator::new(TANGLE_ADDRESS_BYTE_LEN);
+            println!("[SubscriberManager.export_to_serialization_file()] - persist PREV_MSG_LINK");
             self.persist_optional_tangle_address(&mut buffer, &mut range, self.prev_msg_link);
 
             // SUBSCRIPTION_LINK
             range.increment(TANGLE_ADDRESS_BYTE_LEN);
+            println!("[SubscriberManager.export_to_serialization_file()] - persist SUBSCRIPTION_LINK");
             self.persist_optional_tangle_address(&mut buffer, &mut range, self.subscription_link);
 
             // SUBSCRIBER
-            buffer.append(&mut subscriber.export(self.wallet.get_serialization_password()).await?);
+            println!("[SubscriberManager.export_to_serialization_file()] - persist SUBSCRIBER");
+            let mut persisted_subscriber = subscriber.export(self.wallet.get_serialization_password()).await?;
+            println!("[SubscriberManager.export_to_serialization_file()] - persisted_subscriber length: {}", persisted_subscriber.len());
+            buffer.append(&mut persisted_subscriber);
+            println!("[SubscriberManager.export_to_serialization_file()] - write file '{}'", file_name);
             write(file_name, &buffer).expect(format!("[SubscriberManager.subscribe()] - Error while writing Subscriber state file '{}'", file_name).as_str());
         }
+        println!("[SubscriberManager.export_to_serialization_file()] - Ok");
         Ok(())
     }
 
@@ -194,7 +239,9 @@ async fn import_from_serialization_file<ClientT: ClientTTrait, WalletT: SimpleWa
     file_name: &str,
     ret_val: &mut SubscriberManager<ClientT, WalletT>
 ) -> Result<()>{
-    let buffer = read(file_name).expect(format!("[SubscriberManager.subscribe()] - Error while opening channel state file '{}'", file_name).as_str());
+    println!("[SubscriberManager::import_from_serialization_file()] - START");
+    let buffer = read(file_name).expect(format!("[SubscriberManager::import_from_serialization_file()] - Error while opening channel state file '{}'", file_name).as_str());
+    println!("[SubscriberManager::import_from_serialization_file()] - buffer len: {}", buffer.len());
 
     // PREV_MSG_LINK
     let mut range: Range<usize> = RangeIterator::new(TANGLE_ADDRESS_BYTE_LEN);
@@ -234,6 +281,7 @@ async fn import_from_serialization_file<ClientT: ClientTTrait, WalletT: SimpleWa
 */
     ret_val.subscriber = Some(subscriber);
 
+    println!("[SubscriberManager::import_from_serialization_file()] - Ok");
     Ok(())
 }
 
@@ -249,6 +297,7 @@ fn read_optional_tangle_address_from_bytes(
     }
 }
 
+#[cfg(feature = "std")]
 impl<ClientT: ClientTTrait, WalletT: SimpleWallet> Drop for SubscriberManager<ClientT, WalletT>{
     fn drop(&mut self) {
         if let Some(serial_file_name) = self.serialization_file.clone() {

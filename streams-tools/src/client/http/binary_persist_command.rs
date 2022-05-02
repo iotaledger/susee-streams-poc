@@ -26,6 +26,7 @@ impl Command {
     pub const SUBSCRIBE_TO_ANNOUNCEMENT_LINK: Command = Command(2);
     pub const REGISTER_KEYLOAD_MESSAGE: Command = Command(3);
     pub const PRINTLN_SUBSCRIBER_STATUS: Command = Command(4);
+    pub const CLEAR_CLIENT_STATE: Command = Command(5);
 
     pub const COMMAND_LENGTH_BYTES: usize = size_of::<u8>();
 
@@ -55,6 +56,7 @@ fn print_command(key: &Command) -> &'static str {
         &Command::SUBSCRIBE_TO_ANNOUNCEMENT_LINK => "SUBSCRIBE_TO_ANNOUNCEMENT_LINK",   // 2
         &Command::REGISTER_KEYLOAD_MESSAGE => "REGISTER_KEYLOAD_Message",               // 3
         &Command::PRINTLN_SUBSCRIBER_STATUS => "PRINTLN_SUBSCRIBER_STATUS",             // 4
+        &Command::CLEAR_CLIENT_STATE => "CLEAR_CLIENT_STATE",                           // 5
         _ => "Unknown Command",
     };
 }

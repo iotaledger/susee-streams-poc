@@ -115,4 +115,9 @@ impl SensorManager {
 
         Ok(())
     }
+
+    pub async fn clear_client_state(subscriber_mngr: &mut SubscriberManagerPlainTextWalletHttpClient)  -> Result<()> {
+        subscriber_mngr.clear_client_state().await?;
+        Ok(())
+    }
 }

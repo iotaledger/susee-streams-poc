@@ -93,7 +93,7 @@ use anyhow::{
 // }
 
 pub struct HttpClientOptions<'a> {
-    http_url: &'a str,
+    pub(crate) http_url: &'a str,
 }
 
 impl Default for HttpClientOptions<'_> {

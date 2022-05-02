@@ -10,6 +10,6 @@ impl SimpleWallet for DummyWallet {
     }
 
     fn get_serialization_password(&self) -> &str {
-        unimplemented!()
+        "dummy serialization password"
     }
 }

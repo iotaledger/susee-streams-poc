@@ -27,6 +27,7 @@ smol_rt = [
     "smol",
     "streams-tools/smol_rt",
     "susee-tools/smol_rt",
+    "payloads",
 ]
 
 esp_idf = [
@@ -61,6 +62,7 @@ embedded-svc = { version = "0.19", optional = true }
 # smol_rt dependencies
 # log = { version = "0.4", optional = true }
 smol = { version = "1.2", optional = true}
+payloads = { version = "0.1.2", path = "../../test/payloads", optional = true }
 
 # std dependencies
 tokio = {version = "1.5", optional = true}

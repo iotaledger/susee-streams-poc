@@ -5,7 +5,6 @@
 /**/user-state-*.bin
 /.embuild/espressif/
 /sensor/main-rust-esp-r/build/CMakeFiles/
-/**/Cargo.lock
-Cargo.lock
+Cargo.lock.bak-*
 /sensor/main-idf/build/
 /temp-apps/

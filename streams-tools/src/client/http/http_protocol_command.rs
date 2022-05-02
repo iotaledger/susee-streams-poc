@@ -1,13 +1,10 @@
 use hyper::{
     Body,
-    body,
     http::{
         Request,
         Response,
         Result,
         Method,
-        StatusCode,
-        request::Builder,
     }
 };
 
@@ -26,15 +23,10 @@ use crate::{
 };
 
 use url::{
-    Url,
     form_urlencoded::Parse
 };
 
 use iota_streams::core::async_trait;
-
-use std::{
-    ops::Deref,
-};
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -142,7 +134,7 @@ fn get_body_bytes_from_command(command: &Command) -> Result<[u8; Command::COMMAN
     Ok(buffer)
 }
 
-pub async fn dispatch_request_command(method: &Method, path: &str, body_bytes: &[u8], query_pairs: &Parse<'_>, callbacks: &mut impl ServerDispatchCommand) -> Result<Response<Body>> {
+pub async fn dispatch_request_command(method: &Method, path: &str, body_bytes: &[u8], _query_pairs: &Parse<'_>, callbacks: &mut impl ServerDispatchCommand) -> Result<Response<Body>> {
     match (method, path) {
         (&Method::GET, EndpointUris::FETCH_NEXT_COMMAND) => {
             callbacks.fetch_next_command().await

@@ -7,7 +7,6 @@ use hyper::{
         Result,
         Method,
         StatusCode,
-        request::Builder,
     }
 };
 
@@ -24,7 +23,6 @@ use crate::client::http::{
 
 use url::{
     Url,
-    form_urlencoded::Parse
 };
 
 use std::{
@@ -34,8 +32,8 @@ use hyper::body::Bytes;
 
 pub async fn dispatch_request(
     req: Request<Body>,
-    streamsCallbacks: &mut impl ServerDispatchStreams,
-    commandCallbacks: &mut impl ServerDispatchCommand,
+    streams_callbacks: &mut impl ServerDispatchStreams,
+    command_callbacks: &mut impl ServerDispatchCommand,
 ) -> Result<Response<Body>> {
 
     let uri_str = req.uri().to_string();
@@ -48,7 +46,7 @@ pub async fn dispatch_request(
     let method = req.method().clone();
 
     // In case of a POST request move the binary body into a buffer
-    let mut binary_body: &[u8];
+    let binary_body: &[u8];
     let body_bytes: Bytes;
     if req.method() == Method::POST {
         body_bytes = body::to_bytes(req.into_body()).await.unwrap();
@@ -57,10 +55,10 @@ pub async fn dispatch_request(
         binary_body = &[];
     }
 
-    let mut response = dispatch_request_streams(&method, path, binary_body, &query_pairs, streamsCallbacks).await?;
+    let mut response = dispatch_request_streams(&method, path, binary_body, &query_pairs, streams_callbacks).await?;
 
     if response.status() == StatusCode::NOT_FOUND {
-        response = dispatch_request_command(&method, path, binary_body, &query_pairs, commandCallbacks).await?;
+        response = dispatch_request_command(&method, path, binary_body, &query_pairs, command_callbacks).await?;
     }
 
     Ok(response)

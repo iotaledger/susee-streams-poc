@@ -16,4 +16,5 @@ crate-type = ["rlib"]
 serde = { version = "1.0.130", default-features = false, features = ["derive"] }
 bee-message = { version  = "0.1.6", default-features = false, features = ["serde"] }
 bee-rest-api = { version = "0.1.7", default-features = false }
-iota-streams-core = { version = "0.1.2", path = "../../../iotaledger/streams/iota-streams-core", default-features = false }
+# iota-streams-core = { version = "0.1.2", path = "../../../iotaledger/streams/iota-streams-core", default-features = false }
+iota-streams-core = { git = "https://github.com/iotaledger/streams", branch = "develop", package="iota-streams-core", default-features = false }

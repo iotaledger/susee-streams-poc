@@ -1,13 +1,11 @@
 use hyper::{
     Body,
-    body,
     http::{
         Request,
         Response,
         Result,
         Method,
         StatusCode,
-        request::Builder,
     }
 };
 
@@ -27,14 +25,8 @@ use iota_streams::{
 };
 
 use url::{
-    Url,
     form_urlencoded::Parse
 };
-
-use std::{
-    ops::Deref,
-};
-
 
 use crate::{
     BinaryPersist,

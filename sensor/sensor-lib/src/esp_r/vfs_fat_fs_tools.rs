@@ -39,6 +39,6 @@ pub fn setup_vfs_fat_filesystem() -> Result<wl_handle_t> {
 pub fn drop_vfs_fat_filesystem(s_wl_handle: wl_handle_t) -> Result<()> {
     println!("[Sensor] Starting drop_vfs_fat_filesystem");
     let base_path: CString = CString::new(BASE_PATH).expect("CString::new for BASE_PATH failed");
-    esp!(unsafe {esp_vfs_fat_spiflash_unmount(base_path.as_ptr(), s_wl_handle)});
+    esp!(unsafe {esp_vfs_fat_spiflash_unmount(base_path.as_ptr(), s_wl_handle)})?;
     Ok(())
 }

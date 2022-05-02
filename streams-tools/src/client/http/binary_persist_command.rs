@@ -61,15 +61,6 @@ fn print_command(key: &Command) -> &'static str {
     };
 }
 
-fn has_command_args(key: &Command) -> bool {
-    return match key {
-        &Command::START_SENDING_MESSAGES => true,
-        &Command::SUBSCRIBE_TO_ANNOUNCEMENT_LINK => true,
-        &Command::REGISTER_KEYLOAD_MESSAGE => true,
-        _ => false,
-    };
-}
-
 impl fmt::Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

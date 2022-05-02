@@ -210,9 +210,9 @@ async fn process_command(command: Command, buffer: Vec<u8>, client_factory: Tang
     #[cfg(feature = "esp_idf")]
     {
         println!("[Sensor - process_command()] Safe subscriber client_status to disk");
-        subscriber.safe_client_status_to_disk().await;
+        subscriber.safe_client_status_to_disk().await?;
         println!("[Sensor - process_command()] drop_vfs_fat_filesystem");
-        drop_vfs_fat_filesystem(vfs_fat_handle);
+        drop_vfs_fat_filesystem(vfs_fat_handle)?;
     }
 
     Ok(())
@@ -229,7 +229,7 @@ pub async fn process_main_esp_rs(client_factory: TangleHttpClientFactory) -> Res
     #[cfg(feature = "wifi")]
         println!("[Sensor] init_wifi");
     #[cfg(feature = "wifi")]
-        let (wifi_hdl, client_settings) = init_wifi()?;
+        let (_wifi_hdl, _client_settings) = init_wifi()?;
 
     let command_fetcher = CommandFetcher::new(None);
 
@@ -237,7 +237,7 @@ pub async fn process_main_esp_rs(client_factory: TangleHttpClientFactory) -> Res
         if let Ok((command, buffer)) = command_fetcher.fetch_next_command() {
             if command != Command::NO_COMMAND {
                 println!("[Sensor] process_main_esp_rs - Starting process_command for command: {}.", command);
-                process_command(command, buffer, client_factory).await;
+                process_command(command, buffer, client_factory).await?;
             }
         } else {
             println!("[Sensor] process_main_esp_rs - command_fetcher.fetch_next_command() failed.");
@@ -248,9 +248,4 @@ pub async fn process_main_esp_rs(client_factory: TangleHttpClientFactory) -> Res
             thread::sleep(Duration::from_secs(1));
         }
     }
-
-    #[cfg(feature = "wifi")]
-        drop(wifi_hdl);
-
-    Ok(())
 }

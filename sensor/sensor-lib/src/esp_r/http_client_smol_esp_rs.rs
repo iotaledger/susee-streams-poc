@@ -274,7 +274,7 @@ impl Transport<TangleAddress, TangleMessage> for HttpClient
 #[async_trait(?Send)]
 impl TransportDetails<TangleAddress> for HttpClient {
     type Details = Details;
-    async fn get_link_details(&mut self, link: &TangleAddress) -> anyhow::Result<Self::Details> {
+    async fn get_link_details(&mut self, _link: &TangleAddress) -> anyhow::Result<Self::Details> {
         unimplemented!()
     }
 }

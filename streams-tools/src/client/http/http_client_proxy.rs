@@ -131,7 +131,7 @@ pub struct DispatchCommand<'a> {
 
 impl<'a> Clone for DispatchCommand<'a> {
     fn clone(&self) -> DispatchCommand<'a> {
-        let mut fifo_queue: & mut VecDeque::<Vec<u8>>;
+        let fifo_queue: & mut VecDeque::<Vec<u8>>;
         unsafe {
             // TODO: This unsafe code needs to be replaced by a thread safe shared queue instance
             //       based on Arc::new(Mutex::new(......)) as been described here
@@ -151,7 +151,7 @@ impl<'a> Clone for DispatchCommand<'a> {
 impl<'a> DispatchCommand<'a>
 {
     pub fn new(client: &Client) -> Self {
-        let mut fifo_queue: & mut VecDeque::<Vec<u8>>;
+        let fifo_queue: & mut VecDeque::<Vec<u8>>;
         unsafe {
             // TODO: This unsafe code needs to be replaced by ... (See comment in the unsafe scope above)
             if FIFO_QUEUE.is_none() {

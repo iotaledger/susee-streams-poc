@@ -122,7 +122,7 @@ pub async fn process_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
     }
 
     if show_subscriber_state {
-        remote_manager.println_subscriber_status().await;
+        remote_manager.println_subscriber_status().await?;
     }
 
     Ok(())

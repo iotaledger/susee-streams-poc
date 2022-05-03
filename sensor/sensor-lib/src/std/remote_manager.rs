@@ -2,12 +2,8 @@ use clap::Values;
 
 use hyper::{
     Client,
-    body,
     Body,
     client::HttpConnector,
-    http::{
-        StatusCode,
-    },
 };
 
 

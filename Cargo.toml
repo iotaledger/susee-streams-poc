@@ -2,7 +2,7 @@
 members = [
     "management-console",
     "sensor/main-rust",
-    "sensor/main-rust-esp-r",
+    "sensor/main-rust-esp-rs",
     "sensor/main-rust-pio",
     "sensor/sensor-lib",
     "iota-client-types",

@@ -1531,7 +1531,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "main-rust-esp-r"
+name = "main-rust-esp-rs"
 version = "0.1.0"
 dependencies = [
  "anyhow",

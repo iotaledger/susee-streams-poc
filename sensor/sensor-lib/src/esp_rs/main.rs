@@ -5,7 +5,6 @@ use super::{
     http_client_smol_esp_rs::{
         HttpClient,
     },
-    // send_message_utils::send_content_as_msg,
 };
 
 use payloads::{
@@ -66,10 +65,6 @@ type SubscriberManagerDummyWalletHttpClient = SubscriberManager<ClientType, Dumm
 #[cfg(feature = "esp_idf")]
 fn print_heap_info() {
     unsafe {
-        // esp_idf_sys::heap_caps_print_heap_info(
-        //     esp_idf_sys::MALLOC_CAP_8BIT
-        // );
-
         let free_mem = esp_idf_sys::heap_caps_get_free_size(
             esp_idf_sys::MALLOC_CAP_8BIT
         );

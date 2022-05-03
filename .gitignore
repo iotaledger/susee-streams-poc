@@ -4,7 +4,7 @@
 /**/wallet-*.txt
 /**/user-state-*.bin
 /.embuild/espressif/
-/sensor/main-rust-esp-r/build/CMakeFiles/
+/sensor/main-rust-esp-rs/build/CMakeFiles/
 Cargo.lock.bak-*
 /sensor/main-idf/build/
 /temp-apps/

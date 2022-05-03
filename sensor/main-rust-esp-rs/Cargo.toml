@@ -1,5 +1,5 @@
 [package]
-name = "main-rust-esp-r"
+name = "main-rust-esp-rs"
 version = "0.1.0"
 authors = ["chrisgitiota <christof.gerritsma@iota.org>"]
 edition = "2018"

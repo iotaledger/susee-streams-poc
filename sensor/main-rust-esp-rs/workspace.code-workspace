@@ -22,7 +22,7 @@
 				"miDebuggerPath": "riscv32-esp-elf-gdb",
 				"miDebuggerArgs": "-x ${workspaceFolder:main}/gdbinit",
 				"MIMode": "gdb",
-				"program": "/home/christof/Develop/chrisgitiota/susee-streams-poc/target/riscv32imc-esp-espidf/debug/main-rust-esp-r",
+				"program": "/home/christof/Develop/chrisgitiota/susee-streams-poc/target/riscv32imc-esp-espidf/debug/main-rust-esp-rs",
 				"launchCompleteCommand": "None",
 				"externalConsole": false,
 				"cwd": "${workspaceFolder:main}"
@@ -40,7 +40,7 @@
 				"name": "GDB Debug - attach",
 				"type": "gdb",
 				"request": "attach",
-				"executable": "../../target/riscv32imc-esp-espidf/release/main-rust-esp-r",
+				"executable": "../../target/riscv32imc-esp-espidf/release/main-rust-esp-rs",
 				"target": ":3333",
 				"remote": true,
 				"cwd": "${workspaceFolder}",

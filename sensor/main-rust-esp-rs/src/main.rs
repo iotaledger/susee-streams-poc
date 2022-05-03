@@ -1,8 +1,6 @@
 use esp_idf_sys as _; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
 use esp_idf_sys::EspError;
 
-// use smol::{io, net, prelude::*, Unblock};
-
 use log::*;
 use sensor_lib::{
     process_main_esp_rs,

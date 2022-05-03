@@ -38,6 +38,6 @@ ESP_IDF_VERSION = { value = "master" }
 # is by running "cargo pio espidf menuconfig" (that is, if using the pio builder)
 #ESP_IDF_SDKCONFIG = { value = "sdkconfig.release;sdkconfig.debug" }
 ESP_IDF_SDKCONFIG_DEFAULTS = { value = """
-./sensor/main-rust-esp-r/sdkconfig.defaults;
-./sensor/main-rust-esp-r/sdkconfig.defaults.esp32c3;
+./sensor/main-rust-esp-rs/sdkconfig.defaults;
+./sensor/main-rust-esp-rs/sdkconfig.defaults.esp32c3;
 """ }

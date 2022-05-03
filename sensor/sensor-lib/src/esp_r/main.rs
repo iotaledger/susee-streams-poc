@@ -4,7 +4,6 @@ use super::{
     },
     http_client_smol_esp_rs::{
         HttpClient,
-        HttpClientOptions,
     },
     // send_message_utils::send_content_as_msg,
 };
@@ -63,8 +62,6 @@ use std::{
 type ClientType = HttpClient;
 
 type SubscriberManagerDummyWalletHttpClient = SubscriberManager<ClientType, DummyWallet>;
-
-pub type TangleHttpClientFactory = fn(options: Option<HttpClientOptions>) -> HttpClient;
 
 #[cfg(feature = "esp_idf")]
 fn print_heap_info() {
@@ -159,14 +156,14 @@ async fn register_keyload_msg(keyload_msg_link_str: &str, subscriber_mngr: &mut 
     Ok(())
 }
 
-async fn process_command(command: Command, buffer: Vec<u8>, client_factory: TangleHttpClientFactory) -> Result<()>{
+async fn process_command(command: Command, buffer: Vec<u8>) -> Result<()>{
     let wallet = DummyWallet{};
 
     #[cfg(feature = "esp_idf")]
         let vfs_fat_handle = setup_vfs_fat_filesystem()?;
 
     println!("[Sensor - process_command()] Creating HttpClient");
-    let client = client_factory(None);
+    let client = HttpClient::new(None);
     println!("[Sensor] Creating subscriber");
     let mut subscriber= SubscriberManagerDummyWalletHttpClient::new(
         client,
@@ -218,7 +215,7 @@ async fn process_command(command: Command, buffer: Vec<u8>, client_factory: Tang
     Ok(())
 }
 
-pub async fn process_main_esp_rs(client_factory: TangleHttpClientFactory) -> Result<()> {
+pub async fn process_main_esp_rs() -> Result<()> {
     println!("[Sensor] process_main() entry");
 
     let command_fetch_wait_seconds = 5;
@@ -237,7 +234,7 @@ pub async fn process_main_esp_rs(client_factory: TangleHttpClientFactory) -> Res
         if let Ok((command, buffer)) = command_fetcher.fetch_next_command() {
             if command != Command::NO_COMMAND {
                 println!("[Sensor] process_main_esp_rs - Starting process_command for command: {}.", command);
-                process_command(command, buffer, client_factory).await?;
+                process_command(command, buffer).await?;
             }
         } else {
             println!("[Sensor] process_main_esp_rs - command_fetcher.fetch_next_command() failed.");

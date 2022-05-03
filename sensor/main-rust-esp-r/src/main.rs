@@ -6,23 +6,7 @@ use esp_idf_sys::EspError;
 use log::*;
 use sensor_lib::{
     process_main_esp_rs,
-    HttpClient,
-    HttpClientOptions,
 };
-
-// use esp_idf_svc::{
-//     // http::client::*,
-//     timer::{
-//         EspTimerService,
-//         EspTimer,
-//     }
-// };
-
-
-fn create_tangle_http_client(options: Option<HttpClientOptions>) -> HttpClient {
-    info!("create_tangle_http_client called");
-    HttpClient::new(options)
-}
 
 fn main() -> Result<(), EspError> {
     // Temporary. Will disappear once ESP-IDF 4.4 is released, but for now it is necessary to call this function once,
@@ -45,7 +29,7 @@ fn main() -> Result<(), EspError> {
 
     match smol::block_on(async {
         info!("Start smol::block_on");
-        process_main_esp_rs(create_tangle_http_client).await
+        process_main_esp_rs().await
     }){
         Ok(_) => {},
         Err(error) => {

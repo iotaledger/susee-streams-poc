@@ -19,6 +19,7 @@ use iota_streams::{
 
 use std::{
     clone::Clone,
+    fmt
 };
 
 use streams_tools::{
@@ -74,11 +75,19 @@ pub struct HttpClientOptions<'a> {
     pub(crate) http_url: &'a str,
 }
 
+const TANGLE_PROXY_URL: &str = env!("SENSOR_MAIN_POC_TANGLE_PROXY_URL");
+
 impl Default for HttpClientOptions<'_> {
     fn default() -> Self {
         Self {
-            http_url: "http://192.168.38.69:50000"
+            http_url: TANGLE_PROXY_URL
         }
+    }
+}
+
+impl fmt::Display for HttpClientOptions<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HttpClientOptions: http_url: {}", self.http_url)
     }
 }
 
@@ -92,7 +101,7 @@ impl HttpClient
 {
     pub fn new(options: Option<HttpClientOptions>) -> Self {
         let options = options.unwrap_or_default();
-
+        log::info!("[HttpClient::new()] Creating new HttpClient using options: {}", options);
         Self {
             request_builder: RequestBuilderStreams::new(options.http_url),
             tangle_client_options: SendOptions::default(),

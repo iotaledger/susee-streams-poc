@@ -46,6 +46,7 @@ use crate::{
     http_server_dispatch::dispatch_request
 };
 use std::collections::VecDeque;
+use log;
 
 static mut FIFO_QUEUE: Option<VecDeque<Vec<u8>>> = None;
 
@@ -68,7 +69,7 @@ static LINK_AND_PREVLINK_LENGTH: usize = 2 * TANGLE_ADDRESS_BYTE_LEN;
 fn println_send_message_for_incoming_message(message: &TangleMessage) {
     println!(
         "\
-[HttpClientProxy - DispatchStreams] send_message() - Incoming Message to attach to tangle with {} bytes payload. Data:
+[HttpClientProxy - DispatchStreams] send_message() - Incoming Message to attach to tangle with absolut length of {} bytes. Data:
 {}
 ", message.body.as_bytes().len() + LINK_AND_PREVLINK_LENGTH, message.to_string()
     );
@@ -77,7 +78,7 @@ fn println_send_message_for_incoming_message(message: &TangleMessage) {
 fn println_receive_message_from_address_for_received_message(message: &TangleMessage) {
     println!(
         "\
-[HttpClientProxy - DispatchStreams] receive_message_from_address() - Received Message from tangle with {} bytes payload. Data:
+[HttpClientProxy - DispatchStreams] receive_message_from_address() - Received Message from tangle with absolut length of {} bytes. Data:
 {}
 ", message.body.as_bytes().len() + LINK_AND_PREVLINK_LENGTH, message.to_string()
     );
@@ -98,7 +99,7 @@ impl ServerDispatchStreams for DispatchStreams {
     }
 
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
-        println!("[HttpClientProxy - DispatchStreams] receive_message_from_address() - Incoming request for address: {}", address_str);
+        log::debug!("[HttpClientProxy - DispatchStreams] receive_message_from_address() - Incoming request for address: {}", address_str);
         let address = TangleAddress::from_str(address_str).unwrap();
         let message = Transport::<TangleAddress, TangleMessage>::
             recv_message(&mut self.client, &address).await;
@@ -107,7 +108,7 @@ impl ServerDispatchStreams for DispatchStreams {
                 println_receive_message_from_address_for_received_message(&msg);
                 let mut buffer: Vec<u8> = vec![0;BinaryPersist::needed_size(&msg)];
                 let size = BinaryPersist::to_bytes(&msg, buffer.as_mut_slice());
-                println!("[HttpClientProxy - DispatchStreams] receive_message_from_address() - Returning binary data via socket connection. length: {} bytes, data:\n\
+                log::debug!("[HttpClientProxy - DispatchStreams] receive_message_from_address() - Returning binary data via socket connection. length: {} bytes, data:\n\
 {:02X?}\n", size.unwrap_or_default(), buffer);
                 Ok(Response::new(buffer.into()))
             },
@@ -167,18 +168,19 @@ impl<'a> DispatchCommand<'a>
     }
 }
 
-
 #[async_trait(?Send)]
 impl<'a> ServerDispatchCommand for DispatchCommand<'a> {
     async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>> {
         if let Some(req_body_binary) = self.fifo.pop_front() {
-            println!("[HttpClientProxy - DispatchCommand] fetch_next_command() - Returning command blob.\nBlob length: {}\nqueue length: {}",
+            let cmd = Command::from_bytes(req_body_binary.as_slice()).expect("Could not deserialize command from outgoing binary http body.");
+            println!("[HttpClientProxy - DispatchCommand] fetch_next_command() - Returning command {}.\nBlob length: {}\nQueue length: {}",
+                    cmd,
                     req_body_binary.len(),
                     self.fifo.len(),
             );
             Ok(Response::new(req_body_binary.into()))
         } else {
-            println!("[HttpClientProxy - DispatchCommand] fetch_next_command() - No command available. Returning Command::NO_COMMAND.");
+            println!("[HttpClientProxy - DispatchCommand] fetch_next_command() - No command available. Returning Command::NO_COMMAND.\n");
             let mut buffer: [u8; Command::COMMAND_LENGTH_BYTES] = [0; Command::COMMAND_LENGTH_BYTES];
             Command::NO_COMMAND.to_bytes(&mut buffer).unwrap();
             Ok(Response::new(Body::from(buffer.to_vec())))
@@ -187,8 +189,10 @@ impl<'a> ServerDispatchCommand for DispatchCommand<'a> {
 
     async fn register_remote_command(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>> {
         self.fifo.push_back(req_body_binary.to_vec());
-        println!("[HttpClientProxy - DispatchCommand] {}() - Receiving command blob.\nBlob length: {}\nqueue length: {}",
+        let cmd = Command::from_bytes(req_body_binary).expect("Could not deserialize command from incoming binary http body.");
+        println!("[HttpClientProxy - DispatchCommand] {}() - Received command {}.\nBinary length: {}\nQueue length: {}",
                  api_fn_name,
+                 cmd,
                  req_body_binary.len(),
                  self.fifo.len(),
         );
@@ -216,7 +220,6 @@ impl<'a> HttpClientProxy<'a>
         dispatch_request(req, &mut self.dispatch_streams, &mut self.dispatch_command).await
     }
 }
-
 
 impl<'a> HttpClientProxy<'a> {
     fn log_err_and_respond_500(err: anyhow::Error, fn_name: &str) -> Result<Response<Body>> {

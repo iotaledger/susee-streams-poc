@@ -23,7 +23,7 @@ std = [
     "iota-streams/client",
 ]
 smol_rt = [
-    #    "log",
+    "log",
     "smol",
     "streams-tools/smol_rt",
     "susee-tools/smol_rt",
@@ -34,8 +34,6 @@ esp_idf = [
     "esp-idf-sys",
     "esp-idf-svc",
     "embedded-svc",
-#    "embedded-hal",
-#    "esp-idf-hal",
     "streams-tools/esp_idf",
     "susee-tools/esp_idf",
 ]
@@ -58,7 +56,7 @@ esp-idf-svc = { version = "0.41.2", optional = true }
 embedded-svc = { version = "0.21.1", optional = true }
 
 # smol_rt dependencies
-# log = { version = "0.4", optional = true }
+log = { version = "0.4", optional = true }
 smol = { version = "1.2", optional = true}
 payloads = { version = "0.1.2", path = "../../test/payloads", optional = true }
 

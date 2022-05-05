@@ -123,7 +123,7 @@ impl HttpClient
 impl Transport<TangleAddress, TangleMessage> for HttpClient
 {
     async fn send_message(&mut self, msg: &TangleMessage) -> Result<()> {
-        println!("[HttpClient.send_message] Sending message with {} bytes payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
+        println!("[HttpClient.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
         self.send_message_via_http(msg).await
     }
 
@@ -134,7 +134,7 @@ impl Transport<TangleAddress, TangleMessage> for HttpClient
     async fn recv_message(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         let ret_val = self.recv_message_via_http(link).await;
         match ret_val.as_ref() {
-            Ok(msg) => println!("[HttpClient.recv_message] Receiving message with {} bytes payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string()),
+            Ok(msg) => println!("[HttpClient.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string()),
             _ => ()
         }
         ret_val

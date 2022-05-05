@@ -69,7 +69,7 @@ fn print_heap_info() {
             esp_idf_sys::MALLOC_CAP_8BIT
         );
 
-        println!("heap_caps_get_free_size(MALLOC_CAP_8BIT): {}", free_mem);
+        log::info!("heap_caps_get_free_size(MALLOC_CAP_8BIT): {}", free_mem);
     }
 }
 
@@ -118,8 +118,8 @@ async fn clear_client_state<'a> (subscriber_manager: &mut SubscriberManagerDummy
 
 pub async fn send_content_as_msg(message_key: String, subscriber: &mut SubscriberManagerDummyWalletHttpClient) -> Result<Address>{
     let message_bytes = get_message_bytes(Message::from(message_key.as_str()));
-    println!("[Sensor] Sending {} bytes payload\n", message_bytes.len());
-    println!("[Sensor - send_content_as_msg()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
+    log::info!("[Sensor] Sending {} bytes payload\n", message_bytes.len());
+    log::debug!("[Sensor - send_content_as_msg()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
     subscriber.send_signed_packet(&Bytes(message_bytes.to_vec())).await
 }
 
@@ -157,53 +157,53 @@ async fn process_command(command: Command, buffer: Vec<u8>) -> Result<()>{
     #[cfg(feature = "esp_idf")]
         let vfs_fat_handle = setup_vfs_fat_filesystem()?;
 
-    println!("[Sensor - process_command()] Creating HttpClient");
+    log::debug!("[Sensor - process_command()] Creating HttpClient");
     let client = HttpClient::new(None);
-    println!("[Sensor] Creating subscriber");
+    log::debug!("[Sensor] Creating subscriber");
     let mut subscriber= SubscriberManagerDummyWalletHttpClient::new(
         client,
         wallet,
         Some(String::from(BASE_PATH) + "/user-state-sensor.bin"),
     ).await;
 
-    println!("[Sensor - process_command()] subscriber created");
+    log::debug!("[Sensor - process_command()] subscriber created");
 
     #[cfg(feature = "esp_idf")]
         print_heap_info();
 
     if command == Command::SUBSCRIBE_TO_ANNOUNCEMENT_LINK {
         let cmd_args = SubscribeToAnnouncement::try_from_bytes(buffer.as_slice())?;
-        println!("[Sensor - process_command()] processing SUBSCRIBE_ANNOUNCEMENT_LINK: {}", cmd_args.announcement_link);
+        log::info!("[Sensor - process_command()] processing SUBSCRIBE_ANNOUNCEMENT_LINK: {}", cmd_args.announcement_link);
         subscribe_to_channel(cmd_args.announcement_link.as_str(), &mut subscriber).await?
     }
 
     if command == Command::START_SENDING_MESSAGES {
         let cmd_args = StartSendingMessages::try_from_bytes(buffer.as_slice())?;
-        println!("[Sensor - process_command()] processing START_SENDING_MESSAGES: {}", cmd_args.message_template_key);
+        log::info!("[Sensor - process_command()] processing START_SENDING_MESSAGES: {}", cmd_args.message_template_key);
         send_content_as_msg(cmd_args.message_template_key, &mut subscriber).await?;
     }
 
     if command == Command::REGISTER_KEYLOAD_MESSAGE {
         let cmd_args = RegisterKeyloadMessage::try_from_bytes(buffer.as_slice())?;
-        println!("[Sensor - process_command()] processing REGISTER_KEYLOAD_MESSAGE: {}", cmd_args.keyload_msg_link);
+        log::info!("[Sensor - process_command()] processing REGISTER_KEYLOAD_MESSAGE: {}", cmd_args.keyload_msg_link);
         register_keyload_msg(cmd_args.keyload_msg_link.as_str(), &mut subscriber).await?
     }
 
     if command == Command::PRINTLN_SUBSCRIBER_STATUS {
-        println!("[Sensor - process_command()] PRINTLN_SUBSCRIBER_STATUS");
+        log::info!("[Sensor - process_command()] PRINTLN_SUBSCRIBER_STATUS");
         println_subscriber_status(&subscriber);
     }
 
     if command == Command::CLEAR_CLIENT_STATE {
-        println!("[Sensor - process_command()] =========> processing CLEAR_CLIENT_STATE <=========");
+        log::info!("[Sensor - process_command()] =========> processing CLEAR_CLIENT_STATE <=========");
         clear_client_state(&mut subscriber).await?;
     }
 
     #[cfg(feature = "esp_idf")]
     {
-        println!("[Sensor - process_command()] Safe subscriber client_status to disk");
+        log::debug!("[Sensor - process_command()] Safe subscriber client_status to disk");
         subscriber.safe_client_status_to_disk().await?;
-        println!("[Sensor - process_command()] drop_vfs_fat_filesystem");
+        log::debug!("[Sensor - process_command()] drop_vfs_fat_filesystem");
         drop_vfs_fat_filesystem(vfs_fat_handle)?;
     }
 
@@ -211,7 +211,7 @@ async fn process_command(command: Command, buffer: Vec<u8>) -> Result<()>{
 }
 
 pub async fn process_main_esp_rs() -> Result<()> {
-    println!("[Sensor] process_main() entry");
+    log::debug!("[Sensor] process_main() entry");
 
     let command_fetch_wait_seconds = 5;
 
@@ -219,7 +219,7 @@ pub async fn process_main_esp_rs() -> Result<()> {
         print_heap_info();
 
     #[cfg(feature = "wifi")]
-        println!("[Sensor] init_wifi");
+        log::debug!("[Sensor] init_wifi");
     #[cfg(feature = "wifi")]
         let (_wifi_hdl, _client_settings) = init_wifi()?;
 
@@ -228,11 +228,13 @@ pub async fn process_main_esp_rs() -> Result<()> {
     loop {
         if let Ok((command, buffer)) = command_fetcher.fetch_next_command() {
             if command != Command::NO_COMMAND {
-                println!("[Sensor] process_main_esp_rs - Starting process_command for command: {}.", command);
+                log::debug!("[Sensor] process_main_esp_rs - Starting process_command for command: {}.", command);
                 process_command(command, buffer).await?;
+            } else {
+                log::info!("[Sensor] process_main_esp_rs - Received Command::NO_COMMAND.");
             }
         } else {
-            println!("[Sensor] process_main_esp_rs - command_fetcher.fetch_next_command() failed.");
+            log::error!("[Sensor] process_main_esp_rs - command_fetcher.fetch_next_command() failed.");
         }
 
         for s in 0..command_fetch_wait_seconds {

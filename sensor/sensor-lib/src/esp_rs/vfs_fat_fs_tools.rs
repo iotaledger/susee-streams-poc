@@ -20,7 +20,7 @@ use std::ffi::{
 pub static BASE_PATH: &str = "/spiflash";
 
 pub fn setup_vfs_fat_filesystem() -> Result<wl_handle_t> {
-    println!("[Sensor] Starting setup_vfs_fat_filesystem");
+    log::debug!("[Sensor] Starting setup_vfs_fat_filesystem");
 
     let mount_config = esp_vfs_fat_mount_config_t{
         max_files: 2,
@@ -37,7 +37,7 @@ pub fn setup_vfs_fat_filesystem() -> Result<wl_handle_t> {
 }
 
 pub fn drop_vfs_fat_filesystem(s_wl_handle: wl_handle_t) -> Result<()> {
-    println!("[Sensor] Starting drop_vfs_fat_filesystem");
+    log::debug!("[Sensor] Starting drop_vfs_fat_filesystem");
     let base_path: CString = CString::new(BASE_PATH).expect("CString::new for BASE_PATH failed");
     esp!(unsafe {esp_vfs_fat_spiflash_unmount(base_path.as_ptr(), s_wl_handle)})?;
     Ok(())

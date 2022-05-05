@@ -85,6 +85,7 @@ async fn send_keyload_message<'a> (channel_manager: &mut ChannelManagerPlainText
 #[tokio::main]
 async fn main() -> Result<()> {
 
+    env_logger::init();
     let arg_matches = get_arg_matches();
     let cli = ManagementConsoleCli::new(&arg_matches, &ARG_KEYS) ;
     let wallet = get_wallet(

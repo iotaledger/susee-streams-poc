@@ -35,7 +35,8 @@ use tokio::sync::oneshot;
 async fn handle_request(mut client: HttpClientProxy<'_>, request: Request<Body>)
                         -> Result<Response<Body>, hyper::http::Error>
 {
-    println!("[Tangle Proxy] Handling request {}", request.uri().to_string());
+    println!("-----------------------------------------------------------------\n\
+    [Tangle Proxy] Handling request {}\n", request.uri().to_string());
     client.handle_request(request).await
 }
 
@@ -52,6 +53,7 @@ fn main() {
 }
 
 async fn run() {
+    env_logger::init();
     let arg_matches = get_arg_matches();
     let cli = TangleProxyCli::new(&arg_matches, &ARG_KEYS) ;
     println!("[Tangle Proxy] Using node '{}' for tangle connection", cli.node);

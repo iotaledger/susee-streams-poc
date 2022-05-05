@@ -1565,6 +1565,7 @@ version = "0.1.2"
 dependencies = [
  "anyhow",
  "clap 3.1.14",
+ "env_logger",
  "iota-streams",
  "streams-tools",
  "susee-tools",
@@ -2073,6 +2074,7 @@ version = "0.1.2"
 dependencies = [
  "anyhow",
  "clap 3.1.14",
+ "env_logger",
  "iota-streams",
  "sensor-lib",
  "streams-tools",
@@ -2092,6 +2094,7 @@ dependencies = [
  "hyper",
  "iota-client-types",
  "iota-streams",
+ "log",
  "payloads",
  "smol",
  "streams-tools",
@@ -2236,6 +2239,7 @@ dependencies = [
  "hyper",
  "iota-client-types",
  "iota-streams",
+ "log",
  "rand",
  "smol",
  "tokio",
@@ -2336,6 +2340,7 @@ version = "0.1.2"
 dependencies = [
  "anyhow",
  "clap 3.1.14",
+ "env_logger",
  "hex-literal",
  "hyper",
  "iota-streams",

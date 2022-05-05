@@ -18,6 +18,7 @@ use std::{
 };
 
 use anyhow::Result;
+use log;
 
 use crate::binary_persist::{
     RangeIterator,
@@ -110,7 +111,7 @@ impl BinaryPersist for BinaryBody {
         BinaryPersist::to_bytes(&needed_size, &mut buffer[range.clone()]).expect("Serializing needed_size failed");
         range.increment(self.as_bytes().len());
         buffer[range.clone()].copy_from_slice(self.to_bytes().as_slice());
-        // println!("[BinaryPersist-BinaryBody.to_bytes] buffer: {:02X?}", buffer[range.clone()]);
+        log::debug!("[BinaryPersist-BinaryBody.to_bytes] buffer: {:02X?}", buffer[range.clone()].to_vec());
         Ok(range.end)
     }
 
@@ -118,15 +119,9 @@ impl BinaryPersist for BinaryBody {
         let mut range: Range<usize> = RangeIterator::new(USIZE_LEN);
 
         let body_len= u32::try_from_bytes(&buffer[range.clone()]).unwrap();
-        // let mut u32buf: [u8;4] = [0;4];
-        // println!("[BinaryPersist-BinaryBody.try_from_bytes] u32buf.clone_from_slice");
-        // u32buf.clone_from_slice(&buffer[range.clone()]);
-        // println!("[BinaryPersist-BinaryBody.try_from_bytes] u32buf.from_le_bytes.\n       u32buf: {:02X?}", u32buf);
-        // let body_len = u32::from_le_bytes(u32buf);
-
-        println!("[BinaryPersist-BinaryBody.try_from_bytes] body_len: {}", body_len);
+        log::debug!("[BinaryPersist-BinaryBody.try_from_bytes] body_len: {}", body_len);
         range.increment(body_len as usize);
-        println!("[BinaryPersist-BinaryBody.try_from_bytes] Ok");
+        log::debug!("[BinaryPersist-BinaryBody.try_from_bytes] Ok");
         Ok(<BinaryBody as From<Vec<u8>>>::from(buffer[range].to_vec()))
     }
 }
@@ -134,8 +129,8 @@ impl BinaryPersist for BinaryBody {
 impl BinaryPersist for TangleMessage {
     fn needed_size(&self) -> usize {
         let link_bytes_len = self.link().needed_size();
-        let mut len_bytes = 2 * link_bytes_len;                        // LINK + PREV_LINK
-        len_bytes += self.body.needed_size();            // BINARY_BODY
+        let mut len_bytes = 2 * link_bytes_len;               // LINK + PREV_LINK
+        len_bytes += self.body.needed_size();                       // BINARY_BODY
         len_bytes
     }
 
@@ -148,7 +143,7 @@ impl BinaryPersist for TangleMessage {
         let link_bytes_len = self.link().needed_size();
         let mut range: Range<usize> = RangeIterator::new(link_bytes_len);
         BinaryPersist::to_bytes(self.link(), &mut buffer[range.clone()]).expect("Could not persist message link");
-        // println!("[BinaryPersist-TangleMessage.to_bytes] buffer: {:02X?}", buffer[range.clone()]);
+        log::debug!("[BinaryPersist-TangleMessage.to_bytes] buffer: {:02X?}", buffer[range.clone()].to_vec());
         // PREV_LINK
         range.increment(link_bytes_len);
         BinaryPersist::to_bytes(self.prev_link(), &mut buffer[range.clone()]).expect("Could not persist message prev_link");
@@ -161,23 +156,23 @@ impl BinaryPersist for TangleMessage {
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
         // LINK
         let mut pos: usize = 0;
-        println!("[BinaryPersist-TangleMessage.try_from_bytes] converting LINK");
+        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] converting LINK");
         let link = <TangleAddress as BinaryPersist>::try_from_bytes(&buffer[pos..]).unwrap();
-        println!("[BinaryPersist-TangleMessage.try_from_bytes] LINK: {}", link.to_string());
+        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] LINK: {}", link.to_string());
         pos += link.needed_size();
 
         // PREV_LINK
-        println!("[BinaryPersist-TangleMessage.try_from_bytes] converting PREV_LINK");
+        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] converting PREV_LINK");
         let prev_link = <TangleAddress as BinaryPersist>::try_from_bytes(&buffer[pos..]).unwrap();
-        println!("[BinaryPersist-TangleMessage.try_from_bytes] PREV_LINK: {}", prev_link.to_string());
+        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] PREV_LINK: {}", prev_link.to_string());
         pos += link.needed_size();
         // BINARY_BODY
-        println!("[BinaryPersist-TangleMessage.try_from_bytes] converting BINARY_BODY");
+        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] converting BINARY_BODY");
         let body = BinaryBody::try_from_bytes(&buffer[pos..]).unwrap();
-        println!("[BinaryPersist-TangleMessage.try_from_bytes] length: {} BINARY_BODY: {}", body.to_bytes().len(), body);
+        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] length: {} BINARY_BODY: {}", body.to_bytes().len(), body);
 
         // TangleMessage
-        println!("[BinaryPersist-TangleMessage.try_from_bytes] Ok");
+        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] Ok");
         Ok(TangleMessage::new(link, prev_link, body))
     }
 }

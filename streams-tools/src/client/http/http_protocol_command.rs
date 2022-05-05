@@ -84,8 +84,6 @@ impl RequestBuilderCommand {
             .body(Body::empty())
     }
 
-
-
     pub fn send_message(self: &Self, message_template_key: &str) -> Result<Request<Body>> {
         self.send_command_with_args(
             StartSendingMessages{

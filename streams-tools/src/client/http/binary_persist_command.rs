@@ -35,8 +35,8 @@ impl Command {
     }
 
     pub fn from_bytes(buffer: &[u8]) -> Result<Command> {
-        if buffer.len() != Self::COMMAND_LENGTH_BYTES {
-            bail!("Input binary buffer has divergent length of {} bytes. Expected size is {}", buffer.len(), Self::COMMAND_LENGTH_BYTES);
+        if buffer.len() < Self::COMMAND_LENGTH_BYTES {
+            bail!("Input binary buffer to small. length of buffer is {} bytes. Expected size is {} min", buffer.len(), Self::COMMAND_LENGTH_BYTES);
         }
         Ok(Self(u8::try_from_bytes(&buffer[0..Self::COMMAND_LENGTH_BYTES]).unwrap()))
     }

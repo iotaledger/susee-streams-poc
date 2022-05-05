@@ -25,7 +25,8 @@ use std::{
 use streams_tools::{
     RequestBuilderStreams,
     http_protocol_streams::MapStreamsErrors,
-    BinaryPersist
+    BinaryPersist,
+    STREAMS_TOOLS_CONST_HTTP_PROXY_URL
 };
 
 use hyper::{
@@ -75,12 +76,10 @@ pub struct HttpClientOptions<'a> {
     pub(crate) http_url: &'a str,
 }
 
-const TANGLE_PROXY_URL: &str = env!("SENSOR_MAIN_POC_TANGLE_PROXY_URL");
-
 impl Default for HttpClientOptions<'_> {
     fn default() -> Self {
         Self {
-            http_url: TANGLE_PROXY_URL
+            http_url: STREAMS_TOOLS_CONST_HTTP_PROXY_URL
         }
     }
 }
@@ -101,7 +100,7 @@ impl HttpClient
 {
     pub fn new(options: Option<HttpClientOptions>) -> Self {
         let options = options.unwrap_or_default();
-        log::info!("[HttpClient::new()] Creating new HttpClient using options: {}", options);
+        log::debug!("[HttpClient::new()] Creating new HttpClient using options: {}", options);
         Self {
             request_builder: RequestBuilderStreams::new(options.http_url),
             tangle_client_options: SendOptions::default(),
@@ -158,7 +157,7 @@ impl HttpClient
         if response.status() == StatusCode::OK {
             log::debug!("[HttpClient.recv_message_via_http] StatusCode::OK");
             if let Some(content_len) = response.content_len() {
-                log::info!("[HttpClient.recv_message_via_http] response.content_len()={}", content_len);
+                log::info!("[HttpClient.recv_message_via_http] Received response with content length of {}", content_len);
                 let mut buffer = Vec::new();
                 buffer.resize(content_len, 0);
                 log::debug!("[HttpClient.recv_message_via_http] do_read");
@@ -175,7 +174,7 @@ impl HttpClient
                 ))
             }
         } else {
-            log::error!("[HttpClient.recv_message_via_http] MapStreamsErrors");
+            log::error!("[HttpClient.recv_message_via_http] StatusCode is not OK");
             err!(MapStreamsErrors::from_http_status_codes(
                 StatusCode::from_u16(response.status())?,
                  Some(link.to_string())
@@ -207,7 +206,7 @@ impl HttpClient
         match req.method() {
             &Method::POST => {
                 let bytes = hyper_body::to_bytes(req.into_body()).await.unwrap();
-                log::info!("[HttpClient.request] Bytes to send: Length: {}\n    {:02X?}", bytes.len(), bytes);
+                log::debug!("[HttpClient.request] Bytes to send: Length: {}\n    {:02X?}", bytes.len(), bytes);
                 resulting_ret_val = esp_http_req.send_bytes(bytes);
             },
             &Method::GET => {
@@ -234,7 +233,7 @@ impl HttpClient
 impl Transport<TangleAddress, TangleMessage> for HttpClient
 {
     async fn send_message(&mut self, msg: &TangleMessage) -> anyhow::Result<()> {
-        log::info!("[HttpClient.send_message] Sending message with {} bytes payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
+        log::info!("[HttpClient.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
         self.send_message_via_http(msg).await
     }
 
@@ -249,10 +248,10 @@ impl Transport<TangleAddress, TangleMessage> for HttpClient
         match ret_val.as_ref() {
             Ok(msg) => {
                 log::debug!("[HttpClient.recv_message] ret_val Ok");
-                log::info!("[HttpClient.recv_message] Receiving message with {} bytes payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string())
+                log::info!("[HttpClient.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string())
             },
-            _ => {
-                log::error!("[HttpClient.recv_message] ret_val not Ok");
+            Err(err) => {
+                log::error!("[HttpClient.recv_message] Received streams error: '{}'", err);
                 ()
             }
         }

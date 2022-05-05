@@ -17,8 +17,9 @@ use streams_tools::{
         Command,
     },
     http_protocol_command::{
-        EndpointUris
-    }
+        EndpointUris,
+    },
+    STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
 };
 
 use hyper::http::StatusCode;
@@ -29,17 +30,24 @@ use anyhow::{
 };
 use embedded_svc::io::Read;
 use embedded_svc::http::Headers;
+use std::fmt;
 use log;
 
 pub struct CommandFetcherOptions<'a> {
-    http_url: &'a str,
+    pub(crate) http_url: &'a str,
 }
 
 impl Default for CommandFetcherOptions<'_> {
     fn default() -> Self {
         Self {
-            http_url: "http://192.168.38.69:50000"
+            http_url: STREAMS_TOOLS_CONST_HTTP_PROXY_URL
         }
+    }
+}
+
+impl fmt::Display for CommandFetcherOptions<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CommandFetcherOptions: http_url: {}", self.http_url)
     }
 }
 
@@ -50,8 +58,10 @@ pub struct CommandFetcher<'a> {
 impl<'a> CommandFetcher<'a> {
 
     pub fn new(options: Option<CommandFetcherOptions<'a>>) -> Self {
+        let options = options.unwrap_or_default();
+        log::debug!("[CommandFetcher::new()] Creating new CommandFetcher using options: {}", options);
         Self {
-            options: options.unwrap_or_default(),
+            options,
         }
     }
 

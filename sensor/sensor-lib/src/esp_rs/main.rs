@@ -1,9 +1,11 @@
 use super::{
     command_fetcher::{
         CommandFetcher,
+        CommandFetcherOptions,
     },
     http_client_smol_esp_rs::{
         HttpClient,
+        HttpClientOptions,
     },
 };
 
@@ -61,6 +63,8 @@ use std::{
 type ClientType = HttpClient;
 
 type SubscriberManagerDummyWalletHttpClient = SubscriberManager<ClientType, DummyWallet>;
+
+const TANGLE_PROXY_URL: &str = env!("SENSOR_MAIN_POC_TANGLE_PROXY_URL");
 
 #[cfg(feature = "esp_idf")]
 fn print_heap_info() {
@@ -158,7 +162,7 @@ async fn process_command(command: Command, buffer: Vec<u8>) -> Result<()>{
         let vfs_fat_handle = setup_vfs_fat_filesystem()?;
 
     log::debug!("[Sensor - process_command()] Creating HttpClient");
-    let client = HttpClient::new(None);
+    let client = HttpClient::new(Some(HttpClientOptions{ http_url: TANGLE_PROXY_URL }));
     log::debug!("[Sensor] Creating subscriber");
     let mut subscriber= SubscriberManagerDummyWalletHttpClient::new(
         client,
@@ -223,13 +227,19 @@ pub async fn process_main_esp_rs() -> Result<()> {
     #[cfg(feature = "wifi")]
         let (_wifi_hdl, _client_settings) = init_wifi()?;
 
-    let command_fetcher = CommandFetcher::new(None);
+    log::info!("[Sensor] process_main_esp_rs - Using tangle-proxy url: {}", TANGLE_PROXY_URL);
+    let command_fetcher = CommandFetcher::new(Some(CommandFetcherOptions{ http_url: TANGLE_PROXY_URL }));
 
     loop {
         if let Ok((command, buffer)) = command_fetcher.fetch_next_command() {
             if command != Command::NO_COMMAND {
                 log::debug!("[Sensor] process_main_esp_rs - Starting process_command for command: {}.", command);
-                process_command(command, buffer).await?;
+                match process_command(command, buffer).await {
+                    Ok(_) => {},
+                    Err(err) => {
+                        log::error!("[Sensor] process_main_esp_rs - process_command() returned error: {}", err);
+                    }
+                };
             } else {
                 log::info!("[Sensor] process_main_esp_rs - Received Command::NO_COMMAND.");
             }

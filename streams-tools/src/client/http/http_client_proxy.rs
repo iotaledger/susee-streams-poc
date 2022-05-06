@@ -140,7 +140,7 @@ impl<'a> Clone for DispatchCommand<'a> {
             if FIFO_QUEUE.is_none() {
                 FIFO_QUEUE = Some(VecDeque::<Vec<u8>>::new());
             }
-            fifo_queue = FIFO_QUEUE.as_mut().unwrap_unchecked()
+            fifo_queue = FIFO_QUEUE.as_mut().unwrap()
         }
         Self {
             client: self.client.clone(),
@@ -158,7 +158,7 @@ impl<'a> DispatchCommand<'a>
             if FIFO_QUEUE.is_none() {
                 FIFO_QUEUE = Some(VecDeque::<Vec<u8>>::new());
             }
-            fifo_queue = FIFO_QUEUE.as_mut().unwrap_unchecked()
+            fifo_queue = FIFO_QUEUE.as_mut().unwrap()
         }
 
         Self {

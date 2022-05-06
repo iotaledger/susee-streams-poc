@@ -1,4 +1,6 @@
 pub mod cli_base;
+
+#[cfg(feature = "std")]
 mod helpers;
 
 pub use {
@@ -7,6 +9,10 @@ pub use {
     cli_base::BASE_ARG_KEYS,
     cli_base::Cli,
     cli_base::PROJECT_CONSTANTS,
+};
+
+#[cfg(feature = "std")]
+pub use {
     helpers::get_wallet,
 };
 

@@ -1,6 +1,15 @@
-pub mod channel_manager;
 pub mod subscriber_manager;
 
+#[cfg(feature = "std")]
+pub mod channel_manager;
+
+pub use {
+    subscriber_manager::{
+        SubscriberManager,
+    }
+};
+
+#[cfg(feature = "std")]
 pub use {
     channel_manager::{
         ChannelManager,
@@ -8,7 +17,6 @@ pub use {
         Author,
     },
     subscriber_manager::{
-        SubscriberManager,
         SubscriberManagerPlainTextWallet
     }
 };

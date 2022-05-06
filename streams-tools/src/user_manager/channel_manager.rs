@@ -9,7 +9,7 @@ use iota_streams::{
 };
 
 use crate::{
-    plain_text_wallet::PlainTextWallet,
+    wallet::plain_text_wallet::PlainTextWallet,
     SimpleWallet
 };
 
@@ -21,7 +21,7 @@ use std::{
     }
 };
 
-use iota_streams::app::futures::executor::block_on;
+use futures::executor::block_on;
 use iota_streams::app_channels::api::tangle::PublicKey;
 use iota_streams::app::identifier::Identifier;
 
@@ -132,7 +132,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
         }
 
         let author = self.author.as_mut().unwrap() ;
-        author.sync_state().await;
+        author.sync_state().await.expect("Could not sync_state");
         let (msg_link, _seq_link) = author.send_signed_packet(
             &self.prev_msg_link.as_ref().unwrap(),
             &Bytes::default(),

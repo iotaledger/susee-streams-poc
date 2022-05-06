@@ -13,8 +13,29 @@ crate-type = ["rlib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-iota-streams = { git = "https://github.com/iotaledger/streams", branch = "develop" }
-tokio = {version = "1.5"}
+iota-streams = { git = "https://github.com/iotaledger/streams", branch = "develop", default-features = false, features = ["std", "tangle"] }
+futures = { version = "0.3.8", default-features = false, features = ["executor"] }
 anyhow = "1.0.40"
 rand = "0.7.3"
-hyper = "0.14"
+url = "2.2.2"
+hyper = { version = "0.14", features = ["client", "http1"] }
+iota-client-types = { version = "0.1.2", path = "../iota-client-types" }
+log = { version = "0.4" }
+
+# smol_rt dependencies
+smol = { version = "1.2", optional = true }
+
+# esp_idf dependencies
+esp-idf-svc = { version = "0.41.2", optional = true }
+esp-idf-sys = { version = "0.31.5", optional = true }
+embedded-svc = { version = "0.21.1", optional = true }
+
+# std dependencies
+tokio = { version = "1.5", optional = true }
+
+
+[features]
+default = ["std"]
+smol_rt = ["smol"]
+esp_idf = ["embedded-svc", "esp-idf-svc", "esp-idf-sys"]
+std = ["tokio", "iota-streams/client", "iota-streams/std"]

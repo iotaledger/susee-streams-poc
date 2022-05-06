@@ -1,17 +1,24 @@
-pub mod helpers;
-pub mod client;
-pub mod plain_text_wallet;
+pub mod wallet;
 pub mod user_manager;
-pub mod dummy_wallet;
+pub mod client;
+
+#[cfg(feature = "std")]
+pub mod helpers;
 
 pub use {
-    user_manager::*,
-    client::*,
-    plain_text_wallet::{
-        PlainTextWallet,
-        SimpleWallet,
+    wallet::{
+        dummy_wallet::DummyWallet,
+        simple_wallet::SimpleWallet,
     },
-    dummy_wallet::DummyWallet,
+    client::*,
+    user_manager::*,
+};
+
+#[cfg(feature = "std")]
+pub use {
+    wallet::plain_text_wallet::{
+        PlainTextWallet,
+    },
 };
 
 #[cfg(test)]

@@ -1,13 +1,11 @@
 use hyper::{
     Body,
-    body,
     http::{
         Request,
         Response,
         Result,
         Method,
         StatusCode,
-        request::Builder,
     }
 };
 
@@ -16,8 +14,7 @@ use iota_streams::{
     {
         transport::tangle::{
             TangleMessage,
-            TangleAddress,
-            client::iota_client::Url,
+            TangleAddress
         },
     },
     app_channels::api::DefaultF,
@@ -27,15 +24,17 @@ use iota_streams::{
     },
 };
 
-use std::ops::Deref;
+use url::{
+    form_urlencoded::Parse
+};
 
-use crate::BinaryPersist;
-
-pub enum ClientCommand {
-    SubscribeToAnnouncement,
-    RegisterKeyloadMessage,
-}
-
+use crate::{
+    BinaryPersist,
+    http::http_protocol_tools::{
+        RequestBuilderTools,
+        get_response_404,
+    },
+};
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -49,7 +48,6 @@ pub struct EndpointUris {}
 impl EndpointUris {
     pub const SEND_MESSAGE: &'static str = "/message/send";
     pub const RECEIVE_MESSAGE_FROM_ADDRESS: &'static str  = "/message";
-    pub const FETCH_NEW_COMMANDS: &'static str  = "message/fetch_new";
 }
 
 pub struct QueryParameters {}
@@ -104,84 +102,55 @@ impl MapStreamsErrors {
 }
 
 #[derive(Clone)]
-pub struct RequestBuilder {
-    uri_prefix: String,
+pub struct RequestBuilderStreams {
+    tools: RequestBuilderTools,
 }
 
-impl RequestBuilder {
+impl RequestBuilderStreams {
     pub fn new(uri_prefix: &str) -> Self {
         Self {
-            uri_prefix: String::from(uri_prefix)
+            tools: RequestBuilderTools::new(uri_prefix)
         }
     }
 
-    fn get_request_builder(self: &Self) -> Builder {
-        Request::builder().header("User-Agent", "streams-client/1.0")
-    }
-
-    fn get_uri(self: &Self, path: &str) -> String {
-        format!("{}{}", self.uri_prefix, path)
-    }
-
-    pub fn send_message<F>(self: &Self, message: &TangleMessage<F>) -> Result<Request<Body>> {
+    pub fn send_message(self: &Self, message: &TangleMessage) -> Result<Request<Body>> {
         let mut buffer: Vec<u8> = vec![0; message.needed_size()];
         message.to_bytes(buffer.as_mut_slice()).expect("Persisting into binary data failed");
 
-        self.get_request_builder()
+        self.tools.get_request_builder()
             .method("POST")
-            .uri(self.get_uri(EndpointUris::SEND_MESSAGE).as_str())
+            .uri(self.tools.get_uri(EndpointUris::SEND_MESSAGE).as_str())
             .body(Body::from(buffer))
     }
 
     pub fn receive_message_from_address(self: &Self, address: &TangleAddress) -> Result<Request<Body>> {
         let uri = format!("{}?{}={}",
-              self.get_uri(EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS).as_str(),
+              self.tools.get_uri(EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS).as_str(),
               QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS,
               address.to_string()
         );
-        self.get_request_builder()
+        self.tools.get_request_builder()
             .method("GET")
             .uri(uri)
             .body(Body::empty())
     }
-
-    pub fn fetch_new_commands(self: &Self) -> (Vec<ClientCommand>, Result<Request<Body>>) {
-        let client_commands: Vec<ClientCommand> = Vec::new();
-        let req_result = self.get_request_builder()
-            .method("GET")
-            .uri(self.get_uri(EndpointUris::FETCH_NEW_COMMANDS).as_str())
-            .body(Body::empty());
-
-        // TODO: Parse client commands out of req_result body and return the resulting list of
-        // commands and arguments. May be then the Request<Body> is no more needed and the
-        // return value can be of type Result<Vec<(ClientCommand, Vec<ClientCommandArgs>))>>
-        (client_commands, req_result)
-    }
 }
 
 #[async_trait(?Send)]
-pub trait ServerDispatch {
+pub trait ServerDispatchStreams {
     async fn send_message<F: 'static + core::marker::Send + core::marker::Sync>(
-        self: &mut Self, message: &TangleMessage<F>) -> Result<Response<Body>>;
+        self: &mut Self, message: &TangleMessage) -> Result<Response<Body>>;
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>>;
     async fn receive_messages_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>>;
-    async fn fetch_new_commands(self: &mut Self) -> Result<Response<Body>>;
+    async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>>;
 }
 
-pub async fn dispatch_request(req: Request<Body>, callbacks: &mut impl ServerDispatch) -> Result<Response<Body>> {
-
-    let uri_str = req.uri().to_string();
-    // unfortunately we need to specify a scheme and domain to use Url::parse() correctly
-    let uri_base = Url::parse("http://this-can-be-ignored.com").unwrap();
-    let req_url = uri_base.join(&uri_str).unwrap();
-    let query_pairs = req_url.query_pairs();
-    let path = req_url.path();
-    match (req.method(), path) {
+pub async fn dispatch_request_streams(method: &Method, path: &str, body_bytes: &[u8], query_pairs: &Parse<'_>, callbacks: &mut impl ServerDispatchStreams ) -> Result<Response<Body>> {
+    match (method, path) {
 
         (&Method::POST, EndpointUris::SEND_MESSAGE) => {
-            let bytes = body::to_bytes(req.into_body()).await.unwrap();
-            let tangle_msg: TangleMessage<DefaultF> = TangleMessage::try_from_bytes(bytes.deref()).unwrap();
-            callbacks.send_message(&tangle_msg).await
+            let tangle_msg: TangleMessage = TangleMessage::try_from_bytes(body_bytes).unwrap();
+            callbacks.send_message::<DefaultF>(&tangle_msg).await
         },
 
 
@@ -192,24 +161,16 @@ pub async fn dispatch_request(req: Request<Body>, callbacks: &mut impl ServerDis
                 Specify the message address using /{}?{}={}",
                        EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS,
                        QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS,
-                        "<MESSAGE-ADDRESS-GOES-HERE>")
+                       "<MESSAGE-ADDRESS-GOES-HERE>")
             }
             if address_key_val[0].0 != QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS {
                 panic!("[http_protocoll - RECEIVE_MESSAGE_FROM_ADDRESS] Query parameter {} is not specified",
-                    QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS)
+                       QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS)
             }
             callbacks.receive_message_from_address(&*address_key_val[0].1).await
         },
 
-        (&Method::GET, EndpointUris::FETCH_NEW_COMMANDS) => {
-            callbacks.fetch_new_commands().await
-        },
-
         // Return the 404 Not Found for other routes.
-        _ => {
-            let mut not_found = Response::default();
-            *not_found.status_mut() = StatusCode::NOT_FOUND;
-            Ok(not_found)
-        }
+        _ => get_response_404()
     }
 }

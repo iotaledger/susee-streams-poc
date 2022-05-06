@@ -1,4 +1,4 @@
-use crate::SimpleWallet;
+use super::simple_wallet::SimpleWallet;
 
 pub struct DummyWallet {}
 
@@ -10,6 +10,6 @@ impl SimpleWallet for DummyWallet {
     }
 
     fn get_serialization_password(&self) -> &str {
-        unimplemented!()
+        "dummy serialization password"
     }
 }

@@ -32,10 +32,11 @@ use std::{
 use hyper::server::conn::AddrStream;
 use tokio::sync::oneshot;
 
-async fn handle_request(mut client: HttpClientProxy, request: Request<Body>)
+async fn handle_request(mut client: HttpClientProxy<'_>, request: Request<Body>)
                         -> Result<Response<Body>, hyper::http::Error>
 {
-    println!("[Tangle Proxy] Handling request {}", request.uri().to_string());
+    println!("-----------------------------------------------------------------\n\
+    [Tangle Proxy] Handling request {}\n", request.uri().to_string());
     client.handle_request(request).await
 }
 
@@ -52,13 +53,18 @@ fn main() {
 }
 
 async fn run() {
+    env_logger::init();
     let arg_matches = get_arg_matches();
     let cli = TangleProxyCli::new(&arg_matches, &ARG_KEYS) ;
     println!("[Tangle Proxy] Using node '{}' for tangle connection", cli.node);
 
     let client = HttpClientProxy::new_from_url(cli.node);
 
-    let addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_HTTP_PROXY_PORT).into();
+    let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_HTTP_PROXY_PORT).into();
+    if cli.matches.is_present(cli.arg_keys.listener_ip_address_port) {
+        let addr_str = cli.matches.value_of(cli.arg_keys.listener_ip_address_port).unwrap().trim();
+        addr = addr_str.parse().unwrap();
+    }
 
     // Template from https://docs.rs/hyper/0.14.15/hyper/server/index.html
     // A `MakeService` that produces a `Service` to handle each connection.

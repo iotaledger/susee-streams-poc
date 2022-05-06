@@ -1,22 +1,33 @@
 # Susee Streams POC
 
 ## About
-This project contains three tiny test applications providing command line interfaces (CLI) to evaluate the iota streams functionality for the
+This project contains four test applications providing command line interfaces (CLI) to evaluate the iota streams functionality for the
 SUSEE project.
 
 Following test applications are contained. For more details please see below in the <a href="#applications-and-workflows">Applications and workflows</a> section:
-* *Sensor*<br>
-  Imitates the processes running in the smart meter (a.k.a. *Sensor*)<br>
-  Can only be used together with a running *Tangle Proxy* instance
- * *Management Console*<br>
-  Imitates the processes needed for *Initialization* of the sensor, monitoring of *Sensor Processing* and managing the 
-  *Add/Remove Subscriber* workflow
- * *Tangle Proxy*<br>
-   Imitates processes in the Application Server and used by the initialization software performing the *Initialization*
-   of the sensor<br>
-   Provides an http rest api used by the sensor to access the tangle
+* *ESP32 Sensor*<br>
+  * Imitates the processes running in the smart meter (a.k.a. *Sensor*)
+  * Runs un ESP32 devices
+  * Can only be used together with a running *Tangle Proxy* instance
+  * Currently only ESP32-C3 provided
+* *Sensor remote control*<br>
+  * Used to send commands to the *ESP32 Sensor*
+  * Can also be used as a standalone *Sensor* app to be run on x86/PC targets
+  * Like the *ESP32 Sensor* application it can only be used together with a running *Tangle Proxy* instance
+* *Management Console*<br>
+  * Imitates the processes needed for *Initialization* of the sensor and the monitoring of *Sensor Processing*
+  * Manages the *Add/Remove Subscriber* workflows
+* *Tangle Proxy*<br>
+  * Imitates processes
+    * in the Susee Application Server (*Sensor Processing*) and
+    * processes used by the initialization software that performs the Sensor *Initialization*
+      that will probably run at the Susee-Module manufacturer<br>
+  * Provides an http rest api used by the *Sensor* applications to access the tangle<br>
+  * Attaches the Streams packages received from the *Sensor* applications to the tangle
+  * Forwards remote control commands from the *Sensor remote control* to the *ESP32 Sensor*
+   
 
-The Channel used for the SUSEE project generally can be described as follows:
+The Streams Channel used for the SUSEE project generally can be described as follows:
 * One single branch per sensor
 * Sensor will be a subscriber and will be the only publishing actor in the single branch
 * Energy provider will be the author
@@ -26,9 +37,21 @@ The Channel used for the SUSEE project generally can be described as follows:
     a sensor is installed in a home, which means for the inital handshake the limitations of lorawan don't apply
   * If anything changes in the single branch channel setup, e.g. the addition of a new reading subscriber, the sensor
     will have to be able to receive new keyload information downstream via lorawan
+* The current POC version of the *ESP32 Sensor* uses WiFi to connect to the *Tangle Proxy*.
+  * For *Sensor* *Initialization* this is similar to a wired SLIP (Serial Line Internet Protocol)
+    connection that might be used.
+  * For *Sensor Processing* itz has to be taken into account thet the LoRaWan connection used in production
+    will be much slower than the WiFi connection used for the POC.
+
 ## Prerequisites
-To build the applications, you need the following:
-- [Rust](https://www.rust-lang.org/tools/install)
+
+### For x86/PC
+
+To build the applications for x86/PC platforms, you need the following:
+- Rust - Please use the [official install script from rust-lang.org](https://www.rust-lang.org/tools/install)
+  to have an up to date rust compiler (rustc). Do not to use install packages provided with you OS because your
+  rustc could be too old to build this project.
+
 - (Optional) An IDE that supports Rust autocompletion. We recommend [Visual Studio Code](https://code.visualstudio.com/Download) with the [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer) extension
 
 We also recommend updating Rust to the [latest stable version](https://github.com/rust-lang/rustup.rs#keeping-rust-up-to-date):
@@ -37,27 +60,117 @@ We also recommend updating Rust to the [latest stable version](https://github.co
 rustup update stable
 ```
 
+### For ESP32
+
+To build the *ESP32 Sensor* application for ESP32 platforms (currently only ESP32-C3 provided), you need the following:
+
+* If you want to flash the *Sensor* app on an ESP32-C3 device you need to install the Espressif software development environment.
+  This is not needed if you only want to build the *ESP32 Sensor* app into an ELF file that can be flashed later on. 
+  The Rust based build process for the *ESP32 Sensor* app uses its own copy of the needed Espressif tools that is
+  automatically downloaded.<br>
+  These are the main steps to install the Espressif software development environment:
+  * Please follow the *Espressif Install Guide* for
+    [manual instalation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/linux-macos-setup.html)
+    or via [IDE install](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/index.html#ide)
+    for the ESP32-C3 - master branch(latest).
+  * If you have not flashed an ESP32 application before you should also follow the
+    [First Steps on ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/linux-macos-setup.html#get-started-first-steps)
+    section of the 
+    [Espressif Get Startet](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/index.html#) guide
+  * You should also [Check your port on Linux and macOS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/establish-serial-connection.html#check-port-on-linux-and-macos)
+    to find out how to access the serial port connection to the ESP32. Please replace the port identifier `/dev/ttyYOURPORT`
+    used in this readme always with your port identifier.
+* Make sure your installed python3 version is >= 3.8 and pip is already installed
+  (`sudo apt install python3-pip`).
+* Check that your rustc version is >= 1.58.0 (see Rust install hints in the section above).
+* Use the stock nightly Rust compiler:
+```bash
+    rustup install nightly
+    rustup default nightly
+    # For future daily/weekly updates
+    rustup update
+```
+* We also need rust-src to install cargo-espflash in one of the next steps
+```bash
+    rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+```
+* Install clang version >= 12
+```bash
+    sudo apt-get update
+    sudo apt-get install clang-12 --install-suggests
+```
+* Install [Cargo-Espflash](https://github.com/esp-rs/espflash)
+```bash
+    sudo apt-get install libudev-dev
+    sudo apt-get install pkg-config
+    cargo install cargo-espflash
+    cargo install espflash
+```
+* Install [ldproxy](https://github.com/esp-rs/embuild/tree/master/ldproxy)
+```bash
+    cargo install ldproxy
+```
+
+The fundamentals of these build Prerequisites are taken from the
+[Rust on ESP32 STD demo app](https://github.com/ivmarkov/rust-esp32-std-demo) project by Ivan Markov.
+If you want to build the *ESP32 Sensor* for other ESP32 devices than ESP32-C3 you can try to follow the
+instructions there to build for Extensa core based MCUs (ESP32-C3 is a Risc-V core based MCU).
+
 ## Build
+
+### For x86/PC
 
 Build as usual using `build` or `run` with or without `--release`.
 
-In the project root folder:
+In the workspace root folder:
 ```bash
 cargo build
 ```
 
 Every application has its own crate so you might want to build only one application like this:
 
-In the project root folder:
+In the workspace root folder:
 ```bash
 cargo build --package management-console  # alternatively 'sensor' or "tangle-proxy"
 ```
+The *ESP32 Sensor* is not build if `cargo build` is started in the workspace root folder.
+The next describes how to build it.
+
+### For ESP32
+
+The *ESP32 Sensor* project is contained in the folder `sensor/main-rust-esp-rs`. All build steps must be
+executed in this project folder:
+```bash
+cd sensor/main-rust-esp-rs/
+```
+Before building we need to specify the WiFi SSID, the WiFi password and the url of the used *Tangle-Proxy* as
+environment variables. These variables will be hard coded into the *ESP32 Sensor*:
+```bash
+export SENSOR_MAIN_POC_WIFI_SSID=NameOfMyWifiGoesHere
+export SENSOR_MAIN_POC_WIFI_PASS=SecureWifiPassword
+export SENSOR_MAIN_POC_TANGLE_PROXY_URL="http://192.168.47.11:50000" 
+```
+
+If you have no ESP32-C3 device you can just start the build using cargo-espflash.
+The ELF file will be created in the project folder.
+```bash
+cargo espflash save-image sensor-esp-rs.elf
+```
+
+If you have an ESP32-C3 device you can plug in the usb (or other serial bus) cable of your board
+and start the build:
+```bash
+cargo espflash --monitor --partition-table="partitions.csv" --release
+```
+Given you already installed all needed driver to access the serial port to your board, the port will be
+detected automatically by cargo-espflash. After the application has been build and flashed the log output
+of the *ESP32 Sensor* app is displayed on the console. This is controlled by the `--monitor` option used above. 
 
 ## CLI API reference
 
 ### Common CLI options and i/o files
 
-Using the --help option of all three applications will show the app specific help text:
+Using the --help option of all three x86/PC applications will show the app specific help text:
 ```bash
 target/release/management-console --help # Use 'sensor' or "tangle-proxy" instead of 'management-console' for the other apps
 ```
@@ -122,9 +235,16 @@ as the *Tangle-Proxy* does not need a wallet:
             Subscription message link for the sensor subscriber.
             Will be logged to console by the sensor app.
 
+The SUBSCRIPTION_PUB_KEY and SUBSCRIPTION_LINK will be logged to the console by the *Sensor* app when the 
+CLI command --subscribe-announcement-link of the *Sensor* app is used. This applies to the x86/PC version 
+of the *Sensor* app (*Sensor remote control*) and to the *ESP32 Sensor* application. To see the log
+output of the *ESP32 Sensor* app you need a serial port monitor like `idf.py monitor`
+or [cargo espmonitor](https://github.com/esp-rs/espmonitor).
 
 ### Sensor CLI
 
+Both Sensor applications (x86/PC and ESP32 version) provide CLI commands to manage the Streams usage:
+ 
     -s, --subscribe-announcement-link <SUBSCRIBE_ANNOUNCEMENT_LINK>
             Subscribe to the channel via the specified announcement link.
             
@@ -135,12 +255,58 @@ as the *Tangle-Proxy* does not need a wallet:
     -f, --file-to-send <FILE_TO_SEND>...
             A message file that will be encrypted and send using the streams channel.
             If needed you can use this option multiple times to specify several message files.
+            
+    -p, --println-subscriber-status
+            Print information about the current client status of the sensor.
+            In streams the sensor is a subscriber so that this client status is called subscriber
+            status.
+            
+        --clear-client-state
+            Deletes the current client status of the sensor so that
+            all subscriptions get lost and the sensor can be used to subscribe to a new Streams
+            channel.
+            TODO: In future versions the seed will also be replaced by a new generated seed.
+            TODO: -----------------------------
+                  --------  WARNING  ---------- Currently there is no confirmation cli dialog
+                  -----------------------------       use this option carefully!
+                              
+The x86/PC version (a.k.a *Sensor remote control*) additionally provides following CLI commands to manage the
+remote control functionality:
+
+    -t, --tangle-proxy-url <TANGLE_PROXY_URL>
+            The url of the tangle-proxy to connect to.
+            Default value is http://localhost:50000
+            
+            Example: tangle-proxy-url="http://192.168.47.11:50000"
+
+    -c, --act-as-remote-control
+            Use this argument to remotely control a running sensor application on
+            an embedded device. For example this
+            
+              > ./sensor --subscribe-announcement-link "c67551dade.....6daff2"\
+                         --act-as-remote-control
+            
+            will make the remote sensor subscribe the channel via the specified
+            announcement-link. This sensor app instance communicates with the remote sensor
+            app via the tangle-proxy application. Please make sure that both sensor
+            app instances have a working connection to the running tangle-proxy.
+            
+            If sensor and tangle-proxy run on the same machine they can communicate over the
+            loopback IP address (localhost). This is not possible in case the sensor runs on an
+            external device (embedded MCU). In this case the tangle-proxy needs to listen to
+            the ip address of the network interface (the ip address of the device that runs
+            the tangle proxy) so that the embedded sensor can access the tangle-proxy.
+            Therefore in case you are using 'act-as-remote-control' you will also need to use
+            the 'tangle-proxy' option to connect to the tangle-proxy.
 
 ### Tangle Proxy CLI
-Currently, the Tangle Proxy does not have any special CLI options except those described in the
-<a href="#common-cli-options-and-io-files">Common CLI options section</a>.
+Additionally to those commands described in the
+<a href="#common-cli-options-and-io-files">Common CLI options section</a> section the
+Tangle Proxy provides only one CLI command to control the ip adress to listen to:
 
-Use the `--node` option to specify the url of the iota node to connect to.
+    -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
+            IP address and port to listen to.
+            Example: listener-ip-address="192.168.47.11:50500"
 
 ## Example Workflow
 
@@ -157,9 +323,10 @@ In the /target/debug or release folder:
     >                      Announcement Link: c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2
     >                           Tangle Index: 491e1459e1bc6200b741fdc90fac8058bacc9c37f6c56ed4d1ce38ef3493f13e
 ```
-**Subscribe the *Sensor***
+**Subscribe the *Sensor* x86/PC version**
 
-To use the sensor we need to start the *Tangle Proxy* first:
+To use a *Sensor* application we need to start the *Tangle Proxy* first. To use it together with a local x86/PC
+sensor start it like this:
 ```bash
     > ./tangle-proxy
     > 
@@ -168,22 +335,44 @@ To use the sensor we need to start the *Tangle Proxy* first:
 ```
 
 Now the subscription message can be created using the announcement link from the console log of the *Management Console* above.<br>
-In a second command shell in the /target/debug or release folder:
+Using a local x86/PC Sensor app just enter this in a second command shell in the /target/debug or release folder:
 ```bash
     > ./sensor --subscribe-announcement-link\
              "c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2"
     > 
     > [Sensor] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
-    > [HttpClient.recv_message] Receiving message with 151 bytes payload:
+    > [HttpClient.new_from_url()] Initializing instance with options:
+    > HttpClientOptions: http_url: http://localhost:50000
+    > 
+    > [HttpClient.recv_message] Receiving message with 151 bytes tangle-message-payload:
     > @c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2[000000010400000000000000000000000000c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500e000001c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d195379850003cfa4c38fe060b13252e5b89cc00b893c127ea716a387e5b035e029fc2141e009c080e08b3d6214383ad27718581b60cf36935b5a3e23825d0ceb0afe6aa8c0d]->00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
     > 
-    > [HttpClient.send_message] Sending message with 279 bytes payload:
+    > [HttpClient.send_message] Sending message with 279 bytes tangle-message-payload:
     > @c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:aa5fc8814ca5a81c0dbf2b7e[00005001040000000134c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d195379850000000000000000056bc12247881ff94606daff2000000000000000000399dc641cec739093ef6f0ecbac881d5f80b049fe1e2d46bc84cb5aff505f66b0e00000156bc12247881ff94606daff2d874444633bd857b36bb47869a5b52e4ff212d21c4394aecb4db93a9fc2f29050352c3d6c34136614cd5003f43ef470bc8b65d8e908fa21a41d2dbeabfbb8aa9011692c14ff33a4d7bf71b0d77d352dc5ed93ff04660dfc3eda84ab9665586c517a12e5900aa39878aee3c259cecc464a647277d3e30ed937d5deea44aff1bb7161dcaf1006e3339ae9ead4b35a47d422fd5b0cf0a66f83852f9b593869f650e]->00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
     > 
     > [Sensor] A subscription with the following details has been created:
-    >          Subscription Link:     c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:aa5fc8814ca5a81c0dbf2b7e
-    >               Tangle Index:     744935bae3a2e42acf0c9b2bf89cb42ef09351b40f92e4791438049a54a2ef4d
-    >          Subscriber public key: 399dc641cec739093ef6f0ecbac881d5f80b049fe1e2d46bc84cb5aff505f66b
+    >              Subscription Link:     c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:aa5fc8814ca5a81c0dbf2b7e
+    >                   Tangle Index:     744935bae3a2e42acf0c9b2bf89cb42ef09351b40f92e4791438049a54a2ef4d
+    >              Subscriber public key: 399dc641cec739093ef6f0ecbac881d5f80b049fe1e2d46bc84cb5aff505f66b
+```
+
+The *Tangle-Proxy* also logs every data package that is transferred. Regarding absolute length of transferred binary packages
+only take the *Tangle-Proxy* log into account as these are the correct packages sizes. *Sensor* and *Management-Console* only
+log the sizes of the tangle-message-payload: 
+```bash
+    [Tangle Proxy] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
+    Listening on http://127.0.0.1:50000
+    -----------------------------------------------------------------
+    [Tangle Proxy] Handling request /message?addr=c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2
+    
+    [HttpClientProxy - DispatchStreams] receive_message_from_address() - Received Message from tangle with absolut length of 255 bytes. Data:
+    @c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2[0000000104000000000000000000000000006f5aa6cb462dad3d8b84820bdda1fa62aa6aeeaab36cf2d0a58adde074f7807d0e0000016f5aa6cb462dad3d8b84820bdda1fa62aa6aeeaab36cf2d0a58adde074f7807d00f834f535075f4aa802dfa8a31074f8c4cd8f27e37c6afb90a0508bedac6f501a0c47daaed785cd09b3400f7ec4f6f07b54be2c3728a20e99eb4106e0870f0806]->00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
+    
+    -----------------------------------------------------------------
+    [Tangle Proxy] Handling request /message/send
+    
+    [HttpClientProxy - DispatchStreams] send_message() - Incoming Message to attach to tangle with absolut length of 383 bytes. Data:
+    @c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:aa5fc8814ca5a81c0dbf2b7e[000050010400000001346f5aa6cb462dad3d8b84820bdda1fa62aa6aeeaab36cf2d0a58adde074f7807d00000000000000001ee77d9fb6f0a1b65ec853aa0000000000000000002a61cce46327e1f7abf2ec842c20952057c037fcdd8e2636c93b13e2f1ee36e20e0000011ee77d9fb6f0a1b65ec853aae4d48f2f2d7fd7d1669a90d84e0ba1bc967869f019ea1d6a2b91d9c4fbe16c431912540f5ea95775cc19c848ccd06cfd3a7b6e16af2074414870bcd2584ccb527b1253727a999a1c0de13557b3e00867a881f0c6dcae21d894bb532098800e03e95c67cff559715ec577eaaab78c89069dd4d919acab32cc6a8b8b3c7c64122569a00e73536bfa27513e6849e14aa862028212442f89307f28f57a449e72dd08]->00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
 ```
 
 The subscription link and public key then must be used with the management-console to accept the subscription
@@ -214,12 +403,95 @@ of the branch used by the sensor to publish its messages.
     >          Subscriber public key: 399dc641cec739093ef6f0ecbac881d5f80b049fe1e2d46bc84cb5aff505f66b
 ```
 
+**Subscribe the *Sensor* ESP32 version**
+
+If we run an *ESP32 Sensor* the *Tangle-Proxy* must be started this way:
+```bash
+    > ./tangle-proxy -l "192.168.47.11:50000"
+    > 
+    > [Tangle Proxy] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
+    > Listening on http://192.168.47.11:50000
+```
+
+Please replace the ip address used in this example with the ip address of the network interface of your computer.
+You need also to make sure that the used port is opened in the firewall of your OS. After having startet the
+*Tangle-Proxy* you can use telnet from another machine in your LAN to verify that the *Tangle-Proxy* can be accessed
+from within in the LAN.
+
+Before we can send the `subscribe-announcement-link` command to the *ESP32 Sensor* you need to
+connect the serial port of your ESP32 board to your computer. After the ESP32 has bootet the
+*ESP32 Sensor* will poll commands from the *Tangle-Proxy* every 5 seconds.
+ 
+To see the console log output of the *ESP32 Sensor* you need to start a serial port monitor application like
+`idf.py monitor` or [cargo espmonitor](https://github.com/esp-rs/espmonitor).
+ ```bash
+    cargo espmonitor --chip=esp32c3 /dev/ttyYOURPORT
+ ```
+
+The console output will contain a lot of boot and WiFi initialization messages. The most important messages
+are the following ones:
+ ```bash
+    Wifi connected
+    I (4087) sensor_lib::esp_rs::main: [Sensor] process_main_esp_rs - Using tangle-proxy url: http://192.168.47.11:50000
+    I (5244) HTTP_CLIENT: Body received in fetch header state, 0x3fcb52ff, 1
+    I (5246) sensor_lib::esp_rs::main: [Sensor] process_main_esp_rs - Received Command::NO_COMMAND.
+    Fetching next command in 5 secs
+    Fetching next command in 4 secs
+    Fetching next command in 3 secs
+    Fetching next command in 2 secs
+    Fetching next command in 1 secs
+    I (11183) HTTP_CLIENT: Body received in fetch header state, 0x3fcb52ef, 1
+    I (11185) sensor_lib::esp_rs::main: [Sensor] process_main_esp_rs - Received Command::NO_COMMAND.
+    Fetching next command in 5 secs
+    ...
+ ```
+Now we can the send the `subscribe-announcement-link` command to the *ESP32 Sensor* using the x86/PC version of the
+*Sensor* app. The CLI command is almost the same as used in the
+<a href="#subscribe-the-sensor-x86-pc-version">Subscribe the *Sensor* x86/PC version</a> section.
+We only need to add the `--act-as-remote-control` and `--tangle-proxy-url` command to use the *Sensor* app 
+as remote control for the *ESP32 Sensor*:
+ ```bash
+     > ./sensor -c -t "http://192.168.47.11:50000" --subscribe-announcement-link\
+              "c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2"
+ ```
+
+The *Tangle-Proxy* then will confirm that it has received the subscribe-announcement-link command and that the command is
+delivered to the *ESP32 Sensor*:
+ ```bash
+    > Listening on http://192.168.47.11:50000
+    -----------------------------------------------------------------
+    [Tangle Proxy] Handling request /command/subscribe_to_announcement
+    
+    [HttpClientProxy - DispatchCommand] subscribe_to_announcement() - Received command SUBSCRIBE_TO_ANNOUNCEMENT_LINK.
+    Binary length: 110
+    Queue length: 1
+    -----------------------------------------------------------------
+    [Tangle Proxy] Handling request /command/next
+    
+    [HttpClientProxy - DispatchCommand] fetch_next_command() - Returning command SUBSCRIBE_TO_ANNOUNCEMENT_LINK.
+    Blob length: 110
+    Queue length: 0
+ ```
+As with the X86/PC version of the *Sensor* app the console log of *Tangle-Proxy* and the *ESP32 Sensor* will contain the
+length of transferred binary data (*Tangle-Proxy*) and the subscription link and subscriber public key (*ESP32 Sensor*).  
+
+The subscription link and public key then must be used with the management-console to accept the subscription as being
+described in the x86/PC section above.
+
+To finalize the subscription the keyload message link has to be registered by the *ESP32 Sensor*. Again the CLI command
+is almost the same as used in the
+<a href="#subscribe-the-sensor-x86-pc-version">Subscribe the *Sensor* x86/PC version</a> section:
+```bash
+    > ./sensor -c -t "http://192.168.47.11:50000" --register-keyload-msg "c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:dc4567247bbb6396057bfba9"
+```
+
+
 **Send messages using the *Sensor***
 
 Make sure that the *Tangle Proxy* is up and running in another shell. The folder `test/payloads` contains several message files that can be
 send like this:
 ```bash
-    > ./sensor --file-to-send "../../test/payloads/meter_reading-1-compact.json"
+    > ./sensor --file-to-send "../../test/payloads/meter_reading_1_compact.json"
     > 
     > [Sensor] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
     > [Sensor] Message file '../../test/payloads/meter_reading-1-compact.json' contains 136 bytes payload
@@ -240,6 +512,15 @@ send like this:
     > [Sensor] The last previously used message link is: c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:b387f1dcf73e24ff466c493c
 ```
 
+Using the *ESP32 Sensor* we can send these files using the following remote control execution:
+```bash
+    > ./sensor -c -t "http://192.168.47.11:50000" --file-to-send "meter_reading_1_compact.json"
+```
+
+Here the filename acts as a key or identifier for the file content that is hardcodet in the *ESP32 Sensor* application.
+If you want to add additionally files you need to add those files to `test/payloads/lib.rs` and recompile the
+*ESP32 Sensor* app.
+
 ## Applications and workflows 
 ### Applications
 For each service being part in the different workflows a console application is provided to test the
@@ -252,7 +533,8 @@ streams channel management and data transmission in the SUSEE project. These ser
   Running in the application server or as part of the initialization software at the energy provider
  
 Lorawan and other inter process communication is simulated using a socket connection. The applications can be run in
-three shells in parallel so that the applications can react to new lorawan or tangle messages.
+three shells in parallel or using the *ESP32 Sensor* on a connected ESP32 board together with the *Sensor Remote Cotrol*
+app so that the applications can react to new lorawan or tangle messages.
 
 The services are characterized by following properties/aspects:
 

@@ -1,4 +1,4 @@
-use clap::{ArgMatches, App, Arg};
+use clap::{ArgMatches, Command, Arg};
 
 pub static NODE_ABOUT: &str = "The url of the iota node to connect to.
 Use 'https://chrysalis-nodes.iota.org' for the mainnet.
@@ -72,10 +72,10 @@ impl<'a, ArgKeysT> Cli<'a, ArgKeysT> {
         }
     }
 
-    pub fn get_app<'help>(name: &str, about: &'help str, options: Option<CliOptions> ) -> App<'help> {
+    pub fn get_app<'help>(name: &str, about: &'help str, options: Option<CliOptions> ) -> Command<'help> {
         let app_name_lowercase = name.to_lowercase().replace(" ", "-");
         let options = options.unwrap_or_default();
-        let mut ret_val = App::new(name)
+        let mut ret_val = Command::new(name)
             .version(PROJECT_CONSTANTS.version)
             .author(PROJECT_CONSTANTS.author)
             .about(about)
@@ -83,7 +83,7 @@ impl<'a, ArgKeysT> Cli<'a, ArgKeysT> {
                 .long(BASE_ARG_KEYS.node)
                 .short('n')
                 .value_name("NODE_URL")
-                .about(NODE_ABOUT)
+                .help(NODE_ABOUT)
                 .default_value(PROJECT_CONSTANTS.default_node)
             );
 
@@ -94,7 +94,7 @@ impl<'a, ArgKeysT> Cli<'a, ArgKeysT> {
                     .long(BASE_ARG_KEYS.wallet_file)
                     .short('w')
                     .value_name("WALLET_FILE_PATH_AND_NAME")
-                    .about(WALLET_FILE_ABOUT.as_str())
+                    .help(WALLET_FILE_ABOUT.as_str())
                 );
             }
         }

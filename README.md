@@ -40,7 +40,7 @@ The Streams Channel used for the SUSEE project generally can be described as fol
 * The current POC version of the *ESP32 Sensor* uses WiFi to connect to the *Tangle Proxy*.
   * For *Sensor* *Initialization* this is similar to a wired SLIP (Serial Line Internet Protocol)
     connection that might be used.
-  * For *Sensor Processing* itz has to be taken into account thet the LoRaWan connection used in production
+  * For *Sensor Processing* it has to be taken into account that the LoRaWan connection used in production
     will be much slower than the WiFi connection used for the POC.
 
 ## Prerequisites
@@ -49,7 +49,7 @@ The Streams Channel used for the SUSEE project generally can be described as fol
 
 To build the applications for x86/PC platforms, you need the following:
 - Rust - Please use the [official install script from rust-lang.org](https://www.rust-lang.org/tools/install)
-  to have an up to date rust compiler (rustc). Do not to use install packages provided with you OS because your
+  to have an up to date rust compiler (rustc). Do not use install packages provided with you OS because your
   rustc could be too old to build this project.
 
 - (Optional) An IDE that supports Rust autocompletion. We recommend [Visual Studio Code](https://code.visualstudio.com/Download) with the [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer) extension
@@ -77,7 +77,7 @@ To build the *ESP32 Sensor* application for ESP32 platforms (currently only ESP3
     [First Steps on ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/linux-macos-setup.html#get-started-first-steps)
     section of the 
     [Espressif Get Startet](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/index.html#) guide
-  * You should also [Check your port on Linux and macOS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/establish-serial-connection.html#check-port-on-linux-and-macos)
+  * You should also [Check your serial port on Linux and macOS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/establish-serial-connection.html#check-port-on-linux-and-macos)
     to find out how to access the serial port connection to the ESP32. Please replace the port identifier `/dev/ttyYOURPORT`
     used in this readme always with your port identifier.
 * Make sure your installed python3 version is >= 3.8 and pip is already installed
@@ -134,17 +134,19 @@ In the workspace root folder:
 cargo build --package management-console  # alternatively 'sensor' or "tangle-proxy"
 ```
 The *ESP32 Sensor* is not build if `cargo build` is started in the workspace root folder.
-The next describes how to build it.
+The next section describes how to build it.
 
 ### For ESP32
 
-The *ESP32 Sensor* project is contained in the folder `sensor/main-rust-esp-rs`. All build steps must be
+The *ESP32 Sensor* project is contained in the folder [sensor/main-rust-esp-rs](sensor/main-rust-esp-rs). All build steps must be
 executed in this project folder:
 ```bash
 cd sensor/main-rust-esp-rs/
 ```
 Before building we need to specify the WiFi SSID, the WiFi password and the url of the used *Tangle-Proxy* as
-environment variables. These variables will be hard coded into the *ESP32 Sensor*:
+environment variables. These variables will be hard coded into the *ESP32 Sensor*.
+Currently this is the only way to initiate a socket connection to the ESP32.
+This also means that currently you need to compile the ESP32 sensor app yourself to test it.:
 ```bash
 export SENSOR_MAIN_POC_WIFI_SSID=NameOfMyWifiGoesHere
 export SENSOR_MAIN_POC_WIFI_PASS=SecureWifiPassword
@@ -158,7 +160,7 @@ cargo espflash save-image sensor-esp-rs.elf
 ```
 
 If you have an ESP32-C3 device you can plug in the usb (or other serial bus) cable of your board
-and start the build:
+and start the build (with or without `--release`):
 ```bash
 cargo espflash --monitor --partition-table="partitions.csv" --release
 ```
@@ -207,7 +209,8 @@ as the *Tangle-Proxy* does not need a wallet:
               'wallet-<APPLICATION-NAME>.txt'.
 
 *Management Console* and *Sensor* use the following files for persistence
-* Wallet for the user seed<br>
+* Wallet for the user seed<br><br>
+  *x86/PC*<br>
   The applications are using a plain text wallet that stores the automatically generated seed in a text file.
   If option '--wallet-file' is not used a default filename 'wallet-<APPLICATION-NAME>.txt' is used.
   If the file does not exist a new seed is created and stored in a new wallet file. Otherwise the seed stored
@@ -215,11 +218,22 @@ as the *Tangle-Proxy* does not need a wallet:
   As the wallet file contains the plain text seed (not encrypted) make absolutely sure to<br>
   **DO NOT USE THIS WALLET FOR PRODUCTION PURPOSES**<br>
   Instead implement the [SimpleWallet trait](streams-tools/src/plain_text_wallet.rs)
-  using a secure wallet library like [stronghold](https://github.com/iotaledger/stronghold.rs). 
+  using a secure wallet library like [stronghold](https://github.com/iotaledger/stronghold.rs).
+  <br><br>
+  *ESP32 Sensor*<br>
+  Currently a dummy wallet providing a static seed phrase is used. For production purposes this needs to be
+  replaced with a randomly generated seed that is stored in
+  [encrypted flash or NVM storage](https://docs.espressif.com/projects/esp-jumpstart/en/latest/security.html).  
 
 * User state<br>
+  *x86/PC*<br>
   On application start the current user state is loaded from a file named 'user-state-<APPLICATION-NAME>.bin'.
   On application exit the current user state is written into this file.
+  <br><br>
+  *ESP32*<br>
+  The *ESP32 Sensor* reads and persists its user state every time a command is received from the *Tangle-Proxy*.
+  The state is persisted in a FAT partition located in the SPI flash memory of the ESP32 board.
+  This way the user state is secured against power outages of the ESP32.
 
 ### Management Console CLI
 
@@ -312,9 +326,9 @@ Tangle Proxy provides only one CLI command to control the ip adress to listen to
 
 ### Sensor Initialization
 
-**Create the channel using the *Management Console***
+#### Create the channel using the *Management Console
 
-In the /target/debug or release folder:
+In the `/target/debug` or `/target/release` folder:
 ```bash
     > ./management-console --create-channel
     >
@@ -323,7 +337,7 @@ In the /target/debug or release folder:
     >                      Announcement Link: c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2
     >                           Tangle Index: 491e1459e1bc6200b741fdc90fac8058bacc9c37f6c56ed4d1ce38ef3493f13e
 ```
-**Subscribe the *Sensor* x86/PC version**
+#### Subscribe the *Sensor* - x86/PC version
 
 To use a *Sensor* application we need to start the *Tangle Proxy* first. To use it together with a local x86/PC
 sensor start it like this:
@@ -335,7 +349,7 @@ sensor start it like this:
 ```
 
 Now the subscription message can be created using the announcement link from the console log of the *Management Console* above.<br>
-Using a local x86/PC Sensor app just enter this in a second command shell in the /target/debug or release folder:
+Using a local x86/PC *Sensor* app just enter this in a second command shell in the `/target/debug` or `/target/release` folder:
 ```bash
     > ./sensor --subscribe-announcement-link\
              "c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2"
@@ -403,7 +417,7 @@ of the branch used by the sensor to publish its messages.
     >          Subscriber public key: 399dc641cec739093ef6f0ecbac881d5f80b049fe1e2d46bc84cb5aff505f66b
 ```
 
-**Subscribe the *Sensor* ESP32 version**
+#### Subscribe the *Sensor* - ESP32 version
 
 If we run an *ESP32 Sensor* the *Tangle-Proxy* must be started this way:
 ```bash
@@ -486,7 +500,7 @@ is almost the same as used in the
 ```
 
 
-**Send messages using the *Sensor***
+#### Send messages using the *Sensor*
 
 Make sure that the *Tangle Proxy* is up and running in another shell. The folder `test/payloads` contains several message files that can be
 send like this:

@@ -146,7 +146,7 @@ cd sensor/main-rust-esp-rs/
 Before building we need to specify the WiFi SSID, the WiFi password and the url of the used *Tangle-Proxy* as
 environment variables. These variables will be hard coded into the *ESP32 Sensor*.
 Currently this is the only way to initiate a socket connection to the ESP32.
-This also means that currently you need to compile the ESP32 sensor app yourself to test it.:
+This also means that currently you need to compile the ESP32 sensor app yourself to test it:
 ```bash
 export SENSOR_MAIN_POC_WIFI_SSID=NameOfMyWifiGoesHere
 export SENSOR_MAIN_POC_WIFI_PASS=SecureWifiPassword
@@ -164,7 +164,7 @@ and start the build (with or without `--release`):
 ```bash
 cargo espflash --monitor --partition-table="partitions.csv" --release
 ```
-Given you already installed all needed driver to access the serial port to your board, the port will be
+Given you already installed all needed drivers to access the serial port of your board, the port will be
 detected automatically by cargo-espflash. After the application has been build and flashed the log output
 of the *ESP32 Sensor* app is displayed on the console. This is controlled by the `--monitor` option used above. 
 
@@ -227,7 +227,7 @@ as the *Tangle-Proxy* does not need a wallet:
 
 * User state<br>
   *x86/PC*<br>
-  On application start the current user state is loaded from a file named 'user-state-<APPLICATION-NAME>.bin'.
+  On application start the current user state is loaded from a file named 'user-state-[APPLICATION-NAME].bin'.
   On application exit the current user state is written into this file.
   <br><br>
   *ESP32*<br>
@@ -461,7 +461,7 @@ are the following ones:
  ```
 Now we can the send the `subscribe-announcement-link` command to the *ESP32 Sensor* using the x86/PC version of the
 *Sensor* app. The CLI command is almost the same as used in the
-<a href="#subscribe-the-sensor-x86-pc-version">Subscribe the *Sensor* x86/PC version</a> section.
+<a href="#subscribe-the-sensor---x86pc-version">Subscribe the *Sensor* x86/PC version</a> section.
 We only need to add the `--act-as-remote-control` and `--tangle-proxy-url` command to use the *Sensor* app 
 as remote control for the *ESP32 Sensor*:
  ```bash
@@ -494,7 +494,7 @@ described in the x86/PC section above.
 
 To finalize the subscription the keyload message link has to be registered by the *ESP32 Sensor*. Again the CLI command
 is almost the same as used in the
-<a href="#subscribe-the-sensor-x86-pc-version">Subscribe the *Sensor* x86/PC version</a> section:
+<a href="#subscribe-the-sensor---x86pc-version">Subscribe the *Sensor* x86/PC version</a> section:
 ```bash
     > ./sensor -c -t "http://192.168.47.11:50000" --register-keyload-msg "c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:dc4567247bbb6396057bfba9"
 ```
@@ -562,8 +562,10 @@ The services are characterized by following properties/aspects:
     Due to the low processing capabilities the sensor does not send the streams packages to the tangle directly but sends
     the packages to the *Tangle Proxy*. This way it does not need to process the adaptive POW.<br>
     Streams packages coming from the tangle are also received via the *Tangle Proxy*.
-  * `no_std` is needed for Rust implementation. A specialized new delete operator may be needed for the C++ implementation.
-    FreeRTOS will most probably be available (e.g. [ESP-IDF FreeRTOS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-guides/freertos-smp.html)).
+  * The current *ESP32 Sensor* POC uses the Rust standard library. This means `no_std` is not used for the Rust
+    implementation. Currently there is no need to use a supplementary C++ implementation of parts of the streams library.
+    The curent POC is based on a FreeRTOS adoption provided by Espressif
+    ([ESP-IDF FreeRTOS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-guides/freertos-smp.html)).
 
  * *Management Console*<br>
    Software needed for *Initialization* of the sensor, monitoring of *Sensor Processing* and managing the 
@@ -580,13 +582,17 @@ The services are characterized by following properties/aspects:
    * Receives prepared iota streams packages from the *Sensor* and sends these packages to the tangle performing the adaptive POW.
    * Listens to new tangle messages and sends the encrypted streams packages to the sensor:
      * Announcement Messages: Used in the *Initialization* workflow 
-     * Keyload Messages: Used in the *Add/Remove Subscriber* and *Initialization* workflows              
+     * Keyload Messages: Used in the *Add/Remove Subscriber* and *Initialization* workflows
+   * In the current POC implementation the *Tangle-Proxy* also forwards remote control commands from
+     the *Sensor remote control* to the *ESP32 Sensor*. In a later production system for the *Sensor Processing* workflow
+     this service will probably be implemented as an independent service while for the *Initialization* workflow an integration
+     of Tangle- and Command-Communication can be of advantage.
 
 Following workflows will exist for each channel. Every sensor uses its own exclusive channel:
 
 #### Initialization
   * Limitations of lorawan don't apply. Sensor is connected via Wifi or wired using peripherals (e.g. usb).
-  * Performs the initial handshake (announcement/subscription/keyload) between sensor and the channel author (*Management Console*)
+  * Performs the initial handshake (announcement/subscription/keyload) between *Sensor* and the channel author (*Management Console*)
     via the *Tangle Proxy*.
 <img src="workflow_initialization.png" alt="drawing" width="650"/>
 

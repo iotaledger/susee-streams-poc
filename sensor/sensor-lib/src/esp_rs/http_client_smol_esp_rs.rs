@@ -46,25 +46,25 @@ use iota_client_types::{
 
 #[cfg(feature = "esp_idf")]
 use embedded_svc::{
+    io::Read,
     http::{
         Status,
         Headers,
         client::{
             Client,
             Request,
+            RequestWrite,
         },
-    },
-    io::Read,
+    }
 };
 
 #[cfg(feature = "esp_idf")]
-use esp_idf_sys::EspError;
-
-#[cfg(feature = "esp_idf")]
 use esp_idf_svc::{
+    errors::EspIOError,
     http::client::{
         EspHttpClient,
         EspHttpResponse,
+//        EspHttpRequestWrite,
     },
 };
 
@@ -124,7 +124,7 @@ impl HttpClient
             let mut http_client = EspHttpClient::new_default()?;
         log::debug!("[HttpClient.recv_message_via_http] EspHttpClient created");
         #[cfg(feature = "esp_idf")]
-            let response: EspHttpResponse = self.request(
+            let mut response: EspHttpResponse = self.request(
             &mut http_client,
             self.request_builder.receive_message_from_address(link)?,
         ).await?;
@@ -160,8 +160,8 @@ impl HttpClient
                 log::info!("[HttpClient.recv_message_via_http] Received response with content length of {}", content_len);
                 let mut buffer = Vec::new();
                 buffer.resize(content_len, 0);
-                log::debug!("[HttpClient.recv_message_via_http] do_read");
-                (&response).do_read(&mut buffer)?;
+                log::debug!("[HttpClient.recv_message_via_http] read");
+                (&mut response).read(&mut buffer)?;
                 log::info!("[HttpClient.recv_message_via_http] create TangleMessage ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}", buffer.len(), buffer.as_slice());
                 let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&buffer).unwrap();
                 log::debug!("[HttpClient.recv_message_via_http] return ret_val");
@@ -190,7 +190,7 @@ impl HttpClient
 #[cfg(feature = "esp_idf")]
 impl HttpClient
 {
-    pub async fn request<'a>(&mut self, http_client: &'a mut EspHttpClient, req: HyperRequest<Body>) -> Result<EspHttpResponse<'a>> { // Result<EspHttpResponse, EspError> {
+    pub async fn request<'a>(&mut self, http_client: &'a mut EspHttpClient, req: HyperRequest<Body>) -> Result<EspHttpResponse<'a>> {
         let svc_http_method = match req.method() {
             &Method::POST => embedded_svc::http::Method::Post,
             &Method::GET => embedded_svc::http::Method::Get,
@@ -199,15 +199,16 @@ impl HttpClient
 
         let esp_http_req = http_client.request(
             svc_http_method,
-            req.uri().to_string(),
+            &req.uri().to_string(),
         )?;
 
-        let resulting_ret_val: Result<EspHttpResponse, EspError>;
+        let resulting_ret_val: Result<EspHttpResponse, EspIOError>;
         match req.method() {
             &Method::POST => {
                 let bytes = hyper_body::to_bytes(req.into_body()).await.unwrap();
                 log::debug!("[HttpClient.request] Bytes to send: Length: {}\n    {:02X?}", bytes.len(), bytes);
-                resulting_ret_val = esp_http_req.send_bytes(bytes);
+                let http_request_write = esp_http_req.send_bytes(&bytes)?;
+                resulting_ret_val = http_request_write.submit();
             },
             &Method::GET => {
                 resulting_ret_val = esp_http_req.submit();

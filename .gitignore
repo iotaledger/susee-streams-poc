@@ -8,3 +8,4 @@
 Cargo.lock.bak-*
 /sensor/main-idf/build/
 /temp-apps/
+/sensor/main-idf/components/rustlib/target/

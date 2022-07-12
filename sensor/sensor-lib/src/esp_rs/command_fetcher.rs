@@ -1,9 +1,13 @@
 
-use embedded_svc::http::{
-    Status,
-    client::{
-        Client,
-        Request,
+use embedded_svc::{
+    io::Read,
+    http::{
+        Status,
+        Headers,
+        client::{
+            Client,
+            Request,
+        }
     }
 };
 
@@ -28,8 +32,6 @@ use anyhow::{
     Result,
     bail,
 };
-use embedded_svc::io::Read;
-use embedded_svc::http::Headers;
 use std::fmt;
 use log;
 
@@ -71,7 +73,7 @@ impl<'a> CommandFetcher<'a> {
 
         let esp_http_req = http_client.request(
             embedded_svc::http::Method::Get,
-            url.to_string(),
+            &url.to_string(),
         )?;
 
         match esp_http_req.submit() {
@@ -91,7 +93,7 @@ impl<'a> CommandFetcher<'a> {
         }
     }
 
-    fn deserialize_command(& self, response: EspHttpResponse) -> Result<(Command, Vec<u8>)> {
+    fn deserialize_command(& self, mut response: EspHttpResponse) -> Result<(Command, Vec<u8>)> {
         let mut ret_val = (Command::NO_COMMAND, Vec::<u8>::default());
         if let Some(content_len) = response.content_len() {
             if content_len >= Command::COMMAND_LENGTH_BYTES {
@@ -99,7 +101,7 @@ impl<'a> CommandFetcher<'a> {
                 let mut buffer = Vec::new();
                 buffer.resize(content_len, 0);
                 log::debug!("[CommandFetcher.deserialize_command] do_read");
-                (&response).do_read(&mut buffer)?;
+                (&mut response).read(&mut buffer)?;
                 log::debug!("[CommandFetcher.deserialize_command] create Command ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}", buffer.len(), buffer.as_slice());
                 let command = Command::from_bytes(&buffer[0..Command::COMMAND_LENGTH_BYTES]).unwrap();
                 log::debug!("[CommandFetcher.deserialize_command] return ret_val");

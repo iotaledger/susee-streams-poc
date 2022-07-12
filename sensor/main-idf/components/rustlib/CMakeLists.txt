@@ -1,3 +1,5 @@
+include(CMakePrintHelpers)
+
 idf_component_register(
     SRCS "placeholder.c"
     INCLUDE_DIRS ""
@@ -18,10 +20,21 @@ set(RUST_PROJECT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(RUST_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 set(RUST_TARGET_DIR "${RUST_BUILD_DIR}/target")
 set(RUST_INCLUDE_DIR "${RUST_TARGET_DIR}")
-set(RUST_INCLUDE_HEADER "${RUST_INCLUDE_DIR}/RustApi.h")
+set(RUST_INCLUDE_HEADER "${RUST_INCLUDE_DIR}/streams_poc_lib.h")
 set(RUST_STATIC_LIBRARY "${RUST_TARGET_DIR}/${CARGO_TARGET}/${CARGO_BUILD_TYPE}/librustlib.a")
 
 idf_build_get_property(sdkconfig SDKCONFIG)
+
+cmake_print_variables(RUST_PROJECT_DIR)
+cmake_print_variables(RUST_BUILD_DIR)
+cmake_print_variables(RUST_TARGET_DIR)
+cmake_print_variables(RUST_INCLUDE_DIR)
+cmake_print_variables(RUST_INCLUDE_HEADER)
+cmake_print_variables(RUST_STATIC_LIBRARY)
+
+cmake_print_variables(CARGO_TARGET)
+cmake_print_variables(sdkconfig)
+cmake_print_properties(TARGETS ${COMPONENT_LIB} PROPERTIES INCLUDE_DIRECTORIES LINK_LIBRARIES)
 
 ExternalProject_Add(
     rustlib_project
@@ -32,6 +45,7 @@ ExternalProject_Add(
         CARGO_BUILD_TARGET_DIR=${RUST_TARGET_DIR}
         cargo clean
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
+        CARGO_CMAKE_BUILD_ESP_IDF=${IDF_PATH}
         CARGO_BUILD_TARGET=${CARGO_TARGET}
         CARGO_BUILD_TARGET_DIR=${RUST_TARGET_DIR}
         CARGO_CMAKE_BUILD_INCLUDES=$<TARGET_PROPERTY:${COMPONENT_LIB},INCLUDE_DIRECTORIES>
@@ -54,8 +68,8 @@ ExternalProject_Add(
 
 set_source_files_properties("${RUST_INCLUDE_HEADER}" PROPERTIES GENERATED true)
 
-add_prebuilt_library(rustlib_lib "${RUST_STATIC_LIBRARY}" PRIV_REQUIRES "${RUST_DEPS}")
+add_prebuilt_library(rustlib_lib "${RUST_STATIC_LIBRARY}" PRIV_REQUIRES "${RUST_DEPS}" fatfs wpa_supplicant)
 add_dependencies(rustlib_lib rustlib_project)
 
 target_include_directories(${COMPONENT_LIB} PUBLIC "${RUST_INCLUDE_DIR}")
-target_link_libraries(${COMPONENT_LIB} PRIVATE rustlib_lib)
+target_link_libraries(${COMPONENT_LIB} PUBLIC rustlib_lib)

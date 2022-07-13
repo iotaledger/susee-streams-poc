@@ -1,5 +1,5 @@
 [package]
-name = "rustlib"
+name = "streams_poc_lib"
 version = "0.1.0"
 authors = ["chrisgitiota <christof.gerritsma@iota.org>"]
 edition = "2018"

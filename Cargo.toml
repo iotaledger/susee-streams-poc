@@ -24,7 +24,7 @@ default-members = [
 ]
 
 exclude = [
-    "sensor/streams-poc-lib/components/rustlib",
+    "sensor/streams-poc-lib/components/streams-poc-lib",
 ]
 
 resolver = "2"

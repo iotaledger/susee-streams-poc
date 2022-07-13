@@ -1,4 +1,4 @@
-# rustlib
+# streams_poc_lib
 
 This component generates a static library from Rust source code and exposes functions that will be callable from the main IDF application from C.
 

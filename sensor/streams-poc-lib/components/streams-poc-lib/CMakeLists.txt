@@ -21,7 +21,7 @@ set(RUST_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 set(RUST_TARGET_DIR "${RUST_BUILD_DIR}/target")
 set(RUST_INCLUDE_DIR "${RUST_TARGET_DIR}")
 set(RUST_INCLUDE_HEADER "${RUST_INCLUDE_DIR}/streams_poc_lib.h")
-set(RUST_STATIC_LIBRARY "${RUST_TARGET_DIR}/${CARGO_TARGET}/${CARGO_BUILD_TYPE}/librustlib.a")
+set(RUST_STATIC_LIBRARY "${RUST_TARGET_DIR}/${CARGO_TARGET}/${CARGO_BUILD_TYPE}/libstreams_poc_lib.a")
 
 idf_build_get_property(sdkconfig SDKCONFIG)
 
@@ -37,7 +37,7 @@ cmake_print_variables(sdkconfig)
 cmake_print_properties(TARGETS ${COMPONENT_LIB} PROPERTIES INCLUDE_DIRECTORIES LINK_LIBRARIES)
 
 ExternalProject_Add(
-    rustlib_project
+    streams_poc_lib_project
     PREFIX "${RUST_PROJECT_DIR}"
     DOWNLOAD_COMMAND ""
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
@@ -68,8 +68,8 @@ ExternalProject_Add(
 
 set_source_files_properties("${RUST_INCLUDE_HEADER}" PROPERTIES GENERATED true)
 
-add_prebuilt_library(rustlib_lib "${RUST_STATIC_LIBRARY}" PRIV_REQUIRES "${RUST_DEPS}" fatfs wpa_supplicant)
-add_dependencies(rustlib_lib rustlib_project)
+add_prebuilt_library(streams_poc_lib_lib "${RUST_STATIC_LIBRARY}" PRIV_REQUIRES "${RUST_DEPS}" fatfs wpa_supplicant)
+add_dependencies(streams_poc_lib_lib streams_poc_lib_project)
 
 target_include_directories(${COMPONENT_LIB} PUBLIC "${RUST_INCLUDE_DIR}")
-target_link_libraries(${COMPONENT_LIB} PRIVATE rustlib_lib)
+target_link_libraries(${COMPONENT_LIB} PRIVATE streams_poc_lib_lib)

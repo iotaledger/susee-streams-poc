@@ -8,4 +8,4 @@ Cargo.lock.bak-*
 /temp-apps/
 /sensor/main-rust-esp-rs/build/CMakeFiles/
 /sensor/streams-poc-lib/build/
-/sensor/streams-poc-lib/components/rustlib/target/
+/sensor/streams-poc-lib/components/streams-poc-lib/target/

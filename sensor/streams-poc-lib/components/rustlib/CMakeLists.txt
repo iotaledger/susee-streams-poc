@@ -72,4 +72,4 @@ add_prebuilt_library(rustlib_lib "${RUST_STATIC_LIBRARY}" PRIV_REQUIRES "${RUST_
 add_dependencies(rustlib_lib rustlib_project)
 
 target_include_directories(${COMPONENT_LIB} PUBLIC "${RUST_INCLUDE_DIR}")
-target_link_libraries(${COMPONENT_LIB} PUBLIC rustlib_lib)
+target_link_libraries(${COMPONENT_LIB} PRIVATE rustlib_lib)

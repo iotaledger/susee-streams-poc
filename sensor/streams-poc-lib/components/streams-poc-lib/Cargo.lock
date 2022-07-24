@@ -928,8 +928,6 @@ dependencies = [
 [[package]]
 name = "esp-idf-svc"
 version = "0.42.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16fbd87764197cd2b5dbb85ada5cd9e10dabafeb3a297bfb1d7740cf6547cd0b"
 dependencies = [
  "anyhow",
  "cstr_core",

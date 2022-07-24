@@ -1,6 +1,7 @@
 pub mod command_fetcher;
 pub mod main;
 pub mod http_client_smol_esp_rs;
+pub mod streams_poc_lib;
 
 #[cfg(feature = "wifi")]
 pub mod wifi_utils;

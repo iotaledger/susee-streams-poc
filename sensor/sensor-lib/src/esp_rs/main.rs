@@ -73,7 +73,7 @@ fn print_heap_info() {
             esp_idf_sys::MALLOC_CAP_8BIT
         );
 
-        log::info!("heap_caps_get_free_size(MALLOC_CAP_8BIT): {}", free_mem);
+        log::info!("[fn print_heap_info] heap_caps_get_free_size(MALLOC_CAP_8BIT): {}", free_mem);
     }
 }
 
@@ -122,8 +122,8 @@ async fn clear_client_state<'a> (subscriber_manager: &mut SubscriberManagerDummy
 
 pub async fn send_content_as_msg(message_key: String, subscriber: &mut SubscriberManagerDummyWalletHttpClient) -> Result<Address>{
     let message_bytes = get_message_bytes(Message::from(message_key.as_str()));
-    log::info!("[Sensor] Sending {} bytes payload\n", message_bytes.len());
-    log::debug!("[Sensor - send_content_as_msg()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
+    log::info!("[fn send_content_as_msg] Sending {} bytes payload\n", message_bytes.len());
+    log::debug!("[fn send_content_as_msg] - send_content_as_msg()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
     subscriber.send_signed_packet(&Bytes(message_bytes.to_vec())).await
 }
 
@@ -143,7 +143,7 @@ async fn subscribe_to_channel(announcement_link_str: &str, subscriber_mngr: &mut
 
 async fn register_keyload_msg(keyload_msg_link_str: &str, subscriber_mngr: &mut SubscriberManagerDummyWalletHttpClient) -> Result<()> {
     let keyload_msg_link = Address::from_str(&keyload_msg_link_str)?;
-    subscriber_mngr.register_keyload_msg(&keyload_msg_link).expect("[Sensor] register_keyload_msg err");
+    subscriber_mngr.register_keyload_msg(&keyload_msg_link).expect("[fn register_keyload_msg] register_keyload_msg err");
 
     println_subscription_details(
         &subscriber_mngr.subscriber.as_ref().unwrap(),
@@ -161,53 +161,53 @@ async fn process_command(command: Command, buffer: Vec<u8>) -> Result<()>{
     #[cfg(feature = "esp_idf")]
         let vfs_fat_handle = setup_vfs_fat_filesystem()?;
 
-    log::debug!("[Sensor - process_command()] Creating HttpClient");
+    log::debug!("[fn process_command]  Creating HttpClient");
     let client = HttpClient::new(Some(HttpClientOptions{ http_url: TANGLE_PROXY_URL }));
-    log::debug!("[Sensor] Creating subscriber");
+    log::debug!("[fn process_command] Creating subscriber");
     let mut subscriber= SubscriberManagerDummyWalletHttpClient::new(
         client,
         wallet,
         Some(String::from(BASE_PATH) + "/user-state-sensor.bin"),
     ).await;
 
-    log::debug!("[Sensor - process_command()] subscriber created");
+    log::debug!("[fn process_command]  subscriber created");
 
     #[cfg(feature = "esp_idf")]
         print_heap_info();
 
     if command == Command::SUBSCRIBE_TO_ANNOUNCEMENT_LINK {
         let cmd_args = SubscribeToAnnouncement::try_from_bytes(buffer.as_slice())?;
-        log::info!("[Sensor - process_command()] processing SUBSCRIBE_ANNOUNCEMENT_LINK: {}", cmd_args.announcement_link);
+        log::info!("[fn process_command]  processing SUBSCRIBE_ANNOUNCEMENT_LINK: {}", cmd_args.announcement_link);
         subscribe_to_channel(cmd_args.announcement_link.as_str(), &mut subscriber).await?
     }
 
     if command == Command::START_SENDING_MESSAGES {
         let cmd_args = StartSendingMessages::try_from_bytes(buffer.as_slice())?;
-        log::info!("[Sensor - process_command()] processing START_SENDING_MESSAGES: {}", cmd_args.message_template_key);
+        log::info!("[fn process_command]  processing START_SENDING_MESSAGES: {}", cmd_args.message_template_key);
         send_content_as_msg(cmd_args.message_template_key, &mut subscriber).await?;
     }
 
     if command == Command::REGISTER_KEYLOAD_MESSAGE {
         let cmd_args = RegisterKeyloadMessage::try_from_bytes(buffer.as_slice())?;
-        log::info!("[Sensor - process_command()] processing REGISTER_KEYLOAD_MESSAGE: {}", cmd_args.keyload_msg_link);
+        log::info!("[fn process_command]  processing REGISTER_KEYLOAD_MESSAGE: {}", cmd_args.keyload_msg_link);
         register_keyload_msg(cmd_args.keyload_msg_link.as_str(), &mut subscriber).await?
     }
 
     if command == Command::PRINTLN_SUBSCRIBER_STATUS {
-        log::info!("[Sensor - process_command()] PRINTLN_SUBSCRIBER_STATUS");
+        log::info!("[fn process_command]  PRINTLN_SUBSCRIBER_STATUS");
         println_subscriber_status(&subscriber);
     }
 
     if command == Command::CLEAR_CLIENT_STATE {
-        log::info!("[Sensor - process_command()] =========> processing CLEAR_CLIENT_STATE <=========");
+        log::info!("[fn process_command]  =========> processing CLEAR_CLIENT_STATE <=========");
         clear_client_state(&mut subscriber).await?;
     }
 
     #[cfg(feature = "esp_idf")]
     {
-        log::debug!("[Sensor - process_command()] Safe subscriber client_status to disk");
+        log::debug!("[fn process_command]  Safe subscriber client_status to disk");
         subscriber.safe_client_status_to_disk().await?;
-        log::debug!("[Sensor - process_command()] drop_vfs_fat_filesystem");
+        log::debug!("[fn process_command]  drop_vfs_fat_filesystem");
         drop_vfs_fat_filesystem(vfs_fat_handle)?;
     }
 
@@ -215,7 +215,7 @@ async fn process_command(command: Command, buffer: Vec<u8>) -> Result<()>{
 }
 
 pub async fn process_main_esp_rs() -> Result<()> {
-    log::debug!("[Sensor] process_main() entry");
+    log::debug!("[fn process_main_esp_rs] process_main() entry");
 
     let command_fetch_wait_seconds = 5;
 
@@ -223,28 +223,28 @@ pub async fn process_main_esp_rs() -> Result<()> {
         print_heap_info();
 
     #[cfg(feature = "wifi")]
-        log::debug!("[Sensor] init_wifi");
+        log::debug!("[fn process_main_esp_rs] init_wifi");
     #[cfg(feature = "wifi")]
         let (_wifi_hdl, _client_settings) = init_wifi()?;
 
-    log::info!("[Sensor] process_main_esp_rs - Using tangle-proxy url: {}", TANGLE_PROXY_URL);
+    log::info!("[fn process_main_esp_rs] Using tangle-proxy url: {}", TANGLE_PROXY_URL);
     let command_fetcher = CommandFetcher::new(Some(CommandFetcherOptions{ http_url: TANGLE_PROXY_URL }));
 
     loop {
         if let Ok((command, buffer)) = command_fetcher.fetch_next_command() {
             if command != Command::NO_COMMAND {
-                log::debug!("[Sensor] process_main_esp_rs - Starting process_command for command: {}.", command);
+                log::info!("[fn process_main_esp_rs] Starting process_command for command: {}.", command);
                 match process_command(command, buffer).await {
                     Ok(_) => {},
                     Err(err) => {
-                        log::error!("[Sensor] process_main_esp_rs - process_command() returned error: {}", err);
+                        log::error!("[fn process_main_esp_rs] process_command() returned error: {}", err);
                     }
                 };
             } else {
-                log::info!("[Sensor] process_main_esp_rs - Received Command::NO_COMMAND.");
+                log::info!("[fn process_main_esp_rs] Received Command::NO_COMMAND.");
             }
         } else {
-            log::error!("[Sensor] process_main_esp_rs - command_fetcher.fetch_next_command() failed.");
+            log::error!("[fn process_main_esp_rs] command_fetcher.fetch_next_command() failed.");
         }
 
         for s in 0..command_fetch_wait_seconds {

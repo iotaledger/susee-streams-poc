@@ -74,6 +74,9 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
     // We are using response_data array to imitate the rx_buffer we'd received in our
     // recv(sock, ...) call.
     StreamsError err = response_callback(response_data, RESPONSE_DATA_LENGTH);
+    if (err < 0) {
+        printf("response_callback returned with error code: %s, ", streams_error_to_string(err));
+    }
 
     // As we have not called send(sock, ...) we assume that no LoRaWanError occured.
     return LORAWAN_OK;
@@ -99,9 +102,9 @@ void app_main(void)
 
     printf("Free heap: %d\n", esp_get_free_heap_size());
 
-    // printf("Calling send_message for message_data of length %d \n\n", MESSAGE_DATA_LENGTH);
-    // send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket);
+    printf("Calling send_message for message_data of length %d \n\n", MESSAGE_DATA_LENGTH);
+    send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket);
 
-    printf("Calling sprocess_main()");
-    process_main();
+    // printf("Calling sprocess_main()");
+    // process_main();
 }

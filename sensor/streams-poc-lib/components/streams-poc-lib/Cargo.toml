@@ -50,3 +50,4 @@ time = { version = "=0.3.4", git = "https://github.com/time-rs/time", rev="8ec5f
 iota-crypto = { version = "0.9.1", git = "https://github.com/iotaledger/crypto.rs.git", rev="6840d43f98ad1a991571268f7a9543025200ca4f" }
 esp-idf-sys = { version = "0.31.6", path = "/home/christof/Develop/esp-rs/esp-idf-sys/" }
 esp-idf-hal = { version = "0.38.0", path = "/home/christof/Develop/esp-rs/esp-idf-hal/" }
+esp-idf-svc = { version = "0.42.0", path = "/home/christof/Develop/esp-rs/esp-idf-svc/" }

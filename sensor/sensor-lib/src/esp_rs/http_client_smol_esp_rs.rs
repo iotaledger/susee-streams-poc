@@ -125,9 +125,9 @@ impl HttpClient
         log::debug!("[HttpClient.recv_message_via_http] EspHttpClient created");
         #[cfg(feature = "esp_idf")]
             let mut response: EspHttpResponse = self.request(
-            &mut http_client,
-            self.request_builder.receive_message_from_address(link)?,
-        ).await?;
+                &mut http_client,
+                self.request_builder.receive_message_from_address(link)?,
+            ).await?;
         #[cfg(not(feature = "esp_idf"))]
             log::warn!("[HttpClient.recv_message_via_http] Calling self.request() is skipped. Enable feature 'esp_idf' to use http client.");
 

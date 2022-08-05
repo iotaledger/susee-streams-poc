@@ -10,6 +10,7 @@ use hyper::{
 
 use crate::{
     BinaryPersist,
+
     binary_persist_command::{
         Command,
         SubscribeToAnnouncement,
@@ -27,6 +28,7 @@ use url::{
 };
 
 use iota_streams::core::async_trait;
+use crate::binary_persist::EnumeratedPersistable;
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -126,8 +128,8 @@ pub trait ServerDispatchCommand {
 }
 
 // Use the the persisted Command::XXXX_XXXX_XXXX instead as Response<Body>
-fn get_body_bytes_from_command(command: &Command) -> Result<[u8; Command::COMMAND_LENGTH_BYTES]> {
-    let mut buffer: [u8; Command::COMMAND_LENGTH_BYTES] = [0; Command::COMMAND_LENGTH_BYTES];
+fn get_body_bytes_from_command(command: &Command) -> Result<[u8; Command::LENGTH_BYTES]> {
+    let mut buffer: [u8; Command::LENGTH_BYTES] = [0; Command::LENGTH_BYTES];
     command.to_bytes(&mut buffer).unwrap();
     Ok(buffer)
 }

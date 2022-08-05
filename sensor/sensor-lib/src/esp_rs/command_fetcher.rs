@@ -17,6 +17,7 @@ use esp_idf_svc::http::client::{
 };
 
 use streams_tools::{
+    binary_persist::EnumeratedPersistable,
     binary_persist_command::{
         Command,
     },
@@ -24,6 +25,7 @@ use streams_tools::{
         EndpointUris,
     },
     STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
+    BinaryPersist
 };
 
 use hyper::http::StatusCode;
@@ -96,14 +98,14 @@ impl<'a> CommandFetcher<'a> {
     fn deserialize_command(& self, mut response: EspHttpResponse) -> Result<(Command, Vec<u8>)> {
         let mut ret_val = (Command::NO_COMMAND, Vec::<u8>::default());
         if let Some(content_len) = response.content_len() {
-            if content_len >= Command::COMMAND_LENGTH_BYTES {
+            if content_len >= Command::LENGTH_BYTES {
                 log::debug!("[CommandFetcher.deserialize_command] response.content_len()={}", content_len);
                 let mut buffer = Vec::new();
                 buffer.resize(content_len, 0);
                 log::debug!("[CommandFetcher.deserialize_command] do_read");
                 (&mut response).read(&mut buffer)?;
                 log::debug!("[CommandFetcher.deserialize_command] create Command ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}", buffer.len(), buffer.as_slice());
-                let command = Command::from_bytes(&buffer[0..Command::COMMAND_LENGTH_BYTES]).unwrap();
+                let command = Command::try_from_bytes(&buffer[0..Command::LENGTH_BYTES]).unwrap();
                 log::debug!("[CommandFetcher.deserialize_command] return ret_val");
                 ret_val = (command, buffer.to_vec());
             } else {

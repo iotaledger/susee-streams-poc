@@ -9,8 +9,6 @@ use hyper::{
 };
 
 use crate::{
-    BinaryPersist,
-
     binary_persist_command::{
         Command,
         SubscribeToAnnouncement,
@@ -20,6 +18,7 @@ use crate::{
     http::http_protocol_tools::{
         RequestBuilderTools,
         get_response_404,
+        get_body_bytes_from_enumerated_persistable,
     },
 };
 
@@ -28,7 +27,6 @@ use url::{
 };
 
 use iota_streams::core::async_trait;
-use crate::binary_persist::EnumeratedPersistable;
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -87,7 +85,7 @@ impl RequestBuilderCommand {
     }
 
     pub fn send_message(self: &Self, message_template_key: &str) -> Result<Request<Body>> {
-        self.send_command_with_args(
+        self.tools.send_enumerated_persistable_args(
             StartSendingMessages{
                 wait_seconds_between_repeats: 30,
                 message_template_key: message_template_key.to_string()
@@ -97,27 +95,17 @@ impl RequestBuilderCommand {
     }
 
     pub fn subscribe_to_announcement(self: &Self, announcement_link_str: &str) -> Result<Request<Body>> {
-        self.send_command_with_args(
+        self.tools.send_enumerated_persistable_args(
             SubscribeToAnnouncement{ announcement_link: announcement_link_str.to_string() },
             EndpointUris::SUBSCRIBE_TO_ANNOUNCEMENT
         )
     }
 
     pub fn register_keyload_msg(self: &Self, keyload_msg_link_str: &str) -> Result<Request<Body>> {
-        self.send_command_with_args(
+        self.tools.send_enumerated_persistable_args(
             RegisterKeyloadMessage{ keyload_msg_link: keyload_msg_link_str.to_string() },
             EndpointUris::REGISTER_KEYLOAD_MSG
         )
-    }
-
-    fn send_command_with_args<CommandT: BinaryPersist>(self: &Self, cmd_args: CommandT, path: &str) -> Result<Request<Body>> {
-        let mut buffer: Vec<u8> = vec![0; cmd_args.needed_size()];
-        cmd_args.to_bytes(buffer.as_mut_slice()).expect("Persisting into binary data failed");
-
-        self.tools.get_request_builder()
-            .method("POST")
-            .uri(self.tools.get_uri(path).as_str())
-            .body(Body::from(buffer))
     }
 }
 
@@ -127,13 +115,6 @@ pub trait ServerDispatchCommand {
     async fn register_remote_command(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>>;
 }
 
-// Use the the persisted Command::XXXX_XXXX_XXXX instead as Response<Body>
-fn get_body_bytes_from_command(command: &Command) -> Result<[u8; Command::LENGTH_BYTES]> {
-    let mut buffer: [u8; Command::LENGTH_BYTES] = [0; Command::LENGTH_BYTES];
-    command.to_bytes(&mut buffer).unwrap();
-    Ok(buffer)
-}
-
 pub async fn dispatch_request_command(method: &Method, path: &str, body_bytes: &[u8], _query_pairs: &Parse<'_>, callbacks: &mut impl ServerDispatchCommand) -> Result<Response<Body>> {
     match (method, path) {
         (&Method::GET, EndpointUris::FETCH_NEXT_COMMAND) => {
@@ -141,12 +122,12 @@ pub async fn dispatch_request_command(method: &Method, path: &str, body_bytes: &
         },
 
         (&Method::GET, EndpointUris::PRINTLN_SUBSCRIBER_STATUS) => {
-            let buffer = get_body_bytes_from_command(&Command::PRINTLN_SUBSCRIBER_STATUS)?;
+            let buffer = get_body_bytes_from_enumerated_persistable(&Command::PRINTLN_SUBSCRIBER_STATUS)?;
             callbacks.register_remote_command(&buffer, "println_subscriber_status").await
         },
 
         (&Method::GET, EndpointUris::CLEAR_CLIENT_STATE) => {
-            let buffer = get_body_bytes_from_command(&Command::CLEAR_CLIENT_STATE)?;
+            let buffer = get_body_bytes_from_enumerated_persistable(&Command::CLEAR_CLIENT_STATE)?;
             callbacks.register_remote_command(&buffer, "clear_client_state").await
         },
 

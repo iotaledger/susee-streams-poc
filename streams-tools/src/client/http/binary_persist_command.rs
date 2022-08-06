@@ -8,18 +8,18 @@ use std::{
 
 use anyhow::{
     Result,
-    bail,
 };
 
 use crate::binary_persist::{
     RangeIterator,
     BinaryPersist,
     USIZE_LEN,
-    serialize_persistable_thing_and_streams_link,
+    serialize_binary_persistable_and_streams_link,
     EnumeratedPersistable,
     EnumeratedPersistableInner,
     EnumeratedPersistableArgs,
-    calc_string_binary_length
+    calc_string_binary_length,
+    deserialize_enumerated_persistable_arg
 };
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -58,9 +58,7 @@ impl EnumeratedPersistable for Command {
     }
 }
 
-// TODO Replace this with an implementation macro like #[derive(BinaryPersist)]
 impl BinaryPersist for Command {
-
     fn needed_size(&self) -> usize {
         self.0.needed_size()
     }
@@ -68,30 +66,8 @@ impl BinaryPersist for Command {
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized { EnumeratedPersistableInner::try_from_bytes::<Command>(buffer) }
 }
 
-// TODO Replace this with an implementation macro like #[derive(Display)]
 impl fmt::Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { self.0.fmt(f) }
-}
-
-fn command_try_from_bytes<CommandT>(buffer: &[u8] ) -> Result<(CommandT, usize)>
-    where
-        CommandT: Sized + EnumeratedPersistableArgs<Command> + Default
-{
-    let mut range: Range<usize> = RangeIterator::new(Command::LENGTH_BYTES);
-    // COMMAND type
-    let command = Command::try_from_bytes(&buffer[range.clone()])?;
-    if command != *CommandT::INSTANCE {
-        bail!("Wrong COMMAND type for deserializing {} instance. Wrong type is {}.", CommandT::INSTANCE, command)
-    }
-    // Length of persisted link utf8 string binary
-    range.increment(USIZE_LEN);
-    let link_len= u32::try_from_bytes(&buffer[range.clone()]).unwrap();
-    // link utf8 string
-    range.increment(link_len as usize);
-    let link = String::from_utf8(buffer[range.clone()].to_vec())?;
-    let mut ret_val = CommandT::default();
-    ret_val.set_str_arg(link);
-    Ok((ret_val, range.end))
 }
 
 #[derive(Default)]
@@ -113,15 +89,17 @@ impl BinaryPersist for SubscribeToAnnouncement {
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
-        serialize_persistable_thing_and_streams_link(Self::INSTANCE.clone(), &self.announcement_link, buffer)
+        let mut range: Range<usize> = RangeIterator::new(0);
+        serialize_binary_persistable_and_streams_link(Self::INSTANCE.clone(), &self.announcement_link, buffer, &mut range)?;
+        Ok(range.end)
     }
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized {
-        let (ret_val, _pos) = command_try_from_bytes::<SubscribeToAnnouncement>(buffer)?;
+        let mut range: Range<usize> = RangeIterator::new(0);
+        let ret_val = deserialize_enumerated_persistable_arg::<SubscribeToAnnouncement, Command>(buffer, &mut range)?;
         Ok(ret_val)
     }
 }
-
 
 #[derive(Default)]
 pub struct RegisterKeyloadMessage {
@@ -142,11 +120,14 @@ impl BinaryPersist for RegisterKeyloadMessage {
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
-        serialize_persistable_thing_and_streams_link(Self::INSTANCE.clone(), &self.keyload_msg_link, buffer)
+        let mut range: Range<usize> = RangeIterator::new(0);
+        serialize_binary_persistable_and_streams_link(Self::INSTANCE.clone(), &self.keyload_msg_link, buffer, &mut range)?;
+        Ok(range.end)
     }
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized {
-        let (ret_val, _pos) = command_try_from_bytes::<RegisterKeyloadMessage>(buffer)?;
+        let mut range: Range<usize> = RangeIterator::new(0);
+        let ret_val = deserialize_enumerated_persistable_arg::<RegisterKeyloadMessage, Command>(buffer, &mut range)?;
         Ok(ret_val)
     }
 }
@@ -175,8 +156,8 @@ impl BinaryPersist for StartSendingMessages {
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
         // COMMAND + message_template_key
-        let pos = serialize_persistable_thing_and_streams_link(Self::INSTANCE.clone(), &self.message_template_key, buffer)?;
-        let mut range: Range<usize> = RangeIterator::new(pos);
+        let mut range: Range<usize> = RangeIterator::new(0);
+        serialize_binary_persistable_and_streams_link(Self::INSTANCE.clone(), &self.message_template_key, buffer, &mut range)?;
         // wait_seconds_between_repeats
         range.increment(USIZE_LEN);
         BinaryPersist::to_bytes(&self.wait_seconds_between_repeats, &mut buffer[range.clone()])
@@ -186,8 +167,8 @@ impl BinaryPersist for StartSendingMessages {
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized {
         // COMMAND + message_template_key
-        let ( mut ret_val, pos) = command_try_from_bytes::<StartSendingMessages>(buffer)?;
-        let mut range: Range<usize> = RangeIterator::new(pos);
+        let mut range: Range<usize> = RangeIterator::new(0);
+        let mut ret_val = deserialize_enumerated_persistable_arg::<StartSendingMessages, Command>(buffer, &mut range)?;
         // wait_seconds_between_repeats
         range.increment(USIZE_LEN);
         ret_val.wait_seconds_between_repeats = u32::try_from_bytes(&buffer[range]).unwrap();

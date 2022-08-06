@@ -41,49 +41,6 @@ pub static TANGLE_ADDRESS_BYTE_LEN: usize = APPINST_SIZE + MSGID_SIZE;
 // * https://users.rust-lang.org/t/comparison-of-way-too-many-rust-asn-1-der-libraries/58683
 // * https://github.com/Geal/nom
 
-impl BinaryPersist for u64 {
-    fn needed_size(&self) -> usize {
-        8
-    }
-
-    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
-        buffer[0..8].copy_from_slice(&self.to_le_bytes());
-        Ok(8)
-    }
-
-    fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
-        Ok(u64::from_le_bytes(buffer[0..8].try_into().expect("slice with incorrect length")))
-    }
-}
-
-impl BinaryPersist for u32 {
-    fn needed_size(&self) -> usize {
-        4
-    }
-
-    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
-        buffer[0..4].copy_from_slice(&self.to_le_bytes());
-        Ok(4)
-    }
-
-    fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
-        Ok(u32::from_le_bytes(buffer[0..4].try_into().expect("slice with incorrect length")))
-    }
-}
-
-impl BinaryPersist for u8 {
-    fn needed_size(&self) -> usize { 1 }
-
-    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
-        buffer[0..1].copy_from_slice(&self.to_le_bytes());
-        Ok(1)
-    }
-
-    fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
-        Ok(u8::from_le_bytes(buffer[0..1].try_into().expect("slice with incorrect length")))
-    }
-}
-
 impl BinaryPersist for TangleAddress {
     fn needed_size(&self) -> usize { TANGLE_ADDRESS_BYTE_LEN }
 

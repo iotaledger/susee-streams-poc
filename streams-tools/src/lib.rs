@@ -1,3 +1,5 @@
+#![feature(generic_const_exprs)]
+
 pub mod wallet;
 pub mod user_manager;
 pub mod client;

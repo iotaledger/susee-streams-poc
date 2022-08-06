@@ -1,5 +1,6 @@
 use std::{
     fmt,
+    convert::TryInto,
     ops::Range,
 };
 
@@ -37,6 +38,50 @@ pub trait BinaryPersist {
 
     // static
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized;
+}
+
+
+impl BinaryPersist for u64 {
+    fn needed_size(&self) -> usize {
+        8
+    }
+
+    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
+        buffer[0..8].copy_from_slice(&self.to_le_bytes());
+        Ok(8)
+    }
+
+    fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
+        Ok(u64::from_le_bytes(buffer[0..8].try_into().expect("slice with incorrect length")))
+    }
+}
+
+impl BinaryPersist for u32 {
+    fn needed_size(&self) -> usize {
+        4
+    }
+
+    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
+        buffer[0..4].copy_from_slice(&self.to_le_bytes());
+        Ok(4)
+    }
+
+    fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
+        Ok(u32::from_le_bytes(buffer[0..4].try_into().expect("slice with incorrect length")))
+    }
+}
+
+impl BinaryPersist for u8 {
+    fn needed_size(&self) -> usize { 1 }
+
+    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
+        buffer[0..1].copy_from_slice(&self.to_le_bytes());
+        Ok(1)
+    }
+
+    fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
+        Ok(u8::from_le_bytes(buffer[0..1].try_into().expect("slice with incorrect length")))
+    }
 }
 
 pub trait EnumeratedPersistable {
@@ -95,20 +140,53 @@ impl Deref for EnumeratedPersistableInner {
     }
 }
 
-pub fn serialize_persistable_thing_and_streams_link<T: BinaryPersist>(persistable_thing: T, streams_link: &String, buffer: &mut [u8])  -> Result<usize> {
+pub fn serialize_binary_persistable_and_streams_link<T: BinaryPersist>(binary_persistable: T, streams_link: &String, buffer: &mut [u8], range: &mut Range<usize>) -> Result<()> {
     // Serialize persistable_thing to buffer
-    let mut range: Range<usize> = RangeIterator::new(persistable_thing.needed_size());
-    persistable_thing.to_bytes(&mut buffer[range.clone()]).expect("Serializing 'persistable_thing' failed");
-    let link_bytes = streams_link.as_bytes();
-    // Length of persisted link utf8 string binary
+    range.increment(binary_persistable.needed_size());
+    binary_persistable.to_bytes(&mut buffer[range.clone()]).expect("Serializing 'persistable_thing' failed");
+    // streams link
+    serialize_string(streams_link, buffer, range)?;
+    Ok(())
+}
+
+pub fn serialize_string(str: &String, buffer: &mut [u8], range: &mut Range<usize>) -> Result<()> {
+    let str_bytes = str.as_bytes();
+    // Length of persisted utf8 string binary
     range.increment(USIZE_LEN);
-    BinaryPersist::to_bytes(&(link_bytes.len() as u32), &mut buffer[range.clone()]).expect("Serializing 'length of persisted link' failed");
-    // persisted link string utf8 bytes
-    range.increment(link_bytes.len());
-    buffer[range.clone()].copy_from_slice(link_bytes);
-    Ok(range.end)
+    BinaryPersist::to_bytes(&(str_bytes.len() as u32), &mut buffer[range.clone()]).expect("Serializing 'length of persisted string' failed");
+    // persisted string utf8 bytes
+    range.increment(str_bytes.len());
+    buffer[range.clone()].copy_from_slice(str_bytes);
+    Ok(())
+}
+
+pub fn deserialize_enumerated_persistable_arg<T, E>(buffer: &[u8], range: &mut Range<usize> ) -> Result<T>
+    where
+        T: Sized + EnumeratedPersistableArgs<E> + Default,
+        E: EnumeratedPersistable + 'static + std::cmp::PartialEq + std::fmt::Display
+{
+    // COMMAND type
+    range.increment(E::LENGTH_BYTES);
+    let enumerated_persistable = EnumeratedPersistableInner::try_from_bytes::<E>(&buffer[range.clone()])?;
+    if enumerated_persistable != *T::INSTANCE {
+        bail!("Wrong type T for deserializing {} instance. Wrong type is {}.", T::INSTANCE, enumerated_persistable)
+    }
+    // persisted steams link utf8 string binary
+    let link = deserialize_string(buffer, range)?;
+    let mut ret_val = T::default();
+    ret_val.set_str_arg(link);
+    Ok(ret_val)
 }
 
 pub fn calc_string_binary_length( str_arg: &String) -> usize {
     str_arg.as_bytes().len() + USIZE_LEN
+}
+
+pub fn deserialize_string(buffer: &[u8], range: &mut Range<usize> ) -> Result<String> {
+    // string length
+    range.increment(USIZE_LEN);
+    let str_len= u32::try_from_bytes(&buffer[range.clone()]).unwrap();
+    // utf8 string
+    range.increment(str_len as usize);
+    Ok(String::from_utf8(buffer[range.clone()].to_vec())?)
 }

@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "management-console",
-    "tangle-proxy",
+    "iota-bridge",
     "streams-tools",
     "susee-tools",
     "iota-client-types",
@@ -15,7 +15,7 @@ members = [
 
 default-members = [
     "management-console",
-    "tangle-proxy",
+    "iota-bridge",
     "streams-tools",
     "susee-tools",
     "iota-client-types",

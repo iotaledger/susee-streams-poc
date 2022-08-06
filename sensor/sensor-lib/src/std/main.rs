@@ -94,7 +94,7 @@ pub async fn process_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 
     let remote_manager = RemoteManager::new(remote_manager_options);
 
-    println!("[Sensor] Acting as remote sensor using {} as tangle-proxy url", remote_manager.get_proxy_url());
+    println!("[Sensor] Acting as remote sensor using {} as iota-bridge url", remote_manager.get_proxy_url());
 
     if cli.matches.is_present(cli.arg_keys.subscribe_announcement_link) {
         let announcement_link_str = cli.matches.value_of(cli.arg_keys.subscribe_announcement_link).unwrap().trim();

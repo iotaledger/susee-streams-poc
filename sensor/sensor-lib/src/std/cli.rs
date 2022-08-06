@@ -28,22 +28,22 @@ an embedded device. For example this
 
 will make the remote sensor subscribe the channel via the specified
 announcement-link. This sensor app instance communicates with the remote sensor
-app via the tangle-proxy application. Please make sure that both sensor
-app instances have a working connection to the running tangle-proxy.
+app via the iota-bridge application. Please make sure that both sensor
+app instances have a working connection to the running iota-bridge.
 
-If sensor and tangle-proxy run on the same machine they can communicate over the
+If sensor and iota-bridge run on the same machine they can communicate over the
 loopback IP address (localhost). This is not possible in case the sensor runs on an
-external device (embedded MCU). In this case the tangle-proxy needs to listen to
+external device (embedded MCU). In this case the iota-bridge needs to listen to
 the ip address of the network interface (the ip address of the device that runs
-the tangle proxy) so that the embedded sensor can access the tangle-proxy.
+the iota-bridge) so that the embedded sensor can access the iota-bridge.
 Therefore in case you are using 'act-as-remote-control' you will also need to use
-the 'tangle-proxy' option to connect to the tangle-proxy.
+the 'iota-bridge' option to connect to the iota-bridge.
 ";
 
-static TANGLE_PROXY_URL_ABOUT_FMT_STR: &str = "The url of the tangle-proxy to connect to.
+static TANGLE_PROXY_URL_ABOUT_FMT_STR: &str = "The url of the iota-bridge to connect to.
 Default value is {}
 
-Example: tangle-proxy-url=\"http://192.168.47.11:50500\"";
+Example: iota-bridge-url=\"http://192.168.47.11:50500\"";
 
 static PRINTLN_SUBSCRIBER_STATUS_ABOUT: &str = "Print information about the current client status of the sensor.
 In streams the sensor is a subscriber so that this client status is called subscriber status.
@@ -78,7 +78,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     subscribe_announcement_link: "subscribe-announcement-link",
     register_keyload_msg: "register-keyload-msg",
     act_as_remote_control: "act-as-remote-control",
-    tangle_proxy_url: "tangle-proxy-url",
+    tangle_proxy_url: "iota-bridge-url",
     clear_client_state: "clear-client-state",
     println_subscriber_status: "println-subscriber-status",
 };

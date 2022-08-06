@@ -1425,6 +1425,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "iota-bridge"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "clap 3.1.18",
+ "env_logger",
+ "hex-literal",
+ "hyper",
+ "iota-streams",
+ "streams-tools",
+ "susee-tools",
+ "tokio",
+]
+
+[[package]]
 name = "iota-client"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2460,21 +2475,6 @@ dependencies = [
  "quote",
  "syn",
  "unicode-xid",
-]
-
-[[package]]
-name = "tangle-proxy"
-version = "0.1.2"
-dependencies = [
- "anyhow",
- "clap 3.1.18",
- "env_logger",
- "hex-literal",
- "hyper",
- "iota-streams",
- "streams-tools",
- "susee-tools",
- "tokio",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 [package]
-name = "tangle-proxy"
+name = "iota-bridge"
 version = "0.1.2"
 edition = "2018"
 readme = "README.md"

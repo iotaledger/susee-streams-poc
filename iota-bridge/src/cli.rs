@@ -28,7 +28,7 @@ pub type TangleProxyCli<'a> = Cli<'a, ArgKeys>;
 
 pub fn get_arg_matches() -> ArgMatches {
     TangleProxyCli::get_app(
-            "Tangle Proxy",
+            "IOTA Bridge",
             "Test tool to evaluate the behavior of the sensor counterpart proxy in the SUSEE \
             project which runs in the application server.",
             Some(CliOptions {

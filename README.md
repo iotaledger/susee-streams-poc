@@ -8,16 +8,16 @@ Following test applications are contained. For more details please see below in 
 * *ESP32 Sensor*<br>
   * Imitates the processes running in the smart meter (a.k.a. *Sensor*)
   * Runs un ESP32 devices
-  * Can only be used together with a running *Tangle Proxy* instance
+  * Can only be used together with a running *IOTA Bridge* instance
   * Currently only ESP32-C3 provided
 * *Sensor remote control*<br>
   * Used to send commands to the *ESP32 Sensor*
   * Can also be used as a standalone *Sensor* app to be run on x86/PC targets
-  * Like the *ESP32 Sensor* application it can only be used together with a running *Tangle Proxy* instance
+  * Like the *ESP32 Sensor* application it can only be used together with a running *IOTA Bridge* instance
 * *Management Console*<br>
   * Imitates the processes needed for *Initialization* of the sensor and the monitoring of *Sensor Processing*
   * Manages the *Add/Remove Subscriber* workflows
-* *Tangle Proxy*<br>
+* *IOTA Bridge*<br>
   * Imitates processes
     * in the Susee Application Server (*Sensor Processing*) and
     * processes used by the initialization software that performs the Sensor *Initialization*
@@ -37,7 +37,7 @@ The Streams Channel used for the SUSEE project generally can be described as fol
     a sensor is installed in a home, which means for the inital handshake the limitations of lorawan don't apply
   * If anything changes in the single branch channel setup, e.g. the addition of a new reading subscriber, the sensor
     will have to be able to receive new keyload information downstream via lorawan
-* The current POC version of the *ESP32 Sensor* uses WiFi to connect to the *Tangle Proxy*.
+* The current POC version of the *ESP32 Sensor* uses WiFi to connect to the *IOTA Bridge*.
   * For *Sensor* *Initialization* this is similar to a wired SLIP (Serial Line Internet Protocol)
     connection that might be used.
   * For *Sensor Processing* it has to be taken into account that the LoRaWan connection used in production
@@ -131,7 +131,7 @@ Every application has its own crate so you might want to build only one applicat
 
 In the workspace root folder:
 ```bash
-cargo build --package management-console  # alternatively 'sensor' or "tangle-proxy"
+cargo build --package management-console  # alternatively 'sensor' or "iota-bridge"
 ```
 The *ESP32 Sensor* is not build if `cargo build` is started in the workspace root folder.
 The next section describes how to build it.
@@ -143,7 +143,7 @@ executed in this project folder:
 ```bash
 cd sensor/main-rust-esp-rs/
 ```
-Before building we need to specify the WiFi SSID, the WiFi password and the url of the used *Tangle-Proxy* as
+Before building we need to specify the WiFi SSID, the WiFi password and the url of the used *IOTA-Bridge* as
 environment variables. These variables will be hard coded into the *ESP32 Sensor*.
 Currently this is the only way to initiate a socket connection to the ESP32.
 This also means that currently you need to compile the ESP32 sensor app yourself to test it:
@@ -174,11 +174,11 @@ of the *ESP32 Sensor* app is displayed on the console. This is controlled by the
 
 Using the --help option of all three x86/PC applications will show the app specific help text:
 ```bash
-target/release/management-console --help # Use 'sensor' or "tangle-proxy" instead of 'management-console' for the other apps
+target/release/management-console --help # Use 'sensor' or "iota-bridge" instead of 'management-console' for the other apps
 ```
 
-*Management Console* and *Sensor* provide the following options. *Tangle-Proxy* uses the same options expect `--wallet-file`
-as the *Tangle-Proxy* does not need a wallet:
+*Management Console* and *Sensor* provide the following options. *IOTA-Bridge* uses the same options expect `--wallet-file`
+as the *IOTA-Bridge* does not need a wallet:
 
     -h, --help
             Print help information
@@ -231,7 +231,7 @@ as the *Tangle-Proxy* does not need a wallet:
   On application exit the current user state is written into this file.
   <br><br>
   *ESP32*<br>
-  The *ESP32 Sensor* reads and persists its user state every time a command is received from the *Tangle-Proxy*.
+  The *ESP32 Sensor* reads and persists its user state every time a command is received from the *IOTA-Bridge*.
   The state is persisted in a FAT partition located in the SPI flash memory of the ESP32 board.
   This way the user state is secured against power outages of the ESP32.
 
@@ -287,11 +287,11 @@ Both Sensor applications (x86/PC and ESP32 version) provide CLI commands to mana
 The x86/PC version (a.k.a *Sensor remote control*) additionally provides following CLI commands to manage the
 remote control functionality:
 
-    -t, --tangle-proxy-url <TANGLE_PROXY_URL>
-            The url of the tangle-proxy to connect to.
+    -t, --iota-bridge-url <TANGLE_PROXY_URL>
+            The url of the iota-bridge to connect to.
             Default value is http://localhost:50000
             
-            Example: tangle-proxy-url="http://192.168.47.11:50000"
+            Example: iota-bridge-url="http://192.168.47.11:50000"
 
     -c, --act-as-remote-control
             Use this argument to remotely control a running sensor application on
@@ -302,21 +302,21 @@ remote control functionality:
             
             will make the remote sensor subscribe the channel via the specified
             announcement-link. This sensor app instance communicates with the remote sensor
-            app via the tangle-proxy application. Please make sure that both sensor
-            app instances have a working connection to the running tangle-proxy.
+            app via the iota-bridge application. Please make sure that both sensor
+            app instances have a working connection to the running iota-bridge.
             
-            If sensor and tangle-proxy run on the same machine they can communicate over the
+            If sensor and iota-bridge run on the same machine they can communicate over the
             loopback IP address (localhost). This is not possible in case the sensor runs on an
-            external device (embedded MCU). In this case the tangle-proxy needs to listen to
+            external device (embedded MCU). In this case the iota-bridge needs to listen to
             the ip address of the network interface (the ip address of the device that runs
-            the tangle proxy) so that the embedded sensor can access the tangle-proxy.
+            the iota-bridge) so that the embedded sensor can access the iota-bridge.
             Therefore in case you are using 'act-as-remote-control' you will also need to use
-            the 'tangle-proxy' option to connect to the tangle-proxy.
+            the 'iota-bridge' option to connect to the iota-bridge.
 
-### Tangle Proxy CLI
+### IOTA Bridge CLI
 Additionally to those commands described in the
 <a href="#common-cli-options-and-io-files">Common CLI options section</a> section the
-Tangle Proxy provides only one CLI command to control the ip adress to listen to:
+IOTA Bridge provides only one CLI command to control the ip adress to listen to:
 
     -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
             IP address and port to listen to.
@@ -339,12 +339,12 @@ In the `/target/debug` or `/target/release` folder:
 ```
 #### Subscribe the *Sensor* - x86/PC version
 
-To use a *Sensor* application we need to start the *Tangle Proxy* first. To use it together with a local x86/PC
+To use a *Sensor* application we need to start the *IOTA Bridge* first. To use it together with a local x86/PC
 sensor start it like this:
 ```bash
-    > ./tangle-proxy
+    > ./iota-bridge
     > 
-    > [Tangle Proxy] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
+    > [IOTA Bridge] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
     > Listening on http://127.0.0.1:50000
 ```
 
@@ -370,20 +370,20 @@ Using a local x86/PC *Sensor* app just enter this in a second command shell in t
     >              Subscriber public key: 399dc641cec739093ef6f0ecbac881d5f80b049fe1e2d46bc84cb5aff505f66b
 ```
 
-The *Tangle-Proxy* also logs every data package that is transferred. Regarding absolute length of transferred binary packages
-only take the *Tangle-Proxy* log into account as these are the correct packages sizes. *Sensor* and *Management-Console* only
+The *IOTA-Bridge* also logs every data package that is transferred. Regarding absolute length of transferred binary packages
+only take the *IOTA-Bridge* log into account as these are the correct packages sizes. *Sensor* and *Management-Console* only
 log the sizes of the tangle-message-payload: 
 ```bash
-    [Tangle Proxy] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
+    [IOTA Bridge] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
     Listening on http://127.0.0.1:50000
     -----------------------------------------------------------------
-    [Tangle Proxy] Handling request /message?addr=c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2
+    [IOTA Bridge] Handling request /message?addr=c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2
     
     [HttpClientProxy - DispatchStreams] receive_message_from_address() - Received Message from tangle with absolut length of 255 bytes. Data:
     @c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2[0000000104000000000000000000000000006f5aa6cb462dad3d8b84820bdda1fa62aa6aeeaab36cf2d0a58adde074f7807d0e0000016f5aa6cb462dad3d8b84820bdda1fa62aa6aeeaab36cf2d0a58adde074f7807d00f834f535075f4aa802dfa8a31074f8c4cd8f27e37c6afb90a0508bedac6f501a0c47daaed785cd09b3400f7ec4f6f07b54be2c3728a20e99eb4106e0870f0806]->00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
     
     -----------------------------------------------------------------
-    [Tangle Proxy] Handling request /message/send
+    [IOTA Bridge] Handling request /message/send
     
     [HttpClientProxy - DispatchStreams] send_message() - Incoming Message to attach to tangle with absolut length of 383 bytes. Data:
     @c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:aa5fc8814ca5a81c0dbf2b7e[000050010400000001346f5aa6cb462dad3d8b84820bdda1fa62aa6aeeaab36cf2d0a58adde074f7807d00000000000000001ee77d9fb6f0a1b65ec853aa0000000000000000002a61cce46327e1f7abf2ec842c20952057c037fcdd8e2636c93b13e2f1ee36e20e0000011ee77d9fb6f0a1b65ec853aae4d48f2f2d7fd7d1669a90d84e0ba1bc967869f019ea1d6a2b91d9c4fbe16c431912540f5ea95775cc19c848ccd06cfd3a7b6e16af2074414870bcd2584ccb527b1253727a999a1c0de13557b3e00867a881f0c6dcae21d894bb532098800e03e95c67cff559715ec577eaaab78c89069dd4d919acab32cc6a8b8b3c7c64122569a00e73536bfa27513e6849e14aa862028212442f89307f28f57a449e72dd08]->00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
@@ -419,22 +419,22 @@ of the branch used by the sensor to publish its messages.
 
 #### Subscribe the *Sensor* - ESP32 version
 
-If we run an *ESP32 Sensor* the *Tangle-Proxy* must be started this way:
+If we run an *ESP32 Sensor* the *IOTA-Bridge* must be started this way:
 ```bash
-    > ./tangle-proxy -l "192.168.47.11:50000"
+    > ./iota-bridge -l "192.168.47.11:50000"
     > 
-    > [Tangle Proxy] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
+    > [IOTA Bridge] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
     > Listening on http://192.168.47.11:50000
 ```
 
 Please replace the ip address used in this example with the ip address of the network interface of your computer.
 You need also to make sure that the used port is opened in the firewall of your OS. After having startet the
-*Tangle-Proxy* you can use telnet from another machine in your LAN to verify that the *Tangle-Proxy* can be accessed
+*IOTA-Bridge* you can use telnet from another machine in your LAN to verify that the *IOTA-Bridge* can be accessed
 from within in the LAN.
 
 Before we can send the `subscribe-announcement-link` command to the *ESP32 Sensor* you need to
 connect the serial port of your ESP32 board to your computer. After the ESP32 has bootet the
-*ESP32 Sensor* will poll commands from the *Tangle-Proxy* every 5 seconds.
+*ESP32 Sensor* will poll commands from the *IOTA-Bridge* every 5 seconds.
  
 To see the console log output of the *ESP32 Sensor* you need to start a serial port monitor application like
 `idf.py monitor` or [cargo espmonitor](https://github.com/esp-rs/espmonitor).
@@ -446,7 +446,7 @@ The console output will contain a lot of boot and WiFi initialization messages. 
 are the following ones:
  ```bash
     Wifi connected
-    I (4087) sensor_lib::esp_rs::main: [Sensor] process_main_esp_rs - Using tangle-proxy url: http://192.168.47.11:50000
+    I (4087) sensor_lib::esp_rs::main: [Sensor] process_main_esp_rs - Using iota-bridge url: http://192.168.47.11:50000
     I (5244) HTTP_CLIENT: Body received in fetch header state, 0x3fcb52ff, 1
     I (5246) sensor_lib::esp_rs::main: [Sensor] process_main_esp_rs - Received Command::NO_COMMAND.
     Fetching next command in 5 secs
@@ -462,32 +462,32 @@ are the following ones:
 Now we can the send the `subscribe-announcement-link` command to the *ESP32 Sensor* using the x86/PC version of the
 *Sensor* app. The CLI command is almost the same as used in the
 <a href="#subscribe-the-sensor---x86pc-version">Subscribe the *Sensor* x86/PC version</a> section.
-We only need to add the `--act-as-remote-control` and `--tangle-proxy-url` command to use the *Sensor* app 
+We only need to add the `--act-as-remote-control` and `--iota-bridge-url` command to use the *Sensor* app 
 as remote control for the *ESP32 Sensor*:
  ```bash
      > ./sensor -c -t "http://192.168.47.11:50000" --subscribe-announcement-link\
               "c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2"
  ```
 
-The *Tangle-Proxy* then will confirm that it has received the subscribe-announcement-link command and that the command is
+The *IOTA-Bridge* then will confirm that it has received the subscribe-announcement-link command and that the command is
 delivered to the *ESP32 Sensor*:
  ```bash
     > Listening on http://192.168.47.11:50000
     -----------------------------------------------------------------
-    [Tangle Proxy] Handling request /command/subscribe_to_announcement
+    [IOTA Bridge] Handling request /command/subscribe_to_announcement
     
     [HttpClientProxy - DispatchCommand] subscribe_to_announcement() - Received command SUBSCRIBE_TO_ANNOUNCEMENT_LINK.
     Binary length: 110
     Queue length: 1
     -----------------------------------------------------------------
-    [Tangle Proxy] Handling request /command/next
+    [IOTA Bridge] Handling request /command/next
     
     [HttpClientProxy - DispatchCommand] fetch_next_command() - Returning command SUBSCRIBE_TO_ANNOUNCEMENT_LINK.
     Blob length: 110
     Queue length: 0
  ```
-As with the X86/PC version of the *Sensor* app the console log of *Tangle-Proxy* and the *ESP32 Sensor* will contain the
-length of transferred binary data (*Tangle-Proxy*) and the subscription link and subscriber public key (*ESP32 Sensor*).  
+As with the X86/PC version of the *Sensor* app the console log of *IOTA-Bridge* and the *ESP32 Sensor* will contain the
+length of transferred binary data (*IOTA-Bridge*) and the subscription link and subscriber public key (*ESP32 Sensor*).  
 
 The subscription link and public key then must be used with the management-console to accept the subscription as being
 described in the x86/PC section above.
@@ -502,7 +502,7 @@ is almost the same as used in the
 
 #### Send messages using the *Sensor*
 
-Make sure that the *Tangle Proxy* is up and running in another shell. The folder `test/payloads` contains several message files that can be
+Make sure that the *IOTA Bridge* is up and running in another shell. The folder `test/payloads` contains several message files that can be
 send like this:
 ```bash
     > ./sensor --file-to-send "../../test/payloads/meter_reading_1_compact.json"
@@ -543,7 +543,7 @@ streams channel management and data transmission in the SUSEE project. These ser
   Running on the smart meter device
 * *Management Console*<br>
   Running at the energy provider
-* *Tangle Proxy*<br>
+* *IOTA Bridge*<br>
   Running in the application server or as part of the initialization software at the energy provider
  
 Lorawan and other inter process communication is simulated using a socket connection. The applications can be run in
@@ -560,8 +560,8 @@ The services are characterized by following properties/aspects:
   * Low processing capabilities<br>
     Following applies to all workflows (*Initialization*, *Sensor Processing*, *Add/Remove Subscriber*):
     Due to the low processing capabilities the sensor does not send the streams packages to the tangle directly but sends
-    the packages to the *Tangle Proxy*. This way it does not need to process the adaptive POW.<br>
-    Streams packages coming from the tangle are also received via the *Tangle Proxy*.
+    the packages to the *IOTA Bridge*. This way it does not need to process the adaptive POW.<br>
+    Streams packages coming from the tangle are also received via the *IOTA Bridge*.
   * The current *ESP32 Sensor* POC uses the Rust standard library. This means `no_std` is not used for the Rust
     implementation. Currently there is no need to use a supplementary C++ implementation of parts of the streams library.
     The curent POC is based on a FreeRTOS adoption provided by Espressif
@@ -571,7 +571,7 @@ The services are characterized by following properties/aspects:
    Software needed for *Initialization* of the sensor, monitoring of *Sensor Processing* and managing the 
    *Add/Remove Subscriber* workflow. No Hardware or performance restrictions. 
 
- * *Tangle Proxy*
+ * *IOTA Bridge*
    * Is used in the 
      * Application Server for *Sensor Processing* and *Add/Remove Subscriber* workflows
      * Initialization software as part of the *Management Console* for the *Initialization* of the sensor
@@ -583,7 +583,7 @@ The services are characterized by following properties/aspects:
    * Listens to new tangle messages and sends the encrypted streams packages to the sensor:
      * Announcement Messages: Used in the *Initialization* workflow 
      * Keyload Messages: Used in the *Add/Remove Subscriber* and *Initialization* workflows
-   * In the current POC implementation the *Tangle-Proxy* also forwards remote control commands from
+   * In the current POC implementation the *IOTA-Bridge* also forwards remote control commands from
      the *Sensor remote control* to the *ESP32 Sensor*. In a later production system for the *Sensor Processing* workflow
      this service will probably be implemented as an independent service while for the *Initialization* workflow an integration
      of Tangle- and Command-Communication can be of advantage.
@@ -593,7 +593,7 @@ Following workflows will exist for each channel. Every sensor uses its own exclu
 #### Initialization
   * Limitations of lorawan don't apply. Sensor is connected via Wifi or wired using peripherals (e.g. usb).
   * Performs the initial handshake (announcement/subscription/keyload) between *Sensor* and the channel author (*Management Console*)
-    via the *Tangle Proxy*.
+    via the *IOTA Bridge*.
 <img src="workflow_initialization.png" alt="drawing" width="650"/>
 
 #### Add/Remove Subscriber

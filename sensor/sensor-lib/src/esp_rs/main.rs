@@ -227,7 +227,7 @@ pub async fn process_main_esp_rs() -> Result<()> {
     #[cfg(feature = "wifi")]
         let (_wifi_hdl, _client_settings) = init_wifi()?;
 
-    log::info!("[fn process_main_esp_rs] Using tangle-proxy url: {}", TANGLE_PROXY_URL);
+    log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", TANGLE_PROXY_URL);
     let command_fetcher = CommandFetcher::new(Some(CommandFetcherOptions{ http_url: TANGLE_PROXY_URL }));
 
     loop {

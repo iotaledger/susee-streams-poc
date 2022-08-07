@@ -9,7 +9,7 @@ use hyper::{
 };
 
 use crate::{
-    binary_persist_command::{
+    binary_persist::{
         Command,
         SubscribeToAnnouncement,
         RegisterKeyloadMessage,

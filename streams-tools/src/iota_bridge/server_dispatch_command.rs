@@ -16,8 +16,8 @@ use crate::{
     binary_persist::{
         BinaryPersist,
         EnumeratedPersistable,
+        Command,
     },
-    binary_persist_command::Command,
     http_protocol_command::{
         ServerDispatchCommand,
     },

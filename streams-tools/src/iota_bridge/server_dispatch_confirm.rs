@@ -16,8 +16,8 @@ use crate::{
     binary_persist::{
         BinaryPersist,
         EnumeratedPersistable,
+        Confirmation,
     },
-    binary_persist_confirmation::Confirmation,
     http_protocol_confirm::{
         ServerDispatchConfirm,
     },

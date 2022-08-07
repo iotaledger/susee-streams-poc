@@ -30,10 +30,10 @@ use crate::{
     binary_persist::{
         BinaryPersist,
         RangeIterator,
+        binary_persist_tangle::{
+            TANGLE_ADDRESS_BYTE_LEN,
+        }
     },
-    binary_persist_tangle::{
-        TANGLE_ADDRESS_BYTE_LEN,
-    }
 };
 
 #[cfg(feature = "std")]

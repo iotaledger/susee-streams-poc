@@ -30,7 +30,7 @@ use super::{
 
 use streams_tools::{
     subscriber_manager::get_public_key_str,
-    binary_persist_command::{
+    binary_persist::{
         Command,
         SubscribeToAnnouncement,
         RegisterKeyloadMessage,

@@ -33,8 +33,8 @@ use hyper::{
 use crate::{
     binary_persist::{
         BinaryPersist,
+        TANGLE_ADDRESS_BYTE_LEN,
     },
-    binary_persist_tangle::TANGLE_ADDRESS_BYTE_LEN,
     http_protocol_streams::{
         ServerDispatchStreams,
     },

@@ -29,7 +29,7 @@ use url::{
 };
 
 use crate::{
-    BinaryPersist,
+    binary_persist::BinaryPersist,
     http::http_protocol_tools::{
         RequestBuilderTools,
         get_response_404,

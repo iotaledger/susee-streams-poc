@@ -14,7 +14,7 @@ use crate::{
         get_response_404,
         get_body_bytes_from_enumerated_persistable,
     },
-    binary_persist_confirmation::{
+    binary_persist::binary_persist_confirmation::{
         Subscription,
         Confirmation
     }

@@ -17,8 +17,8 @@ use esp_idf_svc::http::client::{
 };
 
 use streams_tools::{
-    binary_persist::EnumeratedPersistable,
-    binary_persist_command::{
+    binary_persist::{
+        EnumeratedPersistable
         Command,
     },
     http_protocol_command::{

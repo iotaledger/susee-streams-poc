@@ -10,8 +10,10 @@ use hyper::{
         }
     }
 };
-use crate::BinaryPersist;
-use crate::binary_persist::EnumeratedPersistable;
+use crate::binary_persist::{
+    BinaryPersist,
+    EnumeratedPersistable,
+};
 
 #[derive(Clone)]
 pub struct RequestBuilderTools {

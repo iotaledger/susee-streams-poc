@@ -35,7 +35,7 @@ use crate::{
         BinaryPersist,
         TANGLE_ADDRESS_BYTE_LEN,
     },
-    http_protocol_streams::{
+    http::http_protocol_streams::{
         ServerDispatchStreams,
     },
     iota_bridge::helpers::log_err_and_respond_500,

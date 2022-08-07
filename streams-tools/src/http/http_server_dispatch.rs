@@ -10,7 +10,7 @@ use hyper::{
     }
 };
 
-use crate::client::http::{
+use super::{
     http_protocol_streams::{
         ServerDispatchStreams,
         dispatch_request_streams,

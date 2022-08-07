@@ -7,7 +7,7 @@ use hyper::{
 };
 use iota_streams::core::Errors;
 
-use crate::client::http::http_protocol_streams::MapStreamsErrors;
+use crate::http::http_protocol_streams::MapStreamsErrors;
 
 pub fn log_err_and_respond_500(err: anyhow::Error, fn_name: &str) -> Result<Response<Body>> {
     println!("[HttpClientProxy - {}] Error: {}", fn_name, err);

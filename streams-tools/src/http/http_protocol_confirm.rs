@@ -9,7 +9,7 @@ use hyper::{
 };
 
 use crate::{
-    http::http_protocol_tools::{
+    http::http_tools::{
         RequestBuilderTools,
         get_response_404,
         get_body_bytes_from_enumerated_persistable,

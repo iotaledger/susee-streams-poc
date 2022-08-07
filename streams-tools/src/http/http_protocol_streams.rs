@@ -30,10 +30,11 @@ use url::{
 
 use crate::{
     binary_persist::BinaryPersist,
-    http::http_protocol_tools::{
-        RequestBuilderTools,
-        get_response_404,
-    },
+};
+
+use super::http_tools::{
+    RequestBuilderTools,
+    get_response_404,
 };
 
 // TODO s:

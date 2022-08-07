@@ -15,11 +15,12 @@ use crate::{
         RegisterKeyloadMessage,
         StartSendingMessages,
     },
-    http::http_protocol_tools::{
-        RequestBuilderTools,
-        get_response_404,
-        get_body_bytes_from_enumerated_persistable,
-    },
+};
+
+use super::http_tools::{
+    RequestBuilderTools,
+    get_response_404,
+    get_body_bytes_from_enumerated_persistable,
 };
 
 use url::{

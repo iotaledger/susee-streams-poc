@@ -1,5 +1,4 @@
 pub mod client_base;
-pub mod http;
 
 #[cfg(feature = "std")]
 pub mod capture_client;
@@ -12,7 +11,6 @@ pub use {
         STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
         WrappedClient,
     },
-    http::*,
 };
 
 #[cfg(feature = "std")]

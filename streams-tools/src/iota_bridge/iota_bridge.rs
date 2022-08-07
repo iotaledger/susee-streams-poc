@@ -20,7 +20,7 @@ use crate::{
         DispatchCommand,
         DispatchConfirm,
     },
-    dispatch_request
+    http::dispatch_request
 };
 
 #[derive(Clone)]

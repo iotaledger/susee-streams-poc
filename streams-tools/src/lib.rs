@@ -3,6 +3,7 @@
 pub mod wallet;
 pub mod user_manager;
 pub mod client;
+pub mod http;
 pub mod binary_persist;
 
 #[cfg(feature = "std")]

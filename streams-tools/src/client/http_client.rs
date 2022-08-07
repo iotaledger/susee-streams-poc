@@ -30,10 +30,12 @@ use std::{
 };
 
 use crate::{
-    RequestBuilderStreams,
+    http::{
+        RequestBuilderStreams,
+        MapStreamsErrors,
+    },
     client_base::STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
     binary_persist::BinaryPersist,
-    http_protocol_streams::MapStreamsErrors,
 };
 
 use hyper::{

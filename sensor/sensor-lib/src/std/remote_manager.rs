@@ -9,7 +9,7 @@ use hyper::{
 
 use streams_tools::{
     STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
-    http_protocol_command::RequestBuilderCommand,
+    http::http_protocol_command::RequestBuilderCommand,
 };
 
 use anyhow::Result;

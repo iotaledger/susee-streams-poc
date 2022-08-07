@@ -18,7 +18,7 @@ use crate::{
         EnumeratedPersistable,
         Command,
     },
-    http_protocol_command::{
+    http::http_protocol_command::{
         ServerDispatchCommand,
     },
 };

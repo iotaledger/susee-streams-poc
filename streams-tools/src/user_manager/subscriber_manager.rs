@@ -26,7 +26,7 @@ use anyhow::bail;
 use log;
 
 use crate::{
-    SimpleWallet,
+    wallet::SimpleWallet,
     binary_persist::{
         BinaryPersist,
         RangeIterator,

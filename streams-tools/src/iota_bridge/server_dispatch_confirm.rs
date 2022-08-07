@@ -18,7 +18,7 @@ use crate::{
         EnumeratedPersistable,
         Confirmation,
     },
-    http_protocol_confirm::{
+    http::http_protocol_confirm::{
         ServerDispatchConfirm,
     },
 };

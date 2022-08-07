@@ -4,7 +4,7 @@ mod cli;
 
 use streams_tools::{
     STREAMS_TOOLS_CONST_HTTP_PROXY_PORT,
-    HttpClientProxy,
+    IotaBridge,
 };
 
 use hyper::{
@@ -32,7 +32,7 @@ use std::{
 use hyper::server::conn::AddrStream;
 use tokio::sync::oneshot;
 
-async fn handle_request(mut client: HttpClientProxy<'_>, request: Request<Body>)
+async fn handle_request(mut client: IotaBridge<'_>, request: Request<Body>)
                         -> Result<Response<Body>, hyper::http::Error>
 {
     println!("-----------------------------------------------------------------\n\
@@ -58,7 +58,7 @@ async fn run() {
     let cli = TangleProxyCli::new(&arg_matches, &ARG_KEYS) ;
     println!("[IOTA Bridge] Using node '{}' for tangle connection", cli.node);
 
-    let client = HttpClientProxy::new_from_url(cli.node);
+    let client = IotaBridge::new_from_url(cli.node);
 
     let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_HTTP_PROXY_PORT).into();
     if cli.matches.is_present(cli.arg_keys.listener_ip_address_port) {

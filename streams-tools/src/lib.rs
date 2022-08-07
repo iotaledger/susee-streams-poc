@@ -6,6 +6,8 @@ pub mod client;
 
 #[cfg(feature = "std")]
 pub mod helpers;
+#[cfg(feature = "std")]
+pub mod iota_bridge;
 
 pub use {
     wallet::{
@@ -14,6 +16,7 @@ pub use {
     },
     client::*,
     user_manager::*,
+    iota_bridge::IotaBridge,
 };
 
 #[cfg(feature = "std")]

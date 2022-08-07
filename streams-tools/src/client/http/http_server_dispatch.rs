@@ -19,6 +19,10 @@ use crate::client::http::{
         ServerDispatchCommand,
         dispatch_request_command,
     },
+    http_protocol_confirm::{
+        ServerDispatchConfirm,
+        dispatch_request_confirm,
+    },
 };
 
 use url::{
@@ -34,6 +38,7 @@ pub async fn dispatch_request(
     req: Request<Body>,
     streams_callbacks: &mut impl ServerDispatchStreams,
     command_callbacks: &mut impl ServerDispatchCommand,
+    confirm_callbacks: &mut impl ServerDispatchConfirm,
 ) -> Result<Response<Body>> {
 
     let uri_str = req.uri().to_string();
@@ -59,6 +64,10 @@ pub async fn dispatch_request(
 
     if response.status() == StatusCode::NOT_FOUND {
         response = dispatch_request_command(&method, path, binary_body, &query_pairs, command_callbacks).await?;
+    }
+
+    if response.status() == StatusCode::NOT_FOUND {
+        response = dispatch_request_confirm(&method, path, binary_body, &query_pairs, confirm_callbacks).await?;
     }
 
     Ok(response)

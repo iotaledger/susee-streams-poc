@@ -105,7 +105,7 @@ pub trait ServerDispatchConfirm {
     async fn register_confirmation(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>>;
 }
 
-pub async fn fetch_next_confirmation(method: &Method, path: &str, body_bytes: &[u8], _query_pairs: &Parse<'_>, callbacks: &mut impl ServerDispatchConfirm) -> Result<Response<Body>> {
+pub async fn dispatch_request_confirm(method: &Method, path: &str, body_bytes: &[u8], _query_pairs: &Parse<'_>, callbacks: &mut impl ServerDispatchConfirm) -> Result<Response<Body>> {
     match (method, path) {
         (&Method::GET, EndpointUris::FETCH_NEXT_CONFIRMATION) => {
             callbacks.fetch_next_confirmation().await

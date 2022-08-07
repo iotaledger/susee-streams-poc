@@ -40,7 +40,7 @@ Therefore in case you are using 'act-as-remote-control' you will also need to us
 the 'iota-bridge' option to connect to the iota-bridge.
 ";
 
-static TANGLE_PROXY_URL_ABOUT_FMT_STR: &str = "The url of the iota-bridge to connect to.
+static IOTA_BRIDGE_URL_ABOUT_FMT_STR: &str = "The url of the iota-bridge to connect to.
 Default value is {}
 
 Example: iota-bridge-url=\"http://192.168.47.11:50500\"";
@@ -69,7 +69,7 @@ pub struct ArgKeys {
     pub act_as_remote_control: &'static str,
     pub println_subscriber_status: &'static str,
     pub clear_client_state: &'static str,
-    pub tangle_proxy_url: &'static str,
+    pub iota_bridge_url: &'static str,
 }
 
 pub static ARG_KEYS: ArgKeys = ArgKeys {
@@ -78,7 +78,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     subscribe_announcement_link: "subscribe-announcement-link",
     register_keyload_msg: "register-keyload-msg",
     act_as_remote_control: "act-as-remote-control",
-    tangle_proxy_url: "iota-bridge-url",
+    iota_bridge_url: "iota-bridge-url",
     clear_client_state: "clear-client-state",
     println_subscriber_status: "println-subscriber-status",
 };
@@ -86,7 +86,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
 pub type SensorCli<'a> = Cli<'a, ArgKeys>;
 
 pub fn get_arg_matches() -> ArgMatches {
-    let tangle_proxy_url_about = String::from(TANGLE_PROXY_URL_ABOUT_FMT_STR).replace("{}", STREAMS_TOOLS_CONST_HTTP_PROXY_URL);
+    let iota_bridge_url_about = String::from(IOTA_BRIDGE_URL_ABOUT_FMT_STR).replace("{}", STREAMS_TOOLS_CONST_HTTP_PROXY_URL);
 
     SensorCli::get_app(
         "Sensor",
@@ -127,11 +127,11 @@ pub fn get_arg_matches() -> ArgMatches {
             .takes_value(false)
             .conflicts_with(BASE_ARG_KEYS.node)
         )
-        .arg(Arg::new(ARG_KEYS.tangle_proxy_url)
-            .long(ARG_KEYS.tangle_proxy_url)
+        .arg(Arg::new(ARG_KEYS.iota_bridge_url)
+            .long(ARG_KEYS.iota_bridge_url)
             .short('t')
-            .value_name("TANGLE_PROXY_URL")
-            .help(tangle_proxy_url_about.as_str())
+            .value_name("IOTA_BRIDGE_URL")
+            .help(iota_bridge_url_about.as_str())
         )
         .arg(Arg::new(ARG_KEYS.println_subscriber_status)
             .long(ARG_KEYS.println_subscriber_status)

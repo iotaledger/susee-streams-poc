@@ -37,9 +37,9 @@ pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
     println!("[Sensor] Using node '{}' for tangle connection", cli.node);
 
     let mut http_client_options: Option<HttpClientOptions> = None;
-    if let Some(tangle_proxy_url) = cli.matches.value_of(cli.arg_keys.tangle_proxy_url) {
+    if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
         http_client_options = Some(HttpClientOptions{
-            http_url: tangle_proxy_url
+            http_url: iota_bridge_url
         });
     }
 
@@ -86,9 +86,9 @@ pub async fn process_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
     let mut show_subscriber_state = cli.matches.is_present(cli.arg_keys.println_subscriber_status);
 
     let mut remote_manager_options: Option<RemoteManagerOptions> = None;
-    if let Some(tangle_proxy_url) = cli.matches.value_of(cli.arg_keys.tangle_proxy_url) {
+    if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
         remote_manager_options = Some(RemoteManagerOptions{
-            http_url: tangle_proxy_url
+            http_url: iota_bridge_url
         });
     }
 

@@ -37,7 +37,7 @@ pub enum StreamsError {
     STREAMS_OK = 1,
     STREAMS_UNKNOWN_ERROR = -1,
     STREAMS_NODE_NOT_AVAILABLE = -2,
-    STREAMS_TANGLE_PROXY_NOT_AVAILABLE = -3,
+    STREAMS_IOTA_BRIDGE_NOT_AVAILABLE = -3,
 }
 
 /// Convert a StreamsError value into a static C string
@@ -47,7 +47,7 @@ pub extern "C" fn streams_error_to_string(error: StreamsError) -> *const cty::c_
         StreamsError::STREAMS_OK=> "STREAMS_OK\0".as_ptr(),
         StreamsError::STREAMS_UNKNOWN_ERROR=> "STREAMS_UNKNOWN_ERROR\0".as_ptr(),
         StreamsError::STREAMS_NODE_NOT_AVAILABLE=> "STREAMS_NODE_NOT_AVAILABLE\0".as_ptr(),
-        StreamsError::STREAMS_TANGLE_PROXY_NOT_AVAILABLE=> "STREAMS_TANGLE_PROXY_NOT_AVAILABLE\0".as_ptr(),
+        StreamsError::STREAMS_IOTA_BRIDGE_NOT_AVAILABLE=> "STREAMS_IOTA_BRIDGE_NOT_AVAILABLE\0".as_ptr(),
     }
 }
 

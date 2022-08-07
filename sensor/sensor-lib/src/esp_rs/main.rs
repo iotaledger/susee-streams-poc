@@ -64,7 +64,7 @@ type ClientType = HttpClient;
 
 type SubscriberManagerDummyWalletHttpClient = SubscriberManager<ClientType, DummyWallet>;
 
-const TANGLE_PROXY_URL: &str = env!("SENSOR_MAIN_POC_TANGLE_PROXY_URL");
+const IOTA_BRIDGE_URL: &str = env!("SENSOR_MAIN_POC_IOTA_BRIDGE_URL");
 
 #[cfg(feature = "esp_idf")]
 fn print_heap_info() {
@@ -162,7 +162,7 @@ async fn process_command(command: Command, buffer: Vec<u8>) -> Result<()>{
         let vfs_fat_handle = setup_vfs_fat_filesystem()?;
 
     log::debug!("[fn process_command]  Creating HttpClient");
-    let client = HttpClient::new(Some(HttpClientOptions{ http_url: TANGLE_PROXY_URL }));
+    let client = HttpClient::new(Some(HttpClientOptions{ http_url: IOTA_BRIDGE_URL }));
     log::debug!("[fn process_command] Creating subscriber");
     let mut subscriber= SubscriberManagerDummyWalletHttpClient::new(
         client,
@@ -227,8 +227,8 @@ pub async fn process_main_esp_rs() -> Result<()> {
     #[cfg(feature = "wifi")]
         let (_wifi_hdl, _client_settings) = init_wifi()?;
 
-    log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", TANGLE_PROXY_URL);
-    let command_fetcher = CommandFetcher::new(Some(CommandFetcherOptions{ http_url: TANGLE_PROXY_URL }));
+    log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", IOTA_BRIDGE_URL);
+    let command_fetcher = CommandFetcher::new(Some(CommandFetcherOptions{ http_url: IOTA_BRIDGE_URL }));
 
     loop {
         if let Ok((command, buffer)) = command_fetcher.fetch_next_command() {

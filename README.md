@@ -150,7 +150,7 @@ This also means that currently you need to compile the ESP32 sensor app yourself
 ```bash
 export SENSOR_MAIN_POC_WIFI_SSID=NameOfMyWifiGoesHere
 export SENSOR_MAIN_POC_WIFI_PASS=SecureWifiPassword
-export SENSOR_MAIN_POC_TANGLE_PROXY_URL="http://192.168.47.11:50000" 
+export SENSOR_MAIN_POC_IOTA_BRIDGE_URL="http://192.168.47.11:50000" 
 ```
 
 If you have no ESP32-C3 device you can just start the build using cargo-espflash.
@@ -287,7 +287,7 @@ Both Sensor applications (x86/PC and ESP32 version) provide CLI commands to mana
 The x86/PC version (a.k.a *Sensor remote control*) additionally provides following CLI commands to manage the
 remote control functionality:
 
-    -t, --iota-bridge-url <TANGLE_PROXY_URL>
+    -t, --iota-bridge-url <IOTA_BRIDGE_URL>
             The url of the iota-bridge to connect to.
             Default value is http://localhost:50000
             

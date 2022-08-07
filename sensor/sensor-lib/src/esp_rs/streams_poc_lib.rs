@@ -39,7 +39,7 @@ type ClientType = HttpClient;
 
 type SubscriberManagerDummyWalletHttpClient = SubscriberManager<ClientType, DummyWallet>;
 
-const TANGLE_PROXY_URL: &str = env!("SENSOR_MAIN_POC_TANGLE_PROXY_URL");
+const IOTA_BRIDGE_URL: &str = env!("SENSOR_MAIN_POC_IOTA_BRIDGE_URL");
 
 pub async fn send_message(message_bytes: &[u8]) -> Result<()>{
 
@@ -55,7 +55,7 @@ pub async fn send_message(message_bytes: &[u8]) -> Result<()>{
         let vfs_fat_handle = setup_vfs_fat_filesystem()?;
 
     log::debug!("[fn - send_message()] Creating HttpClient");
-    let client = HttpClient::new(Some(HttpClientOptions{ http_url: TANGLE_PROXY_URL }));
+    let client = HttpClient::new(Some(HttpClientOptions{ http_url: IOTA_BRIDGE_URL }));
     log::debug!("[fn - send_message()] Creating subscriber");
     let mut subscriber= SubscriberManagerDummyWalletHttpClient::new(
         client,

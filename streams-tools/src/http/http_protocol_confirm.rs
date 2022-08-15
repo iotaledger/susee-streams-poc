@@ -25,6 +25,7 @@ use url::{
 };
 
 use iota_streams::core::async_trait;
+use crate::binary_persist::{SubscriberStatus, SendMessages};
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -35,9 +36,12 @@ use iota_streams::core::async_trait;
 
 pub struct EndpointUris {}
 
+pub const URI_PREFIX_CONFIRM: &'static str = "/confirm";
+
 impl EndpointUris {
     pub const FETCH_NEXT_CONFIRMATION: &'static str  = "/confirm/next";
     pub const SUBSCRIPTION: &'static str  = "/confirm/subscription";
+    pub const SUBSCRIBER_STATUS: &'static str  = "/confirm/subscriber_status";
     pub const KEYLOAD_REGISTRATION: &'static str  = "/confirm/keyload_registration";
     pub const CLEAR_CLIENT_STATE: &'static str  = "/confirm/clear_client_state";
     pub const SEND_MESSAGES: &'static str  = "/confirm/send_messages";
@@ -77,6 +81,23 @@ impl RequestBuilderConfirm {
         )
     }
 
+    pub fn subscriber_status(self: &Self, previous_message_link: String, subscription: Subscription) -> Result<Request<Body>> {
+        self.tools.send_enumerated_persistable_args(
+            SubscriberStatus{
+                previous_message_link,
+                subscription,
+            },
+            EndpointUris::SUBSCRIBER_STATUS
+        )
+    }
+
+    pub fn send_message(self: &Self, previous_message_link: String) -> Result<Request<Body>> {
+        self.tools.send_enumerated_persistable_args(
+            SendMessages{previous_message_link},
+            EndpointUris::SEND_MESSAGES
+        )
+    }
+
     pub fn keyload_registration(self: &Self) -> Result<Request<Body>> {
         self.tools.get_request_builder()
             .method("GET")
@@ -90,45 +111,49 @@ impl RequestBuilderConfirm {
             .uri(self.tools.get_uri(EndpointUris::CLEAR_CLIENT_STATE).as_str())
             .body(Body::empty())
     }
-
-    pub fn send_message(self: &Self) -> Result<Request<Body>> {
-        self.tools.get_request_builder()
-            .method("GET")
-            .uri(self.tools.get_uri(EndpointUris::SEND_MESSAGES).as_str())
-            .body(Body::empty())
-    }
 }
 
 #[async_trait(?Send)]
 pub trait ServerDispatchConfirm {
+    fn get_uri_prefix(&self) -> &'static str;
     async fn fetch_next_confirmation(self: &mut Self) -> Result<Response<Body>>;
     async fn register_confirmation(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>>;
 }
 
 pub async fn dispatch_request_confirm(method: &Method, path: &str, body_bytes: &[u8], _query_pairs: &Parse<'_>, callbacks: &mut impl ServerDispatchConfirm) -> Result<Response<Body>> {
+
     match (method, path) {
         (&Method::GET, EndpointUris::FETCH_NEXT_CONFIRMATION) => {
             callbacks.fetch_next_confirmation().await
         },
 
-        (&Method::GET, EndpointUris::SUBSCRIPTION) => {
+        (&Method::POST, EndpointUris::SUBSCRIPTION) => {
             let buffer = get_body_bytes_from_enumerated_persistable(&Confirmation::SUBSCRIPTION)?;
             callbacks.register_confirmation(&buffer, "subscription").await
         },
 
-        (&Method::GET, EndpointUris::KEYLOAD_REGISTRATION) => {
-            callbacks.register_confirmation(body_bytes, "keyload_registration").await
-        },
-
-        (&Method::POST, EndpointUris::CLEAR_CLIENT_STATE) => {
-            callbacks.register_confirmation(body_bytes, "clear_client_state").await
+        (&Method::POST, EndpointUris::SUBSCRIBER_STATUS) => {
+            callbacks.register_confirmation(body_bytes, "subscriber_status").await
         },
 
         (&Method::POST, EndpointUris::SEND_MESSAGES) => {
             callbacks.register_confirmation(body_bytes, "send_message").await
         },
 
+        (&Method::GET, EndpointUris::KEYLOAD_REGISTRATION) => {
+            let buffer = get_body_bytes_from_enumerated_persistable(&Confirmation::KEYLOAD_REGISTRATION)?;
+            callbacks.register_confirmation(&buffer, "keyload_registration").await
+        },
+
+        (&Method::GET, EndpointUris::CLEAR_CLIENT_STATE) => {
+            let buffer = get_body_bytes_from_enumerated_persistable(&Confirmation::CLEAR_CLIENT_STATE)?;
+            callbacks.register_confirmation(&buffer, "clear_client_state").await
+        },
+
         // Return the 404 Not Found for other routes.
-        _ => get_response_404()
+        _ => {
+            log::debug!("[dispatch_request_confirm] could not dispatch method {} for path '{}'. Returning 404.", method, path);
+            get_response_404()
+        }
     }
 }

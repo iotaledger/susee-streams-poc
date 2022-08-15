@@ -18,17 +18,23 @@ use esp_idf_svc::http::client::{
 
 use streams_tools::{
     binary_persist::{
-        EnumeratedPersistable
+        BinaryPersist,
+        EnumeratedPersistable,
         Command,
     },
-    http_protocol_command::{
-        EndpointUris,
+    http::{
+        http_protocol_command::EndpointUris as EndpointUrisCommand,
     },
     STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
-    BinaryPersist
 };
 
-use hyper::http::StatusCode;
+use hyper::{
+    Body as HyperBody,
+    http::{
+        StatusCode as HyperStatusCode,
+        Request as HyperRequest,
+    }
+};
 
 use anyhow::{
     Result,
@@ -36,6 +42,7 @@ use anyhow::{
 };
 use std::fmt;
 use log;
+use crate::esp_rs::hyper_esp_rs_tools::send_hyper_request_via_esp_http;
 
 pub struct CommandFetcherOptions<'a> {
     pub(crate) http_url: &'a str,
@@ -69,9 +76,13 @@ impl<'a> CommandFetcher<'a> {
         }
     }
 
+    fn get_iota_bridge_url(&self, endpoint_uri: &str) -> String {
+        format!("{}{}", self.options.http_url, endpoint_uri)
+    }
+
     pub fn fetch_next_command(& self) -> Result<(Command, Vec<u8>)> {
         let mut http_client = EspHttpClient::new_default()?;
-        let url = format!("{}{}", self.options.http_url, EndpointUris::FETCH_NEXT_COMMAND);
+        let url = self.get_iota_bridge_url(EndpointUrisCommand::FETCH_NEXT_COMMAND);
 
         let esp_http_req = http_client.request(
             embedded_svc::http::Method::Get,
@@ -81,7 +92,7 @@ impl<'a> CommandFetcher<'a> {
         match esp_http_req.submit() {
             Ok(response) => {
                 log::debug!("[CommandFetcher.fetch_next_command] Received EspHttpResponse");
-                if response.status() == StatusCode::OK {
+                if response.status() == HyperStatusCode::OK {
                     log::debug!("[CommandFetcher.fetch_next_command] StatusCode::OK - deserializing command");
                     self.deserialize_command(response)
                 } else {
@@ -115,5 +126,17 @@ impl<'a> CommandFetcher<'a> {
             log::error!("[CommandFetcher.deserialize_command] response.content_len() is None");
         }
         Ok(ret_val)
+    }
+
+    pub async fn send_confirmation(&self, confirmation_request: HyperRequest<HyperBody>) -> Result<()> {
+        let mut http_client = EspHttpClient::new_default()?;
+        let response = send_hyper_request_via_esp_http(&mut http_client, confirmation_request).await?;
+        log::debug!("[CommandFetcher.send_confirmation] Received EspHttpResponse");
+        if response.status() == HyperStatusCode::OK {
+            log::debug!("[CommandFetcher.send_confirmation] StatusCode::OK");
+            Ok(())
+        } else {
+            bail!("[CommandFetcher.send_confirmation] Received HTTP Error as response for confirmation transmission. Status: {}", response.status())
+        }
     }
 }

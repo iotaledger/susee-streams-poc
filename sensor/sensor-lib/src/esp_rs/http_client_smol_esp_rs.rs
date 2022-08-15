@@ -23,18 +23,16 @@ use std::{
 };
 
 use streams_tools::{
-    RequestBuilderStreams,
-    http_protocol_streams::MapStreamsErrors,
-    BinaryPersist,
+    http::{
+        RequestBuilderStreams,
+        MapStreamsErrors,
+    },
+    binary_persist::BinaryPersist,
     STREAMS_TOOLS_CONST_HTTP_PROXY_URL
 };
 
 use hyper::{
-    body as hyper_body,
-    Body,
-    Request as HyperRequest,
     http::{
-        Method,
         StatusCode,
     }
 };
@@ -50,26 +48,19 @@ use embedded_svc::{
     http::{
         Status,
         Headers,
-        client::{
-            Client,
-            Request,
-            RequestWrite,
-        },
     }
 };
 
+use crate::esp_rs::hyper_esp_rs_tools::send_hyper_request_via_esp_http;
+
+
 #[cfg(feature = "esp_idf")]
 use esp_idf_svc::{
-    errors::EspIOError,
     http::client::{
         EspHttpClient,
         EspHttpResponse,
 //        EspHttpRequestWrite,
     },
-};
-
-use anyhow::{
-    bail,
 };
 
 pub struct HttpClientOptions<'a> {
@@ -112,9 +103,9 @@ impl HttpClient
         #[cfg(feature = "esp_idf")]
             let mut http_client = EspHttpClient::new_default()?;
         #[cfg(feature = "esp_idf")]
-            self.request(&mut http_client, req).await?;
+            send_hyper_request_via_esp_http(&mut http_client, req).await?;
         #[cfg(not(feature = "esp_idf"))]
-            log::warn!("[HttpClient.send_message_via_http] self.request(&mut http_client, req) call is skipped. Enable feature 'esp_idf' to use http client.");
+            log::warn!("[HttpClient.send_message_via_http] send_hyper_request_via_esp_http(&mut http_client, req) call is skipped. Enable feature 'esp_idf' to use http client.");
         Ok(())
     }
 
@@ -124,12 +115,12 @@ impl HttpClient
             let mut http_client = EspHttpClient::new_default()?;
         log::debug!("[HttpClient.recv_message_via_http] EspHttpClient created");
         #[cfg(feature = "esp_idf")]
-            let mut response: EspHttpResponse = self.request(
+            let mut response: EspHttpResponse = send_hyper_request_via_esp_http(
                 &mut http_client,
                 self.request_builder.receive_message_from_address(link)?,
             ).await?;
         #[cfg(not(feature = "esp_idf"))]
-            log::warn!("[HttpClient.recv_message_via_http] Calling self.request() is skipped. Enable feature 'esp_idf' to use http client.");
+            log::warn!("[HttpClient.recv_message_via_http] Calling send_hyper_request_via_esp_http() is skipped. Enable feature 'esp_idf' to use http client.");
 
 
         log::debug!("[HttpClient.recv_message_via_http] check for retrials");
@@ -139,7 +130,7 @@ impl HttpClient
         if response.status() == StatusCode::CONTINUE {
             log::warn!("[HttpClient.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
             // let periodic = getPeriodicTimer(Duration::from_millis(500), move || {
-            //     response = self.request(
+            //     response = send_hyper_request_via_esp_http(
             //             self.request_builder.receive_message_from_address(link)?
             //         ).await?;
             // });
@@ -147,7 +138,7 @@ impl HttpClient
             // let mut interval = time::interval(Duration::from_millis(500));
             // while response.status() == StatusCode::CONTINUE {
             //     interval.tick().await;
-            //     response = self.request(
+            //     response = send_hyper_request_via_esp_http(
             //        self.request_builder.receive_message_from_address(link)?
             //     ).await?;
             // }
@@ -190,44 +181,6 @@ impl HttpClient
 #[cfg(feature = "esp_idf")]
 impl HttpClient
 {
-    pub async fn request<'a>(&mut self, http_client: &'a mut EspHttpClient, req: HyperRequest<Body>) -> Result<EspHttpResponse<'a>> {
-        let svc_http_method = match req.method() {
-            &Method::POST => embedded_svc::http::Method::Post,
-            &Method::GET => embedded_svc::http::Method::Get,
-            _ => embedded_svc::http::Method::Unbind,
-        };
-
-        let esp_http_req = http_client.request(
-            svc_http_method,
-            &req.uri().to_string(),
-        )?;
-
-        let resulting_ret_val: Result<EspHttpResponse, EspIOError>;
-        match req.method() {
-            &Method::POST => {
-                let bytes = hyper_body::to_bytes(req.into_body()).await.unwrap();
-                log::debug!("[HttpClient.request] Bytes to send: Length: {}\n    {:02X?}", bytes.len(), bytes);
-                let http_request_write = esp_http_req.send_bytes(&bytes)?;
-                resulting_ret_val = http_request_write.submit();
-            },
-            &Method::GET => {
-                resulting_ret_val = esp_http_req.submit();
-            },
-            _ => {
-                bail!("Method '{}' is currently not supported", req.method())
-            },
-        }
-
-        match resulting_ret_val {
-            Ok(resp) => {
-                log::debug!("[HttpClient.request] Received EspHttpResponse");
-                Ok(resp)
-            },
-            Err(e) => {
-                bail!("espHttpReq.submit failed: {}", e)
-            }
-        }
-    }
 }
 
 #[async_trait(?Send)]

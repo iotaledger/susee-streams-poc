@@ -23,6 +23,7 @@ use crate::{
     },
 };
 use std::collections::VecDeque;
+use crate::http::http_protocol_command::URI_PREFIX_COMMAND;
 
 static mut FIFO_QUEUE: Option<VecDeque<Vec<u8>>> = None;
 
@@ -68,6 +69,9 @@ impl<'a> DispatchCommand<'a>
 
 #[async_trait(?Send)]
 impl<'a> ServerDispatchCommand for DispatchCommand<'a> {
+
+    fn get_uri_prefix(&self) -> &'static str { URI_PREFIX_COMMAND }
+
     async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>> {
         if let Some(req_body_binary) = self.fifo.pop_front() {
             let cmd = Command::try_from_bytes(req_body_binary.as_slice()).expect("Could not deserialize command from outgoing binary http body.");

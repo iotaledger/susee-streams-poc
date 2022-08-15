@@ -465,7 +465,7 @@ Now we can the send the `subscribe-announcement-link` command to the *ESP32 Sens
 We only need to add the `--act-as-remote-control` and `--iota-bridge-url` command to use the *Sensor* app 
 as remote control for the *ESP32 Sensor*:
  ```bash
-     > ./sensor -c -t "http://192.168.47.11:50000" --subscribe-announcement-link\
+     > ./sensor -c -b "http://192.168.47.11:50000" --subscribe-announcement-link\
               "c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:56bc12247881ff94606daff2"
  ```
 
@@ -496,7 +496,7 @@ To finalize the subscription the keyload message link has to be registered by th
 is almost the same as used in the
 <a href="#subscribe-the-sensor---x86pc-version">Subscribe the *Sensor* x86/PC version</a> section:
 ```bash
-    > ./sensor -c -t "http://192.168.47.11:50000" --register-keyload-msg "c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:dc4567247bbb6396057bfba9"
+    > ./sensor -c -b "http://192.168.47.11:50000" --register-keyload-msg "c67551dade4858b8d1e7ff099c8097e0feda9c8584489ccdbdd046d1953798500000000000000000:dc4567247bbb6396057bfba9"
 ```
 
 
@@ -528,7 +528,7 @@ send like this:
 
 Using the *ESP32 Sensor* we can send these files using the following remote control execution:
 ```bash
-    > ./sensor -c -t "http://192.168.47.11:50000" --file-to-send "meter_reading_1_compact.json"
+    > ./sensor -c -b "http://192.168.47.11:50000" --file-to-send "meter_reading_1_compact.json"
 ```
 
 Here the filename acts as a key or identifier for the file content that is hardcodet in the *ESP32 Sensor* application.

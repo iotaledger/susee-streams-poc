@@ -25,6 +25,7 @@ use iota_streams::{
 use core::str::FromStr;
 
 use anyhow::Result;
+use streams_tools::remote::remote_sensor::{RemoteSensorOptions, RemoteSensor};
 
 fn println_announcement_link(link: &Address, comment: &str) {
     println!(
@@ -37,10 +38,10 @@ fn println_announcement_link(link: &Address, comment: &str) {
     );
 }
 
-async fn create_channel(channel_manager: &mut ChannelManagerPlainTextWallet) -> Result<()>{
+async fn create_channel(channel_manager: &mut ChannelManagerPlainTextWallet) -> Result<Address>{
     let announcement_link = channel_manager.create_announcement().await?;
     println_announcement_link(&announcement_link, "A channel has been created with the following announcement link");
-    Ok(())
+    Ok(announcement_link)
 }
 
 async fn println_channel_status<'a> (channel_manager: &mut ChannelManagerPlainTextWallet)
@@ -60,11 +61,49 @@ async fn println_channel_status<'a> (channel_manager: &mut ChannelManagerPlainTe
     }
 }
 
-async fn send_keyload_message<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>) -> Result<()>
+
+async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>) -> Result<()>{
+    println!("[Management Console] Initializing remote sensor");
+    let announcement_link = create_channel(channel_manager).await?;
+
+    let mut remote_manager_options: Option<RemoteSensorOptions> = None;
+    if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
+        remote_manager_options = Some(RemoteSensorOptions {
+            http_url: iota_bridge_url,
+            command_fetch_wait_seconds: 5,
+        });
+    }
+    let remote_manager = RemoteSensor::new(remote_manager_options);
+    println!("[Management Console] Using {} as iota-bridge url", remote_manager.get_proxy_url());
+
+    println!("[Management Console] Sending subscribe_announcement_link command to remote sensor.");
+    let subscription_confirm = remote_manager.subscribe_to_channel(announcement_link.to_string().as_str()).await?;
+
+    println!("[Management Console] Creating keyload_message for subscription {} and public key {}.",
+             subscription_confirm.subscription_link,
+             subscription_confirm.pup_key,
+    );
+    let keyload_msg_link = send_keyload_message(
+        channel_manager,
+        subscription_confirm.subscription_link.as_str(),
+        subscription_confirm.pup_key.as_str()
+    ).await?;
+
+    remote_manager.register_keyload_msg(keyload_msg_link.to_string().as_str()).await?;
+
+    Ok(())
+}
+
+async fn send_keyload_message_cli<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>) -> Result<Address>
 {
     let sub_msg_link_string = cli.matches.value_of(cli.arg_keys.subscription_link).unwrap();
-    let subscription_msg_link = Address::from_str(sub_msg_link_string)?;
     let pub_key_str = cli.matches.value_of(cli.arg_keys.subscription_pub_key).unwrap();
+    send_keyload_message(channel_manager, sub_msg_link_string, pub_key_str).await
+}
+
+async fn send_keyload_message<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, sub_msg_link_string: &str, pub_key_str: &str) -> Result<Address>
+{
+    let subscription_msg_link = Address::from_str(sub_msg_link_string)?;
     let pub_key = hex::decode(pub_key_str).unwrap();
     let keyload_msg_link = channel_manager.add_subscribers(&vec![ SubscriberData {
         subscription_link: & subscription_msg_link,
@@ -79,7 +118,7 @@ async fn send_keyload_message<'a> (channel_manager: &mut ChannelManagerPlainText
 ", keyload_msg_link.to_string(), keyload_msg_link.to_msg_index()
     );
 
-    Ok(())
+    Ok(keyload_msg_link)
 }
 
 #[tokio::main]
@@ -104,12 +143,21 @@ async fn main() -> Result<()> {
     ).await;
 
     if cli.matches.is_present(cli.arg_keys.create_channel) {
-        create_channel(&mut channel_manager).await?
+        create_channel(&mut channel_manager).await?;
     } else if cli.matches.is_present(cli.arg_keys.subscription_link) {
-        send_keyload_message(&mut channel_manager, &cli).await?
-    } else {
-        println!("[Management Console] You need to specify one of these options: --{} or --{}\n", cli.arg_keys.create_channel, cli.arg_keys.subscription_link);
+        send_keyload_message_cli(&mut channel_manager, &cli).await?;
+    } else if cli.matches.is_present(cli.arg_keys.init_sensor) {
+        init_sensor(&mut channel_manager, &cli).await?;
+    } else if cli.matches.is_present(cli.arg_keys.println_channel_status) {
         println_channel_status(&mut channel_manager ).await;
+    } else {
+        println!("[Management Console] You need to specify one of these options: --{}, --{}, --{} or --{}\n",
+                 cli.arg_keys.create_channel,
+                 cli.arg_keys.subscription_link,
+                 cli.arg_keys.init_sensor,
+                 cli.arg_keys.println_channel_status,
+        );
+        // println_channel_status(&mut channel_manager ).await;
     }
 
     Ok(())

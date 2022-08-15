@@ -46,6 +46,8 @@ use super::http_tools::{
 
 pub struct EndpointUris {}
 
+pub const URI_PREFIX_STREAMS: &'static str = "/message";
+
 impl EndpointUris {
     pub const SEND_MESSAGE: &'static str = "/message/send";
     pub const RECEIVE_MESSAGE_FROM_ADDRESS: &'static str  = "/message";
@@ -139,6 +141,7 @@ impl RequestBuilderStreams {
 
 #[async_trait(?Send)]
 pub trait ServerDispatchStreams {
+    fn get_uri_prefix(&self) -> &'static str;
     async fn send_message<F: 'static + core::marker::Send + core::marker::Sync>(
         self: &mut Self, message: &TangleMessage) -> Result<Response<Body>>;
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>>;
@@ -172,6 +175,9 @@ pub async fn dispatch_request_streams(method: &Method, path: &str, body_bytes: &
         },
 
         // Return the 404 Not Found for other routes.
-        _ => get_response_404()
+        _ => {
+            log::debug!("[dispatch_request_streams] could not dispatch method {} for path '{}'. Returning 404.", method, path);
+            get_response_404()
+        }
     }
 }

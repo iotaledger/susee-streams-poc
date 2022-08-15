@@ -38,6 +38,8 @@ use iota_streams::core::async_trait;
 
 pub struct EndpointUris {}
 
+pub const URI_PREFIX_COMMAND: &'static str = "/command";
+
 impl EndpointUris {
     pub const FETCH_NEXT_COMMAND: &'static str  = "/command/next";
     pub const SUBSCRIBE_TO_ANNOUNCEMENT: &'static str  = "/command/subscribe_to_announcement";
@@ -112,6 +114,7 @@ impl RequestBuilderCommand {
 
 #[async_trait(?Send)]
 pub trait ServerDispatchCommand {
+    fn get_uri_prefix(&self) -> &'static str;
     async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>>;
     async fn register_remote_command(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>>;
 }
@@ -145,6 +148,9 @@ pub async fn dispatch_request_command(method: &Method, path: &str, body_bytes: &
         },
 
         // Return the 404 Not Found for other routes.
-        _ => get_response_404()
+        _ => {
+            log::debug!("[dispatch_request_command] could not dispatch method {} for path '{}'. Returning 404.", method, path);
+            get_response_404()
+        }
     }
 }

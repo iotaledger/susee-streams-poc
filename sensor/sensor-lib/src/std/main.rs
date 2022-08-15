@@ -16,14 +16,16 @@ use crate::{
         ClientType,
         SubscriberManagerPlainTextWalletHttpClient,
         sensor_manager::SensorManager,
-        remote_manager::{
-            RemoteManager,
-            RemoteManagerOptions,
-        },
     }
 };
 
-use streams_tools::client::http_client::HttpClientOptions;
+use streams_tools::{
+    http_client::HttpClientOptions,
+    remote::remote_sensor::{
+        RemoteSensor,
+        RemoteSensorOptions,
+    },
+};
 
 pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 
@@ -85,14 +87,15 @@ pub async fn process_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 
     let mut show_subscriber_state = cli.matches.is_present(cli.arg_keys.println_subscriber_status);
 
-    let mut remote_manager_options: Option<RemoteManagerOptions> = None;
+    let mut remote_manager_options: Option<RemoteSensorOptions> = None;
     if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
-        remote_manager_options = Some(RemoteManagerOptions{
-            http_url: iota_bridge_url
+        remote_manager_options = Some(RemoteSensorOptions {
+            http_url: iota_bridge_url,
+            command_fetch_wait_seconds: 5,
         });
     }
 
-    let remote_manager = RemoteManager::new(remote_manager_options);
+    let remote_manager = RemoteSensor::new(remote_manager_options);
 
     println!("[Sensor] Acting as remote sensor using {} as iota-bridge url", remote_manager.get_proxy_url());
 
@@ -100,29 +103,38 @@ pub async fn process_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
         let announcement_link_str = cli.matches.value_of(cli.arg_keys.subscribe_announcement_link).unwrap().trim();
         println!("[Sensor] Sending subscribe_announcement_link command to remote sensor. announcement_link: {}", announcement_link_str);
         show_subscriber_state = false;
-        remote_manager.subscribe_to_channel(announcement_link_str).await?
+        let confirm = remote_manager.subscribe_to_channel(announcement_link_str).await?;
+        println!("[Sensor] Remote sensor confirmed Subscription: {}", confirm);
     }
 
     if cli.matches.is_present(cli.arg_keys.files_to_send) {
-        let files_to_send = cli.matches.values_of(cli.arg_keys.files_to_send).unwrap();
-        println!("[Sensor] Sending files_to_send command to remote sensor.");
-        remote_manager.send_messages(files_to_send).await?
+        let mut files_to_send = cli.matches.values_of(cli.arg_keys.files_to_send).unwrap();
+        if let Some(first_file) = files_to_send.nth(0) {
+            println!("[Sensor] Sending files_to_send command to remote sensor.");
+            let confirm = remote_manager.send_messages(first_file).await?;
+            println!("[Sensor] Remote sensor confirmed files_to_send: {}", confirm);
+        } else {
+            println!("[Sensor] WARNING: Could not find any filename in files_to_send list.");
+        }
     }
 
     if cli.matches.is_present(cli.arg_keys.register_keyload_msg) {
         let keyload_msg_link_str = cli.matches.value_of(cli.arg_keys.register_keyload_msg).unwrap().trim();
         println!("[Sensor] Sending register_keyload_msg command to remote sensor. keyload_msg_link: {}", keyload_msg_link_str);
         show_subscriber_state = false;
-        remote_manager.register_keyload_msg(keyload_msg_link_str).await?
+        let confirm = remote_manager.register_keyload_msg(keyload_msg_link_str).await?;
+        println!("[Sensor] Remote sensor confirmed KeyloadRegistration: {}", confirm);
     }
 
     if cli.matches.is_present(cli.arg_keys.clear_client_state) {
         println!("[Sensor] Sending clear_client_state command to remote sensor.");
-        remote_manager.clear_client_state().await?
+        let confirm = remote_manager.clear_client_state().await?;
+        println!("[Sensor] Remote sensor confirmed ClearClientState: {}", confirm);
     }
 
     if show_subscriber_state {
-        remote_manager.println_subscriber_status().await?;
+        let confirm = remote_manager.println_subscriber_status().await?;
+        println!("[Sensor] Remote sensor SubscriberStatus: {}", confirm);
     }
 
     Ok(())

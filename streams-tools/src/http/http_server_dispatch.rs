@@ -5,8 +5,7 @@ use hyper::{
         Request,
         Response,
         Result,
-        Method,
-        StatusCode,
+        Method
     }
 };
 
@@ -33,6 +32,7 @@ use std::{
     ops::Deref,
 };
 use hyper::body::Bytes;
+use hyper::http::status;
 
 pub async fn dispatch_request(
     req: Request<Body>,
@@ -60,15 +60,23 @@ pub async fn dispatch_request(
         binary_body = &[];
     }
 
-    let mut response = dispatch_request_streams(&method, path, binary_body, &query_pairs, streams_callbacks).await?;
-
-    if response.status() == StatusCode::NOT_FOUND {
-        response = dispatch_request_command(&method, path, binary_body, &query_pairs, command_callbacks).await?;
+    let path_string = String::from(path);
+    let mut ret_val: Option<Response<Body>> = None;
+    if path_string.starts_with(streams_callbacks.get_uri_prefix()) {
+        ret_val = Some(dispatch_request_streams(&method, path, binary_body, &query_pairs, streams_callbacks).await?);
+    }
+    else if path_string.starts_with(command_callbacks.get_uri_prefix()) {
+        ret_val = Some(dispatch_request_command(&method, path, binary_body, &query_pairs, command_callbacks).await?);
+    }
+    else if path_string.starts_with(confirm_callbacks.get_uri_prefix()) {
+        ret_val = Some(dispatch_request_confirm(&method, path, binary_body, &query_pairs, confirm_callbacks).await?);
     }
 
-    if response.status() == StatusCode::NOT_FOUND {
-        response = dispatch_request_confirm(&method, path, binary_body, &query_pairs, confirm_callbacks).await?;
-    }
-
-    Ok(response)
+    ret_val.ok_or_else(|| {
+        if let Err(e) = status::StatusCode::from_u16(404) {
+            e.into()
+        } else {
+            panic!("Should never happen");
+        }
+    })
 }

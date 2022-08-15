@@ -19,7 +19,7 @@ use crate::binary_persist::{
     EnumeratedPersistableInner,
     EnumeratedPersistableArgs,
     calc_string_binary_length,
-    deserialize_enumerated_persistable_arg
+    deserialize_enumerated_persistable_arg_with_one_string
 };
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -39,12 +39,12 @@ impl EnumeratedPersistable for Command {
 
     fn as_str(&self) -> &'static str {
         return match self {
-            &Command::NO_COMMAND => "NO_COMMAND",                                           // 0
-            &Command::START_SENDING_MESSAGES => "START_SENDING_MESSAGES",                   // 1
-            &Command::SUBSCRIBE_TO_ANNOUNCEMENT_LINK => "SUBSCRIBE_TO_ANNOUNCEMENT_LINK",   // 2
-            &Command::REGISTER_KEYLOAD_MESSAGE => "REGISTER_KEYLOAD_Message",               // 3
-            &Command::PRINTLN_SUBSCRIBER_STATUS => "PRINTLN_SUBSCRIBER_STATUS",             // 4
-            &Command::CLEAR_CLIENT_STATE => "CLEAR_CLIENT_STATE",                           // 5
+            &Command::NO_COMMAND => "NO_COMMAND",
+            &Command::START_SENDING_MESSAGES => "START_SENDING_MESSAGES",
+            &Command::SUBSCRIBE_TO_ANNOUNCEMENT_LINK => "SUBSCRIBE_TO_ANNOUNCEMENT_LINK",
+            &Command::REGISTER_KEYLOAD_MESSAGE => "REGISTER_KEYLOAD_Message",
+            &Command::PRINTLN_SUBSCRIBER_STATUS => "PRINTLN_SUBSCRIBER_STATUS",
+            &Command::CLEAR_CLIENT_STATE => "CLEAR_CLIENT_STATE",
             _ => "Unknown Command",
         };
     }
@@ -67,7 +67,7 @@ impl BinaryPersist for Command {
 }
 
 impl fmt::Display for Command {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { self.0.fmt(f) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.as_str()) }
 }
 
 #[derive(Default)]
@@ -96,7 +96,7 @@ impl BinaryPersist for SubscribeToAnnouncement {
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized {
         let mut range: Range<usize> = RangeIterator::new(0);
-        let ret_val = deserialize_enumerated_persistable_arg::<SubscribeToAnnouncement, Command>(buffer, &mut range)?;
+        let ret_val = deserialize_enumerated_persistable_arg_with_one_string::<SubscribeToAnnouncement, Command>(buffer, &mut range)?;
         Ok(ret_val)
     }
 }
@@ -127,7 +127,7 @@ impl BinaryPersist for RegisterKeyloadMessage {
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized {
         let mut range: Range<usize> = RangeIterator::new(0);
-        let ret_val = deserialize_enumerated_persistable_arg::<RegisterKeyloadMessage, Command>(buffer, &mut range)?;
+        let ret_val = deserialize_enumerated_persistable_arg_with_one_string::<RegisterKeyloadMessage, Command>(buffer, &mut range)?;
         Ok(ret_val)
     }
 }
@@ -168,7 +168,7 @@ impl BinaryPersist for StartSendingMessages {
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized {
         // COMMAND + message_template_key
         let mut range: Range<usize> = RangeIterator::new(0);
-        let mut ret_val = deserialize_enumerated_persistable_arg::<StartSendingMessages, Command>(buffer, &mut range)?;
+        let mut ret_val = deserialize_enumerated_persistable_arg_with_one_string::<StartSendingMessages, Command>(buffer, &mut range)?;
         // wait_seconds_between_repeats
         range.increment(USIZE_LEN);
         ret_val.wait_seconds_between_repeats = u32::try_from_bytes(&buffer[range]).unwrap();

@@ -20,6 +20,7 @@ use crate::{
     },
     http::http_protocol_confirm::{
         ServerDispatchConfirm,
+        URI_PREFIX_CONFIRM,
     },
 };
 use std::collections::VecDeque;
@@ -68,6 +69,9 @@ impl<'a> DispatchConfirm<'a>
 
 #[async_trait(?Send)]
 impl<'a> ServerDispatchConfirm for DispatchConfirm<'a> {
+
+    fn get_uri_prefix(&self) -> &'static str { URI_PREFIX_CONFIRM }
+
     async fn fetch_next_confirmation(self: &mut Self) -> Result<Response<Body>> {
         if let Some(req_body_binary) = self.fifo.pop_front() {
             let confirm = Confirmation::try_from_bytes(req_body_binary.as_slice()).expect("Could not deserialize confirmation from outgoing binary http body.");

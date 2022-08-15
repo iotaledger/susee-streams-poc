@@ -7,6 +7,8 @@ pub mod http;
 pub mod binary_persist;
 
 #[cfg(feature = "std")]
+pub mod remote;
+#[cfg(feature = "std")]
 pub mod helpers;
 #[cfg(feature = "std")]
 pub mod iota_bridge;
@@ -18,11 +20,11 @@ pub use {
     },
     client::*,
     user_manager::*,
-    iota_bridge::IotaBridge,
 };
 
 #[cfg(feature = "std")]
 pub use {
+    iota_bridge::IotaBridge,
     wallet::plain_text_wallet::{
         PlainTextWallet,
     },

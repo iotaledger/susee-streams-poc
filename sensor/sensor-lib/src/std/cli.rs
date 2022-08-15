@@ -24,7 +24,7 @@ static ACT_AS_REMOTE_CONTROL_ABOUT: &str = "Use this argument to remotely contro
 an embedded device. For example this
 
   > ./sensor --subscribe-announcement-link \"c67551dade.....6daff2\"\\
-             --act-as-remote-control
+             --act-as-remote-control --iota-bridge-url=\"http://192.168.47.11:50500\"
 
 will make the remote sensor subscribe the channel via the specified
 announcement-link. This sensor app instance communicates with the remote sensor
@@ -41,9 +41,10 @@ the 'iota-bridge' option to connect to the iota-bridge.
 ";
 
 static IOTA_BRIDGE_URL_ABOUT_FMT_STR: &str = "The url of the iota-bridge to connect to.
+See --act-as-remote-control for further information.
 Default value is {}
 
-Example: iota-bridge-url=\"http://192.168.47.11:50500\"";
+Example: --iota-bridge-url=\"http://192.168.47.11:50500\"";
 
 static PRINTLN_SUBSCRIBER_STATUS_ABOUT: &str = "Print information about the current client status of the sensor.
 In streams the sensor is a subscriber so that this client status is called subscriber status.
@@ -129,7 +130,7 @@ pub fn get_arg_matches() -> ArgMatches {
         )
         .arg(Arg::new(ARG_KEYS.iota_bridge_url)
             .long(ARG_KEYS.iota_bridge_url)
-            .short('t')
+            .short('b')
             .value_name("IOTA_BRIDGE_URL")
             .help(iota_bridge_url_about.as_str())
         )

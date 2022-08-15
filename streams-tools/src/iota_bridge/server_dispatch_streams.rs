@@ -37,6 +37,7 @@ use crate::{
     },
     http::http_protocol_streams::{
         ServerDispatchStreams,
+        URI_PREFIX_STREAMS,
     },
     iota_bridge::helpers::log_err_and_respond_500,
 };
@@ -78,6 +79,9 @@ fn println_receive_message_from_address_for_received_message(message: &TangleMes
 
 #[async_trait(?Send)]
 impl ServerDispatchStreams for DispatchStreams {
+
+    fn get_uri_prefix(&self) -> &'static str { URI_PREFIX_STREAMS }
+
     async fn send_message<F: 'static + core::marker::Send + core::marker::Sync>(
         self: &mut Self, message: &TangleMessage) -> Result<Response<Body>>
     {

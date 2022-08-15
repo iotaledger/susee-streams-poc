@@ -8,7 +8,6 @@ type SubscriberManagerPlainTextWalletHttpClient = SubscriberManagerPlainTextWall
 
 
 mod sensor_manager;
-mod remote_manager;
 
 pub mod cli;
 pub mod main;

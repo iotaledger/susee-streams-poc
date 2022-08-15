@@ -101,7 +101,7 @@ pub trait EnumeratedPersistableArgs<T: EnumeratedPersistable + 'static> {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct EnumeratedPersistableInner( pub u8);
+pub struct EnumeratedPersistableInner(pub u8);
 
 impl EnumeratedPersistableInner {
 
@@ -160,7 +160,7 @@ pub fn serialize_string(str: &String, buffer: &mut [u8], range: &mut Range<usize
     Ok(())
 }
 
-pub fn deserialize_enumerated_persistable_arg<T, E>(buffer: &[u8], range: &mut Range<usize> ) -> Result<T>
+pub fn deserialize_enumerated_persistable_arg_with_one_string<T, E>(buffer: &[u8], range: &mut Range<usize> ) -> Result<T>
     where
         T: Sized + EnumeratedPersistableArgs<E> + Default,
         E: EnumeratedPersistable + 'static + std::cmp::PartialEq + std::fmt::Display

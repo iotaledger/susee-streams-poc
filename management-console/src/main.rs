@@ -76,10 +76,14 @@ async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, c
     let remote_manager = RemoteSensor::new(remote_manager_options);
     println!("[Management Console] Using {} as iota-bridge url", remote_manager.get_proxy_url());
 
-    println!("[Management Console] Sending subscribe_announcement_link command to remote sensor.");
+    println!("[Management Console] Sending subscribe_announcement_link command to remote sensor.\n");
     let subscription_confirm = remote_manager.subscribe_to_channel(announcement_link.to_string().as_str()).await?;
 
-    println!("[Management Console] Creating keyload_message for subscription {} and public key {}.",
+    println!("
+[Management Console] Received confirmation for successful Subscription from remote sensor.
+                     Creating keyload_message for
+                            subscription: {}
+                            public key: {}\n",
              subscription_confirm.subscription_link,
              subscription_confirm.pup_key,
     );
@@ -89,8 +93,11 @@ async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, c
         subscription_confirm.pup_key.as_str()
     ).await?;
 
-    remote_manager.register_keyload_msg(keyload_msg_link.to_string().as_str()).await?;
-
+    println!("[Management Console] Sending register_keyload_msg command to remote sensor.\n");
+    let keyload_registration_confirm = remote_manager.register_keyload_msg(keyload_msg_link.to_string().as_str()).await?;
+    println!("
+[Management Console] Received confirmation for successful KeyloadRegistration from remote sensor.
+                     =========> Sensor has been fully initialized <===========");
     Ok(())
 }
 

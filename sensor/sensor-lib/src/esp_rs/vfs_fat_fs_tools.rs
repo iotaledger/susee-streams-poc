@@ -26,6 +26,7 @@ pub fn setup_vfs_fat_filesystem() -> Result<wl_handle_t> {
         max_files: 2,
         format_if_mount_failed: true,
         allocation_unit_size: CONFIG_WL_SECTOR_SIZE,
+        disk_status_check_enable: true,
     };
 
     let mut ret_val: wl_handle_t = WL_INVALID_HANDLE;

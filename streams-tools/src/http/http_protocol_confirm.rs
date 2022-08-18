@@ -128,8 +128,7 @@ pub async fn dispatch_request_confirm(method: &Method, path: &str, body_bytes: &
         },
 
         (&Method::POST, EndpointUris::SUBSCRIPTION) => {
-            let buffer = get_body_bytes_from_enumerated_persistable(&Confirmation::SUBSCRIPTION)?;
-            callbacks.register_confirmation(&buffer, "subscription").await
+            callbacks.register_confirmation(body_bytes, "subscription").await
         },
 
         (&Method::POST, EndpointUris::SUBSCRIBER_STATUS) => {

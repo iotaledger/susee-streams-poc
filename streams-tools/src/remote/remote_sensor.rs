@@ -26,6 +26,8 @@ use crate::binary_persist::{Confirmation, BinaryPersist, EnumeratedPersistableAr
 
 use tokio::time::Duration;
 
+use log;
+
 type HttpClient = Client<HttpConnector, Body>;
 
 pub struct RemoteSensorOptions<'a> {
@@ -58,7 +60,7 @@ impl<'a> RemoteSensor<'a> {
 
     pub fn new(options: Option<RemoteSensorOptions<'a>>) -> Self {
         let options = options.unwrap_or_default();
-        println!("[RemoteSensor.new()] Initializing instance with options:\n{}\n", options);
+        log::debug!("[RemoteSensor.new()] Initializing instance with options:\n       {}\n", options);
         Self {
             options,
             http_client: HttpClient::new(),
@@ -81,6 +83,11 @@ impl<'a> RemoteSensor<'a> {
     {
         let confirm_fetch_wait_sec = self.options.command_fetch_wait_seconds;
         loop {
+            for s in 0..confirm_fetch_wait_sec {
+                println!("[RemoteSensor] Fetching next confirmation in {} secs", confirm_fetch_wait_sec - s);
+                thread::sleep(Duration::from_secs(1));
+            }
+
             if let Ok((confirmation, buffer)) = self.fetch_next_confirmation().await {
                 if confirmation != Confirmation::NO_CONFIRMATION {
                     return self.process_confirmation::<T>(confirmation, buffer).await;
@@ -89,11 +96,6 @@ impl<'a> RemoteSensor<'a> {
                 }
             } else {
                 log::error!("[fn poll_confirmation] fn call fetch_next_confirmation() failed.");
-            }
-
-            for s in 0..confirm_fetch_wait_sec {
-                println!("[RemoteSensor] Fetching next confirmation in {} secs", confirm_fetch_wait_sec - s);
-                thread::sleep(Duration::from_secs(1));
             }
         }
     }

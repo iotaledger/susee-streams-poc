@@ -42,7 +42,6 @@ use iota_client_types::{
     SendOptions
 };
 
-#[cfg(feature = "esp_idf")]
 use embedded_svc::{
     io::Read,
     http::{
@@ -54,7 +53,6 @@ use embedded_svc::{
 use crate::esp_rs::hyper_esp_rs_tools::send_hyper_request_via_esp_http;
 
 
-#[cfg(feature = "esp_idf")]
 use esp_idf_svc::{
     http::client::{
         EspHttpClient,
@@ -100,33 +98,23 @@ impl HttpClient
 
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
         let req = self.request_builder.send_message(msg)?;
-        #[cfg(feature = "esp_idf")]
-            let mut http_client = EspHttpClient::new_default()?;
-        #[cfg(feature = "esp_idf")]
-            send_hyper_request_via_esp_http(&mut http_client, req).await?;
-        #[cfg(not(feature = "esp_idf"))]
-            log::warn!("[HttpClient.send_message_via_http] send_hyper_request_via_esp_http(&mut http_client, req) call is skipped. Enable feature 'esp_idf' to use http client.");
+        let mut http_client = EspHttpClient::new_default()?;
+        send_hyper_request_via_esp_http(&mut http_client, req).await?;
         Ok(())
     }
 
     async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         log::debug!("[HttpClient.recv_message_via_http]");
-        #[cfg(feature = "esp_idf")]
-            let mut http_client = EspHttpClient::new_default()?;
+        let mut http_client = EspHttpClient::new_default()?;
         log::debug!("[HttpClient.recv_message_via_http] EspHttpClient created");
-        #[cfg(feature = "esp_idf")]
-            let mut response: EspHttpResponse = send_hyper_request_via_esp_http(
-                &mut http_client,
-                self.request_builder.receive_message_from_address(link)?,
-            ).await?;
-        #[cfg(not(feature = "esp_idf"))]
-            log::warn!("[HttpClient.recv_message_via_http] Calling send_hyper_request_via_esp_http() is skipped. Enable feature 'esp_idf' to use http client.");
-
+        let mut response: EspHttpResponse = send_hyper_request_via_esp_http(
+            &mut http_client,
+            self.request_builder.receive_message_from_address(link)?,
+        ).await?;
 
         log::debug!("[HttpClient.recv_message_via_http] check for retrials");
         // TODO: Implement following retrials using EspTimerService if needed.
         // May be StatusCode::CONTINUE is handled by the EspHttpClient
-        #[cfg(feature = "esp_idf")]
         if response.status() == StatusCode::CONTINUE {
             log::warn!("[HttpClient.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
             // let periodic = getPeriodicTimer(Duration::from_millis(500), move || {
@@ -144,7 +132,6 @@ impl HttpClient
             // }
         }
 
-        #[cfg(feature = "esp_idf")]
         if response.status() == StatusCode::OK {
             log::debug!("[HttpClient.recv_message_via_http] StatusCode::OK");
             if let Some(content_len) = response.content_len() {
@@ -171,16 +158,7 @@ impl HttpClient
                  Some(link.to_string())
             ))
         }
-        #[cfg(not(feature = "esp_idf"))]
-            let mut buffer = Vec::new();
-        #[cfg(not(feature = "esp_idf"))]
-            Ok(<TangleMessage as BinaryPersist>::try_from_bytes(&buffer).unwrap())
     }
-}
-
-#[cfg(feature = "esp_idf")]
-impl HttpClient
-{
 }
 
 #[async_trait(?Send)]

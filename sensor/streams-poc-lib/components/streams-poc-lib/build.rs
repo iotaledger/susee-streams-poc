@@ -20,6 +20,13 @@ fn run_cbindgen(cargo_dir: &Path, target_dir: &Path) {
     cbindgen::Builder::new()
         .with_crate(cargo_dir)
         .with_language(cbindgen::Language::C)
+        .with_include_guard("streams_poc_lib_h")
+        .with_parse_deps(true)
+        .with_parse_include(&["sensor-lib"])
+        .include_item("StreamsError")
+        .include_item("LoRaWanError")
+        .include_item("resolve_request_response_t")
+        .include_item("send_request_via_lorawan_t")
         .generate()
         .expect("Unable to generate bindings")
         .write_to_file(&out);

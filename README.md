@@ -1,15 +1,19 @@
 # Susee Streams POC
 
 ## About
-This project contains four test applications providing command line interfaces (CLI) to evaluate the iota streams functionality for the
+This project contains four test applications providing command line interfaces (CLI) to evaluate the iota streams
+functionality and C bindings for the most relevant *Sensor* specific functionality for the
 SUSEE project.
 
-Following test applications are contained. For more details please see below in the <a href="#applications-and-workflows">Applications and workflows</a> section:
+Following test applications are contained. For more details please see below in the 
+<a href="#applications-and-workflows">Applications and workflows</a> section:
 * *ESP32 Sensor*<br>
   * Imitates the processes running in the smart meter (a.k.a. *Sensor*)
   * Runs un ESP32 devices
   * Can only be used together with a running *IOTA Bridge* instance
   * Currently only ESP32-C3 provided
+* *streams-poc-lib*<br>
+  * provides C bindings for most functionalities of the *ESP32 Sensor*
 * *Sensor remote control*<br>
   * Used to send commands to the *ESP32 Sensor*
   * Can also be used as a standalone *Sensor* app to be run on x86/PC targets
@@ -24,7 +28,8 @@ Following test applications are contained. For more details please see below in 
       that will probably run at the Susee-Module manufacturer<br>
   * Provides an http rest api used by the *Sensor* applications to access the tangle<br>
   * Attaches the Streams packages received from the *Sensor* applications to the tangle
-  * Forwards remote control commands from the *Sensor remote control* to the *ESP32 Sensor*
+  * Forwards remote control commands from the *Sensor remote control* or *Management Console* to the *ESP32 Sensor*
+  * Forwards command confirmations from the *ESP32 Sensor* or *Sensor* app to *Sensor remote control* or *Management Console*
    
 
 The Streams Channel used for the SUSEE project generally can be described as follows:
@@ -168,6 +173,9 @@ Given you already installed all needed drivers to access the serial port of your
 detected automatically by cargo-espflash. After the application has been build and flashed the log output
 of the *ESP32 Sensor* app is displayed on the console. This is controlled by the `--monitor` option used above. 
 
+### For the *streams-poc-lib*
+Have a look into the [streams-poc-lib README](sensor/streams-poc-lib/README.md)
+
 ## CLI API reference
 
 ### Common CLI options and i/o files
@@ -248,12 +256,58 @@ as the *IOTA-Bridge* does not need a wallet:
     -l, --subscription-link <SUBSCRIPTION_LINK>
             Subscription message link for the sensor subscriber.
             Will be logged to console by the sensor app.
+            
+    -i, --init-sensor
+            Initialize the streams channel of a remote sensor.
+            The whole channel initialization is done automatically following the process described
+            below. Management-console and remote sensor are communicating via the IOTA-Bridge.
+            Therefore you also need to use the '--iota-bridge' option to connect the management-
+            console to a running IOTA-Bridge.
+            
+            Example:
+            
+              > ./management-console --init-sensor --iota-bridge-url="http://192.168.47.11:50000"
+            
+            Please make sure that the remote sensor and the management-console have a working
+            connection to the running iota-bridge.
+            
+            Initialization Process
+            ----------------------
+            The below mentioned Commands and Confirmations are used for process communication
+            with the remote sensor via the IOTA-Bridge and are defined in the binary_persist
+            module of the streams-tools library:
+            
+             * management-console: --create-channel
+                --> Announcement Link       # Send to the sensor using the SubscribeToAnnouncement
+                                            # Command
+             * sensor: --subscribe-announcement-link
+                --> Subscription Link       # Send to the management-console using
+                --> Public Key              # the SubscribeToAnnouncement Confirmation
+            
+             * management-console: --subscription-link --subscription-pub-key
+                --> Keyload Link            # Send to the sensor using the RegisterKeyloadMessage
+                                            # Command
+            
+             * sensor: --register-keyload-msg
+                                            # Successful keyload registration is acknowledged with
+                                            # a KEYLOAD_REGISTRATION Confirmation
+            
 
 The SUBSCRIPTION_PUB_KEY and SUBSCRIPTION_LINK will be logged to the console by the *Sensor* app when the 
 CLI command --subscribe-announcement-link of the *Sensor* app is used. This applies to the x86/PC version 
-of the *Sensor* app (*Sensor remote control*) and to the *ESP32 Sensor* application. To see the log
-output of the *ESP32 Sensor* app you need a serial port monitor like `idf.py monitor`
+of the *Sensor* app (*Sensor remote control*) and to the *ESP32 Sensor* application. In case of the *ESP32 Sensor*
+these properties are also logged to the console of the *Sensor* app that is used as *Sensor remote control*.
+
+To allow fully automated channel initializations the SUSEE Streams POC applications and the streams-poc-lib
+are using an own communication protocol consisting of `commands` and `confirmations` where a `confirmation`
+always carries the relevant data resulting from a command executed by a remote sensor.
+
+Alternatively to see the log output of the *ESP32 Sensor* app you can use a serial port monitor like `idf.py monitor`
 or [cargo espmonitor](https://github.com/esp-rs/espmonitor).
+
+If you use the `--init-sensor` option all relevant Streams channel properties like announcement-link,
+subscription_pub_key, ... are logged to the console of the *Management Console* app as these equivalent to
+the usage of the *Sensor* app when it's used as a *Sensor remote control*. 
 
 ### Sensor CLI
 
@@ -314,19 +368,79 @@ remote control functionality:
             the 'iota-bridge' option to connect to the iota-bridge.
 
 ### IOTA Bridge CLI
+
+The *IOTA Bridge* acts as a proxy for messages from/to the
+* *Management Console* and *Sensor* applications
+* *ESP32 Sensor*
+* IOTA Tangle
+
+It provides a REST API to:
+* send/receive streams packages that will_be/are attached to the tangle using an IOTA Node
+* Send remote control commands from the *Sensor* or *Management Console* application to the *ESP32 Sensor*
+* Send remote control confirmations from the *ESP32 Sensor* to the *Sensor* or *Management Console* application
+* receive IotaBridgeRequests containing one of the above described REST API requests as binary serialized package
+  which can be used to use the IOTA Bridge e.g. via LoRaWAN
+
 Additionally to those commands described in the
 <a href="#common-cli-options-and-io-files">Common CLI options section</a> section the
 IOTA Bridge provides only one CLI command to control the ip adress to listen to:
 
     -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
             IP address and port to listen to.
-            Example: listener-ip-address="192.168.47.11:50500"
+            Example: listener-ip-address="192.168.47.11:50000"
+            
+### IOTA Bridge REST API
+Most of the REST API is used internally by the accompanying susee-streams-poc applications. The only endpoint relevant
+for public use is the IotaBridgeRequests API which can be called via the `lorawan-rest/binary_request` endpoints.
+
+To demonstrate the usage of the API here is a cURL example:
+```bash
+    curl --location --request POST 'http://192.168.47.11:50000/lorawan-rest/binary_request?deveui=4711' \
+         --header 'Content-Type: application/octet-stream' \
+         --data-binary '@~/path-to-my-develop-folder/susee-streams-poc/test/iota-bridge/request_parts.bin'
+```
+
+Underlying usecase: Given you are using the streams-poc-lib function
+[send_message()](sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
+in your C code you will receive a binary package via the `lorawan_send_callback` callback function that you need
+to specify to call this function. You'll transmit this binary package e.g. via LoRaWAN. In your LoRaWAN Application
+Server you can use the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge* to hand the binary package over to it. 
+
+The body of the resulting HTTP Resonse needs to be returned to the *ESP32 Sensor* via the `response_callback`
+function that is provided by the streams-poc-lib.
+
+Have a look into the following documentation for more details:
+
+* Interface of the streams-poc-lib: 
+  [streams_poc_lib.h](sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
+* Readme of the [streams-poc-lib](sensor/streams-poc-lib/README.md)
+
 
 ## Example Workflow
 
 ### Sensor Initialization
 
-#### Create the channel using the *Management Console
+There are two ways to initialize a sensor. The easiest way is to use the `--init-sensor` option of
+the *Management Console* application:
+
+* Start the *Sensor* or *ESP32 Sensor* app with an unitialized streams channel.
+  If the Sensor has already been initialized use the ` --clear-client-state` option of the
+  *Sensor* app to set its state back to an uninitialized state (use the the `--act-as-remote-control`
+  option in case of an *ESP32 Sensor*).
+* Start the *IOTA Bridge* as been described in the
+  <a href="#subscribe-the-sensor---x86pc-version">Subscribe the Sensor - x86/PC version</a> or
+  <a href="#subscribe-the-sensor---esp32-version">Subscribe the Sensor - ESP32 version</a>
+  section
+* Run the *Management Console* with the following options
+```bash
+    > ./management-console --init-sensor --iota-bridge-url "http://192.168.47.11:50000"
+```
+
+The *Management Console* then will perform all the steps described below fully automatically.
+See the <a href="#management-console-cli">CLI help for the `--init-sensor` option</a> or
+of the *Management Console* for further details.
+
+#### Create the channel using the *Management Console*
 
 In the `/target/debug` or `/target/release` folder:
 ```bash

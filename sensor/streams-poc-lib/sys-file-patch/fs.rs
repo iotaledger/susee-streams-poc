@@ -184,6 +184,11 @@ pub struct DirEntry(fs_imp::DirEntry);
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct OpenOptions(fs_imp::OpenOptions);
 
+/// Representation of the various timestamps on a file.
+#[derive(Copy, Clone, Debug, Default)]
+#[unstable(feature = "file_set_times", issue = "98245")]
+pub struct FileTimes(fs_imp::FileTimes);
+
 /// Representation of the various permissions on a file.
 ///
 /// This module only currently provides one bit of information,
@@ -249,10 +254,12 @@ pub fn read<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {
         let mut bytes = Vec::new();
         println!("-------------------------------- file.read_to_end --------------");
         file.read_to_end(&mut bytes)?;
-        println!("-------------------------------- Ok --------------");
+        println!("-------------------------------- Ok(bytes) --------------");
         Ok(bytes)
     }
-    inner(path.as_ref())
+    let ret_val = inner(path.as_ref());
+    println!("-------------------------------- return inner(path.as_ref()) --------------");
+    ret_val
 }
 
 /// Read the entire contents of a file into a string.
@@ -518,7 +525,9 @@ impl File {
     #[stable(feature = "rust1", since = "1.0.0")]
     pub fn metadata(&self) -> io::Result<Metadata> {
         println!("-------------------------------- metadata - self.inner.file_attr() --------------");
-        self.inner.file_attr().map(Metadata)
+        let ret_val = self.inner.file_attr().map(Metadata);
+        println!("-------------------------------- metadata - return self.inner.file_attr().map(Metadata)");
+        ret_val
     }
 
     /// Creates a new `File` instance that shares the same underlying file handle
@@ -600,6 +609,58 @@ impl File {
     #[stable(feature = "set_permissions_atomic", since = "1.16.0")]
     pub fn set_permissions(&self, perm: Permissions) -> io::Result<()> {
         self.inner.set_permissions(perm.0)
+    }
+
+    /// Changes the timestamps of the underlying file.
+    ///
+    /// # Platform-specific behavior
+    ///
+    /// This function currently corresponds to the `futimens` function on Unix (falling back to
+    /// `futimes` on macOS before 10.13) and the `SetFileTime` function on Windows. Note that this
+    /// [may change in the future][changes].
+    ///
+    /// [changes]: io#platform-specific-behavior
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the user lacks permission to change timestamps on the
+    /// underlying file. It may also return an error in other os-specific unspecified cases.
+    ///
+    /// This function may return an error if the operating system lacks support to change one or
+    /// more of the timestamps set in the `FileTimes` structure.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// #![feature(file_set_times)]
+    ///
+    /// fn main() -> std::io::Result<()> {
+    ///     use std::fs::{self, File, FileTimes};
+    ///
+    ///     let src = fs::metadata("src")?;
+    ///     let dest = File::options().write(true).open("dest")?;
+    ///     let times = FileTimes::new()
+    ///         .set_accessed(src.accessed()?)
+    ///         .set_modified(src.modified()?);
+    ///     dest.set_times(times)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[unstable(feature = "file_set_times", issue = "98245")]
+    #[doc(alias = "futimens")]
+    #[doc(alias = "futimes")]
+    #[doc(alias = "SetFileTime")]
+    pub fn set_times(&self, times: FileTimes) -> io::Result<()> {
+        self.inner.set_times(times.0)
+    }
+
+    /// Changes the modification time of the underlying file.
+    ///
+    /// This is an alias for `set_times(FileTimes::new().set_modified(time))`.
+    #[unstable(feature = "file_set_times", issue = "98245")]
+    #[inline]
+    pub fn set_modified(&self, time: SystemTime) -> io::Result<()> {
+        self.set_times(FileTimes::new().set_modified(time))
     }
 }
 
@@ -1262,6 +1323,30 @@ impl FromInner<fs_imp::FileAttr> for Metadata {
     }
 }
 
+impl FileTimes {
+    /// Create a new `FileTimes` with no times set.
+    ///
+    /// Using the resulting `FileTimes` in [`File::set_times`] will not modify any timestamps.
+    #[unstable(feature = "file_set_times", issue = "98245")]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the last access time of a file.
+    #[unstable(feature = "file_set_times", issue = "98245")]
+    pub fn set_accessed(mut self, t: SystemTime) -> Self {
+        self.0.set_accessed(t.into_inner());
+        self
+    }
+
+    /// Set the last modified time of a file.
+    #[unstable(feature = "file_set_times", issue = "98245")]
+    pub fn set_modified(mut self, t: SystemTime) -> Self {
+        self.0.set_modified(t.into_inner());
+        self
+    }
+}
+
 impl Permissions {
     /// Returns `true` if these permissions describe a readonly (unwritable) file.
     ///
@@ -1665,7 +1750,9 @@ pub fn metadata<P: AsRef<Path>>(path: P) -> io::Result<Metadata> {
     println!("-------------------------------- fs_imp::stat --------------");
     let temp = fs_imp::stat(path.as_ref());
     println!("--------------------------------- temp.map -------------------");
-    temp.map(Metadata)
+    let  ret_val = temp.map(Metadata);
+    println!("--------------------------------- return ret_val -------------------");
+    ret_val
 }
 
 /// Query the metadata about a file without following symlinks.
@@ -1871,8 +1958,8 @@ pub fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) -> io::Re
 /// ```
 #[stable(feature = "rust1", since = "1.0.0")]
 #[deprecated(
-    since = "1.1.0",
-    note = "replaced with std::os::unix::fs::symlink and \
+since = "1.1.0",
+note = "replaced with std::os::unix::fs::symlink and \
             std::os::windows::fs::{symlink_file, symlink_dir}"
 )]
 pub fn soft_link<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) -> io::Result<()> {

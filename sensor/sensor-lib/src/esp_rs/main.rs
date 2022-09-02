@@ -2,11 +2,7 @@ use super::{
     command_fetcher::{
         CommandFetcher,
         CommandFetcherOptions,
-    },
-    http_client_smol_esp_rs::{
-        HttpClient,
-        HttpClientOptions,
-    },
+    }
 };
 
 use payloads::{
@@ -19,27 +15,25 @@ use super::{
     wifi_utils::init_wifi,
 };
 
-#[cfg(feature = "esp_idf")]
 use super::{
-    vfs_fat_fs_tools::{
-        setup_vfs_fat_filesystem,
+    esp32_subscriber_tools::{
+        create_subscriber,
         drop_vfs_fat_filesystem,
-        BASE_PATH,
-    }
-};
-
-use streams_tools::{
-    subscriber_manager::get_public_key_str,
-    binary_persist::{
-        BinaryPersist,
-        Command,
-        SubscribeToAnnouncement,
-        RegisterKeyloadMessage,
-        StartSendingMessages,
+        IOTA_BRIDGE_URL,
+        SubscriberManagerDummyWalletHttpClientEspRs,
     },
-    DummyWallet,
-    SubscriberManager,
-};
+    http_client_smol_esp_rs::{
+        HttpClient,
+        HttpClientOptions,
+    },};
+
+use streams_tools::{subscriber_manager::get_public_key_str, binary_persist::{
+    BinaryPersist,
+    Command,
+    SubscribeToAnnouncement,
+    RegisterKeyloadMessage,
+    StartSendingMessages,
+}, DummyWallet};
 
 use iota_streams::app_channels::api::{
     tangle::{
@@ -71,11 +65,6 @@ use hyper::{
 
 type ClientType = HttpClient;
 
-type SubscriberManagerDummyWalletHttpClient = SubscriberManager<ClientType, DummyWallet>;
-
-const IOTA_BRIDGE_URL: &str = env!("SENSOR_MAIN_POC_IOTA_BRIDGE_URL");
-
-#[cfg(feature = "esp_idf")]
 fn print_heap_info() {
     unsafe {
         let free_mem = esp_idf_sys::heap_caps_get_free_size(
@@ -102,7 +91,7 @@ fn println_subscription_details(subscriber: &Subscriber<ClientType>, subscriptio
 }
 
 fn println_subscriber_status<'a> (
-    subscriber_manager: &SubscriberManagerDummyWalletHttpClient,
+    subscriber_manager: &SubscriberManagerDummyWalletHttpClientEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -153,7 +142,7 @@ fn println_subscriber_status<'a> (
 }
 
 async fn clear_client_state<'a> (
-    subscriber_manager: &mut SubscriberManagerDummyWalletHttpClient,
+    subscriber_manager: &mut SubscriberManagerDummyWalletHttpClientEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -163,7 +152,7 @@ async fn clear_client_state<'a> (
 
 pub async fn send_content_as_msg(
     message_key: String,
-    subscriber: &mut SubscriberManagerDummyWalletHttpClient,
+    subscriber: &mut SubscriberManagerDummyWalletHttpClientEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -176,7 +165,7 @@ pub async fn send_content_as_msg(
 
 async fn subscribe_to_channel(
     announcement_link_str: &str,
-    subscriber_mngr: &mut SubscriberManagerDummyWalletHttpClient,
+    subscriber_mngr: &mut SubscriberManagerDummyWalletHttpClientEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -197,7 +186,7 @@ async fn subscribe_to_channel(
 
 async fn register_keyload_msg(
     keyload_msg_link_str: &str,
-    subscriber_mngr: &mut SubscriberManagerDummyWalletHttpClient,
+    subscriber_mngr: &mut SubscriberManagerDummyWalletHttpClientEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -215,24 +204,11 @@ async fn register_keyload_msg(
 }
 
 async fn process_command(command: Command, buffer: Vec<u8>) -> Result<Request<Body>>{
-    let wallet = DummyWallet{};
-
-    #[cfg(feature = "esp_idf")]
-        let vfs_fat_handle = setup_vfs_fat_filesystem()?;
-
-    log::debug!("[fn process_command]  Creating HttpClient");
     let client = HttpClient::new(Some(HttpClientOptions{ http_url: IOTA_BRIDGE_URL }));
-    log::debug!("[fn process_command] Creating subscriber");
-    let mut subscriber= SubscriberManagerDummyWalletHttpClient::new(
-        client,
-        wallet,
-        Some(String::from(BASE_PATH) + "/user-state-sensor.bin"),
-    ).await;
+    let (mut subscriber, vfs_fat_handle) =
+        create_subscriber::<HttpClient, DummyWallet>(client).await?;
 
-    log::debug!("[fn process_command]  subscriber created");
-
-    #[cfg(feature = "esp_idf")]
-        print_heap_info();
+    print_heap_info();
 
     let confirm_req_builder = RequestBuilderConfirm::new(IOTA_BRIDGE_URL);
     let mut confirmation_request: Option<Request<Body>> = None;
@@ -276,13 +252,10 @@ async fn process_command(command: Command, buffer: Vec<u8>) -> Result<Request<Bo
         );
     }
 
-    #[cfg(feature = "esp_idf")]
-    {
-        log::debug!("[fn process_command]  Safe subscriber client_status to disk");
-        subscriber.safe_client_status_to_disk().await?;
-        log::debug!("[fn process_command]  drop_vfs_fat_filesystem");
-        drop_vfs_fat_filesystem(vfs_fat_handle)?;
-    }
+    log::debug!("[fn process_command]  Safe subscriber client_status to disk");
+    subscriber.safe_client_status_to_disk().await?;
+    log::debug!("[fn process_command]  drop_vfs_fat_filesystem");
+    drop_vfs_fat_filesystem(vfs_fat_handle)?;
 
     confirmation_request.ok_or(anyhow!("No confirmation_request received"))
 }
@@ -292,8 +265,7 @@ pub async fn process_main_esp_rs() -> Result<()> {
 
     let command_fetch_wait_seconds = 5;
 
-    #[cfg(feature = "esp_idf")]
-        print_heap_info();
+    print_heap_info();
 
     #[cfg(feature = "wifi")]
         log::debug!("[fn process_main_esp_rs] init_wifi");

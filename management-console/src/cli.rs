@@ -57,7 +57,7 @@ console to a running IOTA-Bridge.
 
 Example:
 
-  > ./management-console --init-sensor --iota-bridge-url=\"http://192.168.47.11:50500\"
+  > ./management-console --init-sensor --iota-bridge-url=\"http://192.168.47.11:50000\"
 
 Please make sure that the remote sensor and the management-console have a working
 connection to the running iota-bridge.
@@ -88,7 +88,7 @@ static IOTA_BRIDGE_URL_ABOUT_FMT_STR: &str = "The url of the iota-bridge to conn
 See --init-sensor for further information.
 Default value is {}
 
-Example: iota-bridge-url=\"http://192.168.47.11:50500\"";
+Example: iota-bridge-url=\"http://192.168.47.11:50000\"";
 
 pub type ManagementConsoleCli<'a> = Cli<'a, ArgKeys>;
 

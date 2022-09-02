@@ -328,8 +328,8 @@ impl Drop for Guard<'_> {
 //    the function only *appends* bytes to the buffer. We'll get undefined
 //    behavior if existing bytes are overwritten to have non-UTF-8 data.
 pub(crate) unsafe fn append_to_string<F>(buf: &mut String, f: F) -> Result<usize>
-where
-    F: FnOnce(&mut Vec<u8>) -> Result<usize>,
+    where
+        F: FnOnce(&mut Vec<u8>) -> Result<usize>,
 {
     let mut g = Guard { len: buf.len(), buf: buf.as_mut_vec() };
     let ret = f(g.buf);
@@ -439,16 +439,16 @@ pub(crate) fn default_read_to_string<R: Read + ?Sized>(
 }
 
 pub(crate) fn default_read_vectored<F>(read: F, bufs: &mut [IoSliceMut<'_>]) -> Result<usize>
-where
-    F: FnOnce(&mut [u8]) -> Result<usize>,
+    where
+        F: FnOnce(&mut [u8]) -> Result<usize>,
 {
     let buf = bufs.iter_mut().find(|b| !b.is_empty()).map_or(&mut [][..], |b| &mut **b);
     read(buf)
 }
 
 pub(crate) fn default_write_vectored<F>(write: F, bufs: &[IoSlice<'_>]) -> Result<usize>
-where
-    F: FnOnce(&[u8]) -> Result<usize>,
+    where
+        F: FnOnce(&[u8]) -> Result<usize>,
 {
     let buf = bufs.iter().find(|b| !b.is_empty()).map_or(&[][..], |b| &**b);
     write(buf)
@@ -474,8 +474,8 @@ pub(crate) fn default_read_exact<R: Read + ?Sized>(this: &mut R, mut buf: &mut [
 }
 
 pub(crate) fn default_read_buf<F>(read: F, buf: &mut ReadBuf<'_>) -> Result<()>
-where
-    F: FnOnce(&mut [u8]) -> Result<usize>,
+    where
+        F: FnOnce(&mut [u8]) -> Result<usize>,
 {
     let n = read(buf.initialize_unfilled())?;
     buf.add_filled(n);
@@ -882,8 +882,8 @@ pub trait Read {
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     fn by_ref(&mut self) -> &mut Self
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
         self
     }
@@ -910,7 +910,7 @@ pub trait Read {
     /// use std::fs::File;
     ///
     /// fn main() -> io::Result<()> {
-    ///     let mut f = File::open("foo.txt")?;
+    ///     let f = File::open("foo.txt")?;
     ///
     ///     for byte in f.bytes() {
     ///         println!("{}", byte.unwrap());
@@ -920,8 +920,8 @@ pub trait Read {
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     fn bytes(self) -> Bytes<Self>
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
         Bytes { inner: self }
     }
@@ -944,8 +944,8 @@ pub trait Read {
     /// use std::fs::File;
     ///
     /// fn main() -> io::Result<()> {
-    ///     let mut f1 = File::open("foo.txt")?;
-    ///     let mut f2 = File::open("bar.txt")?;
+    ///     let f1 = File::open("foo.txt")?;
+    ///     let f2 = File::open("bar.txt")?;
     ///
     ///     let mut handle = f1.chain(f2);
     ///     let mut buffer = String::new();
@@ -958,8 +958,8 @@ pub trait Read {
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     fn chain<R: Read>(self, next: R) -> Chain<Self, R>
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
         Chain { first: self, second: next, done_first: false }
     }
@@ -985,7 +985,7 @@ pub trait Read {
     /// use std::fs::File;
     ///
     /// fn main() -> io::Result<()> {
-    ///     let mut f = File::open("foo.txt")?;
+    ///     let f = File::open("foo.txt")?;
     ///     let mut buffer = [0; 5];
     ///
     ///     // read at most five bytes
@@ -997,8 +997,8 @@ pub trait Read {
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     fn take(self, limit: u64) -> Take<Self>
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
         Take { inner: self, limit }
     }
@@ -1717,8 +1717,8 @@ pub trait Write {
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     fn by_ref(&mut self) -> &mut Self
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
         self
     }
@@ -2237,8 +2237,8 @@ pub trait BufRead: Read {
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     fn split(self, byte: u8) -> Split<Self>
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
         Split { buf: self, delim: byte }
     }
@@ -2274,8 +2274,8 @@ pub trait BufRead: Read {
     /// Each line of the iterator has the same error semantics as [`BufRead::read_line`].
     #[stable(feature = "rust1", since = "1.0.0")]
     fn lines(self) -> Lines<Self>
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
         Lines { buf: self }
     }
@@ -2589,6 +2589,7 @@ impl<T: Read> Read for Take<T> {
 
         let max = cmp::min(buf.len() as u64, self.limit) as usize;
         let n = self.inner.read(&mut buf[..max])?;
+        assert!(n as u64 <= self.limit, "number of read bytes exceeds limit");
         self.limit -= n as u64;
         Ok(n)
     }

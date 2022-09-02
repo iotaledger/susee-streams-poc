@@ -4,7 +4,7 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_chip_info.h"
-#include "esp_spi_flash.h"
+// #include "esp_spi_flash.h" // is deprecated, please use spi_flash_mmap.h instead
 
 #include "streams_poc_lib.h"
 
@@ -40,15 +40,11 @@ const uint8_t message_data[MESSAGE_DATA_LENGTH] = {
         0x2e, 0x30, 0x32, 0x0a, 0x7d
 };
 
-// Some data that we use as a dummy response for our LoRaWAN request
-#define RESPONSE_DATA_LENGTH 29
-const uint8_t response_data[RESPONSE_DATA_LENGTH] = {
-        0x54, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20,
-        0x6a, 0x75, 0x73, 0x74, 0x20, 0x61, 0x20, 0x64,
-        0x75, 0x6d, 0x6d, 0x79, 0x20, 0x72, 0x65, 0x73,
-        0x70, 0x6f, 0x6e, 0x73, 0x65
+// Mock data for the LoRaWAN request - requested address could not be found in in the Tangle
+#define RESPONSE_NOT_FOUND_IN_TANGLE_LENGTH 6
+const uint8_t response_not_found_in_tangle[RESPONSE_NOT_FOUND_IN_TANGLE_LENGTH] = {
+        0xFE, 0x01, 0x00, 0x00, 0x00, 0x00
 };
-
 
 // We do not call a socket function in this example code, but if we would do so
 // it would like this:
@@ -66,16 +62,24 @@ const uint8_t response_data[RESPONSE_DATA_LENGTH] = {
 // https://github.com/espressif/esp-idf/tree/v4.2/examples/protocols/sockets/tcp_client
 
 LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback) {
-    printf("send_request_via_lorawan() is called with %d bytes of request_data\n", length);
+    printf("[streams-poc-lib/main.c - fn send_request_via_socket()] is called with %d bytes of request_data\n", length);
+
+    int i;
+    for (i = 0; i < length; i++)
+    {
+        if (i > 0) printf(":");
+        printf("%02X", request_data[i]);
+    }
+    printf("\n");
 
     // We act as if we would have called send(sock, ...) followed by recv(sock, ...)
     // as been described above.
     // The next step is to call the streams_poc_lib callback function.
     // We are using response_data array to imitate the rx_buffer we'd received in our
     // recv(sock, ...) call.
-    StreamsError err = response_callback(response_data, RESPONSE_DATA_LENGTH);
+    StreamsError err = response_callback(response_not_found_in_tangle, RESPONSE_NOT_FOUND_IN_TANGLE_LENGTH);
     if (err < 0) {
-        printf("response_callback returned with error code: %s, ", streams_error_to_string(err));
+        printf("[streams-poc-lib/main.c - fn send_request_via_socket()] response_callback returned with error code: %s, ", streams_error_to_string(err));
     }
 
     // As we have not called send(sock, ...) we assume that no LoRaWanError occured.
@@ -84,7 +88,7 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
 
 void app_main(void)
 {
-    printf("Sensor app is starting!\n");
+    printf("[streams-poc-lib/main.c - fn app_main()] Sensor App is starting!\n");
 
     /* Print chip information */
     esp_chip_info_t chip_info;
@@ -97,14 +101,17 @@ void app_main(void)
 
     printf("silicon revision %d, ", chip_info.revision);
 
-    printf("%dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
-            (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+//    printf("%dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
+//            (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
-    printf("Free heap: %d\n", esp_get_free_heap_size());
+    printf("Free heap: %ld\n", esp_get_free_heap_size());
 
-    printf("Calling send_message for message_data of length %d \n\n", MESSAGE_DATA_LENGTH);
-    send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket);
-
-    // printf("Calling sprocess_main()");
-    // process_main();
+    if (is_streams_channel_initialized()) {
+        printf("[streams-poc-lib/main.c - fn app_main()] Calling send_message for message_data of length %d \n\n", MESSAGE_DATA_LENGTH);
+        send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket);
+    } else {
+        printf("[streams-poc-lib/main.c - fn app_main()] Streams channel for this sensor has not been initialized. Calling start_sensor_manager()");
+        start_sensor_manager();
+    }
+    printf("[streams-poc-lib/main.c - fn app_main()] Exiting Sensor App");
 }

@@ -36,7 +36,7 @@ lto = true
 
 [profile.dev]
 debug = true # Symbols are nice and they don't increase the size on Flash
-opt-level = "z"
+opt-level = 0
 
 [patch.crates-io]
 socket2 = { git = "https://github.com/esp-rs-compat/socket2" }
@@ -52,6 +52,7 @@ esp-idf-sys = { version = "0.31.7", path = "../../esp-rs/esp-idf-sys" }
 # esp-idf-sys = { version = "0.31.7", git = "https://github.com/esp-rs/esp-idf-sys.git", rev="8a0e9280322071c337300de19efdf2807f7877e2" }
 esp-idf-svc = { version = "0.42.3", path = "../../esp-rs/esp-idf-svc" }
 # esp-idf-svc = { version = "0.42.0", git = "https://github.com/esp-rs/esp-idf-svc.git", rev="8fc09c9cfea179dd61f6ac0f28d5749f00bcd474" }
+# embuild = { version = "0.30.2", path = "../../esp-rs/embuild" }
 
 #[patch."https://github.com/iotaledger/streams"]
 #iota-streams = { version = "0.1.2", path = "../../iotaledger/streams" }

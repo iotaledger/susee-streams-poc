@@ -3,6 +3,7 @@ name = "streams_poc_lib"
 version = "0.1.0"
 authors = ["chrisgitiota <christof.gerritsma@iota.org>"]
 edition = "2018"
+resolver = "2"
 
 [lib]
 crate-type = ["staticlib"]
@@ -10,6 +11,7 @@ crate-type = ["staticlib"]
 [dependencies]
 esp-idf-sys = { version = "0.31.7", features = ["native"] }
 esp-idf-svc = { version = "0.42.3", features = ["experimental"] }
+futures-lite = { version = "1.12.0" }
 smol = { version = "1.2"}
 iota-streams = { git = "https://github.com/iotaledger/streams", branch = "develop", default-features = false, features = ["std", "tangle"] }
 streams-tools = { version = "0.1.2", path = "../../../../streams-tools", default-features = false, features=["smol_rt", "esp_idf"] }
@@ -26,19 +28,14 @@ cbindgen = "0.19"
 std = []
 
 [profile.dev]
-# Optimization level 1 is similar to "g" in gcc/clang, although for some reason
-# Cargo doesn't support that flag.
-#opt-level = 1
-opt-level = "s"
+debug = true
+opt-level = "z"
+panic = "unwind"
 
 [profile.release]
 debug = true
-opt-level = "z"
-#debug = true
-#lto = true
-#opt-level = "z"
-#codegen-units = 1
-#panic = "abort"
+opt-level = "s"
+panic = "unwind"
 
 [patch.crates-io]
 socket2 = { git = "https://github.com/esp-rs-compat/socket2" }
@@ -51,3 +48,4 @@ iota-crypto = { version = "0.9.1", git = "https://github.com/iotaledger/crypto.r
 esp-idf-sys = { version = "0.31.7", path = "/home/christof/Develop/esp-rs/esp-idf-sys/" }
 esp-idf-hal = { version = "0.38.0", path = "/home/christof/Develop/esp-rs/esp-idf-hal/" }
 esp-idf-svc = { version = "0.42.3", path = "/home/christof/Develop/esp-rs/esp-idf-svc/" }
+# futures-lite = { version = "1.12.0", path = "/home/christof/Develop/smol-rs/futures-lite/" }

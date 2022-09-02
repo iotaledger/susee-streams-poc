@@ -24,18 +24,20 @@ use iota_streams::{
     },
 };
 
-use url::{
-    form_urlencoded::Parse
-};
-
 use crate::{
-    binary_persist::BinaryPersist,
+    binary_persist::{
+        BinaryPersist,
+        binary_persist_iota_bridge_req::{
+            IotaBridgeRequestParts,
+            HttpMethod,
+        }
+    },
 };
 
 use super::http_tools::{
     RequestBuilderTools,
-    get_response_404,
 };
+use crate::http::http_tools::DispatchedRequestParts;
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -116,26 +118,39 @@ impl RequestBuilderStreams {
         }
     }
 
-    pub fn send_message(self: &Self, message: &TangleMessage) -> Result<Request<Body>> {
+    pub fn get_send_message_request_parts(self: &Self, message: &TangleMessage) -> Result<IotaBridgeRequestParts> {
         let mut buffer: Vec<u8> = vec![0; message.needed_size()];
         message.to_bytes(buffer.as_mut_slice()).expect("Persisting into binary data failed");
 
-        self.tools.get_request_builder()
-            .method("POST")
-            .uri(self.tools.get_uri(EndpointUris::SEND_MESSAGE).as_str())
-            .body(Body::from(buffer))
+        Ok(IotaBridgeRequestParts::new(
+            HttpMethod::POST,
+            self.tools.get_uri(EndpointUris::SEND_MESSAGE),
+            buffer
+        ))
+    }
+
+    pub fn send_message(self: &Self, message: &TangleMessage) -> Result<Request<Body>> {
+        self.get_send_message_request_parts(message)?
+            .into_request(RequestBuilderTools::get_request_builder())
+    }
+
+    pub fn get_receive_message_from_address_request_parts(self: &Self, address: &TangleAddress) -> Result<IotaBridgeRequestParts> {
+        let uri = format!("{}?{}={}",
+                          self.tools.get_uri(EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS).as_str(),
+                          QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS,
+                          address.to_string()
+        );
+
+        Ok(IotaBridgeRequestParts::new(
+            HttpMethod::GET,
+            uri,
+            Vec::<u8>::new()
+        ))
     }
 
     pub fn receive_message_from_address(self: &Self, address: &TangleAddress) -> Result<Request<Body>> {
-        let uri = format!("{}?{}={}",
-              self.tools.get_uri(EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS).as_str(),
-              QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS,
-              address.to_string()
-        );
-        self.tools.get_request_builder()
-            .method("GET")
-            .uri(uri)
-            .body(Body::empty())
+        self.get_receive_message_from_address_request_parts(address)?
+            .into_request(RequestBuilderTools::get_request_builder())
     }
 }
 
@@ -149,17 +164,17 @@ pub trait ServerDispatchStreams {
     async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>>;
 }
 
-pub async fn dispatch_request_streams(method: &Method, path: &str, body_bytes: &[u8], query_pairs: &Parse<'_>, callbacks: &mut impl ServerDispatchStreams ) -> Result<Response<Body>> {
-    match (method, path) {
+pub async fn dispatch_request_streams(req_parts: &DispatchedRequestParts, callbacks: &mut impl ServerDispatchStreams ) -> Result<Response<Body>> {
+    match (&req_parts.method, req_parts.path.as_str()) {
 
         (&Method::POST, EndpointUris::SEND_MESSAGE) => {
-            let tangle_msg: TangleMessage = TangleMessage::try_from_bytes(body_bytes).unwrap();
+            let tangle_msg: TangleMessage = TangleMessage::try_from_bytes(&req_parts.binary_body).unwrap();
             callbacks.send_message::<DefaultF>(&tangle_msg).await
         },
 
 
         (&Method::GET, EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS) => {
-            let address_key_val: Vec<_> = query_pairs.collect();
+            let address_key_val: Vec<_> = req_parts.req_url.query_pairs().collect();
             if address_key_val.len() != 1 {
                 panic!("[http_protocoll - RECEIVE_MESSAGE_FROM_ADDRESS] Wrong number of query parameters.\
                 Specify the message address using /{}?{}={}",
@@ -175,9 +190,6 @@ pub async fn dispatch_request_streams(method: &Method, path: &str, body_bytes: &
         },
 
         // Return the 404 Not Found for other routes.
-        _ => {
-            log::debug!("[dispatch_request_streams] could not dispatch method {} for path '{}'. Returning 404.", method, path);
-            get_response_404()
-        }
+        _ => req_parts.log_and_return_404("dispatch_request_streams")
     }
 }

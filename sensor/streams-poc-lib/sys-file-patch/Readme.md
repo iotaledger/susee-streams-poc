@@ -11,5 +11,6 @@ The files are usually located here on your build system:
 * ~/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/sys/unix/fs.rs
 * ~/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/io/mod.rs
 * ~/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/fs.rs
+* ~/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/path.rs
 
-Just merge the println() calls into your source tre of the rustup nightly toolchain using a merge tool (e.g. Meld or VSCode).
+Just merge the println() calls into your source tree of the rustup nightly toolchain using a merge tool (e.g. Meld or VSCode).

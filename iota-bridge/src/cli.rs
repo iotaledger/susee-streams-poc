@@ -21,7 +21,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
 };
 
 static LISTENER_IP_ADDRESS_PORT_ABOUT: &str = "IP address and port to listen to.
-Example: listener-ip-address=\"192.168.47.11:50500\"
+Example: listener-ip-address=\"192.168.47.11:50000\"
 ";
 
 pub type TangleProxyCli<'a> = Cli<'a, ArgKeys>;

@@ -19,6 +19,7 @@ use crate::{
         DispatchStreams,
         DispatchCommand,
         DispatchConfirm,
+        DispatchLorawanRest,
     },
     http::dispatch_request
 };
@@ -28,6 +29,7 @@ pub struct IotaBridge<'a> {
     dispatch_streams: DispatchStreams,
     dispatch_command: DispatchCommand<'a>,
     dispatch_confirm: DispatchConfirm<'a>,
+    dispatch_lorawan_rest: DispatchLorawanRest,
 }
 
 impl<'a> IotaBridge<'a>
@@ -38,10 +40,16 @@ impl<'a> IotaBridge<'a>
             dispatch_streams: DispatchStreams::new(&client),
             dispatch_command: DispatchCommand::new(),
             dispatch_confirm: DispatchConfirm::new(),
+            dispatch_lorawan_rest: DispatchLorawanRest::new(),
         }
     }
 
     pub async fn handle_request(&mut self, req: Request<Body>) -> Result<Response<Body>> {
-        dispatch_request(req, &mut self.dispatch_streams, &mut self.dispatch_command, &mut self.dispatch_confirm ).await
+        dispatch_request(req,
+             &mut self.dispatch_lorawan_rest,
+             &mut self.dispatch_streams,
+             &mut self.dispatch_command,
+             &mut self.dispatch_confirm
+        ).await
     }
 }

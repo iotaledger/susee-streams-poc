@@ -1,3 +1,6 @@
+#ifndef streams_poc_lib_h
+#define streams_poc_lib_h
+
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -21,8 +24,11 @@ typedef enum LoRaWanError {
 typedef enum StreamsError {
   STREAMS_OK = 1,
   STREAMS_UNKNOWN_ERROR = -1,
-  STREAMS_NODE_NOT_AVAILABLE = -2,
-  STREAMS_IOTA_BRIDGE_NOT_AVAILABLE = -3,
+  STREAMS_INTERNAL_PANIC = -2,
+  STREAMS_NODE_NOT_AVAILABLE = -3,
+  STREAMS_IOTA_BRIDGE_NOT_AVAILABLE = -4,
+  STREAMS_RESPONSE_RESOLVED_WITHOUT_REQUEST = -5,
+  STREAMS_RESPONSE_INTERNAL_CHANNEL_ERR = -6,
 } StreamsError;
 
 /**
@@ -66,6 +72,30 @@ const char *streams_error_to_string(enum StreamsError error);
  */
 enum StreamsError send_message(const uint8_t *message_data,
                                size_t length,
-                               send_request_via_lorawan_t _lorawan_send_callback);
+                               send_request_via_lorawan_t lorawan_send_callback);
 
-int32_t process_main(void);
+/**
+ * Start an interactive app that can be used to automatically initialize the Streams channel or
+ * to query the subscription status of the Streams client.
+ * The "sensor_manager" provides the same functionality as the stand alone sensor application
+ * contained in the project sensor/main-rust-esp-rs.
+ * The sensor can be remote controlled using the 'sensor' app for x86 Linux-PCs
+ * (project sensor/main-rust) or the 'management-console' app.
+ * For more details about the possible remote commands have a look into the CLI help of those
+ * two applications.
+ */
+int32_t start_sensor_manager(void);
+
+/**
+ * Indicates if this sensor instance has already been initialized.
+ * A sensor is initialized if it has subscribed to a streams channel and is ready to send
+ * messages via the send_message() function.
+ * If this function returns false the initialization process can be started using the
+ * function start_sensor_manager(). After start_sensor_manager() has been called you need to run
+ * the management-console (project /management console) like this:
+ *
+ *     $ ./management-console --init-sensor --iota-bridge-url "http://192.168.47.11:50000"
+ */
+bool is_streams_channel_initialized(void);
+
+#endif /* streams_poc_lib_h */

@@ -11,7 +11,6 @@ use hyper::{
 use crate::{
     http::http_tools::{
         RequestBuilderTools,
-        get_response_404,
         get_body_bytes_from_enumerated_persistable,
     },
     binary_persist::binary_persist_confirmation::{
@@ -20,12 +19,9 @@ use crate::{
     }
 };
 
-use url::{
-    form_urlencoded::Parse
-};
-
 use iota_streams::core::async_trait;
 use crate::binary_persist::{SubscriberStatus, SendMessages};
+use crate::http::http_tools::DispatchedRequestParts;
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -65,7 +61,7 @@ impl RequestBuilderConfirm {
     }
 
     pub fn fetch_next_confirmation(self: &Self) -> Result<Request<Body>> {
-        self.tools.get_request_builder()
+        RequestBuilderTools::get_request_builder()
             .method("GET")
             .uri(self.tools.get_uri(EndpointUris::FETCH_NEXT_CONFIRMATION).as_str())
             .body(Body::empty())
@@ -99,14 +95,14 @@ impl RequestBuilderConfirm {
     }
 
     pub fn keyload_registration(self: &Self) -> Result<Request<Body>> {
-        self.tools.get_request_builder()
+        RequestBuilderTools::get_request_builder()
             .method("GET")
             .uri(self.tools.get_uri(EndpointUris::KEYLOAD_REGISTRATION).as_str())
             .body(Body::empty())
     }
 
     pub fn clear_client_state(self: &Self) -> Result<Request<Body>> {
-        self.tools.get_request_builder()
+        RequestBuilderTools::get_request_builder()
             .method("GET")
             .uri(self.tools.get_uri(EndpointUris::CLEAR_CLIENT_STATE).as_str())
             .body(Body::empty())
@@ -120,24 +116,23 @@ pub trait ServerDispatchConfirm {
     async fn register_confirmation(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>>;
 }
 
-pub async fn dispatch_request_confirm(method: &Method, path: &str, body_bytes: &[u8], _query_pairs: &Parse<'_>, callbacks: &mut impl ServerDispatchConfirm) -> Result<Response<Body>> {
+pub async fn dispatch_request_confirm(req_parts: &DispatchedRequestParts, callbacks: &mut impl ServerDispatchConfirm) -> Result<Response<Body>> {
 
-    match (method, path) {
+    match (&req_parts.method, req_parts.path.as_str()) {
         (&Method::GET, EndpointUris::FETCH_NEXT_CONFIRMATION) => {
             callbacks.fetch_next_confirmation().await
         },
 
         (&Method::POST, EndpointUris::SUBSCRIPTION) => {
-            let buffer = get_body_bytes_from_enumerated_persistable(&Confirmation::SUBSCRIPTION)?;
-            callbacks.register_confirmation(&buffer, "subscription").await
+            callbacks.register_confirmation(&req_parts.binary_body, "subscription").await
         },
 
         (&Method::POST, EndpointUris::SUBSCRIBER_STATUS) => {
-            callbacks.register_confirmation(body_bytes, "subscriber_status").await
+            callbacks.register_confirmation(&req_parts.binary_body, "subscriber_status").await
         },
 
         (&Method::POST, EndpointUris::SEND_MESSAGES) => {
-            callbacks.register_confirmation(body_bytes, "send_message").await
+            callbacks.register_confirmation(&req_parts.binary_body, "send_message").await
         },
 
         (&Method::GET, EndpointUris::KEYLOAD_REGISTRATION) => {
@@ -151,9 +146,6 @@ pub async fn dispatch_request_confirm(method: &Method, path: &str, body_bytes: &
         },
 
         // Return the 404 Not Found for other routes.
-        _ => {
-            log::debug!("[dispatch_request_confirm] could not dispatch method {} for path '{}'. Returning 404.", method, path);
-            get_response_404()
-        }
+        _ => req_parts.log_and_return_404("dispatch_request_confirm")
     }
 }

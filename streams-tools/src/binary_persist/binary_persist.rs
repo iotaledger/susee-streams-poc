@@ -71,6 +71,19 @@ impl BinaryPersist for u32 {
     }
 }
 
+impl BinaryPersist for u16 {
+    fn needed_size(&self) -> usize { 2 }
+
+    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
+        buffer[0..2].copy_from_slice(&self.to_le_bytes());
+        Ok(2)
+    }
+
+    fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
+        Ok(u16::from_le_bytes(buffer[0..2].try_into().expect("slice with incorrect length")))
+    }
+}
+
 impl BinaryPersist for u8 {
     fn needed_size(&self) -> usize { 1 }
 
@@ -149,17 +162,6 @@ pub fn serialize_binary_persistable_and_streams_link<T: BinaryPersist>(binary_pe
     Ok(())
 }
 
-pub fn serialize_string(str: &String, buffer: &mut [u8], range: &mut Range<usize>) -> Result<()> {
-    let str_bytes = str.as_bytes();
-    // Length of persisted utf8 string binary
-    range.increment(USIZE_LEN);
-    BinaryPersist::to_bytes(&(str_bytes.len() as u32), &mut buffer[range.clone()]).expect("Serializing 'length of persisted string' failed");
-    // persisted string utf8 bytes
-    range.increment(str_bytes.len());
-    buffer[range.clone()].copy_from_slice(str_bytes);
-    Ok(())
-}
-
 pub fn deserialize_enumerated_persistable_arg_with_one_string<T, E>(buffer: &[u8], range: &mut Range<usize> ) -> Result<T>
     where
         T: Sized + EnumeratedPersistableArgs<E> + Default,
@@ -180,6 +182,18 @@ pub fn deserialize_enumerated_persistable_arg_with_one_string<T, E>(buffer: &[u8
 
 pub fn calc_string_binary_length( str_arg: &String) -> usize {
     str_arg.as_bytes().len() + USIZE_LEN
+}
+
+
+pub fn serialize_string(str: &String, buffer: &mut [u8], range: &mut Range<usize>) -> Result<()> {
+    let str_bytes = str.as_bytes();
+    // Length of persisted utf8 string binary
+    range.increment(USIZE_LEN);
+    BinaryPersist::to_bytes(&(str_bytes.len() as u32), &mut buffer[range.clone()]).expect("Serializing 'length of persisted string' failed");
+    // persisted string utf8 bytes
+    range.increment(str_bytes.len());
+    buffer[range.clone()].copy_from_slice(str_bytes);
+    Ok(())
 }
 
 pub fn deserialize_string(buffer: &[u8], range: &mut Range<usize> ) -> Result<String> {

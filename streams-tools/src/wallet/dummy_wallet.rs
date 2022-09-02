@@ -1,5 +1,6 @@
 use super::simple_wallet::SimpleWallet;
 
+#[derive(Clone, Default)]
 pub struct DummyWallet {}
 
 impl SimpleWallet for DummyWallet {

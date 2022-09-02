@@ -28,12 +28,14 @@ smol_rt = [
     "streams-tools/smol_rt",
     "susee-tools/smol_rt",
     "payloads",
+    "futures-lite"
 ]
 
 esp_idf = [
     "esp-idf-sys",
     "esp-idf-svc",
     "embedded-svc",
+    "cty",
     "streams-tools/esp_idf",
     "susee-tools/esp_idf",
 ]
@@ -54,10 +56,12 @@ hyper = { version = "0.14", features = ["client", "http1"] }
 esp-idf-sys = { version = "0.31.7", optional = true }
 esp-idf-svc = { version = "0.42.3", optional = true }
 embedded-svc = { version = "0.22.1", optional = true }
+cty = { version = "0.2.2", optional = true }
 
 # smol_rt dependencies
 log = { version = "0.4", optional = true }
 smol = { version = "1.2", optional = true}
+futures-lite = { version = "1.12.0", optional = true }
 payloads = { version = "0.1.2", path = "../../test/payloads", optional = true }
 
 # std dependencies

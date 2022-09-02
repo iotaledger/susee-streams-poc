@@ -19,15 +19,11 @@ use crate::{
 
 use super::http_tools::{
     RequestBuilderTools,
-    get_response_404,
     get_body_bytes_from_enumerated_persistable,
 };
 
-use url::{
-    form_urlencoded::Parse
-};
-
 use iota_streams::core::async_trait;
+use crate::http::http_tools::DispatchedRequestParts;
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -67,21 +63,21 @@ impl RequestBuilderCommand {
     }
 
     pub fn fetch_next_command(self: &Self) -> Result<Request<Body>> {
-        self.tools.get_request_builder()
+        RequestBuilderTools::get_request_builder()
             .method("GET")
             .uri(self.tools.get_uri(EndpointUris::FETCH_NEXT_COMMAND).as_str())
             .body(Body::empty())
     }
 
     pub fn println_subscriber_status(self: &Self) -> Result<Request<Body>> {
-        self.tools.get_request_builder()
+        RequestBuilderTools::get_request_builder()
             .method("GET")
             .uri(self.tools.get_uri(EndpointUris::PRINTLN_SUBSCRIBER_STATUS).as_str())
             .body(Body::empty())
     }
 
     pub fn clear_client_state(self: &Self) -> Result<Request<Body>> {
-        self.tools.get_request_builder()
+        RequestBuilderTools::get_request_builder()
             .method("GET")
             .uri(self.tools.get_uri(EndpointUris::CLEAR_CLIENT_STATE).as_str())
             .body(Body::empty())
@@ -119,8 +115,8 @@ pub trait ServerDispatchCommand {
     async fn register_remote_command(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>>;
 }
 
-pub async fn dispatch_request_command(method: &Method, path: &str, body_bytes: &[u8], _query_pairs: &Parse<'_>, callbacks: &mut impl ServerDispatchCommand) -> Result<Response<Body>> {
-    match (method, path) {
+pub async fn dispatch_request_command(req_parts: &DispatchedRequestParts, callbacks: &mut impl ServerDispatchCommand) -> Result<Response<Body>> {
+    match (&req_parts.method, req_parts.path.as_str()) {
         (&Method::GET, EndpointUris::FETCH_NEXT_COMMAND) => {
             callbacks.fetch_next_command().await
         },
@@ -136,21 +132,18 @@ pub async fn dispatch_request_command(method: &Method, path: &str, body_bytes: &
         },
 
         (&Method::POST, EndpointUris::SEND_MESSAGES) => {
-            callbacks.register_remote_command(body_bytes, "send_message").await
+            callbacks.register_remote_command(&req_parts.binary_body, "send_message").await
         },
 
         (&Method::POST, EndpointUris::SUBSCRIBE_TO_ANNOUNCEMENT) => {
-            callbacks.register_remote_command(body_bytes, "subscribe_to_announcement").await
+            callbacks.register_remote_command(&req_parts.binary_body, "subscribe_to_announcement").await
         },
 
         (&Method::POST, EndpointUris::REGISTER_KEYLOAD_MSG) => {
-            callbacks.register_remote_command(body_bytes, "register_keyload_msg").await
+            callbacks.register_remote_command(&req_parts.binary_body, "register_keyload_msg").await
         },
 
         // Return the 404 Not Found for other routes.
-        _ => {
-            log::debug!("[dispatch_request_command] could not dispatch method {} for path '{}'. Returning 404.", method, path);
-            get_response_404()
-        }
+        _ => req_parts.log_and_return_404("dispatch_request_command")
     }
 }

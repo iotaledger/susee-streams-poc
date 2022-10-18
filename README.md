@@ -161,7 +161,7 @@ export SENSOR_MAIN_POC_IOTA_BRIDGE_URL="http://192.168.47.11:50000"
 If you have no ESP32-C3 device you can just start the build using cargo-espflash.
 The ELF file will be created in the project folder.
 ```bash
-cargo espflash save-image sensor-esp-rs.elf
+cargo espflash save-image ESP32-C3 sensor-esp-rs.elf --release
 ```
 
 If you have an ESP32-C3 device you can plug in the usb (or other serial bus) cable of your board

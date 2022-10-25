@@ -30,7 +30,7 @@ impl RangeIterator<usize> for Range<usize> {
 
 // Whenever the size of data is persisted into a binary buffer we will use 4 bytes for the length
 // information independent from the usize of the system
-pub static USIZE_LEN: usize = 4;
+pub const USIZE_LEN: usize = 4;
 
 pub trait BinaryPersist {
     fn needed_size(&self) -> usize;

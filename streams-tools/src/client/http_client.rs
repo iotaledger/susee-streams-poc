@@ -34,7 +34,7 @@ use crate::{
         RequestBuilderStreams,
         MapStreamsErrors,
     },
-    client_base::STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
+    client_base::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
     binary_persist::BinaryPersist,
 };
 
@@ -56,7 +56,7 @@ pub struct HttpClientOptions<'a> {
 impl Default for HttpClientOptions<'_> {
     fn default() -> Self {
         Self {
-            http_url: STREAMS_TOOLS_CONST_HTTP_PROXY_URL
+            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL
         }
     }
 }

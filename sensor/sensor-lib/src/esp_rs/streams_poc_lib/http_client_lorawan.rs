@@ -264,15 +264,19 @@ impl HttpClient
                 match receiver.recv().await {
                     Ok(response) => {
                         log::debug!("[HttpClient.request] Received response via LoRaWAN");
-                        match IotaBridgeResponseParts::try_from_bytes(response.as_slice()) {
-                            Ok(response_parts) => {
-                                log::debug!("[HttpClient.request] Successfully deserialized response_parts");
-                                Ok(response_parts)
-                            },
-                            Err(e) => {
-                                log::debug!("[HttpClient.request] Error on deserializing response_parts: {}", e );
-                                bail!("Could not deserialize response binary to valid IotaBridgeResponseParts: {}", e)
+                        if response.len() > 0 {
+                            match IotaBridgeResponseParts::try_from_bytes(response.as_slice()) {
+                                Ok(response_parts) => {
+                                    log::debug!("[HttpClient.request] Successfully deserialized response_parts");
+                                    Ok(response_parts)
+                                },
+                                Err(e) => {
+                                    log::debug!("[HttpClient.request] Error on deserializing response_parts: {}", e );
+                                    bail!("Could not deserialize response binary to valid IotaBridgeResponseParts: {}", e)
+                                }
                             }
+                        } else {
+                            bail!("Received 0 bytes response from server. Connection has been shut down (shutdown(Write)).")
                         }
                     },
                     Err(e) => {
@@ -282,7 +286,7 @@ impl HttpClient
             },
             LoRaWanError::LORAWAN_NO_CONNECTION => {
                 bail!("lorawan_send_callback returned error LORAWAN_NO_CONNECTION")
-            }
+            },
         }
     }
 }

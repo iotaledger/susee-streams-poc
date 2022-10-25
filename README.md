@@ -1,19 +1,26 @@
 # Susee Streams POC
 
 ## About
-This project contains four test applications providing command line interfaces (CLI) to evaluate the iota streams
-functionality and C bindings for the most relevant *Sensor* specific functionality for the
-SUSEE project.
+This project contains five test applications providing command line interfaces (CLI) to evaluate the iota streams
+functionality. Additionally the static library *streams-poc-lib* provides C bindings for the most relevant *Sensor* 
+specific functionality for the SUSEE project.
 
 Following test applications are contained. For more details please see below in the 
 <a href="#applications-and-workflows">Applications and workflows</a> section:
 * *ESP32 Sensor*<br>
   * Imitates the processes running in the smart meter (a.k.a. *Sensor*)
-  * Runs un ESP32 devices
+  * Runs on ESP32 devices
   * Can only be used together with a running *IOTA Bridge* instance
-  * Currently only ESP32-C3 provided
+  * Currently only ESP32-C3 is provided
 * *streams-poc-lib*<br>
   * provides C bindings for most functionalities of the *ESP32 Sensor*
+  * includes a test application written in C to test the library functionality using a WIFI socket instead of
+    a LoRaWAN connection
+* *LoraWan AppServer Mockup Tool*<br>
+  * test tool to receive & send binary packages from/to the streams-poc-lib test application via a socket
+    connection and transmit these packages to the *IOTA-Bridge* via its `lorawan-rest` API functions.
+  * a real world service would run on the LoRaWAN Application Server (or tightly connected to it).
+    Like this test tool it would transceive binary packages from a LoRaWan connection to the *IOTA-Bridge*.
 * *Sensor remote control*<br>
   * Used to send commands to the *ESP32 Sensor*
   * Can also be used as a standalone *Sensor* app to be run on x86/PC targets
@@ -38,11 +45,13 @@ The Streams Channel used for the SUSEE project generally can be described as fol
 * Energy provider will be the author
 * Additional stakeholders (e.g. home owner) could be added as reading subscribers to the single branch
 * Handshake:
-  * The initial handshake (announcement/subscription/keyload) between sensor and the channel author will be done before
-    a sensor is installed in a home, which means for the inital handshake the limitations of lorawan don't apply
+  * The *Sensor* initialization (initial handshake consisting of announcement/subscription/keyload) between sensor
+    and the channel author will be done before a sensor is installed in a home, which means for the inital handshake
+    the limitations of lorawan don't apply
   * If anything changes in the single branch channel setup, e.g. the addition of a new reading subscriber, the sensor
     will have to be able to receive new keyload information downstream via lorawan
-* The current POC version of the *ESP32 Sensor* uses WiFi to connect to the *IOTA Bridge*.
+* The current POC versions of the *ESP32 Sensor* and the *streams-poc-lib* test application are using WiFi
+  to connect to the *IOTA Bridge*.
   * For *Sensor* *Initialization* this is similar to a wired SLIP (Serial Line Internet Protocol)
     connection that might be used.
   * For *Sensor Processing* it has to be taken into account that the LoRaWan connection used in production
@@ -180,29 +189,17 @@ Have a look into the [streams-poc-lib README](sensor/streams-poc-lib/README.md)
 
 ### Common CLI options and i/o files
 
-Using the --help option of all three x86/PC applications will show the app specific help text:
+Using the --help option of all four x86/PC applications will show the app specific help text:
 ```bash
-target/release/management-console --help # Use 'sensor' or "iota-bridge" instead of 'management-console' for the other apps
+target/release/management-console --help # Use 'sensor', 'lora-app-srv-mock' or "iota-bridge" instead of 'management-console' for the other apps
 ```
 
-*Management Console* and *Sensor* provide the following options. *IOTA-Bridge* uses the same options expect `--wallet-file`
-as the *IOTA-Bridge* does not need a wallet:
+*Management Console* and *Sensor* provide the following options.
+*IOTA-Bridge* and *LoraWan AppServer Mockup Tool* are using the same options expect `--wallet-file`
+as these applications do not need a wallet:
 
     -h, --help
             Print help information
-
-    -n, --node <NODE_URL>
-            The url of the iota node to connect to.
-            Use 'https://chrysalis-nodes.iota.org' for the mainnet.
-            
-            As there are several testnets have a look at
-                https://wiki.iota.org/learn/networks/testnets
-            for alternative testnet urls.
-            
-            Example:
-                The iota chrysalis devnet:
-                https://api.lb-0.h.chrysalis-devnet.iota.cafe
-             [default: https://chrysalis-nodes.iota.org]
 
     -V, --version
             Print version information
@@ -256,6 +253,19 @@ as the *IOTA-Bridge* does not need a wallet:
     -l, --subscription-link <SUBSCRIPTION_LINK>
             Subscription message link for the sensor subscriber.
             Will be logged to console by the sensor app.
+
+    -n, --node <NODE_URL>
+            The url of the iota node to connect to.
+            Use 'https://chrysalis-nodes.iota.org' for the mainnet.
+            
+            As there are several testnets have a look at
+                https://wiki.iota.org/learn/networks/testnets
+            for alternative testnet urls.
+            
+            Example:
+                The iota chrysalis devnet:
+                https://api.lb-0.h.chrysalis-devnet.iota.cafe
+             [default: https://chrysalis-nodes.iota.org]
             
     -i, --init-sensor
             Initialize the streams channel of a remote sensor.
@@ -291,7 +301,14 @@ as the *IOTA-Bridge* does not need a wallet:
              * sensor: --register-keyload-msg
                                             # Successful keyload registration is acknowledged with
                                             # a KEYLOAD_REGISTRATION Confirmation
+
+    -b, --iota-bridge-url <IOTA_BRIDGE_URL>
+            The url of the iota-bridge to connect to.
+            See --init-sensor for further information.
+            Default value is http://localhost:50000
             
+            Example: iota-bridge-url="http://192.168.47.11:50000"
+
 
 The SUBSCRIPTION_PUB_KEY and SUBSCRIPTION_LINK will be logged to the console by the *Sensor* app when the 
 CLI command --subscribe-announcement-link of the *Sensor* app is used. This applies to the x86/PC version 
@@ -306,7 +323,7 @@ Alternatively to see the log output of the *ESP32 Sensor* app you can use a seri
 or [cargo espmonitor](https://github.com/esp-rs/espmonitor).
 
 If you use the `--init-sensor` option all relevant Streams channel properties like announcement-link,
-subscription_pub_key, ... are logged to the console of the *Management Console* app as these equivalent to
+subscription_pub_key, ... are logged to the console of the *Management Console* app equivalent to
 the usage of the *Sensor* app when it's used as a *Sensor remote control*. 
 
 ### Sensor CLI
@@ -367,6 +384,27 @@ remote control functionality:
             Therefore in case you are using 'act-as-remote-control' you will also need to use
             the 'iota-bridge' option to connect to the iota-bridge.
 
+### LoraWan AppServer Mockup Tool
+
+Additionally to those commands described in the
+<a href="#common-cli-options-and-io-files">Common CLI options section</a> section the
+*LoraWan AppServer Mockup Tool* provides these CLI commands:
+
+    -b, --iota-bridge-url <IOTA_BRIDGE_URL>
+            The url of the iota-bridge to connect to.
+            Default value is http://localhost:50000
+            Example: iota-bridge-url="http://192.168.47.11:50000" [default: http://localhost:50000]
+
+    -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
+            IP address and port to listen to.
+            Example: listener-ip-address="192.168.47.11:50001"
+            
+            DO NOT USE THE SAME PORT FOR THE IOTA-BRIDGE AND THIS APPLICATION
+             [default: localhost:50001]
+
+For further details please also have a look into the 
+[README of the *LoraWan AppServer Mockup Tool*](lora-app-srv-mock/README.md) project.
+
 ### IOTA Bridge CLI
 
 The *IOTA Bridge* acts as a proxy for messages from/to the
@@ -383,13 +421,27 @@ It provides a REST API to:
 
 Additionally to those commands described in the
 <a href="#common-cli-options-and-io-files">Common CLI options section</a> section the
-IOTA Bridge provides only one CLI command to control the ip adress to listen to:
+*IOTA Bridge* provides these CLI commands:
 
     -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
             IP address and port to listen to.
             Example: listener-ip-address="192.168.47.11:50000"
             
-### IOTA Bridge REST API
+
+    -n, --node <NODE_URL>
+            The url of the iota node to connect to.
+            Use 'https://chrysalis-nodes.iota.org' for the mainnet.
+            
+            As there are several testnets have a look at
+                https://wiki.iota.org/learn/networks/testnets
+            for alternative testnet urls.
+            
+            Example:
+                The iota chrysalis devnet:
+                https://api.lb-0.h.chrysalis-devnet.iota.cafe
+             [default: https://chrysalis-nodes.iota.org]
+            
+## IOTA Bridge REST API
 Most of the REST API is used internally by the accompanying susee-streams-poc applications. The only endpoint relevant
 for public use is the IotaBridgeRequests API which can be called via the `lorawan-rest/binary_request` endpoints.
 
@@ -415,22 +467,41 @@ Have a look into the following documentation for more details:
   [streams_poc_lib.h](sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
 * Readme of the [streams-poc-lib](sensor/streams-poc-lib/README.md)
 
+The *LoraWan AppServer Mockup Tool* implements this process but uses a WIFI
+socket connection instead of a LoRaWAN connection. For further details please
+have a look into the
+[*LoraWan AppServer Mockup Tool* README](lora-app-srv-mock/README.md).
 
-## Example Workflow
-
-### Sensor Initialization
-
+## Example Workflows
 There are two ways to initialize a sensor. The easiest way is to use the `--init-sensor` option of
+the *Management Console* application which will perform an automatic sensor initialization.
+
+If you prefer to have a more insights into the initialization process you can do the sensor initialization
+manually using the *Management Console* application CLI.
+
+### Automatic Sensor Initialization
+
+To automatically initialize a sensor we need to use the `--init-sensor` option of
 the *Management Console* application:
 
-* Start the *Sensor* or *ESP32 Sensor* app with an unitialized streams channel.
-  If the Sensor has already been initialized use the ` --clear-client-state` option of the
-  *Sensor* app to set its state back to an uninitialized state (use the the `--act-as-remote-control`
-  option in case of an *ESP32 Sensor*).
-* Start the *IOTA Bridge* as been described in the
-  <a href="#subscribe-the-sensor---x86pc-version">Subscribe the Sensor - x86/PC version</a> or
-  <a href="#subscribe-the-sensor---esp32-version">Subscribe the Sensor - ESP32 version</a>
-  section
+* Start the *Sensor*, *ESP32 Sensor* or *streams-poc-lib* test application with an unitialized streams channel.
+  * *Sensor* and *ESP32 Sensor*:<br>
+    If the sensor has already been initialized use the ` --clear-client-state` option of the
+    *Sensor* app to set its state back to an uninitialized state (use the the `--act-as-remote-control`
+    option in case of an *ESP32 Sensor*).
+  * *streams-poc-lib* test application:<br>
+    If the sensor has already been initialized you need to run `idf.py erase-flash` and to flash the
+    *streams-poc-lib* test application again.
+* Start the *IOTA Bridge*
+  * *Sensor* and *ESP32 Sensor*:<br>
+    Start the *IOTA Bridge* as been described in the
+    <a href="#subscribe-the-sensor---x86pc-version">Subscribe the Sensor - x86/PC version</a> or
+    <a href="#subscribe-the-sensor---esp32-version">Subscribe the Sensor - ESP32 version</a>
+    section
+  * *streams-poc-lib* test application:<br>
+    Start the *IOTA Bridge* as been described in the
+    <a href="#subscribe-the-sensor---esp32-version">Subscribe the Sensor - ESP32 version</a>
+    section
 * Run the *Management Console* with the following options
 ```bash
     > ./management-console --init-sensor --iota-bridge-url "http://192.168.47.11:50000"
@@ -439,6 +510,8 @@ the *Management Console* application:
 The *Management Console* then will perform all the steps described below fully automatically.
 See the <a href="#management-console-cli">CLI help for the `--init-sensor` option</a> or
 of the *Management Console* for further details.
+
+### Manual Sensor Initialization
 
 #### Create the channel using the *Management Console*
 
@@ -614,7 +687,7 @@ is almost the same as used in the
 ```
 
 
-#### Send messages using the *Sensor*
+### Send messages using the *Sensor*
 
 Make sure that the *IOTA Bridge* is up and running in another shell. The folder `test/payloads` contains several message files that can be
 send like this:

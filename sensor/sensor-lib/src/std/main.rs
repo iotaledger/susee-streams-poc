@@ -143,8 +143,8 @@ pub async fn process_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 
 pub async fn process_main() -> Result<()> {
 
-    let arg_matches = get_arg_matches();
-    let cli = SensorCli::new(&arg_matches, &ARG_KEYS) ;
+    let matches_and_options = get_arg_matches();
+    let cli = SensorCli::new(&matches_and_options, &ARG_KEYS) ;
 
     if cli.matches.is_present(cli.arg_keys.act_as_remote_control) {
         process_remote_sensor(cli).await

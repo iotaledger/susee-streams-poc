@@ -7,8 +7,9 @@ pub mod http_client;
 
 pub use {
     client_base::{
-        STREAMS_TOOLS_CONST_HTTP_PROXY_PORT,
-        STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
+        STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT,
+        STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
+        STREAMS_TOOLS_CONST_DEFAULT_TCP_LISTENER_ADDRESS,
         WrappedClient,
     },
 };

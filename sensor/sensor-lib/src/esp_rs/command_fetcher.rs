@@ -25,7 +25,7 @@ use streams_tools::{
     http::{
         http_protocol_command::EndpointUris as EndpointUrisCommand,
     },
-    STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
+    STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
 };
 
 use hyper::{
@@ -51,7 +51,7 @@ pub struct CommandFetcherOptions<'a> {
 impl Default for CommandFetcherOptions<'_> {
     fn default() -> Self {
         Self {
-            http_url: STREAMS_TOOLS_CONST_HTTP_PROXY_URL
+            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL
         }
     }
 }

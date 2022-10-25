@@ -84,6 +84,19 @@ impl IotaBridgeRequestParts {
             .uri(String::from(self.uri.as_str()))
             .body(body)
     }
+
+    pub fn is_buffer_length_correct(buffer: &[u8], buffer_length: usize ) -> bool {
+        let (buffer_length_is_correct, _, _) = is_request_buffer_length_correct(buffer, buffer_length);
+        buffer_length_is_correct
+    }
+
+    pub fn get_request_byte_size(buffer: &[u8]) -> anyhow::Result<usize> {
+        if buffer.len() < USIZE_LEN {
+            bail!("The buffer length must be at least {} bytes", USIZE_LEN)
+        }
+        let (_, _, total_needed_size) = is_request_buffer_length_correct(buffer, buffer.len());
+        Ok(total_needed_size)
+    }
 }
 
 impl fmt::Display for IotaBridgeRequestParts {
@@ -120,14 +133,21 @@ fn deserialize_vec_u8(struct_name: &str, prop_name: &str, buffer: &&[u8], range:
     ret_val
 }
 
+pub fn is_request_buffer_length_correct(buffer: &[u8], buffer_length: usize) -> (bool, Range<usize>, usize) {
+    let range: Range<usize> = RangeIterator::new(USIZE_LEN);
+    let total_needed_size = u32::try_from_bytes(&buffer[range.clone()]).unwrap() as usize;
+    (buffer_length <= total_needed_size, range, total_needed_size)
+}
+
 impl BinaryPersist for IotaBridgeRequestParts {
     fn needed_size(&self) -> usize {
         // Request parts will be serialized in the the following order
         // as every Request part has a non static length we need 4 bytes to store the length for each part
+        // 1 - total needed buffer size
         // 1 - method
         // 2 - uri
         // 3 - body
-        let length_values_size = 3 * USIZE_LEN;
+        let length_values_size = 4 * USIZE_LEN;
         length_values_size + self.method_bytes.len() + self.uri_bytes.len() + self.body_bytes.len()
     }
 
@@ -136,8 +156,11 @@ impl BinaryPersist for IotaBridgeRequestParts {
             panic!("[BinaryPersist for IotaBridgeRequestParts - to_bytes()] This Request needs {} bytes but \
                     the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
         }
+        // total needed buffer size
+        let mut range: Range<usize> = RangeIterator::new(USIZE_LEN);
+        let total_needed_size = self.needed_size() as u32;
+        u32::to_bytes(&total_needed_size, &mut buffer[range.clone()]).expect("Could not persist total_needed_size");
         // method
-        let mut range: Range<usize> = RangeIterator::new(0);
         serialize_vec_u8("IotaBridgeRequestParts", "method_bytes", &self.method_bytes, buffer, &mut range);
         // uri
         serialize_vec_u8("IotaBridgeRequestParts", "uri_bytes", &self.uri_bytes, buffer, &mut range);
@@ -147,7 +170,12 @@ impl BinaryPersist for IotaBridgeRequestParts {
     }
 
     fn try_from_bytes(buffer: &[u8]) -> anyhow::Result<Self> where Self: Sized {
-        let mut range: Range<usize> = RangeIterator::new(0);
+        // total needed buffer size
+        let (buffer_length_is_correct, mut range, total_needed_size) = is_request_buffer_length_correct(buffer, buffer.len());
+        if !buffer_length_is_correct {
+            panic!("[BinaryPersist for IotaBridgeRequestParts - try_from_bytes()] This Request needs {} bytes but \
+                    the provided buffer length is only {} bytes.", total_needed_size, buffer.len());
+        }
         // method
         let method_str = deserialize_string(buffer, &mut range)?;
         let method = HttpMethod::from_str(method_str.as_str())?;
@@ -167,9 +195,24 @@ pub struct IotaBridgeResponseParts {
 }
 
 impl IotaBridgeResponseParts {
+
+    pub fn new_for_closed_socket_connection() -> Self {
+        IotaBridgeResponseParts {
+            body_bytes: vec![],
+            status_code: StatusCode::CONFLICT,
+        }
+    }
+
+    pub fn is_closed_socket_connection(&self) -> bool {
+        self.status_code != StatusCode::CONFLICT
+    }
+
     pub async fn from_hyper_response(response: HyperResponse<Body>) -> Self {
         let status_code = response.status();
         let body_bytes = body::to_bytes(response.into_body()).await.unwrap();
+        log::debug!("[from_hyper_response()] Returning IotaBridgeResponseParts with status {} and {} body bytes.",
+                    status_code,
+                    body_bytes.len());
         Self {
             body_bytes: Vec::<u8>::from(body_bytes),
             status_code,

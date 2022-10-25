@@ -1,14 +1,14 @@
 use clap::{
-    ArgMatches,
     Arg
 };
 
 use susee_tools::{
     BaseArgKeys,
     BASE_ARG_KEYS,
-    Cli
+    Cli,
+    cli_base::ArgMatchesAndOptions,
 };
-use streams_tools::STREAMS_TOOLS_CONST_HTTP_PROXY_URL;
+use streams_tools::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL;
 
 pub struct ArgKeys {
     pub base: &'static BaseArgKeys,
@@ -92,53 +92,55 @@ Example: iota-bridge-url=\"http://192.168.47.11:50000\"";
 
 pub type ManagementConsoleCli<'a> = Cli<'a, ArgKeys>;
 
-pub fn get_arg_matches() -> ArgMatches {
-    let iota_bridge_url_about = String::from(IOTA_BRIDGE_URL_ABOUT_FMT_STR).replace("{}", STREAMS_TOOLS_CONST_HTTP_PROXY_URL);
-    ManagementConsoleCli::get_app(
-        "Management Console",
-        "Management console for streams channels used in the SUSEE project",
-        None,
-    )
-    .arg(Arg::new(ARG_KEYS.subscription_link)
-        .long(ARG_KEYS.subscription_link)
-        .short('l')
-        .value_name("SUBSCRIPTION_LINK")
-        .help(SUBSCRIPTION_LINK_ABOUT)
-        .requires(ARG_KEYS.subscription_pub_key)
-    )
-    .arg(Arg::new(ARG_KEYS.subscription_pub_key)
-        .long(ARG_KEYS.subscription_pub_key)
-        .short('k')
-        .value_name("SUBSCRIPTION_PUB_KEY")
-        .help(SUBSCRIPTION_PUB_KEY_ABOUT)
-        .requires(ARG_KEYS.subscription_link)
-    )
-    .arg(Arg::new(ARG_KEYS.create_channel)
-        .long(ARG_KEYS.create_channel)
-        .short('c')
-        .help(CREATE_CHANNEL_ABOUT)
-        .takes_value(false)
-    )
-    .arg(Arg::new(ARG_KEYS.println_channel_status)
-        .long(ARG_KEYS.println_channel_status)
-        .short('p')
-        .value_name("PRINTLN_CHANNEL_STATUS")
-        .long_help(PRINTLN_CHANNEL_STATUS_ABOUT)
-        .takes_value(false)
-    )
-    .arg(Arg::new(ARG_KEYS.init_sensor)
-        .long(ARG_KEYS.init_sensor)
-        .short('i')
-        .help(INIT_SENSOR_ABOUT)
-        .requires(ARG_KEYS.iota_bridge_url)
-        .takes_value(false)
-    )
-    .arg(Arg::new(ARG_KEYS.iota_bridge_url)
-        .long(ARG_KEYS.iota_bridge_url)
-        .short('b')
-        .value_name("IOTA_BRIDGE_URL")
-        .help(iota_bridge_url_about.as_str())
-        .requires(ARG_KEYS.init_sensor)
-    )
-    .get_matches()
+pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
+    let iota_bridge_url_about = String::from(IOTA_BRIDGE_URL_ABOUT_FMT_STR).replace("{}", STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL);
+    let arg_matches = ManagementConsoleCli::get_app(
+            "Management Console",
+            "Management console for streams channels used in the SUSEE project",
+            None,
+        )
+        .arg(Arg::new(ARG_KEYS.subscription_link)
+            .long(ARG_KEYS.subscription_link)
+            .short('l')
+            .value_name("SUBSCRIPTION_LINK")
+            .help(SUBSCRIPTION_LINK_ABOUT)
+            .requires(ARG_KEYS.subscription_pub_key)
+        )
+        .arg(Arg::new(ARG_KEYS.subscription_pub_key)
+            .long(ARG_KEYS.subscription_pub_key)
+            .short('k')
+            .value_name("SUBSCRIPTION_PUB_KEY")
+            .help(SUBSCRIPTION_PUB_KEY_ABOUT)
+            .requires(ARG_KEYS.subscription_link)
+        )
+        .arg(Arg::new(ARG_KEYS.create_channel)
+            .long(ARG_KEYS.create_channel)
+            .short('c')
+            .help(CREATE_CHANNEL_ABOUT)
+            .takes_value(false)
+        )
+        .arg(Arg::new(ARG_KEYS.println_channel_status)
+            .long(ARG_KEYS.println_channel_status)
+            .short('p')
+            .value_name("PRINTLN_CHANNEL_STATUS")
+            .long_help(PRINTLN_CHANNEL_STATUS_ABOUT)
+            .takes_value(false)
+        )
+        .arg(Arg::new(ARG_KEYS.init_sensor)
+            .long(ARG_KEYS.init_sensor)
+            .short('i')
+            .help(INIT_SENSOR_ABOUT)
+            .requires(ARG_KEYS.iota_bridge_url)
+            .takes_value(false)
+        )
+        .arg(Arg::new(ARG_KEYS.iota_bridge_url)
+            .long(ARG_KEYS.iota_bridge_url)
+            .short('b')
+            .value_name("IOTA_BRIDGE_URL")
+            .help(iota_bridge_url_about.as_str())
+            .requires(ARG_KEYS.init_sensor)
+        )
+        .get_matches();
+
+    ArgMatchesAndOptions::new(arg_matches)
 }

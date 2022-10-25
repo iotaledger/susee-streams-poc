@@ -3,7 +3,7 @@ use anyhow::Result;
 mod cli;
 
 use streams_tools::{
-    STREAMS_TOOLS_CONST_HTTP_PROXY_PORT,
+    STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT,
     IotaBridge,
 };
 
@@ -21,7 +21,7 @@ use hyper::{
 };
 
 use cli::{
-    TangleProxyCli,
+    IotaBridgeCli,
     ARG_KEYS,
     get_arg_matches,
 };
@@ -54,13 +54,13 @@ fn main() {
 
 async fn run() {
     env_logger::init();
-    let arg_matches = get_arg_matches();
-    let cli = TangleProxyCli::new(&arg_matches, &ARG_KEYS) ;
+    let matches_and_options = get_arg_matches();
+    let cli = IotaBridgeCli::new(&matches_and_options, &ARG_KEYS) ;
     println!("[IOTA Bridge] Using node '{}' for tangle connection", cli.node);
 
     let client = IotaBridge::new_from_url(cli.node);
 
-    let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_HTTP_PROXY_PORT).into();
+    let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT).into();
     if cli.matches.is_present(cli.arg_keys.listener_ip_address_port) {
         let addr_str = cli.matches.value_of(cli.arg_keys.listener_ip_address_port).unwrap().trim();
         addr = addr_str.parse().unwrap();

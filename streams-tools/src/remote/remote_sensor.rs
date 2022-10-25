@@ -1,5 +1,5 @@
 use crate::{
-    STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
+    STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
     http::http_protocol_command::RequestBuilderCommand,
     http::http_protocol_confirm::RequestBuilderConfirm,
 };
@@ -33,13 +33,12 @@ type HttpClient = Client<HttpConnector, Body>;
 pub struct RemoteSensorOptions<'a> {
     pub http_url: &'a str,
     pub command_fetch_wait_seconds: u32,
-
 }
 
 impl Default for RemoteSensorOptions<'_> {
     fn default() -> Self {
         Self {
-            http_url: STREAMS_TOOLS_CONST_HTTP_PROXY_URL,
+            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
             command_fetch_wait_seconds: 5,
         }
     }

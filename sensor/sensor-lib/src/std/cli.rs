@@ -1,15 +1,16 @@
 use clap::{
-    ArgMatches,
     Arg
 };
 
 use susee_tools::{
     BaseArgKeys,
     BASE_ARG_KEYS,
-    Cli
+    Cli,
+    cli_base::ArgMatchesAndOptions,
 };
 
-use streams_tools::STREAMS_TOOLS_CONST_HTTP_PROXY_URL;
+use streams_tools::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL;
+use susee_tools::cli_base::CliOptions;
 
 static FILE_TO_SEND_ABOUT: &str = "A message file that will be encrypted and send using the streams channel.
 If needed you can use this option multiple times to specify several message files.";
@@ -86,66 +87,73 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
 
 pub type SensorCli<'a> = Cli<'a, ArgKeys>;
 
-pub fn get_arg_matches() -> ArgMatches {
-    let iota_bridge_url_about = String::from(IOTA_BRIDGE_URL_ABOUT_FMT_STR).replace("{}", STREAMS_TOOLS_CONST_HTTP_PROXY_URL);
+pub fn get_arg_matches() -> ArgMatchesAndOptions {
+    let iota_bridge_url_about = String::from(IOTA_BRIDGE_URL_ABOUT_FMT_STR).replace("{}", STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL);
 
-    SensorCli::get_app(
-        "Sensor",
-        "Test tool to evaluate sensor behavior in the SUSEE project",
-        None,
-    )
-        .arg(Arg::new(ARG_KEYS.subscribe_announcement_link)
-            .long(ARG_KEYS.subscribe_announcement_link)
-            .short('s')
-            .value_name("SUBSCRIBE_ANNOUNCEMENT_LINK")
-            .long_help(SUBSCRIBE_ANNOUNCEMENT_LINK_ABOUT)
-            .conflicts_with(ARG_KEYS.register_keyload_msg)
-            .conflicts_with(ARG_KEYS.files_to_send)
+    let cli_opt = CliOptions {
+        use_node: false,
+        use_wallet: true,
+    };
+
+    let arg_matches = SensorCli::get_app(
+            "Sensor",
+            "Test tool to evaluate sensor behavior in the SUSEE project",
+            Some(cli_opt.clone()),
         )
-        .arg(Arg::new(ARG_KEYS.register_keyload_msg)
-            .long(ARG_KEYS.register_keyload_msg)
-            .short('r')
-            .value_name("KEYLOAD_MSG_LINK")
-            .long_help(REGISTER_KEYLOAD_MSG_ABOUT)
-            .conflicts_with(ARG_KEYS.subscribe_announcement_link)
-            .conflicts_with(ARG_KEYS.files_to_send)
-        )
-        .arg(Arg::new(ARG_KEYS.files_to_send)
-            .long(ARG_KEYS.files_to_send)
-            .short('f')
-            .value_name("FILE_TO_SEND")
-            .long_help(FILE_TO_SEND_ABOUT)
-            .multiple_occurrences(true)
-            .min_values(0)
-            .conflicts_with(ARG_KEYS.subscribe_announcement_link)
-            .conflicts_with(ARG_KEYS.register_keyload_msg)
-        )
-        .arg(Arg::new(ARG_KEYS.act_as_remote_control)
-            .long(ARG_KEYS.act_as_remote_control)
-            .short('c')
-            .value_name("ACT_AS_REMOTE_CONTROL")
-            .long_help(ACT_AS_REMOTE_CONTROL_ABOUT)
-            .takes_value(false)
-            .conflicts_with(BASE_ARG_KEYS.node)
-        )
-        .arg(Arg::new(ARG_KEYS.iota_bridge_url)
-            .long(ARG_KEYS.iota_bridge_url)
-            .short('b')
-            .value_name("IOTA_BRIDGE_URL")
-            .help(iota_bridge_url_about.as_str())
-        )
-        .arg(Arg::new(ARG_KEYS.println_subscriber_status)
-            .long(ARG_KEYS.println_subscriber_status)
-            .short('p')
-            .value_name("PRINTLN_SUBSCRIBER_STATUS")
-            .long_help(PRINTLN_SUBSCRIBER_STATUS_ABOUT)
-            .takes_value(false)
-        )
-        .arg(Arg::new(ARG_KEYS.clear_client_state)
-            .long(ARG_KEYS.clear_client_state)
-            .value_name("CLEAR_CLIENT_STATE")
-            .long_help(CLEAR_CLIENT_STATE_ABOUT)
-            .takes_value(false)
-        )
-        .get_matches()
+            .arg(Arg::new(ARG_KEYS.subscribe_announcement_link)
+                .long(ARG_KEYS.subscribe_announcement_link)
+                .short('s')
+                .value_name("SUBSCRIBE_ANNOUNCEMENT_LINK")
+                .long_help(SUBSCRIBE_ANNOUNCEMENT_LINK_ABOUT)
+                .conflicts_with(ARG_KEYS.register_keyload_msg)
+                .conflicts_with(ARG_KEYS.files_to_send)
+            )
+            .arg(Arg::new(ARG_KEYS.register_keyload_msg)
+                .long(ARG_KEYS.register_keyload_msg)
+                .short('r')
+                .value_name("KEYLOAD_MSG_LINK")
+                .long_help(REGISTER_KEYLOAD_MSG_ABOUT)
+                .conflicts_with(ARG_KEYS.subscribe_announcement_link)
+                .conflicts_with(ARG_KEYS.files_to_send)
+            )
+            .arg(Arg::new(ARG_KEYS.files_to_send)
+                .long(ARG_KEYS.files_to_send)
+                .short('f')
+                .value_name("FILE_TO_SEND")
+                .long_help(FILE_TO_SEND_ABOUT)
+                .multiple_occurrences(true)
+                .min_values(0)
+                .conflicts_with(ARG_KEYS.subscribe_announcement_link)
+                .conflicts_with(ARG_KEYS.register_keyload_msg)
+            )
+            .arg(Arg::new(ARG_KEYS.act_as_remote_control)
+                .long(ARG_KEYS.act_as_remote_control)
+                .short('c')
+                .value_name("ACT_AS_REMOTE_CONTROL")
+                .long_help(ACT_AS_REMOTE_CONTROL_ABOUT)
+                .takes_value(false)
+                .conflicts_with(BASE_ARG_KEYS.node)
+            )
+            .arg(Arg::new(ARG_KEYS.iota_bridge_url)
+                .long(ARG_KEYS.iota_bridge_url)
+                .short('b')
+                .value_name("IOTA_BRIDGE_URL")
+                .help(iota_bridge_url_about.as_str())
+            )
+            .arg(Arg::new(ARG_KEYS.println_subscriber_status)
+                .long(ARG_KEYS.println_subscriber_status)
+                .short('p')
+                .value_name("PRINTLN_SUBSCRIBER_STATUS")
+                .long_help(PRINTLN_SUBSCRIBER_STATUS_ABOUT)
+                .takes_value(false)
+            )
+            .arg(Arg::new(ARG_KEYS.clear_client_state)
+                .long(ARG_KEYS.clear_client_state)
+                .value_name("CLEAR_CLIENT_STATE")
+                .long_help(CLEAR_CLIENT_STATE_ABOUT)
+                .takes_value(false)
+            )
+            .get_matches();
+
+    ArgMatchesAndOptions::new(arg_matches)
 }

@@ -49,7 +49,6 @@ pub async fn dispatch_request(
                 confirm_callbacks
             ).await?;
         } else {
-
             ret_val = dispatch_normal_request(req_parts, streams_callbacks, command_callbacks, confirm_callbacks).await?;
         }
     } else {
@@ -71,6 +70,7 @@ async fn dispatch_lorawan_rest_request(
         Ok(lorawan_rest_request) => {
             match lorawan_rest_request.status {
                 DispatchedRequestStatus::DeserializedLorawanRest => {
+                    log::debug!("[dispatch_lorawan_rest_request] Processing DeserializedLorawanRest now");
                     let response = dispatch_normal_request(
                         lorawan_rest_request,
                         streams_callbacks,
@@ -114,8 +114,10 @@ pub async fn dispatch_normal_request(
         ret_val = Some(dispatch_request_confirm(&req_parts, confirm_callbacks).await?);
     }
 
+    log::debug!("[dispatch_normal_request] Exiting function");
     ret_val.ok_or_else(|| {
         if let Err(e) = status::StatusCode::from_u16(404) {
+            log::debug!("[dispatch_normal_request] ret_val is Err. Returning 404");
             e.into()
         } else {
             panic!("Should never happen");

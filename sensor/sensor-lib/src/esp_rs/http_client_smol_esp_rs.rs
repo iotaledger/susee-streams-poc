@@ -28,7 +28,7 @@ use streams_tools::{
         MapStreamsErrors,
     },
     binary_persist::BinaryPersist,
-    STREAMS_TOOLS_CONST_HTTP_PROXY_URL
+    STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL
 };
 
 use hyper::{
@@ -60,6 +60,7 @@ use esp_idf_svc::{
 //        EspHttpRequestWrite,
     },
 };
+use esp_idf_svc::http::client::EspHttpClientConfiguration;
 
 pub struct HttpClientOptions<'a> {
     pub(crate) http_url: &'a str,
@@ -68,7 +69,7 @@ pub struct HttpClientOptions<'a> {
 impl Default for HttpClientOptions<'_> {
     fn default() -> Self {
         Self {
-            http_url: STREAMS_TOOLS_CONST_HTTP_PROXY_URL
+            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL
         }
     }
 }
@@ -83,6 +84,7 @@ impl fmt::Display for HttpClientOptions<'_> {
 pub struct HttpClient {
     request_builder: RequestBuilderStreams,
     tangle_client_options: SendOptions,
+    esp_http_client_opt: EspHttpClientConfiguration,
 }
 
 impl HttpClient
@@ -90,22 +92,25 @@ impl HttpClient
     pub fn new(options: Option<HttpClientOptions>) -> Self {
         let options = options.unwrap_or_default();
         log::debug!("[HttpClient::new()] Creating new HttpClient using options: {}", options);
+        let mut esp_http_client_opt = EspHttpClientConfiguration::default();
+        esp_http_client_opt.timeout_ms = Some(60000);
         Self {
             request_builder: RequestBuilderStreams::new(options.http_url),
             tangle_client_options: SendOptions::default(),
+            esp_http_client_opt,
         }
     }
 
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
         let req = self.request_builder.send_message(msg)?;
-        let mut http_client = EspHttpClient::new_default()?;
+        let mut http_client = EspHttpClient::new(&self.esp_http_client_opt)?;
         send_hyper_request_via_esp_http(&mut http_client, req).await?;
         Ok(())
     }
 
     async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         log::debug!("[HttpClient.recv_message_via_http]");
-        let mut http_client = EspHttpClient::new_default()?;
+        let mut http_client = EspHttpClient::new(&self.esp_http_client_opt)?;
         log::debug!("[HttpClient.recv_message_via_http] EspHttpClient created");
         let mut response: EspHttpResponse = send_hyper_request_via_esp_http(
             &mut http_client,

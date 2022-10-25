@@ -132,8 +132,8 @@ async fn send_keyload_message<'a> (channel_manager: &mut ChannelManagerPlainText
 async fn main() -> Result<()> {
 
     env_logger::init();
-    let arg_matches = get_arg_matches();
-    let cli = ManagementConsoleCli::new(&arg_matches, &ARG_KEYS) ;
+    let matches_and_options = get_arg_matches();
+    let cli = ManagementConsoleCli::new(&matches_and_options, &ARG_KEYS) ;
     let wallet = get_wallet(
         &cli.matches,
         SUSEE_CONST_SECRET_PASSWORD,

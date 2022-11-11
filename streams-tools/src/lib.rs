@@ -6,7 +6,6 @@ pub mod user_manager;
 pub mod client;
 pub mod http;
 pub mod binary_persist;
-mod dao_helpers;
 
 #[cfg(feature = "std")]
 pub mod remote;
@@ -14,6 +13,10 @@ pub mod remote;
 pub mod helpers;
 #[cfg(feature = "std")]
 pub mod iota_bridge;
+
+#[cfg(feature = "dao")]
+mod dao_helpers;
+
 
 pub use {
     wallet::{

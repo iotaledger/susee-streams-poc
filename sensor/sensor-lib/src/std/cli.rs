@@ -59,10 +59,6 @@ TODO: -----------------------------
       -----------------------------       use this option carefully!
 ";
 
-// TODO: Remove the node option because it is not used
-// * Make it optional in CLI base
-// * Remove it from README file
-
 pub struct ArgKeys {
     pub base: &'static BaseArgKeys,
     pub files_to_send: &'static str,
@@ -132,7 +128,6 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
                 .value_name("ACT_AS_REMOTE_CONTROL")
                 .long_help(ACT_AS_REMOTE_CONTROL_ABOUT)
                 .takes_value(false)
-                .conflicts_with(BASE_ARG_KEYS.node)
             )
             .arg(Arg::new(ARG_KEYS.iota_bridge_url)
                 .long(ARG_KEYS.iota_bridge_url)
@@ -155,5 +150,8 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
             )
             .get_matches();
 
-    ArgMatchesAndOptions::new(arg_matches)
+    ArgMatchesAndOptions {
+        options: cli_opt,
+        matches: arg_matches,
+    }
 }

@@ -234,7 +234,7 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
         ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_request_via_socket()] response_callback returned with error code: %s, ", streams_error_to_string(streams_err));
     }
 
-    // We arrived at this point so we assume that no LoRaWanError occured.
+    // We arrived at this point so we assume that no LoRaWanError occurred.
     return LORAWAN_OK;
 }
 
@@ -345,15 +345,13 @@ void send_message_via_streams_poc_lib(void) {
       ESP_ERROR_CHECK(nvs_flash_erase());
       ret = nvs_flash_init();
     }
-    // ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
     wifi_init_sta();
 
     ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Preparing netif and creating default event loop\n");
     ESP_ERROR_CHECK(esp_netif_init());
-    // ESP_ERROR_CHECK(esp_event_loop_create_default());
-    
+
     ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Preparing socket for future send_request_via_socket() calls");
 #if defined(CONFIG_EXAMPLE_IPV4)
     dest_addr_t dest_addr;

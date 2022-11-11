@@ -1,31 +1,35 @@
-mod cli;
+use core::str::FromStr;
 
-use cli::{
-    ManagementConsoleCli,
-    ARG_KEYS,
-    get_arg_matches,
+use anyhow::{
+    Result,
 };
-
-use streams_tools::{
-    ChannelManagerPlainTextWallet,
-    ChannelManager,
-    channel_manager::SubscriberData
-};
-
-use susee_tools::{
-    get_wallet,
-    SUSEE_CONST_SECRET_PASSWORD
-};
-
 use iota_streams::{
     app_channels::api::tangle::Address,
     core::prelude::hex,
 };
 
-use core::str::FromStr;
+use cli::{
+    ARG_KEYS,
+    get_arg_matches,
+    ManagementConsoleCli,
+};
 
-use anyhow::Result;
-use streams_tools::remote::remote_sensor::{RemoteSensorOptions, RemoteSensor};
+use multi_channel_management::create_channel_manager;
+
+use streams_tools::{
+    channel_manager::{
+        SubscriberData,
+    },
+    ChannelManagerPlainTextWallet,
+    remote::remote_sensor::{
+        RemoteSensor,
+        RemoteSensorOptions
+    },
+    UserDataStore,
+};
+
+mod cli;
+mod multi_channel_management;
 
 fn println_announcement_link(link: &Address, comment: &str) {
     println!(
@@ -44,13 +48,19 @@ async fn create_channel(channel_manager: &mut ChannelManagerPlainTextWallet) -> 
     Ok(announcement_link)
 }
 
-async fn println_channel_status<'a> (channel_manager: &mut ChannelManagerPlainTextWallet)
+async fn println_channel_status<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>)
 {
     let mut channel_exists = false;
     if let Some(author) = &channel_manager.author {
+        let starts_with = cli.matches.value_of(cli.arg_keys.channel_starts_with).expect(
+            format!("Error on fetching value from cli.matches for {}", cli.arg_keys.channel_starts_with).as_str()
+        );
         match author.announcement_link() {
             Some(link) => {
-                println_announcement_link(link, "A channel with the following details has already been announced");
+                println_announcement_link(
+                    link,
+                    format!("Channel details for channel ID starting with '{}'", starts_with).as_str()
+                );
                 channel_exists = true
             },
             _ => {},
@@ -134,37 +144,35 @@ async fn main() -> Result<()> {
     env_logger::init();
     let matches_and_options = get_arg_matches();
     let cli = ManagementConsoleCli::new(&matches_and_options, &ARG_KEYS) ;
-    let wallet = get_wallet(
-        &cli.matches,
-        SUSEE_CONST_SECRET_PASSWORD,
-        cli.arg_keys.base.wallet_file,
-        "wallet-management-console.txt"
-    )?;
 
     println!("[Management Console] Using node '{}' for tangle connection", cli.node);
 
-    let mut channel_manager = ChannelManager::new(
-        cli.node,
-        wallet,
-        Some(String::from("user-state-management-console.bin"))
-    ).await;
+    let mut user_store = UserDataStore::new_from_db_file("user-states-management-console.sqlite3");
 
-    if cli.matches.is_present(cli.arg_keys.create_channel) {
-        create_channel(&mut channel_manager).await?;
-    } else if cli.matches.is_present(cli.arg_keys.subscription_link) {
-        send_keyload_message_cli(&mut channel_manager, &cli).await?;
-    } else if cli.matches.is_present(cli.arg_keys.init_sensor) {
-        init_sensor(&mut channel_manager, &cli).await?;
-    } else if cli.matches.is_present(cli.arg_keys.println_channel_status) {
-        println_channel_status(&mut channel_manager ).await;
-    } else {
+    let mut print_usage_help = true;
+    if let Some(mut channel_manager) = create_channel_manager(&mut user_store, &cli).await {
+        if cli.matches.is_present(cli.arg_keys.create_channel) {
+            create_channel(&mut channel_manager).await?;
+            print_usage_help = false;
+        } else if cli.matches.is_present(cli.arg_keys.subscription_link) {
+            send_keyload_message_cli(&mut channel_manager, &cli).await?;
+            print_usage_help = false;
+        } else if cli.matches.is_present(cli.arg_keys.init_sensor) {
+            init_sensor(&mut channel_manager, &cli).await?;
+            print_usage_help = false;
+        } else if cli.matches.is_present(cli.arg_keys.println_channel_status) {
+            println_channel_status(&mut channel_manager, &cli ).await;
+            print_usage_help = false;
+        }
+    }
+
+    if print_usage_help {
         println!("[Management Console] You need to specify one of these options: --{}, --{}, --{} or --{}\n",
                  cli.arg_keys.create_channel,
                  cli.arg_keys.subscription_link,
                  cli.arg_keys.init_sensor,
                  cli.arg_keys.println_channel_status,
         );
-        // println_channel_status(&mut channel_manager ).await;
     }
 
     Ok(())

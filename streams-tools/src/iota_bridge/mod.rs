@@ -5,6 +5,7 @@ mod server_dispatch_command;
 mod server_dispatch_streams;
 mod server_dispatch_confirm;
 mod server_dispatch_lorawan_rest;
+mod dao;
 
 pub use {
     iota_bridge::{

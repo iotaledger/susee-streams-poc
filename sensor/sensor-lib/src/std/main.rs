@@ -4,10 +4,7 @@ use super::cli::{
     get_arg_matches,
 };
 
-use susee_tools::{
-    SUSEE_CONST_SECRET_PASSWORD,
-    get_wallet
-};
+use susee_tools::{SUSEE_CONST_SECRET_PASSWORD, get_wallet_filename};
 
 use anyhow::Result;
 
@@ -19,22 +16,28 @@ use crate::{
     }
 };
 
-use streams_tools::{
-    http_client::HttpClientOptions,
-    remote::remote_sensor::{
-        RemoteSensor,
-        RemoteSensorOptions,
-    },
-};
+use streams_tools::{http_client::HttpClientOptions, remote::remote_sensor::{
+    RemoteSensor,
+    RemoteSensorOptions,
+}, PlainTextWallet};
+
+fn get_wallet<'a>(cli: &SensorCli<'a>) -> Result<PlainTextWallet> {
+    let wallet_filename= get_wallet_filename(
+        &cli.matches,
+        cli.arg_keys.base.wallet_file,
+        "wallet-sensor.txt",
+    )?;
+
+    Ok(PlainTextWallet::new(
+        SUSEE_CONST_SECRET_PASSWORD,
+        Some(wallet_filename.as_str()),
+        None,
+    ))
+}
 
 pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 
-    let wallet = get_wallet(
-        &cli.matches,
-        SUSEE_CONST_SECRET_PASSWORD,
-        cli.arg_keys.base.wallet_file,
-        "wallet-sensor.txt"
-    )?;
+    let wallet = get_wallet(&cli)?;
 
     println!("[Sensor] Using node '{}' for tangle connection", cli.node);
 

@@ -1,10 +1,12 @@
 #![feature(generic_const_exprs)]
+#![feature(hasher_prefixfree_extras)]
 
 pub mod wallet;
 pub mod user_manager;
 pub mod client;
 pub mod http;
 pub mod binary_persist;
+mod dao_helpers;
 
 #[cfg(feature = "std")]
 pub mod remote;
@@ -24,10 +26,14 @@ pub use {
 
 #[cfg(feature = "std")]
 pub use {
-    iota_bridge::IotaBridge,
     wallet::plain_text_wallet::{
         PlainTextWallet,
     },
+};
+
+#[cfg(feature = "std")]
+pub use {
+    iota_bridge::IotaBridge,
 };
 
 #[cfg(test)]

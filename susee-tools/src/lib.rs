@@ -13,7 +13,7 @@ pub use {
 
 #[cfg(feature = "std")]
 pub use {
-    helpers::get_wallet,
+    helpers::get_wallet_filename,
 };
 
 pub static SUSEE_CONST_SECRET_PASSWORD: &str = "SUSEE";

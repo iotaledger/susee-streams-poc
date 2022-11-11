@@ -44,11 +44,9 @@ wifi = []
 [dependencies]
 # bindgen = "0.58"
 # cbindgen = "0.19"
-iota-streams = { git = "https://github.com/iotaledger/streams", branch = "develop", default-features = false, features = ["std", "tangle"] }
 streams-tools = { version = "0.1.2", path = "../../streams-tools", default-features = false }
 susee-tools = { version = "0.1.2", path = "../../susee-tools", default-features = false }
 iota-client-types = { version = "0.1.2", path = "../../iota-client-types" }
-
 anyhow = "1.0.40"
 hyper = { version = "0.14", features = ["client", "http1"] }
 
@@ -66,6 +64,12 @@ payloads = { version = "0.1.2", path = "../../test/payloads", optional = true }
 
 # std dependencies
 tokio = {version = "1.5", optional = true}
+
+[dependencies.iota-streams]
+git = "https://github.com/iotaledger/streams"
+branch="v1"
+default-features = false
+features = ["std", "tangle"]
 
 [dependencies.clap]
 version = "3.0.14"

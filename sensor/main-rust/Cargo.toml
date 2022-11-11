@@ -9,13 +9,18 @@ name = "sensor"
 path = "src/main.rs"
 
 [dependencies]
-iota-streams = { git = "https://github.com/iotaledger/streams", branch = "develop", default-features = false, features = ["std", "tangle", "client"] }
 streams-tools = { version = "0.1.2", path = "../../streams-tools" }
 susee-tools = { version = "0.1.2", path = "../../susee-tools" }
 sensor-lib = { version = "0.1.2", path = "../sensor-lib" }
 anyhow = "1.0.40"
 tokio = {version = "1.5"}
 env_logger = "0.9"
+
+[dependencies.iota-streams]
+git = "https://github.com/iotaledger/streams"
+branch="v1"
+default-features = false
+features = ["std", "tangle", "client"]
 
 [dependencies.clap]
 version = "3.0.14"

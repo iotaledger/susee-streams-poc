@@ -5,7 +5,7 @@ This project contains five test applications providing command line interfaces (
 functionality. Additionally the static library *streams-poc-lib* provides C bindings for the most relevant *Sensor* 
 specific functionality for the SUSEE project.
 
-Following test applications are contained. For more details please see below in the 
+Following test applications are contained. For more details regarding the general usecase please see below in the 
 <a href="#applications-and-workflows">Applications and workflows</a> section:
 * *ESP32 Sensor*<br>
   * Imitates the processes running in the smart meter (a.k.a. *Sensor*)
@@ -28,6 +28,7 @@ Following test applications are contained. For more details please see below in 
 * *Management Console*<br>
   * Imitates the processes needed for *Initialization* of the sensor and the monitoring of *Sensor Processing*
   * Manages the *Add/Remove Subscriber* workflows
+  * Manages multiple channels resp. *Sensors* using a local SQLite3 database
 * *IOTA Bridge*<br>
   * Imitates processes
     * in the Susee Application Server (*Sensor Processing*) and
@@ -217,13 +218,18 @@ as these applications do not need a wallet:
 * Wallet for the user seed<br><br>
   *x86/PC*<br>
   The applications are using a plain text wallet that stores the automatically generated seed in a text file.
-  If option '--wallet-file' is not used a default filename 'wallet-<APPLICATION-NAME>.txt' is used.
-  If the file does not exist a new seed is created and stored in a new wallet file. Otherwise the seed stored
+  If option '--wallet-file' is not used, a default filename 'wallet-<APPLICATION-NAME>.txt' is used.
+  If the file does not exist, a new seed is created and stored in a new wallet file. Otherwise the seed stored
   in the wallet file is used.<br>
   As the wallet file contains the plain text seed (not encrypted) make absolutely sure to<br>
   **DO NOT USE THIS WALLET FOR PRODUCTION PURPOSES**<br>
   Instead implement the [SimpleWallet trait](streams-tools/src/plain_text_wallet.rs)
   using a secure wallet library like [stronghold](https://github.com/iotaledger/stronghold.rs).
+  <br><br>
+  The *Management Console* uses the seed to derive seeds for each managed channel.
+  The channel seed is derived from the main seed stored in the wallet file and a seed-derivation-phrase
+  stored in the the local SQLite3 database file.
+   
   <br><br>
   *ESP32 Sensor*<br>
   Currently a dummy wallet providing a static seed phrase is used. For production purposes this needs to be
@@ -235,6 +241,8 @@ as these applications do not need a wallet:
   On application start the current user state is loaded from a file named 'user-state-[APPLICATION-NAME].bin'.
   On application exit the current user state is written into this file.
   <br><br>
+  The *Management Console* stores the user states of all managed channels in the local SQLite3 database file.
+  <br><br>
   *ESP32*<br>
   The *ESP32 Sensor* reads and persists its user state every time a command is received from the *IOTA-Bridge*.
   The state is persisted in a FAT partition located in the SPI flash memory of the ESP32 board.
@@ -242,17 +250,15 @@ as these applications do not need a wallet:
 
 ### Management Console CLI
 
+The *Management Console* is used to create new Streams channels and to add Sensors(a.k.a. Streams subscribers)
+to those channels. Management of multiple channels is possible. The user states of the
+Streams channels are stored in a local SQLite3 database file (user-states-database).
+
     -c, --create-channel
-            Use this option to create (announce) the channel.
+            Use this option to create (announce) a new Streams channel.
             The announcement link will be logged to the console.
-
-    -k, --subscription-pub-key <SUBSCRIPTION_PUB_KEY>
-            Public key of the sensor subscriber.
-            Will be logged to console by the sensor app.
-
-    -l, --subscription-link <SUBSCRIPTION_LINK>
-            Subscription message link for the sensor subscriber.
-            Will be logged to console by the sensor app.
+            The ID and user_state of the new Streams channel will be stored in in the
+            user-states-database.
 
     -n, --node <NODE_URL>
             The url of the iota node to connect to.
@@ -266,7 +272,56 @@ as these applications do not need a wallet:
                 The iota chrysalis devnet:
                 https://api.lb-0.h.chrysalis-devnet.iota.cafe
              [default: https://chrysalis-nodes.iota.org]
+             
+    -p, --println-channel-status
+            Print information about currently existing channels.
+            Each sensor is a subscriber in a dedicated Streams channel. The management-console
+            manages these channels and stores the channel state information in its
+            'user-states-management-console.sqlite3' database file. Use this CLI option to print
+            the relevant channel state information from the SQLite database to console.
+            Use CLI argument '--channel-starts-with' to select the Streams channel you want to
+            investigate.             
+
+    -s, --channel-starts-with <CHANNEL_STARTS_WITH>
+            Specify the Streams channel when processing a management-console
+            CLI command. As the Streams channels ID has 40 byte length and is
+            not easy to handle manually you only need to specify the beginning
+            of the channels ID so that it can be found in the user-states-database.
+            If there are more than one channels that can be found by the provided search string
+            the command will fail.
             
+            Example:
+            
+                >   ./management-console --channel-starts-with=6f5aa6cb --println-channel-status
+
+#### Subscribe *Sensors*
+Following CLI arguments are used to subscribe *Sensors* to an existing channel:
+
+    -k, --subscription-pub-key <SUBSCRIPTION_PUB_KEY>
+            Add a Sensor to a Streams channel.
+            The CLI argument defines the public key of the sensor subscriber.
+            The public key of the sensor is logged to its console by the Sensor when the
+            --subscribe-announcement-link CLI command is used.
+            For more details have a look at the --subscription-link argument
+
+    -l, --subscription-link <SUBSCRIPTION_LINK>
+            Add a Sensor to a Streams channel.
+            The CLI argument defines the subscription message link for the sensor subscriber.
+            The subscription message link is logged to its console by the Sensor when the
+            --subscribe-announcement-link CLI command is used.
+            As the subscription message link contains the Streams channel ID the correct
+            user state is fetched automatically out of the user-states-database.
+
+The SUBSCRIPTION_PUB_KEY and SUBSCRIPTION_LINK will be logged to the console by the *Sensor* app when the 
+CLI command --subscribe-announcement-link of the *Sensor* app is used. This applies to the x86/PC version 
+of the *Sensor* app (*Sensor remote control*) and to the *ESP32 Sensor* application. In case of the *ESP32 Sensor*
+these properties are also logged to the console of the *Sensor* app that is used as *Sensor remote control*.
+
+#### Automatic *Sensor* initialization
+
+Instead of creating a Streams chanel and subscribing a Sensor manually
+the whole process (called *Sensor* initialization) can be done automatically:
+
     -i, --init-sensor
             Initialize the streams channel of a remote sensor.
             The whole channel initialization is done automatically following the process described
@@ -283,9 +338,26 @@ as these applications do not need a wallet:
             
             Initialization Process
             ----------------------
-            The below mentioned Commands and Confirmations are used for process communication
-            with the remote sensor via the IOTA-Bridge and are defined in the binary_persist
-            module of the streams-tools library:
+            The process consists of the following steps that could also be run manually using
+            the CLI of the management-console and the sensor/ESP32-Sensor application:
+            
+                    ------------------------------------------------------
+                    | management-console | --create-channel              |
+                    |--------------------|--------------------------------
+                    | sensor             | --subscribe-announcement-link |
+                    |--------------------|-------------------------------|
+                    | management-console | --subscription-link           |
+                    |                    | --subscription-pub-key        |
+                    |--------------------|-------------------------------|
+                    | sensor             | --register-keyload-msg        |
+                    ---------------------|--------------------------------
+            
+            In the automated initialization process all CLI commands and the data that are written
+            to console log by the applications are transported using Command and Confirmation
+            packages that are defined in the binary_persist module of the streams-tools library.
+            
+            Here is an overview which Command and Confirmation packages are used for communication
+            with the remote sensor via the IOTA-Bridge:
             
              * management-console: --create-channel
                 --> Announcement Link       # Send to the sensor using the SubscribeToAnnouncement
@@ -308,12 +380,6 @@ as these applications do not need a wallet:
             Default value is http://localhost:50000
             
             Example: iota-bridge-url="http://192.168.47.11:50000"
-
-
-The SUBSCRIPTION_PUB_KEY and SUBSCRIPTION_LINK will be logged to the console by the *Sensor* app when the 
-CLI command --subscribe-announcement-link of the *Sensor* app is used. This applies to the x86/PC version 
-of the *Sensor* app (*Sensor remote control*) and to the *ESP32 Sensor* application. In case of the *ESP32 Sensor*
-these properties are also logged to the console of the *Sensor* app that is used as *Sensor remote control*.
 
 To allow fully automated channel initializations the SUSEE Streams POC applications and the streams-poc-lib
 are using an own communication protocol consisting of `commands` and `confirmations` where a `confirmation`

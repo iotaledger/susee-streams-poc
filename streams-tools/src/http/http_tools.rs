@@ -25,7 +25,7 @@ use std::fmt;
 use std::fmt::Formatter;
 
 #[derive(Clone)]
-pub(crate) struct RequestBuilderTools {
+pub struct RequestBuilderTools {
     pub uri_prefix: String,
 }
 

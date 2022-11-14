@@ -27,6 +27,7 @@ use streams_tools::{
     },
     UserDataStore,
 };
+use susee_tools::SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC;
 
 mod cli;
 mod multi_channel_management;
@@ -80,7 +81,7 @@ async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, c
     if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
         remote_manager_options = Some(RemoteSensorOptions {
             http_url: iota_bridge_url,
-            command_fetch_wait_seconds: 5,
+            confirm_fetch_wait_sec: SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC,
         });
     }
     let remote_manager = RemoteSensor::new(remote_manager_options);

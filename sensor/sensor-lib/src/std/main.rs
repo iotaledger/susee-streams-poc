@@ -4,24 +4,45 @@ use super::cli::{
     get_arg_matches,
 };
 
-use susee_tools::{SUSEE_CONST_SECRET_PASSWORD, get_wallet_filename};
-
-use anyhow::Result;
+use anyhow::{
+    Result,
+    anyhow,
+};
 
 use crate::{
     std::{
         ClientType,
         SubscriberManagerPlainTextWalletHttpClient,
         sensor_manager::SensorManager,
+        command_fetcher::{
+            CommandFetcher,
+            CommandFetcherOptions
+        }
     }
 };
 
-use streams_tools::{http_client::HttpClientOptions, remote::remote_sensor::{
-    RemoteSensor,
-    RemoteSensorOptions,
-}, PlainTextWallet};
+use streams_tools::{PlainTextWallet, http_client::HttpClientOptions, http::http_protocol_confirm::RequestBuilderConfirm, binary_persist::Command, remote::{
+    remote_sensor::{
+        RemoteSensor,
+        RemoteSensorOptions,
+    },
+    command_processor::{
+        CommandProcessor,
+        SensorFunctions
+    }
+}, STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL};
 
-fn get_wallet<'a>(cli: &SensorCli<'a>) -> Result<PlainTextWallet> {
+use susee_tools::{SUSEE_CONST_SECRET_PASSWORD, get_wallet_filename, SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC};
+
+use hyper::{
+    Body,
+    http::Request,
+};
+
+use iota_streams::core::async_trait;
+use streams_tools::remote::command_processor::{process_sensor_commands, run_command_fetch_loop, CommandFetchLoopOptions};
+
+fn get_wallet(cli: &SensorCli) -> Result<PlainTextWallet> {
     let wallet_filename= get_wallet_filename(
         &cli.matches,
         cli.arg_keys.base.wallet_file,
@@ -35,11 +56,8 @@ fn get_wallet<'a>(cli: &SensorCli<'a>) -> Result<PlainTextWallet> {
     ))
 }
 
-pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
-
+pub async fn create_subscriber_manager<'a>(cli: &SensorCli<'a>) -> Result<SubscriberManagerPlainTextWalletHttpClient> {
     let wallet = get_wallet(&cli)?;
-
-    println!("[Sensor] Using node '{}' for tangle connection", cli.node);
 
     let mut http_client_options: Option<HttpClientOptions> = None;
     if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
@@ -48,19 +66,24 @@ pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
         });
     }
 
-    let client = ClientType::new_from_url(&cli.node, http_client_options);
-    let mut subscriber= SubscriberManagerPlainTextWalletHttpClient::new(
+    let client = ClientType::new(http_client_options);
+    Ok(SubscriberManagerPlainTextWalletHttpClient::new(
         client,
         wallet,
         Some(String::from("user-state-sensor.bin")),
-    ).await;
+    ).await)
+}
 
+
+pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
+
+    let mut subscriber= create_subscriber_manager(&cli).await?;
     let mut show_subscriber_state = true;
 
     if cli.matches.is_present(cli.arg_keys.subscribe_announcement_link) {
         let announcement_link_str = cli.matches.value_of(cli.arg_keys.subscribe_announcement_link).unwrap().trim();
         show_subscriber_state = false;
-        SensorManager::subscribe_to_channel(announcement_link_str, &mut subscriber).await?
+        SensorManager::subscribe_to_channel(announcement_link_str, &mut subscriber).await?;
     }
 
     if cli.matches.is_present(cli.arg_keys.files_to_send) {
@@ -80,21 +103,20 @@ pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
     }
 
     if show_subscriber_state {
-        SensorManager::println_subscriber_status(&subscriber);
+        SensorManager::println_subscriber_status(&subscriber)?;
     }
 
     Ok(())
 }
 
 pub async fn process_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
-
     let mut show_subscriber_state = cli.matches.is_present(cli.arg_keys.println_subscriber_status);
 
     let mut remote_manager_options: Option<RemoteSensorOptions> = None;
     if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
         remote_manager_options = Some(RemoteSensorOptions {
             http_url: iota_bridge_url,
-            command_fetch_wait_seconds: 5,
+            confirm_fetch_wait_sec: 5,
         });
     }
 
@@ -144,6 +166,113 @@ pub async fn process_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 }
 
 
+struct CmdProcessor<'a> {
+    command_fetcher: CommandFetcher,
+    iota_bridge_url: String,
+    cli: SensorCli<'a>,
+}
+
+impl<'a> CmdProcessor<'a> {
+    pub fn new(iota_bridge_url: &str, cli: SensorCli<'a>) -> CmdProcessor<'a> {
+        CmdProcessor {
+            command_fetcher: CommandFetcher::new(
+                Some(CommandFetcherOptions{ http_url: String::from(iota_bridge_url) }),
+            ),
+            iota_bridge_url: String::from(iota_bridge_url),
+            cli,
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl<'a> SensorFunctions for CmdProcessor<'a> {
+    type SubscriberManager = SubscriberManagerPlainTextWalletHttpClient;
+
+    fn get_iota_bridge_url(&self) -> &str {
+        self.iota_bridge_url.as_str()
+    }
+
+    async fn subscribe_to_channel(
+        &self, announcement_link_str: &str, subscriber_mngr: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        let (sub_msg_link, public_key_str) = SensorManager::subscribe_to_channel(announcement_link_str, subscriber_mngr).await
+            .expect("Error on calling SensorManager::subscribe_to_channel");
+        confirm_req_builder.subscription(sub_msg_link, public_key_str)
+    }
+
+    async fn send_content_as_msg(
+        &self, message_key: String, subscriber: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        let prev_message = SensorManager::send_file_content_as_msg(message_key.as_str(), subscriber).await
+            .expect("Error on calling SensorManager::send_file_content_as_msg");
+        confirm_req_builder.send_message(prev_message.to_string())
+    }
+
+    async fn register_keyload_msg(
+        &self, keyload_msg_link_str: &str, subscriber_mngr: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        SensorManager::register_keyload_msg(keyload_msg_link_str, subscriber_mngr).await
+            .expect("Error on calling SensorManager::register_keyload_msg");
+        confirm_req_builder.keyload_registration()
+    }
+
+    fn println_subscriber_status<'b>(
+        &self, subscriber_manager: &Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        let (previous_message_link, subs) = SensorManager::println_subscriber_status(subscriber_manager)
+            .expect("Error on calling SensorManager::println_subscriber_status");
+        confirm_req_builder.subscriber_status(previous_message_link, subs)
+    }
+
+    async fn clear_client_state<'b>(
+        &self, subscriber_manager: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        SensorManager::clear_client_state(subscriber_manager).await
+            .expect("Error on calling SensorManager::clear_client_state");
+        confirm_req_builder.clear_client_state()
+    }
+}
+
+#[async_trait(?Send)]
+impl<'a> CommandProcessor for CmdProcessor<'a> {
+    async fn fetch_next_command(&self) -> Result<(Command, Vec<u8>)> {
+        self.command_fetcher.fetch_next_command().await
+    }
+
+    async fn send_confirmation(&self, confirmation_request: Request<Body>) -> Result<()> {
+        self.command_fetcher.send_confirmation(confirmation_request).await
+    }
+
+    async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
+        let mut subscriber= create_subscriber_manager(&self.cli).await?;
+
+        let confirmation_request = process_sensor_commands(
+            self, &mut subscriber, command, buffer
+        ).await.expect("Error on processing sensor commands");
+
+        confirmation_request.ok_or(anyhow!("No confirmation_request received"))
+    }
+}
+
+pub async fn process_mock_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
+    let iota_bridge_url = cli.matches.value_of(cli.arg_keys.iota_bridge_url)
+        .unwrap_or(STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL);
+    let cmd_processor = CmdProcessor::new(iota_bridge_url, cli);
+
+    run_command_fetch_loop(
+        cmd_processor,
+        Some(
+            CommandFetchLoopOptions{
+                confirm_fetch_wait_sec: SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC
+        })
+    ).await
+}
+
 pub async fn process_main() -> Result<()> {
 
     let matches_and_options = get_arg_matches();
@@ -151,6 +280,8 @@ pub async fn process_main() -> Result<()> {
 
     if cli.matches.is_present(cli.arg_keys.act_as_remote_control) {
         process_remote_sensor(cli).await
+    } else if cli.matches.is_present(cli.arg_keys.mock_remote_sensor) {
+        process_mock_remote_sensor(cli).await
     } else {
         process_local_sensor(cli).await
     }

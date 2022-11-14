@@ -32,14 +32,14 @@ type HttpClient = Client<HttpConnector, Body>;
 
 pub struct RemoteSensorOptions<'a> {
     pub http_url: &'a str,
-    pub command_fetch_wait_seconds: u32,
+    pub confirm_fetch_wait_sec: u32,
 }
 
 impl Default for RemoteSensorOptions<'_> {
     fn default() -> Self {
         Self {
             http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
-            command_fetch_wait_seconds: 5,
+            confirm_fetch_wait_sec: 5,
         }
     }
 }
@@ -80,7 +80,7 @@ impl<'a> RemoteSensor<'a> {
         where
             T: EnumeratedPersistableArgs<Confirmation> + BinaryPersist + Display
     {
-        let confirm_fetch_wait_sec = self.options.command_fetch_wait_seconds;
+        let confirm_fetch_wait_sec = self.options.confirm_fetch_wait_sec;
         loop {
             for s in 0..confirm_fetch_wait_sec {
                 println!("[RemoteSensor] Fetching next confirmation in {} secs", confirm_fetch_wait_sec - s);

@@ -47,6 +47,21 @@ Default value is {}
 
 Example: --iota-bridge-url=\"http://192.168.47.11:50000\"";
 
+static MOCK_REMOTE_SENSOR_ABOUT: &str = "Imitate (or mock) a remote sensor resp. an ESP32-Sensor
+ESP32-Sensor here means the 'sensor/main-rust-esp-rs' (not the test app of
+the streams-poc-lib).
+This command is used to test x86/PC applications of the SUSEE streams POC in case
+there are not enough ESP32 devices available. The sensor application will
+periodically fetch and process commands from the iota-bridge.
+
+If the iota-bridge runs on the same machine as this application, they can
+communicate over the loopback IP address (localhost). In case the sensor
+iota-bridge listens to the ip address of the network interface (the ip
+address of the device that runs the iota-bridge) e.g. because some ESP32
+sensors are also used you need to use CLI argument '--iota-bridge-url'
+to specify this ip address.
+";
+
 static PRINTLN_SUBSCRIBER_STATUS_ABOUT: &str = "Print information about the current client status of the sensor.
 In streams the sensor is a subscriber so that this client status is called subscriber status.
 ";
@@ -68,6 +83,7 @@ pub struct ArgKeys {
     pub println_subscriber_status: &'static str,
     pub clear_client_state: &'static str,
     pub iota_bridge_url: &'static str,
+    pub mock_remote_sensor: &'static str,
 }
 
 pub static ARG_KEYS: ArgKeys = ArgKeys {
@@ -79,6 +95,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     iota_bridge_url: "iota-bridge-url",
     clear_client_state: "clear-client-state",
     println_subscriber_status: "println-subscriber-status",
+    mock_remote_sensor: "mock-remote-sensor",
 };
 
 pub type SensorCli<'a> = Cli<'a, ArgKeys>;
@@ -134,6 +151,13 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
                 .short('b')
                 .value_name("IOTA_BRIDGE_URL")
                 .help(iota_bridge_url_about.as_str())
+            )
+            .arg(Arg::new(ARG_KEYS.mock_remote_sensor)
+                .long(ARG_KEYS.mock_remote_sensor)
+                .short('m')
+                .value_name("MOCK_REMOTE_SENSOR")
+                .long_help(MOCK_REMOTE_SENSOR_ABOUT)
+                .takes_value(false)
             )
             .arg(Arg::new(ARG_KEYS.println_subscriber_status)
                 .long(ARG_KEYS.println_subscriber_status)

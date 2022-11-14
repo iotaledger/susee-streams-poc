@@ -17,6 +17,7 @@ pub use {
 };
 
 pub static SUSEE_CONST_SECRET_PASSWORD: &str = "SUSEE";
+pub static SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC: u32 = 5;
 
 #[cfg(test)]
 mod tests {

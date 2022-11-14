@@ -2,7 +2,17 @@ use super::{
     command_fetcher::{
         CommandFetcher,
         CommandFetcherOptions,
-    }
+    },
+    esp32_subscriber_tools::{
+        create_subscriber,
+        drop_vfs_fat_filesystem,
+        IOTA_BRIDGE_URL,
+        SubscriberManagerDummyWalletHttpClientEspRs,
+    },
+    http_client_smol_esp_rs::{
+        HttpClient,
+        HttpClientOptions,
+    },
 };
 
 use payloads::{
@@ -15,31 +25,34 @@ use super::{
     wifi_utils::init_wifi,
 };
 
-use super::{
-    esp32_subscriber_tools::{
-        create_subscriber,
-        drop_vfs_fat_filesystem,
-        IOTA_BRIDGE_URL,
-        SubscriberManagerDummyWalletHttpClientEspRs,
+use susee_tools::SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC;
+
+use streams_tools::{
+    subscriber_manager::get_public_key_str,
+    binary_persist::{
+        Subscription,
+        SubscriberStatus,
+        Command,
     },
-    http_client_smol_esp_rs::{
-        HttpClient,
-        HttpClientOptions,
-    },};
+    DummyWallet,
+    http::http_protocol_confirm::RequestBuilderConfirm,
+    remote::command_processor::{
+        CommandProcessor,
+        SensorFunctions,
+        CommandFetchLoopOptions,
+        run_command_fetch_loop,
+        process_sensor_commands,
+    }
+};
 
-use streams_tools::{subscriber_manager::get_public_key_str, binary_persist::{
-    BinaryPersist,
-    Command,
-    SubscribeToAnnouncement,
-    RegisterKeyloadMessage,
-    StartSendingMessages,
-}, DummyWallet};
-
-use iota_streams::app_channels::api::{
-    tangle::{
-        Address,
-        Bytes,
-        Subscriber,
+use iota_streams::{
+    core::async_trait,
+    app_channels::api::{
+        tangle::{
+            Address,
+            Bytes,
+            Subscriber,
+        },
     }
 };
 
@@ -49,12 +62,7 @@ use anyhow::{
     anyhow,
     Result,
 };
-use std::{
-    time::Duration,
-    thread,
-};
-use streams_tools::binary_persist::{Subscription, SubscriberStatus};
-use streams_tools::http::http_protocol_confirm::RequestBuilderConfirm;
+
 use hyper::{
     Body,
     http::{
@@ -203,67 +211,97 @@ async fn register_keyload_msg(
     confirm_req_builder.keyload_registration()
 }
 
-async fn process_command(command: Command, buffer: Vec<u8>) -> Result<Request<Body>>{
-    let client = HttpClient::new(Some(HttpClientOptions{ http_url: IOTA_BRIDGE_URL }));
-    let (mut subscriber, vfs_fat_handle) =
-        create_subscriber::<HttpClient, DummyWallet>(client).await?;
-
-    print_heap_info();
-
-    let confirm_req_builder = RequestBuilderConfirm::new(IOTA_BRIDGE_URL);
-    let mut confirmation_request: Option<Request<Body>> = None;
-
-    if command == Command::SUBSCRIBE_TO_ANNOUNCEMENT_LINK {
-        let cmd_args = SubscribeToAnnouncement::try_from_bytes(buffer.as_slice())?;
-        log::info!("[fn process_command]  processing SUBSCRIBE_ANNOUNCEMENT_LINK: {}", cmd_args.announcement_link);
-        confirmation_request = Some(
-            subscribe_to_channel(cmd_args.announcement_link.as_str(), &mut subscriber, &confirm_req_builder).await?
-        );
-    }
-
-    if command == Command::START_SENDING_MESSAGES {
-        let cmd_args = StartSendingMessages::try_from_bytes(buffer.as_slice())?;
-        log::info!("[fn process_command]  processing START_SENDING_MESSAGES: {}", cmd_args.message_template_key);
-        confirmation_request = Some(
-            send_content_as_msg(cmd_args.message_template_key, &mut subscriber, &confirm_req_builder).await?
-        );
-    }
-
-    if command == Command::REGISTER_KEYLOAD_MESSAGE {
-        let cmd_args = RegisterKeyloadMessage::try_from_bytes(buffer.as_slice())?;
-        log::info!("[fn process_command]  processing REGISTER_KEYLOAD_MESSAGE: {}", cmd_args.keyload_msg_link);
-        confirmation_request = Some(
-            register_keyload_msg(cmd_args.keyload_msg_link.as_str(), &mut subscriber, &confirm_req_builder ).await?
-        );
-    }
-
-    if command == Command::PRINTLN_SUBSCRIBER_STATUS {
-        log::info!("[fn process_command]  PRINTLN_SUBSCRIBER_STATUS");
-        confirmation_request = Some(
-            println_subscriber_status(&subscriber, &confirm_req_builder)?
-        );
-    }
-
-    if command == Command::CLEAR_CLIENT_STATE {
-        log::info!("[fn process_command]  =========> processing CLEAR_CLIENT_STATE <=========");
-
-        confirmation_request = Some(
-            clear_client_state(&mut subscriber, &confirm_req_builder).await?
-        );
-    }
-
-    log::debug!("[fn process_command]  Safe subscriber client_status to disk");
-    subscriber.safe_client_status_to_disk().await?;
-    log::debug!("[fn process_command]  drop_vfs_fat_filesystem");
-    drop_vfs_fat_filesystem(vfs_fat_handle)?;
-
-    confirmation_request.ok_or(anyhow!("No confirmation_request received"))
+struct CmdProcessor<'a> {
+    command_fetcher: CommandFetcher<'a>,
 }
+
+impl<'a> CmdProcessor<'a> {
+    pub fn new() -> CmdProcessor<'a> {
+        CmdProcessor {
+            command_fetcher: CommandFetcher::new(
+                Some(CommandFetcherOptions{ http_url: IOTA_BRIDGE_URL })
+        )}
+    }
+}
+
+#[async_trait(?Send)]
+impl<'a> SensorFunctions for CmdProcessor<'a> {
+    type SubscriberManager = SubscriberManagerDummyWalletHttpClientEspRs;
+
+    fn get_iota_bridge_url(&self) -> &str {
+        IOTA_BRIDGE_URL
+    }
+
+    async fn subscribe_to_channel(
+        &self, announcement_link_str: &str, subscriber_mngr: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        subscribe_to_channel(announcement_link_str, subscriber_mngr, confirm_req_builder).await
+    }
+
+    async fn send_content_as_msg(
+        &self, message_key: String, subscriber: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        send_content_as_msg(message_key, subscriber, confirm_req_builder).await
+    }
+
+    async fn register_keyload_msg(
+        &self, keyload_msg_link_str: &str, subscriber_mngr: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        register_keyload_msg(keyload_msg_link_str, subscriber_mngr, confirm_req_builder).await
+    }
+
+    fn println_subscriber_status<'b>(
+        &self, subscriber_manager: &Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        println_subscriber_status(subscriber_manager, confirm_req_builder)
+    }
+
+    async fn clear_client_state<'b>(
+        &self, subscriber_manager: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        clear_client_state(subscriber_manager, confirm_req_builder).await
+    }
+}
+
+#[async_trait(?Send)]
+impl<'a> CommandProcessor for CmdProcessor<'a> {
+    async fn fetch_next_command(&self) -> Result<(Command, Vec<u8>)> {
+        self.command_fetcher.fetch_next_command()
+    }
+
+    async fn send_confirmation(&self, confirmation_request: Request<Body>) -> Result<()> {
+        self.command_fetcher.send_confirmation(confirmation_request).await
+    }
+
+    async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
+        let client = HttpClient::new(Some(HttpClientOptions{ http_url: IOTA_BRIDGE_URL }));
+        let (mut subscriber, vfs_fat_handle) =
+            create_subscriber::<HttpClient, DummyWallet>(client).await?;
+
+        print_heap_info();
+
+        let confirmation_request = process_sensor_commands(
+            self, &mut subscriber, command, buffer
+        ).await.expect("Error on processing sensor commands");
+
+        log::debug!("[fn process_command]  Safe subscriber client_status to disk");
+        subscriber.safe_client_status_to_disk().await?;
+        log::debug!("[fn process_command]  drop_vfs_fat_filesystem");
+        drop_vfs_fat_filesystem(vfs_fat_handle)?;
+
+        confirmation_request.ok_or(anyhow!("No confirmation_request received"))
+    }
+}
+
+
 
 pub async fn process_main_esp_rs() -> Result<()> {
     log::debug!("[fn process_main_esp_rs] process_main() entry");
-
-    let command_fetch_wait_seconds = 5;
 
     print_heap_info();
 
@@ -273,32 +311,12 @@ pub async fn process_main_esp_rs() -> Result<()> {
         let (_wifi_hdl, _client_settings) = init_wifi()?;
 
     log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", IOTA_BRIDGE_URL);
-    let command_fetcher = CommandFetcher::new(Some(CommandFetcherOptions{ http_url: IOTA_BRIDGE_URL }));
-
-    loop {
-        if let Ok((command, buffer)) = command_fetcher.fetch_next_command() {
-            if command != Command::NO_COMMAND {
-                log::info!("[fn process_main_esp_rs] Starting process_command for command: {}.", command);
-                match process_command(command, buffer).await {
-                    Ok(confirmation_request) => {
-                        // TODO: Retries in case of errors could be useful
-                        log::debug!("[fn process_main_esp_rs] Calling command_fetcher.send_confirmation for confirmation_request");
-                        command_fetcher.send_confirmation(confirmation_request).await?;
-                    },
-                    Err(err) => {
-                        log::error!("[fn process_main_esp_rs] process_command() returned error: {}", err);
-                    }
-                };
-            } else {
-                log::info!("[fn process_main_esp_rs] Received Command::NO_COMMAND.");
-            }
-        } else {
-            log::error!("[fn process_main_esp_rs] command_fetcher.fetch_next_command() failed.");
-        }
-
-        for s in 0..command_fetch_wait_seconds {
-            println!("Fetching next command in {} secs", command_fetch_wait_seconds - s);
-            thread::sleep(Duration::from_secs(1));
-        }
-    }
+    let command_processor = CmdProcessor::new();
+    run_command_fetch_loop(
+        command_processor,
+        Some(
+            CommandFetchLoopOptions{
+                confirm_fetch_wait_sec: SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC
+            })
+    ).await
 }

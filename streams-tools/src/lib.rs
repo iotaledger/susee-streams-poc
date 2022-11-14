@@ -6,9 +6,8 @@ pub mod user_manager;
 pub mod client;
 pub mod http;
 pub mod binary_persist;
-
-#[cfg(feature = "std")]
 pub mod remote;
+
 #[cfg(feature = "std")]
 pub mod helpers;
 #[cfg(feature = "std")]

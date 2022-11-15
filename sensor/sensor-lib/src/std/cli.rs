@@ -13,7 +13,8 @@ use streams_tools::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL;
 use susee_tools::cli_base::CliOptions;
 
 static FILE_TO_SEND_ABOUT: &str = "A message file that will be encrypted and send using the streams channel.
-If needed you can use this option multiple times to specify several message files.";
+The message will be resend every 10 Seconds in an endless loop.
+Use CTRL-C to stop processing.";
 
 static SUBSCRIBE_ANNOUNCEMENT_LINK_ABOUT: &str = "Subscribe to the channel via the specified announcement link.
 ";

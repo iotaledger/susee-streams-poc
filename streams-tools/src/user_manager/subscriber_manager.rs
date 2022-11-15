@@ -199,7 +199,14 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
         }
     }
 
-    async fn export_to_serialization_file(&mut self, file_name: &str) -> Result<()> {
+    pub fn save_user_state(&self) {
+        if let Some(serial_file_name) = self.serialization_file.clone() {
+            block_on(self.export_to_serialization_file(serial_file_name.as_str()))
+                .expect("Try to export Subscriber state into serialization file");
+        }
+    }
+
+    async fn export_to_serialization_file(&self, file_name: &str) -> Result<()> {
         log::debug!("[fn export_to_serialization_file] - START");
         if let Some(subscriber) = &self.subscriber {
             log::debug!("[fn export_to_serialization_file] - subscriber available");
@@ -306,10 +313,7 @@ fn read_optional_tangle_address_from_bytes(
 #[cfg(feature = "std")]
 impl<ClientT: ClientTTrait, WalletT: SimpleWallet> Drop for SubscriberManager<ClientT, WalletT>{
     fn drop(&mut self) {
-        if let Some(serial_file_name) = self.serialization_file.clone() {
-            block_on(self.export_to_serialization_file(serial_file_name.as_str()))
-                .expect("Try to export Subscriber state into serialization file");
-        }
+        self.save_user_state();
     }
 }
 

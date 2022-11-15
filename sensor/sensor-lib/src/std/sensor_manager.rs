@@ -5,6 +5,8 @@ use streams_tools::{
     binary_persist::Subscription,
 };
 
+use susee_tools::SUSEE_CONST_SEND_MESSAGE_REPETITION_WAIT_SEC;
+
 use iota_streams::app_channels::api::{
     tangle::{
         Address,
@@ -21,28 +23,60 @@ use std::{
     io::{
         Read,
         BufReader
+    },
+    time::Duration,
+    thread,
+    io::{
+        stdout,
+        Write
     }
 };
 
 use anyhow::{
     Result,
     bail,
+    anyhow,
 };
 
-use crate::std::{ClientType, SubscriberManagerPlainTextWalletHttpClient};
+use crate::std::{
+    ClientType,
+    SubscriberManagerPlainTextWalletHttpClient
+};
 
 pub struct SensorManager {}
 
 impl SensorManager {
 
-    pub async fn send_file_content_as_msg(msg_file: &str, subscriber: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<Address>{
+    pub async fn send_file_content_as_msg(msg_file: &str, subscriber: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<Address> {
         let f = File::open(msg_file)?;
         let mut reader = BufReader::new(f);
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer)?;
         println!("[Sensor] Message file '{}' contains {} bytes payload\n", msg_file, buffer.len());
 
-        subscriber.send_signed_packet(&Bytes(buffer.clone())).await
+        let mut prev_message: Option<Address> = None;
+        loop {
+            println!("Sending message file {}\n", msg_file);
+            if let Ok(previous_message) = subscriber.send_signed_packet(&Bytes(buffer.clone())).await {
+                println!("Previous message address now is {}\n\n", previous_message.to_string());
+                prev_message = Some(previous_message);
+                // safe_user_state is usually called by the drop handler of the subscriber but
+                // as this loop runs until the user presses ctr-c we need this to
+                // save the user state immediately.
+                // A probably safer alternative would be a tokio::signal::ctrl_c() handler but for
+                // our test puposes this approach is sufficient and much simpler.
+                subscriber.save_user_state();
+            } else {
+                break;
+            }
+            for s in 0..SUSEE_CONST_SEND_MESSAGE_REPETITION_WAIT_SEC {
+                print!("Sending Message again in {} secs\r", SUSEE_CONST_SEND_MESSAGE_REPETITION_WAIT_SEC - s);
+                stdout().flush().unwrap();
+                thread::sleep(Duration::from_secs(1));
+            }
+        }
+
+        prev_message.ok_or_else(|| anyhow!("Error on Sending message file"))
     }
 
     pub async fn send_messages(files_to_send: Values<'_>, subscriber: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<()>{

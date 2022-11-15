@@ -1,11 +1,14 @@
 use anyhow::Result;
 
-use crate::binary_persist::{
-    Command,
-    SubscribeToAnnouncement,
-    BinaryPersist,
-    StartSendingMessages,
-    RegisterKeyloadMessage
+use crate::{
+    http::http_protocol_confirm::RequestBuilderConfirm,
+    binary_persist::{
+        Command,
+        SubscribeToAnnouncement,
+        BinaryPersist,
+        StartSendingMessages,
+        RegisterKeyloadMessage
+    }
 };
 
 use iota_streams::core::async_trait;
@@ -13,12 +16,17 @@ use iota_streams::core::async_trait;
 use std::{
     time::Duration,
     thread,
+    io::{
+        stdout,
+        Write
+    }
 };
+
 use hyper::{
     Body,
     http::Request
 };
-use crate::http::http_protocol_confirm::RequestBuilderConfirm;
+
 
 pub struct CommandFetchLoopOptions {
     pub confirm_fetch_wait_sec: u32,
@@ -57,14 +65,15 @@ pub async fn run_command_fetch_loop(command_processor: impl CommandProcessor, op
                     }
                 };
             } else {
-                log::info!("[fn run_command_fetch_loop] Received Command::NO_COMMAND.");
+                println!("Received Command::NO_COMMAND    ");
             }
         } else {
             log::error!("[fn run_command_fetch_loop] command_processor.fetch_next_command() failed.");
         }
 
         for s in 0..opt.confirm_fetch_wait_sec {
-            println!("Fetching next command in {} secs\r", opt.confirm_fetch_wait_sec - s);
+            print!("Fetching next command in {} secs\r", opt.confirm_fetch_wait_sec - s);
+            stdout().flush().unwrap();
             thread::sleep(Duration::from_secs(1));
         }
     }

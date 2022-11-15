@@ -2,6 +2,16 @@ use crate::{
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
     http::http_protocol_command::RequestBuilderCommand,
     http::http_protocol_confirm::RequestBuilderConfirm,
+    binary_persist::{
+        Confirmation,
+        BinaryPersist,
+        EnumeratedPersistableArgs,
+        Subscription,
+        SubscriberStatus,
+        KeyloadRegistration,
+        ClearClientState,
+        SendMessages
+    }
 };
 
 use hyper::{
@@ -16,15 +26,17 @@ use anyhow::{
     Result,
     bail,
 };
+
 use std::{
     fmt,
     fmt::Display,
-    thread
+    time::Duration,
+    thread,
+    io::{
+        stdout,
+        Write
+    }
 };
-
-use crate::binary_persist::{Confirmation, BinaryPersist, EnumeratedPersistableArgs, Subscription, SubscriberStatus, KeyloadRegistration, ClearClientState, SendMessages};
-
-use tokio::time::Duration;
 
 use log;
 
@@ -83,7 +95,8 @@ impl<'a> RemoteSensor<'a> {
         let confirm_fetch_wait_sec = self.options.confirm_fetch_wait_sec;
         loop {
             for s in 0..confirm_fetch_wait_sec {
-                println!("[RemoteSensor] Fetching next confirmation in {} secs", confirm_fetch_wait_sec - s);
+                print!("Fetching next confirmation in {} secs\r", confirm_fetch_wait_sec - s);
+                stdout().flush().unwrap();
                 thread::sleep(Duration::from_secs(1));
             }
 
@@ -91,7 +104,7 @@ impl<'a> RemoteSensor<'a> {
                 if confirmation != Confirmation::NO_CONFIRMATION {
                     return self.process_confirmation::<T>(confirmation, buffer).await;
                 } else {
-                    log::info!("[fn poll_confirmation] Received Command::NO_CONFIRMATION.");
+                    println!("Received Confirmation::NO_CONFIRMATION    ");
                 }
             } else {
                 log::error!("[fn poll_confirmation] fn call fetch_next_confirmation() failed.");

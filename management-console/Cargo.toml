@@ -6,12 +6,15 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-iota-streams = { git = "https://github.com/iotaledger/streams", branch = "develop" }
-streams-tools = { version = "0.1.2", path = "../streams-tools" }
+streams-tools = { version = "0.1.2", path = "../streams-tools", features = ["dao"] }
 susee-tools = { version = "0.1.2", path = "../susee-tools" }
 anyhow = "1.0.40"
 tokio = {version = "1.5"}
 env_logger = "0.9"
+
+[dependencies.iota-streams]
+git = "https://github.com/iotaledger/streams"
+branch="v1"
 
 [dependencies.clap]
 version = "3.0.14"

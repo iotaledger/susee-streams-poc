@@ -10,7 +10,8 @@ use iota_streams::{
 
 use crate::{
     wallet::plain_text_wallet::PlainTextWallet,
-    SimpleWallet
+    SimpleWallet,
+    helpers::SerializationCallbackRefToClosure,
 };
 
 use std::{
@@ -24,6 +25,8 @@ use std::{
 use futures::executor::block_on;
 use iota_streams::app_channels::api::tangle::PublicKey;
 use iota_streams::app::identifier::Identifier;
+use log;
+use crate::helpers::{get_channel_id_from_link};
 
 pub type Author = iota_streams::app_channels::api::tangle::Author<Client>;
 
@@ -36,6 +39,7 @@ pub struct ChannelManager<WalletT: SimpleWallet> {
     client: Client,
     wallet: WalletT,
     serialization_file: Option<String>,
+    serialize_user_state_callback: Option<SerializationCallbackRefToClosure>,
     pub author: Option<Author>,
     pub announcement_link: Option<Address>,
     pub keyload_link: Option<Address>,
@@ -45,6 +49,10 @@ pub struct ChannelManager<WalletT: SimpleWallet> {
 
 async fn import_from_serialization_file<WalletT: SimpleWallet>(file_name: &str, ret_val: &mut ChannelManager<WalletT>) -> Result<()> {
     let buffer = read(file_name).expect(format!("Try to open channel state file '{}'", file_name).as_str());
+    import_from_buffer(&buffer, ret_val).await
+}
+
+async fn import_from_buffer<WalletT: SimpleWallet>(buffer: &Vec<u8>, ret_val: &mut ChannelManager<WalletT>) -> Result<()> {
     let author = Author::import(
         &buffer,
         ret_val.wallet.get_serialization_password(),
@@ -58,13 +66,24 @@ async fn import_from_serialization_file<WalletT: SimpleWallet>(file_name: &str, 
     Ok(())
 }
 
+
+#[derive(Default)]
+pub struct ChannelManagerOptions {
+    pub serialization_file: Option<String>,
+    pub user_state: Option<Vec<u8>>,
+    // If specified will be called on drop to serialize the user state
+    pub serialize_user_state_callback: Option<SerializationCallbackRefToClosure>,
+}
+
 impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
     // TOGO CGE: This async new fn should be rewritten as synchronous normal new function.
     //           Problem: Usage of block_on() here results in panic because of the usage of tokio.
-    pub async fn new(node_url: &str, wallet: WalletT, serialization_file: Option<String>) -> Self {
+    pub async fn new(node_url: &str, wallet: WalletT, options: Option<ChannelManagerOptions>) -> Self {
+        let opt = options.unwrap_or_default();
         let mut ret_val = Self {
             wallet,
-            serialization_file: serialization_file.clone(),
+            serialization_file: opt.serialization_file.clone(),
+            serialize_user_state_callback: opt.serialize_user_state_callback,
             client: Client::new_from_url(node_url),
             author: None,
             announcement_link: None,
@@ -73,11 +92,17 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
             prev_msg_link: None,
         };
 
-        if let Some(serial_file_name) = serialization_file {
+        if let Some(serial_file_name) = opt.serialization_file {
             if Path::new(serial_file_name.as_str()).exists(){
                 import_from_serialization_file(serial_file_name.as_str(), &mut ret_val).await
-                    .expect("Try to import Author state from serialization file");
+                    .expect("Error on importing Author state from serialization file");
             }
+        } else if let Some(user_state) = opt.user_state {
+            import_from_buffer(&user_state, &mut ret_val).await
+                .expect("Error on importing Author state from binary user_state buffer");
+        } else {
+            log::warn!("No binary user_state or serial_file_name for the user state provided.\n\
+            Will use empty Streams user state.")
         }
 
         ret_val
@@ -149,13 +174,33 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
         }
         Ok(())
     }
+
+    async fn export_to_serialize_callback(&mut self, serialize_callback: SerializationCallbackRefToClosure) -> Result<Option<usize>> {
+        let mut ret_val = None;
+        if let Some(author) = &self.author {
+            let buffer = author.export( self.wallet.get_serialization_password()).await?;
+            if let Some(announcement_link) = &self.announcement_link {
+                if let Some(channel_id ) = get_channel_id_from_link(announcement_link.to_string().as_str()) {
+                    let bytes_serialized = serialize_callback(channel_id.clone(), buffer)
+                        .expect(format!(
+                            "Error on serializing user state via serialize_user_state_callback for channel {}", channel_id).as_str());
+                    ret_val = Some(bytes_serialized);
+                }
+            }
+        }
+        Ok(ret_val)
+    }
 }
 
 impl<WalletT: SimpleWallet> Drop for ChannelManager<WalletT> {
     fn drop(&mut self) {
         if let Some(serial_file_name) = self.serialization_file.clone() {
             block_on(self.export_to_serialization_file(serial_file_name.as_str()))
-                .expect("Try to export Author state into serialization file");
+                .expect("Error on exporting User State into serialization file");
+        }
+        if let Some(serialize_callback_ref) = self.serialize_user_state_callback.clone() {
+            block_on(self.export_to_serialize_callback(serialize_callback_ref))
+                .expect("Error on exporting User State into serialization callback function");
         }
     }
 }

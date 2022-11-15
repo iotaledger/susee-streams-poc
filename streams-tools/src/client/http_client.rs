@@ -8,7 +8,6 @@ use iota_streams::{
                 TangleAddress,
                 TangleMessage,
                 client::{
-                    Client,
                     Details,
                     SendOptions,
                 }
@@ -70,18 +69,18 @@ impl fmt::Display for HttpClientOptions<'_> {
 
 #[derive(Clone)]
 pub struct HttpClient {
-    client: Client,
+    tangle_client_options: SendOptions,
     hyper_client: HyperClient<HttpConnector, Body>,
     request_builder: RequestBuilderStreams,
 }
 
 impl HttpClient
 {
-    pub fn new_from_url(url: &str, options: Option<HttpClientOptions>) -> Self {
+    pub fn new(options: Option<HttpClientOptions>) -> Self {
         let options = options.unwrap_or_default();
         println!("[HttpClient.new_from_url()] Initializing instance with options:\n{}\n", options);
         Self {
-            client: Client::new_from_url(url),
+            tangle_client_options: SendOptions::default(),
             hyper_client: HyperClient::new(),
             request_builder: RequestBuilderStreams::new(options.http_url)
         }
@@ -146,18 +145,18 @@ impl Transport<TangleAddress, TangleMessage> for HttpClient
 #[async_trait(?Send)]
 impl TransportDetails<TangleAddress> for HttpClient {
     type Details = Details;
-    async fn get_link_details(&mut self, link: &TangleAddress) -> Result<Self::Details> {
-        self.client.get_link_details(link).await
+    async fn get_link_details(&mut self, _link: &TangleAddress) -> Result<Self::Details> {
+        unimplemented!()
     }
 }
 
 impl TransportOptions for HttpClient {
     type SendOptions = SendOptions;
     fn get_send_options(&self) -> SendOptions {
-        self.client.get_send_options()
+        self.tangle_client_options.clone()
     }
     fn set_send_options(&mut self, opt: SendOptions) {
-        self.client.set_send_options(opt)
+        self.tangle_client_options  = opt.clone()
     }
 
     type RecvOptions = ();

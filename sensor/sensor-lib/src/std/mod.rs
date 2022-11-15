@@ -11,3 +11,4 @@ mod sensor_manager;
 
 pub mod cli;
 pub mod main;
+mod command_fetcher;

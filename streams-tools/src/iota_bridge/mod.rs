@@ -6,6 +6,9 @@ mod server_dispatch_streams;
 mod server_dispatch_confirm;
 mod server_dispatch_lorawan_rest;
 
+#[cfg(feature = "dao")]
+mod dao;
+
 pub use {
     iota_bridge::{
         IotaBridge,

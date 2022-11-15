@@ -23,7 +23,6 @@ std = [
     "iota-streams/client",
 ]
 smol_rt = [
-    "log",
     "smol",
     "streams-tools/smol_rt",
     "susee-tools/smol_rt",
@@ -44,13 +43,12 @@ wifi = []
 [dependencies]
 # bindgen = "0.58"
 # cbindgen = "0.19"
-iota-streams = { git = "https://github.com/iotaledger/streams", branch = "develop", default-features = false, features = ["std", "tangle"] }
 streams-tools = { version = "0.1.2", path = "../../streams-tools", default-features = false }
 susee-tools = { version = "0.1.2", path = "../../susee-tools", default-features = false }
 iota-client-types = { version = "0.1.2", path = "../../iota-client-types" }
-
 anyhow = "1.0.40"
 hyper = { version = "0.14", features = ["client", "http1"] }
+log = { version = "0.4" }
 
 # esp_idf dependencies
 esp-idf-sys = { version = "0.31.7", optional = true }
@@ -59,13 +57,18 @@ embedded-svc = { version = "0.22.1", optional = true }
 cty = { version = "0.2.2", optional = true }
 
 # smol_rt dependencies
-log = { version = "0.4", optional = true }
 smol = { version = "1.2", optional = true}
 futures-lite = { version = "1.12.0", optional = true }
 payloads = { version = "0.1.2", path = "../../test/payloads", optional = true }
 
 # std dependencies
 tokio = {version = "1.5", optional = true}
+
+[dependencies.iota-streams]
+git = "https://github.com/iotaledger/streams"
+branch="v1"
+default-features = false
+features = ["std", "tangle"]
 
 [dependencies.clap]
 version = "3.0.14"

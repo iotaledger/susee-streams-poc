@@ -10,6 +10,9 @@ use susee_tools::{
 };
 use streams_tools::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL;
 
+// TODO: Implement new CLI commands "--list-channels", "--user-states-database-path"
+// Instead of "--user-states-database-path" a management-console.config file (toml) could be useful.
+
 pub struct ArgKeys {
     pub base: &'static BaseArgKeys,
     pub subscription_link: &'static str,
@@ -18,6 +21,7 @@ pub struct ArgKeys {
     pub init_sensor: &'static str,
     pub iota_bridge_url: &'static str,
     pub println_channel_status: &'static str,
+    pub channel_starts_with: &'static str,
 }
 
 pub static ARG_KEYS: ArgKeys = ArgKeys {
@@ -28,25 +32,47 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     init_sensor: "init-sensor",
     iota_bridge_url: "iota-bridge-url",
     println_channel_status: "println-channel-status",
+    channel_starts_with: "channel-starts-with",
 };
 
-static SUBSCRIPTION_LINK_ABOUT: &str = "Subscription message link for the sensor subscriber.
-Will be logged to console by the sensor app.
+static SUBSCRIPTION_LINK_ABOUT: &str = "Add a Sensor to a Streams channel.
+The CLI argument defines the subscription message link for the sensor subscriber.
+The subscription message link is logged to its console by the Sensor when the
+--subscribe-announcement-link CLI command is used.
+As the subscription message link contains the Streams channel ID the correct
+user state is fetched automatically out of the user-states-database.
 ";
 
-static SUBSCRIPTION_PUB_KEY_ABOUT: &str = "Public key of the sensor subscriber.
-Will be logged to console by the sensor app.
+static SUBSCRIPTION_PUB_KEY_ABOUT: &str = "Add a Sensor to a Streams channel.
+The CLI argument defines the public key of the sensor subscriber.
+The public key of the sensor is logged to its console by the Sensor when the
+--subscribe-announcement-link CLI command is used.
+For more details have a look at the --subscription-link argument
 ";
 
-static CREATE_CHANNEL_ABOUT: &str = "Use this option to create (announce) the channel.
+static CREATE_CHANNEL_ABOUT: &str = "Use this option to create (announce) a new Streams channel.
 The announcement link will be logged to the console.
+The ID and user_state of the new Streams channel will be stored in in the user-states-database.
 ";
 
-static PRINTLN_CHANNEL_STATUS_ABOUT: &str = "Print information about all currently existing channels.
+static PRINTLN_CHANNEL_STATUS_ABOUT: &str = "Print information about currently existing channels.
 Each sensor is a subscriber in a dedicated Streams channel. The management-console
 manages these channels and stores the channel state information in its
-'user-state-management-console.sqlite' database file. Use this CLI option to print
+'user-states-management-console.sqlite3' database file. Use this CLI option to print
 the relevant channel state information from the SQLite database to console.
+Use CLI argument '--channel-starts-with' to select the Streams channel you want to investigate.
+";
+
+static CHANNEL_STARTS_WITH_ABOUT: &str = "Specify the Streams channel when processing a management-console
+CLI command. As the Streams channels ID has 40 byte length and is
+not easy to handle manually you only need to specify the beginning
+of the channels ID so that it can be found in the user-states-database.
+If there are more than one channels that can be found by the provided search string
+the command will fail.
+
+Example:
+
+    >   ./management-console --channel-starts-with=6f5aa6cb --println-channel-status
 ";
 
 static INIT_SENSOR_ABOUT: &str = "Initialize the streams channel of a remote sensor.
@@ -64,9 +90,26 @@ connection to the running iota-bridge.
 
 Initialization Process
 ----------------------
-The below mentioned Commands and Confirmations are used for process communication
-with the remote sensor via the IOTA-Bridge and are defined in the binary_persist
-module of the streams-tools library:
+The process consists of the following steps that could also be run manually using
+the CLI of the management-console and the sensor/ESP32-Sensor application:
+
+        ------------------------------------------------------
+        | management-console | --create-channel              |
+        |--------------------|--------------------------------
+        | sensor             | --subscribe-announcement-link |
+        |--------------------|-------------------------------|
+        | management-console | --subscription-link           |
+        |                    | --subscription-pub-key        |
+        |--------------------|-------------------------------|
+        | sensor             | --register-keyload-msg        |
+        ---------------------|--------------------------------
+
+In the automated initialization process all CLI commands and the data that are written
+to console log by the applications are transported using Command and Confirmation
+packages that are defined in the binary_persist module of the streams-tools library.
+
+Here is an overview which Command and Confirmation packages are used for communication
+with the remote sensor via the IOTA-Bridge:
 
  * management-console: --create-channel
     --> Announcement Link       # Send to the sensor using the SubscribeToAnnouncement
@@ -90,13 +133,19 @@ Default value is {}
 
 Example: iota-bridge-url=\"http://192.168.47.11:50000\"";
 
+static MANAGEMENTCONSOLE_APPLICATION_ABOUT: &str = "Management console for streams channels used in the SUSEE project.
+Can be used to create new Streams channels and to add Sensors (a.k.a. Streams subscribers)
+to those channels. Management of multiple channels is possible. The user states of the
+Streams channels are stored in a local SQLite3 database file.
+";
+
 pub type ManagementConsoleCli<'a> = Cli<'a, ArgKeys>;
 
 pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
     let iota_bridge_url_about = String::from(IOTA_BRIDGE_URL_ABOUT_FMT_STR).replace("{}", STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL);
     let arg_matches = ManagementConsoleCli::get_app(
             "Management Console",
-            "Management console for streams channels used in the SUSEE project",
+            MANAGEMENTCONSOLE_APPLICATION_ABOUT,
             None,
         )
         .arg(Arg::new(ARG_KEYS.subscription_link)
@@ -125,6 +174,13 @@ pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
             .value_name("PRINTLN_CHANNEL_STATUS")
             .long_help(PRINTLN_CHANNEL_STATUS_ABOUT)
             .takes_value(false)
+            .requires(ARG_KEYS.channel_starts_with)
+        )
+        .arg(Arg::new(ARG_KEYS.channel_starts_with)
+            .long(ARG_KEYS.channel_starts_with)
+            .short('s')
+            .value_name("CHANNEL_STARTS_WITH")
+            .help(CHANNEL_STARTS_WITH_ABOUT)
         )
         .arg(Arg::new(ARG_KEYS.init_sensor)
             .long(ARG_KEYS.init_sensor)

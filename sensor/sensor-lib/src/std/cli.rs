@@ -13,7 +13,8 @@ use streams_tools::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL;
 use susee_tools::cli_base::CliOptions;
 
 static FILE_TO_SEND_ABOUT: &str = "A message file that will be encrypted and send using the streams channel.
-If needed you can use this option multiple times to specify several message files.";
+The message will be resend every 10 Seconds in an endless loop.
+Use CTRL-C to stop processing.";
 
 static SUBSCRIBE_ANNOUNCEMENT_LINK_ABOUT: &str = "Subscribe to the channel via the specified announcement link.
 ";
@@ -47,6 +48,22 @@ Default value is {}
 
 Example: --iota-bridge-url=\"http://192.168.47.11:50000\"";
 
+static MOCK_REMOTE_SENSOR_ABOUT: &str = "Imitate (or mock) a remote sensor resp. an ESP32-Sensor
+ESP32-Sensor here means the 'sensor/main-rust-esp-rs' application or the
+test app of the streams-poc-lib in an initial Streams channel state.
+
+This command is used to test the iota-bridge and the management-console application
+in case there are not enough ESP32 devices available. The sensor application will
+periodically fetch and process commands from the iota-bridge.
+
+If the iota-bridge runs on the same machine as this application, they can
+communicate over the loopback IP address (localhost). In case the sensor
+iota-bridge listens to the ip address of the network interface (the ip
+address of the device that runs the iota-bridge) e.g. because some ESP32
+sensors are also used, you need to use the CLI argument '--iota-bridge-url'
+to specify this ip address.
+";
+
 static PRINTLN_SUBSCRIBER_STATUS_ABOUT: &str = "Print information about the current client status of the sensor.
 In streams the sensor is a subscriber so that this client status is called subscriber status.
 ";
@@ -59,10 +76,6 @@ TODO: -----------------------------
       -----------------------------       use this option carefully!
 ";
 
-// TODO: Remove the node option because it is not used
-// * Make it optional in CLI base
-// * Remove it from README file
-
 pub struct ArgKeys {
     pub base: &'static BaseArgKeys,
     pub files_to_send: &'static str,
@@ -72,6 +85,7 @@ pub struct ArgKeys {
     pub println_subscriber_status: &'static str,
     pub clear_client_state: &'static str,
     pub iota_bridge_url: &'static str,
+    pub mock_remote_sensor: &'static str,
 }
 
 pub static ARG_KEYS: ArgKeys = ArgKeys {
@@ -83,6 +97,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     iota_bridge_url: "iota-bridge-url",
     clear_client_state: "clear-client-state",
     println_subscriber_status: "println-subscriber-status",
+    mock_remote_sensor: "mock-remote-sensor",
 };
 
 pub type SensorCli<'a> = Cli<'a, ArgKeys>;
@@ -132,13 +147,19 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
                 .value_name("ACT_AS_REMOTE_CONTROL")
                 .long_help(ACT_AS_REMOTE_CONTROL_ABOUT)
                 .takes_value(false)
-                .conflicts_with(BASE_ARG_KEYS.node)
             )
             .arg(Arg::new(ARG_KEYS.iota_bridge_url)
                 .long(ARG_KEYS.iota_bridge_url)
                 .short('b')
                 .value_name("IOTA_BRIDGE_URL")
                 .help(iota_bridge_url_about.as_str())
+            )
+            .arg(Arg::new(ARG_KEYS.mock_remote_sensor)
+                .long(ARG_KEYS.mock_remote_sensor)
+                .short('m')
+                .value_name("MOCK_REMOTE_SENSOR")
+                .long_help(MOCK_REMOTE_SENSOR_ABOUT)
+                .takes_value(false)
             )
             .arg(Arg::new(ARG_KEYS.println_subscriber_status)
                 .long(ARG_KEYS.println_subscriber_status)
@@ -155,5 +176,8 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
             )
             .get_matches();
 
-    ArgMatchesAndOptions::new(arg_matches)
+    ArgMatchesAndOptions {
+        options: cli_opt,
+        matches: arg_matches,
+    }
 }

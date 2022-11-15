@@ -1,4 +1,4 @@
-# Susee Streams POC
+# SUSEE Streams POC
 
 ## About
 This project contains five test applications providing command line interfaces (CLI) to evaluate the iota streams
@@ -7,37 +7,39 @@ specific functionality for the SUSEE project.
 
 Following test applications are contained. For more details regarding the general usecase please see below in the 
 <a href="#applications-and-workflows">Applications and workflows</a> section:
+* *IOTA Bridge*<br>
+  * Needed by all Sensor applications to access the IOTA Tangle
+    * Provides an http rest api used by the *Sensor* applications to access the tangle<br>
+    * Attaches the Streams packages received from the *Sensor* applications to the tangle
+  * Forwards remote control commands from the *Sensor remote control* or *Management Console* to the Sensor applications
+  * Forwards command confirmations from Sensor applications to the *Sensor remote control* or *Management Console*
+  * Imitates processes
+    * in the SUSEE Application Server (*Sensor Processing*) and
+    * processes used by the initialization software that performs the Sensor *Initialization*
 * *ESP32 Sensor*<br>
   * Imitates the processes running in the smart meter (a.k.a. *Sensor*)
-  * Runs on ESP32 devices
-  * Can only be used together with a running *IOTA Bridge* instance
-  * Currently only ESP32-C3 is provided
+  * Runs on ESP32-C3 devices
+  * Can be remote controlled by the *Sensor remote control*
 * *streams-poc-lib*<br>
   * provides C bindings for most functionalities of the *ESP32 Sensor*
+  * can be used with Espressifs ESP-IDF build process for ESP32-C3 devices
   * includes a test application written in C to test the library functionality using a WIFI socket instead of
     a LoRaWAN connection
+  * Provides most features of the *ESP32 Sensor* via its library interface
 * *LoraWan AppServer Mockup Tool*<br>
   * test tool to receive & send binary packages from/to the streams-poc-lib test application via a socket
     connection and transmit these packages to the *IOTA-Bridge* via its `lorawan-rest` API functions.
   * a real world service would run on the LoRaWAN Application Server (or tightly connected to it).
     Like this test tool it would transceive binary packages from a LoRaWan connection to the *IOTA-Bridge*.
 * *Sensor remote control*<br>
-  * Used to send commands to the *ESP32 Sensor*
-  * Can also be used as a standalone *Sensor* app to be run on x86/PC targets
-  * Like the *ESP32 Sensor* application it can only be used together with a running *IOTA Bridge* instance
+  * Runs on X86/PC
+  * Used to send commands to the *ESP32 Sensor* or *streams-poc-lib* test app
+  * Can also be used to imitate an *ESP32 Sensor* on X86/PC platforms including
+    the possibility to be remotes controlled
 * *Management Console*<br>
   * Imitates the processes needed for *Initialization* of the sensor and the monitoring of *Sensor Processing*
   * Manages the *Add/Remove Subscriber* workflows
   * Manages multiple channels resp. *Sensors* using a local SQLite3 database
-* *IOTA Bridge*<br>
-  * Imitates processes
-    * in the Susee Application Server (*Sensor Processing*) and
-    * processes used by the initialization software that performs the Sensor *Initialization*
-      that will probably run at the Susee-Module manufacturer<br>
-  * Provides an http rest api used by the *Sensor* applications to access the tangle<br>
-  * Attaches the Streams packages received from the *Sensor* applications to the tangle
-  * Forwards remote control commands from the *Sensor remote control* or *Management Console* to the *ESP32 Sensor*
-  * Forwards command confirmations from the *ESP32 Sensor* or *Sensor* app to *Sensor remote control* or *Management Console*
    
 
 The Streams Channel used for the SUSEE project generally can be described as follows:
@@ -394,7 +396,15 @@ the usage of the *Sensor* app when it's used as a *Sensor remote control*.
 
 ### Sensor CLI
 
-Both Sensor applications (x86/PC and ESP32 version) provide CLI commands to manage the Streams usage:
+There are three different Sensor applications for different purposes:
+
+| Application  |  Platform | Purpose                       | Progr. Language |
+|--------------|-----------|-------------------------------|-----------------|
+| *streams-poc-lib* test application | ESP32  | Test the streams-poc-lib functionality using its C binding| C |
+| *ESP32 Sensor*                     | ESP32  | Test the Rust code that builds the foundation of the streams-poc-lib without the limitations of a foreign function interface | Rust |
+| *Sensor remote control*            | X86/PC | Test the Rust code of *ESP32 Sensor* on X86/PC | Rust |
+
+All Sensor applications provide CLI commands to manage the Streams usage:
  
     -s, --subscribe-announcement-link <SUBSCRIBE_ANNOUNCEMENT_LINK>
             Subscribe to the channel via the specified announcement link.
@@ -403,9 +413,10 @@ Both Sensor applications (x86/PC and ESP32 version) provide CLI commands to mana
             Register the specified keyload message so that it can be used
             as root of the branch used to send messages later on.
 
-    -f, --file-to-send <FILE_TO_SEND>...
+    -f, --file-to-send [<FILE_TO_SEND>...]
             A message file that will be encrypted and send using the streams channel.
-            If needed you can use this option multiple times to specify several message files.
+            The message will be resend every 10 Seconds in an endless loop.
+            Use CTRL-C to stop processing.
             
     -p, --println-subscriber-status
             Print information about the current client status of the sensor.
@@ -421,7 +432,9 @@ Both Sensor applications (x86/PC and ESP32 version) provide CLI commands to mana
                   --------  WARNING  ---------- Currently there is no confirmation cli dialog
                   -----------------------------       use this option carefully!
                               
-The x86/PC version (a.k.a *Sensor remote control*) additionally provides following CLI commands to manage the
+As both Sensor applications running on ESP32 do not provide an interactive terminal, the 
+x86/PC Sensor application (a.k.a *Sensor remote control*) can be used to remote control the ESP32
+applications. The x86/PC Sensor provides following CLI commands to manage the
 remote control functionality:
 
     -t, --iota-bridge-url <IOTA_BRIDGE_URL>
@@ -449,6 +462,30 @@ remote control functionality:
             the iota-bridge) so that the embedded sensor can access the iota-bridge.
             Therefore in case you are using 'act-as-remote-control' you will also need to use
             the 'iota-bridge' option to connect to the iota-bridge.
+
+The *streams-poc-lib* test application can only bee remote controlled if the streams channel has
+not already been initialized (further details can be found in the
+[streams-poc-lib README](sensor/streams-poc-lib/README.md)).
+
+The x86/PC Sensor application can also be used to mock (or imitate) an ESP32 Sensor
+application. This is especially usefull to test the *IOTA Bridge* and the *Management Console*
+without the need to run ESP32 Hardware. The CLI command to mock an ESP32 Sensor is:
+
+    -m, --mock-remote-sensor
+            Imitate (or mock) a remote sensor resp. an ESP32-Sensor
+            ESP32-Sensor here means the 'sensor/main-rust-esp-rs' application or the
+            test app of the streams-poc-lib in an initial Streams channel state.
+            
+            This command is used to test the iota-bridge and the management-console application
+            in case there are not enough ESP32 devices available. The sensor application will
+            periodically fetch and process commands from the iota-bridge.
+            
+            If the iota-bridge runs on the same machine as this application, they can
+            communicate over the loopback IP address (localhost). In case the sensor
+            iota-bridge listens to the ip address of the network interface (the ip
+            address of the device that runs the iota-bridge) e.g. because some ESP32
+            sensors are also used, you need to use the CLI argument '--iota-bridge-url'
+            to specify this ip address.
 
 ### LoraWan AppServer Mockup Tool
 

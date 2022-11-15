@@ -49,17 +49,18 @@ Default value is {}
 Example: --iota-bridge-url=\"http://192.168.47.11:50000\"";
 
 static MOCK_REMOTE_SENSOR_ABOUT: &str = "Imitate (or mock) a remote sensor resp. an ESP32-Sensor
-ESP32-Sensor here means the 'sensor/main-rust-esp-rs' (not the test app of
-the streams-poc-lib).
-This command is used to test x86/PC applications of the SUSEE streams POC in case
-there are not enough ESP32 devices available. The sensor application will
+ESP32-Sensor here means the 'sensor/main-rust-esp-rs' application or the
+test app of the streams-poc-lib in an initial Streams channel state.
+
+This command is used to test the iota-bridge and the management-console application
+in case there are not enough ESP32 devices available. The sensor application will
 periodically fetch and process commands from the iota-bridge.
 
 If the iota-bridge runs on the same machine as this application, they can
 communicate over the loopback IP address (localhost). In case the sensor
 iota-bridge listens to the ip address of the network interface (the ip
 address of the device that runs the iota-bridge) e.g. because some ESP32
-sensors are also used you need to use CLI argument '--iota-bridge-url'
+sensors are also used, you need to use the CLI argument '--iota-bridge-url'
 to specify this ip address.
 ";
 

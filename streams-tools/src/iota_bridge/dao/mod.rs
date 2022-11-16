@@ -1,1 +1,1 @@
-pub mod client;
+pub mod lora_wan_node;

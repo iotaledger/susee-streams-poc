@@ -4,6 +4,7 @@ mod cli;
 
 use streams_tools::{
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT,
+    iota_bridge::LoraWanNodeDataStore,
     IotaBridge,
 };
 
@@ -58,7 +59,8 @@ async fn run() {
     let cli = IotaBridgeCli::new(&matches_and_options, &ARG_KEYS) ;
     println!("[IOTA Bridge] Using node '{}' for tangle connection", cli.node);
 
-    let client = IotaBridge::new_from_url(cli.node);
+    let lora_wan_node_store = LoraWanNodeDataStore::new_from_db_file("lora-wan-nodes-iota-bridge.sqlite3");
+    let client = IotaBridge::new(cli.node, lora_wan_node_store);
 
     let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT).into();
     if cli.matches.is_present(cli.arg_keys.listener_ip_address_port) {

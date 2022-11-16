@@ -20,6 +20,7 @@ use crate::{
         DispatchCommand,
         DispatchConfirm,
         DispatchLorawanRest,
+        LoraWanNodeDataStore,
     },
     http::dispatch_request
 };
@@ -34,10 +35,11 @@ pub struct IotaBridge<'a> {
 
 impl<'a> IotaBridge<'a>
 {
-    pub fn new_from_url(url: &str) -> Self {
+    pub fn new(url: &str, lora_wan_node_store: LoraWanNodeDataStore) -> Self {
         let client = Client::new_from_url(url);
+
         Self {
-            dispatch_streams: DispatchStreams::new(&client),
+            dispatch_streams: DispatchStreams::new(&client, lora_wan_node_store),
             dispatch_command: DispatchCommand::new(),
             dispatch_confirm: DispatchConfirm::new(),
             dispatch_lorawan_rest: DispatchLorawanRest::new(),

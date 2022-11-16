@@ -23,10 +23,11 @@ use streams_tools::{
     ChannelManagerPlainTextWallet,
     remote::remote_sensor::{
         RemoteSensor,
-        RemoteSensorOptions
+        RemoteSensorOptions,
     },
-    UserDataStore,
+    UserDataStore
 };
+
 use susee_tools::SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC;
 
 mod cli;

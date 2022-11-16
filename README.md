@@ -223,16 +223,16 @@ as these applications do not need a wallet:
   If option '--wallet-file' is not used, a default filename 'wallet-<APPLICATION-NAME>.txt' is used.
   If the file does not exist, a new seed is created and stored in a new wallet file. Otherwise the seed stored
   in the wallet file is used.<br>
+  
   As the wallet file contains the plain text seed (not encrypted) make absolutely sure to<br>
   **DO NOT USE THIS WALLET FOR PRODUCTION PURPOSES**<br>
   Instead implement the [SimpleWallet trait](streams-tools/src/plain_text_wallet.rs)
   using a secure wallet library like [stronghold](https://github.com/iotaledger/stronghold.rs).
   <br><br>
   The *Management Console* uses the seed to derive seeds for each managed channel.
-  The channel seed is derived from the main seed stored in the wallet file and a seed-derivation-phrase
-  stored in the the local SQLite3 database file.
-   
-  <br><br>
+  The channel seed is derived from the main seed, stored in the wallet file, and a seed-derivation-phrase,
+  stored in the the local SQLite3 database file.<br>
+  
   *ESP32 Sensor*<br>
   Currently a dummy wallet providing a static seed phrase is used. For production purposes this needs to be
   replaced with a randomly generated seed that is stored in

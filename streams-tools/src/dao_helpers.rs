@@ -10,16 +10,22 @@ use anyhow::{
 };
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use serde::de::DeserializeOwned;
+use std::rc::Rc;
+use crate::helpers::SerializationCallbackRefToClosure;
 
 pub type DbSchemaVersionType = i32;
 
 pub trait DaoManager {
 
     type ItemType;
+    type SerializationCallbackType;
     const ITEM_TYPE_NAME: &'static str;
+    const DAO_MANAGER_NAME: &'static str;
     const TABLE_NAME: &'static str;
     const PRIMARY_KEY_COLUMN_NAME: &'static str;
     const DB_SCHEMA_VERSION: DbSchemaVersionType;
+
+    fn new_from_connection(connection: Rc<Connection>) -> Self;
 
     fn get_connection(&self) -> &Connection;
 
@@ -29,9 +35,13 @@ pub trait DaoManager {
 
     fn get_item_from_db(&self, key: &str) -> Result<Self::ItemType>;
 
+    fn search_item(&self, channel_starts_with: &str) -> Result<Self::ItemType>;
+
     fn write_item_to_db(&self, item: Self::ItemType) -> Result<usize>;
 
     fn update_item_in_db(&self, item: Self::ItemType) -> Result<usize>;
+
+    fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType;
 }
 
 pub fn get_item_from_db<'de, DaoManagerT>(dao_manager: &DaoManagerT, key: &str, starts_with: Option<bool>) -> Result<DaoManagerT::ItemType>
@@ -137,4 +147,50 @@ pub fn update_db_schema_to_current_version<DaoManagerT: DaoManager>(dao_manager:
             ).as_str());
     }
     Ok(())
+}
+
+#[derive(Clone)]
+pub struct DaoDataStore<DaoManagerT: DaoManager + Clone> {
+    _connection: Rc<Connection>,
+    items: DaoManagerT,
+    _file_path_and_name: String
+}
+
+impl<DaoManagerT: DaoManager + Clone> DaoDataStore<DaoManagerT> {
+
+    pub fn open_or_create_db(file_path_and_name: &str) -> Result<Connection>{
+        let connection = Connection::open(file_path_and_name)
+            .expect(format!("Error on open/create SQlite database file '{}'", file_path_and_name).as_str());
+        Ok(connection)
+    }
+
+    pub fn new_from_db_file(file_path_and_name: &str) -> Self {
+        let connection: Rc<Connection> = Rc::new(Self::open_or_create_db(file_path_and_name).unwrap());
+        let items = DaoManagerT::new_from_connection(connection.clone());
+        items.update_db_schema_to_current_version()
+            .expect(format!("Error on updating database schema for {}.{}",
+                            DaoManagerT::DAO_MANAGER_NAME, DaoManagerT::ITEM_TYPE_NAME).as_str());
+
+        DaoDataStore {
+            _connection: connection,
+            items,
+            _file_path_and_name: String::from(file_path_and_name),
+        }
+    }
+
+    pub fn search_item(&mut self, key_starts_with: &str) -> Result<(DaoManagerT::ItemType, DaoManagerT::SerializationCallbackType)>{
+        let item = self.items.search_item(key_starts_with)?;
+        let serialization_callback = self.items.get_serialization_callback(&item);
+        Ok((item, serialization_callback))
+    }
+
+    pub fn get_item(&mut self, key: &str) -> Result<(DaoManagerT::ItemType, DaoManagerT::SerializationCallbackType)>{
+        let item = self.items.get_item_from_db(key)?;
+        let serialization_callback = self.items.get_serialization_callback(&item);
+        Ok((item, serialization_callback))
+    }
+
+    pub fn get_serialization_callback(&self, item: &DaoManagerT::ItemType) -> DaoManagerT::SerializationCallbackType {
+        self.items.get_serialization_callback(item)
+    }
 }

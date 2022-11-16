@@ -161,7 +161,6 @@ pub trait ServerDispatchStreams {
         self: &mut Self, message: &TangleMessage) -> Result<Response<Body>>;
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>>;
     async fn receive_messages_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>>;
-    async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>>;
 }
 
 pub async fn dispatch_request_streams(req_parts: &DispatchedRequestParts, callbacks: &mut impl ServerDispatchStreams ) -> Result<Response<Body>> {

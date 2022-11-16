@@ -39,20 +39,25 @@ use crate::{
         ServerDispatchStreams,
         URI_PREFIX_STREAMS,
     },
-    iota_bridge::helpers::log_err_and_respond_500,
+    iota_bridge::{
+        helpers::log_err_and_respond_500,
+        LoraWanNodeDataStore,
+    },
 };
 use log;
 
 #[derive(Clone)]
 pub struct DispatchStreams {
     client: Client,
+    lorawan_nodes: LoraWanNodeDataStore
 }
 
 impl DispatchStreams
 {
-    pub fn new(client: &Client) -> Self {
+    pub fn new(client: &Client, lorawan_nodes: LoraWanNodeDataStore) -> Self {
         Self {
             client: client.clone(),
+            lorawan_nodes,
         }
     }
 }
@@ -112,10 +117,6 @@ impl ServerDispatchStreams for DispatchStreams {
     }
 
     async fn receive_messages_from_address(self: &mut Self, _address_str: &str) -> Result<Response<Body>> {
-        unimplemented!()
-    }
-
-    async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>> {
         unimplemented!()
     }
 }

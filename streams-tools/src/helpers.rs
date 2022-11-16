@@ -18,14 +18,14 @@ pub fn get_channel_id_from_link(streams_link: &str) -> Option<String> {
 // -------------------------------------------------------------------------------------
 // SerializationCallbackCloneBox and SerializationCallbackRefToClosure are used to handle
 // closures
-//          move |streams_channel_id: String, user_state: Vec<u8>| -> Result<usize> {
+//          move |key: String, data_to_serialize: Vec<u8>| -> Result<usize> {
 //              ....
 //          }
 //
 // as function arguments, fields and e.g. to provide them as optional values
 // using Option<SerializationCallbackRefToClosure>.
 //
-// Please note that in most caes 'move' needs to be used to implement the closure.
+// Please note that in most cases 'move' needs to be used to implement the closure.
 // This will move all values captured in the closure into the closure instead of using
 // references. References will not work when the scope that originally create the closure
 // does not exist anymore when the closure is evaluated.

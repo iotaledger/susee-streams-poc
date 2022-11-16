@@ -4,8 +4,6 @@ pub mod subscriber_manager;
 pub mod channel_manager;
 
 #[cfg(feature = "dao")]
-pub mod user_data_store;
-#[cfg(feature = "dao")]
 pub mod dao;
 
 pub use {
@@ -27,4 +25,6 @@ pub use {
 };
 
 #[cfg(feature = "dao")]
-pub use user_data_store::UserDataStore;
+pub use dao::user::{
+    UserDataStore
+};

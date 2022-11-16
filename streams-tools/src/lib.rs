@@ -14,7 +14,7 @@ pub mod helpers;
 pub mod iota_bridge;
 
 #[cfg(feature = "dao")]
-mod dao_helpers;
+pub mod dao_helpers;
 
 
 pub use {

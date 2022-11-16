@@ -37,8 +37,13 @@ use crate::cli::ManagementConsoleCli;
 async fn get_initial_channel_manager<'a>(user_store: &UserDataStore, cli: &ManagementConsoleCli<'a>) -> Result<ChannelManager<PlainTextWallet>> {
     let mut new_opt = ChannelManagerOptions::default();
     let wallet = get_wallet(cli, None)?;
+    let initial_user_having_seed_derivation_phrase = User{
+        streams_channel_id: "".to_string(),
+        streams_user_state: vec![],
+        seed_derivation_phrase: wallet.seed_derivation_phrase.as_ref().unwrap().clone()
+    };
     new_opt.serialize_user_state_callback = Some(
-        user_store.get_serialization_callback(wallet.seed_derivation_phrase.as_ref().unwrap().as_str())
+        user_store.get_serialization_callback(&initial_user_having_seed_derivation_phrase)
     );
 
     Ok( ChannelManager::new(
@@ -50,7 +55,7 @@ async fn get_initial_channel_manager<'a>(user_store: &UserDataStore, cli: &Manag
 
 async fn get_channel_manager_for_cli_arg_channel_starts_with<'a>(user_store: &mut UserDataStore, cli: &ManagementConsoleCli<'a>, update_user_on_exit: bool) -> Result<ChannelManager<PlainTextWallet>> {
     if let Some(channel_starts_with) = cli.matches.value_of(cli.arg_keys.channel_starts_with) {
-        if let Ok((user_dao, serialize_user_state_callback)) = user_store.search_user_state(channel_starts_with) {
+        if let Ok((user_dao, serialize_user_state_callback)) = user_store.search_item(channel_starts_with) {
             let wallet = get_wallet(cli, Some(&user_dao))?;
             let user_state_callback = if update_user_on_exit {
                 Some(serialize_user_state_callback)
@@ -72,7 +77,7 @@ async fn get_channel_manager_for_cli_arg_channel_starts_with<'a>(user_store: &mu
 }
 
 async fn get_channel_manager_for_channel_id<'a>(channel_id: &str, user_store: &mut UserDataStore, cli: &ManagementConsoleCli<'a>) -> Result<ChannelManager<PlainTextWallet>> {
-    let (user_dao, serialize_user_state_callback) = user_store.get_user_state(channel_id)?;
+    let (user_dao, serialize_user_state_callback) = user_store.get_item(channel_id)?;
     let wallet = get_wallet(cli, Some(&user_dao))?;
     get_channel_manager_by_user_dao(
         user_dao,

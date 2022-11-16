@@ -7,7 +7,7 @@ mod server_dispatch_confirm;
 mod server_dispatch_lorawan_rest;
 
 #[cfg(feature = "dao")]
-mod dao;
+pub mod dao;
 
 pub use {
     iota_bridge::{
@@ -17,4 +17,10 @@ pub use {
     server_dispatch_command::DispatchCommand,
     server_dispatch_confirm::DispatchConfirm,
     server_dispatch_lorawan_rest::DispatchLorawanRest,
+};
+
+
+#[cfg(feature = "dao")]
+pub use dao::lora_wan_node::{
+    LoraWanNodeDataStore
 };

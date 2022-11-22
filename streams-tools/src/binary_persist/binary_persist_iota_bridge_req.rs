@@ -17,12 +17,16 @@ use std::{
     fmt::Formatter,
     ops::Range,
 };
+
 use crate::binary_persist::{
     BinaryPersist,
     USIZE_LEN,
     RangeIterator,
-    deserialize_string
+    deserialize_string,
+    serialize_vec_u8,
+    deserialize_vec_u8
 };
+
 use std::{
     str::FromStr
 };
@@ -109,30 +113,6 @@ impl fmt::Display for IotaBridgeRequestParts {
     }
 }
 
-fn serialize_vec_u8(struct_name: &str, prop_name: &str, bytes: &Vec<u8>, buffer: &mut [u8], range: &mut Range<usize>) {
-    let bytes_len = bytes.len() as u32;
-    range.increment(USIZE_LEN);
-    u32::to_bytes(&bytes_len, &mut buffer[range.clone()]).expect(format!("Could not persist {} size", prop_name).as_str());
-    log::debug!("[BinaryPersist for {} - to_bytes()] {} byte length: {}", struct_name, prop_name, bytes_len);
-    if bytes_len > 0 {
-        range.increment(bytes_len as usize);
-        buffer[range.clone()].clone_from_slice(bytes.as_slice());
-        log::debug!("[BinaryPersist for {} - to_bytes()] {}: {:02X?}", struct_name, prop_name, buffer[range.start..range.end].to_vec());
-    } else {
-        log::debug!("[BinaryPersist for {} - to_bytes()] {}: []", struct_name, prop_name);
-    }
-}
-
-fn deserialize_vec_u8(struct_name: &str, prop_name: &str, buffer: &&[u8], range: &mut Range<usize>) -> Vec<u8>{
-    range.increment(USIZE_LEN);
-    let bytes_len = u32::try_from_bytes(&buffer[range.clone()]).unwrap();
-    log::debug!("[BinaryPersist for {} - try_from_bytes] {}: {}", struct_name, prop_name, bytes_len);
-    range.increment(bytes_len as usize);
-    let ret_val: Vec<u8> = buffer[range.clone()].to_vec();
-    log::debug!("[BinaryPersist for {} - try_from_bytes()] {}: {:02X?}", struct_name, prop_name, buffer[range.start..range.end].to_vec());
-    ret_val
-}
-
 pub fn is_request_buffer_length_correct(buffer: &[u8], buffer_length: usize) -> (bool, Range<usize>, usize) {
     let range: Range<usize> = RangeIterator::new(USIZE_LEN);
     let total_needed_size = u32::try_from_bytes(&buffer[range.clone()]).unwrap() as usize;
@@ -144,9 +124,9 @@ impl BinaryPersist for IotaBridgeRequestParts {
         // Request parts will be serialized in the the following order
         // as every Request part has a non static length we need 4 bytes to store the length for each part
         // 1 - total needed buffer size
-        // 1 - method
-        // 2 - uri
-        // 3 - body
+        // 2 - method
+        // 3 - uri
+        // 4 - body
         let length_values_size = 4 * USIZE_LEN;
         length_values_size + self.method_bytes.len() + self.uri_bytes.len() + self.body_bytes.len()
     }

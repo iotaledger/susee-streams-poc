@@ -53,7 +53,7 @@ pub async fn dispatch_request(
         }
     } else {
         log::debug!("[dispatch_request] Could not create DispatchedRequestParts from hyper request. Returning 500");
-        ret_val = get_response_500()?;
+        ret_val = get_response_500("Error on initial deserialization of your request")?;
     }
 
     Ok(ret_val)
@@ -67,12 +67,12 @@ async fn dispatch_lorawan_rest_request(
     confirm_callbacks: &mut impl ServerDispatchConfirm,
 ) -> Result<Response<Body>> {
     match dispatch_request_lorawan_rest(&req_parts, lorawan_rest_callbacks).await {
-        Ok(lorawan_rest_request) => {
-            match lorawan_rest_request.status {
+        Ok(req_parts_inner) => {
+            match req_parts_inner.status {
                 DispatchedRequestStatus::DeserializedLorawanRest => {
                     log::debug!("[dispatch_lorawan_rest_request] Processing DeserializedLorawanRest now");
                     let response = dispatch_normal_request(
-                        lorawan_rest_request,
+                        req_parts_inner,
                         streams_callbacks,
                         command_callbacks,
                         confirm_callbacks).await?;
@@ -80,17 +80,17 @@ async fn dispatch_lorawan_rest_request(
                     response_parts.persist_to_hyper_response_200()
                 }
                 DispatchedRequestStatus::LorawanRest404 => {
-                    get_response_404()
+                    get_response_404("The lorawan-rest API function addressed by the requested URL does not exist")
                 },
                 _ => {
-                    log::debug!("[dispatch_lorawan_rest_request] Unexpected DispatchedRequestStatus: '{}'. Returning 500", lorawan_rest_request.status);
-                    get_response_500()
+                    log::debug!("[dispatch_lorawan_rest_request] Unexpected DispatchedRequestStatus: '{}'. Returning 500", req_parts_inner.status);
+                    get_response_500("The lorawan-rest request resulted in an unexpected status")
                 }
             }
         },
         Err(e) => {
             log::error!("[dispatch_lorawan_rest_request] Fatal error on dispatching lorawan rest request. Returning 500. Error is: {}", e);
-            get_response_500()
+            get_response_500("Error on deserialization of your lorawan-rest request")
         }
     }
 }

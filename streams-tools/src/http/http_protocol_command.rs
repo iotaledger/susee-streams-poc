@@ -144,6 +144,6 @@ pub async fn dispatch_request_command(req_parts: &DispatchedRequestParts, callba
         },
 
         // Return the 404 Not Found for other routes.
-        _ => req_parts.log_and_return_404("dispatch_request_command")
+        _ => req_parts.log_and_return_404("dispatch_request_command", "")
     }
 }

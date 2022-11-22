@@ -11,7 +11,6 @@ use anyhow::{
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use serde::de::DeserializeOwned;
 use std::rc::Rc;
-use crate::helpers::SerializationCallbackRefToClosure;
 
 pub type DbSchemaVersionType = i32;
 

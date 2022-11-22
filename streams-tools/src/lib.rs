@@ -10,7 +10,7 @@ pub mod remote;
 
 #[cfg(feature = "std")]
 pub mod helpers;
-#[cfg(feature = "std")]
+#[cfg(feature = "iota_bridge")]
 pub mod iota_bridge;
 
 #[cfg(feature = "dao")]
@@ -33,7 +33,7 @@ pub use {
     },
 };
 
-#[cfg(feature = "std")]
+#[cfg(feature = "iota_bridge")]
 pub use {
     iota_bridge::IotaBridge,
 };

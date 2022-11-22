@@ -19,8 +19,8 @@ use crate::helpers::SerializationCallbackRefToClosure;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default, Clone)]
 pub struct LoraWanNode {
-    dev_eui: String,
-    streams_channel_id: String,
+    pub dev_eui: String,
+    pub streams_channel_id: String,
 }
 
 #[derive(Clone)]
@@ -87,7 +87,7 @@ impl DaoManager for LoraWanNodeDaoManager {
         let this = self.clone();
         let dev_eui = item.dev_eui.clone();
         Box::new( move |dev_eui: String, streams_channel_id_utf8_bytes: Vec<u8>| -> Result<usize> {
-            let mut new_node = LoraWanNode {
+            let new_node = LoraWanNode {
                 dev_eui,
                 streams_channel_id: String::from_utf8(streams_channel_id_utf8_bytes)
                     .expect("Error while reading streams_channel_id_utf8_bytes into String instance.")

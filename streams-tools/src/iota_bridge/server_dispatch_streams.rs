@@ -44,7 +44,10 @@ use crate::{
         LoraWanNodeDataStore,
     },
 };
+
 use log;
+use crate::binary_persist::{TangleMessageCompressed, TangleAddressCompressed};
+use crate::http::http_tools::{get_response_400, get_response_500};
 
 #[derive(Clone)]
 pub struct DispatchStreams {
@@ -57,7 +60,7 @@ impl DispatchStreams
     pub fn new(client: &Client, lorawan_nodes: LoraWanNodeDataStore) -> Self {
         Self {
             client: client.clone(),
-            lorawan_nodes,
+            lorawan_nodes: lorawan_nodes,
         }
     }
 }
@@ -118,5 +121,40 @@ impl ServerDispatchStreams for DispatchStreams {
 
     async fn receive_messages_from_address(self: &mut Self, _address_str: &str) -> Result<Response<Body>> {
         unimplemented!()
+    }
+
+    async fn send_compressed_message<F: 'static + core::marker::Send + core::marker::Sync>(
+        self: &mut Self, message: &TangleMessageCompressed) -> Result<Response<Body>>
+    {
+        let dev_eui: u64 = match <u64 as BinaryPersist>::try_from_bytes(message.dev_eui.as_slice()) {
+            Ok(eui_num) => eui_num,
+            Err(err) => return get_response_400(format!(
+                "Binary data provided for dev_eui could not be converted into an u64 number. Error: {}", err).as_str())
+        };
+
+        let dev_eui_str = dev_eui.to_string();
+        let lora_wan_node = match self.lorawan_nodes.get_item(dev_eui_str.as_str()) {
+            Ok(node_and_cb) => node_and_cb.0,
+            Err(err) => return get_response_400(format!(
+                "The provided dev_eui {} is not known. Please use REST function 'send_message' instead. Error: {}", dev_eui_str, err).as_str())
+        };
+
+        let uncompressed_message = match message.to_tangle_message(lora_wan_node.streams_channel_id.as_str()) {
+            Ok(msg) => msg,
+            Err(err) => return get_response_500(format!("Error: {}", err).as_str())
+        };
+
+        self.send_message::<F>(&uncompressed_message).await
+    }
+
+    async fn receive_compressed_message_from_address(self: &mut Self, msgid: &str, dev_eui_str: &str) -> Result<Response<Body>> {
+        let lora_wan_node = match self.lorawan_nodes.get_item(dev_eui_str) {
+            Ok(node_and_cb) => node_and_cb.0,
+            Err(err) => return get_response_400(format!(
+                "The provided dev_eui {} is not known. Please use REST function 'receive_message_from_address' instead. Error: {}", dev_eui_str, err).as_str())
+        };
+
+        let full_address_str = TangleAddressCompressed::build_tangle_address_str(msgid, lora_wan_node.streams_channel_id.as_str());
+        self.receive_message_from_address(full_address_str.as_str()).await
     }
 }

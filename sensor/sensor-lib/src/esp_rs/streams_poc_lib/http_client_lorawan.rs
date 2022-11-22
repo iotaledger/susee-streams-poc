@@ -59,6 +59,8 @@ use smol::channel::{
 };
 use streams_tools::binary_persist::binary_persist_iota_bridge_req::IotaBridgeResponseParts;
 use futures_lite::future;
+use streams_tools::http::http_protocol_streams::{EndpointUris, QueryParameters};
+use streams_tools::binary_persist::{TangleMessageCompressed, TangleAddressCompressed};
 
 pub type ResponseCallbackBuffer = Vec<u8>;
 pub type ResponseCallbackSender = Sender<ResponseCallbackBuffer>;
@@ -135,15 +137,37 @@ impl HttpClient {
     }
 
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
-        let req_parts = self.request_builder.get_send_message_request_parts(msg)?;
+
+        // In the current implementation we always send compressed messages.
+        // This implies that the IOTA Bridge already knows the streams channel_id
+        // for our dev_eui.
+        // In a test scenario where the same iota-bridge is used for channel initialization
+        // and send-message usecases this will always be OK because the IOTA Bridge learns
+        // the dev_eui+channel_id pair when the channel is initialized.
+        //
+        // TODO: In case multiple IOTA Bridge instances are used for these usecases
+        //       the http protocol needs to handle this.
+        let compressed_message = TangleMessageCompressed::from_tangle_message(msg);
+        // We do not set the dev_eui here because it will be communicated by the LoraWAN network
+        // and therefore will not be send as lorawan payload.
+        // Please note that due to this BinaryPersist implementation for TangleMessageCompressed
+        // does not serialize/deserialize the dev_eui in general.
+        let req_parts = self.request_builder.get_send_message_request_parts(&compressed_message, EndpointUris::SEND_COMPRESSED_MESSAGE)?;
         self.request(req_parts).await?;
         Ok(())
     }
 
     async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         log::debug!("[HttpClient.recv_message_via_http]");
+        // Please note the comments in fn send_message_via_http() above
+        // Same principles apply here
+        let compressed_tangle_address = TangleAddressCompressed::from_tangle_address(link);
         let response = self.request(
-            self.request_builder.get_receive_message_from_address_request_parts(link)?,
+            self.request_builder.get_receive_message_from_address_request_parts(
+                &compressed_tangle_address,
+                EndpointUris::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS,
+                QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_MSGID
+            )?,
         ).await?;
 
         log::debug!("[HttpClient.recv_message_via_http] check for retrials");

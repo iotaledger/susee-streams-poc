@@ -48,6 +48,8 @@ use iota_streams::{
 
 #[cfg(feature = "std")]
 use futures::executor::block_on;
+#[cfg(feature = "smol_rt")]
+use smol::block_on;
 
 type Subscriber<ClientT> = iota_streams::app_channels::api::tangle::Subscriber<ClientT>;
 

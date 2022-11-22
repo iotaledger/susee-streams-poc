@@ -68,7 +68,7 @@ pub async fn dispatch_request_lorawan_rest<'a>(req_parts: &DispatchedRequestPart
             let dev_eui_key_val: Vec<_> = req_parts.req_url.query_pairs().collect();
             if dev_eui_key_val.len() != 1 {
                 panic!("[http_protocoll - BINARY_REQUEST] Wrong number of query parameters.\
-                Specify the message address using /{}?{}={}",
+                Specify the device EUI using /{}?{}={}",
                        EndpointUris::BINARY_REQUEST,
                        QueryParameters::BINARY_REQUEST,
                        "<DEV-EUI-GOES-HERE>")
@@ -85,6 +85,7 @@ pub async fn dispatch_request_lorawan_rest<'a>(req_parts: &DispatchedRequestPart
             // Return a copy of the original req_parts and set status to LORAWAN_REST_404.
             log::debug!("[dispatch_request_lorawan_rest] could not dispatch method {} for path '{}'. Returning 404.", req_parts.method, req_parts.path);
             Ok(DispatchedRequestParts {
+                dev_eui: req_parts.dev_eui.clone(),
                 req_url: req_parts.req_url.clone(),
                 status: DispatchedRequestStatus::LorawanRest404,
                 method: req_parts.method.clone(),

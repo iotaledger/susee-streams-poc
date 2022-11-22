@@ -204,3 +204,28 @@ pub fn deserialize_string(buffer: &[u8], range: &mut Range<usize> ) -> Result<St
     range.increment(str_len as usize);
     Ok(String::from_utf8(buffer[range.clone()].to_vec())?)
 }
+
+
+pub fn serialize_vec_u8(struct_name: &str, prop_name: &str, bytes: &Vec<u8>, buffer: &mut [u8], range: &mut Range<usize>) {
+    let bytes_len = bytes.len() as u32;
+    range.increment(USIZE_LEN);
+    u32::to_bytes(&bytes_len, &mut buffer[range.clone()]).expect(format!("Could not persist {} size", prop_name).as_str());
+    log::debug!("[BinaryPersist for {} - to_bytes()] {} byte length: {}", struct_name, prop_name, bytes_len);
+    if bytes_len > 0 {
+        range.increment(bytes_len as usize);
+        buffer[range.clone()].clone_from_slice(bytes.as_slice());
+        log::debug!("[BinaryPersist for {} - to_bytes()] {}: {:02X?}", struct_name, prop_name, buffer[range.start..range.end].to_vec());
+    } else {
+        log::debug!("[BinaryPersist for {} - to_bytes()] {}: []", struct_name, prop_name);
+    }
+}
+
+pub fn deserialize_vec_u8(struct_name: &str, prop_name: &str, buffer: &&[u8], range: &mut Range<usize>) -> Vec<u8>{
+    range.increment(USIZE_LEN);
+    let bytes_len = u32::try_from_bytes(&buffer[range.clone()]).unwrap();
+    log::debug!("[BinaryPersist for {} - try_from_bytes] {}: {}", struct_name, prop_name, bytes_len);
+    range.increment(bytes_len as usize);
+    let ret_val: Vec<u8> = buffer[range.clone()].to_vec();
+    log::debug!("[BinaryPersist for {} - try_from_bytes()] {}: {:02X?}", struct_name, prop_name, buffer[range.start..range.end].to_vec());
+    ret_val
+}

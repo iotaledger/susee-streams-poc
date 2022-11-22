@@ -43,6 +43,7 @@ impl ServerDispatchLorawanRest for DispatchLorawanRest {
         let hyper_request = iota_bridge_request_parts.into_request(RequestBuilderTools::get_request_builder())?;
         let mut ret_val = DispatchedRequestParts::new(hyper_request).await?;
         ret_val.status = DispatchedRequestStatus::DeserializedLorawanRest;
+        ret_val.dev_eui = String::from(dev_eui);
         Ok(ret_val)
     }
 }

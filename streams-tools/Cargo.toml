@@ -35,6 +35,7 @@ tokio = { version = "1.5", optional = true }
 # dao dependencies
 rusqlite = { version = "0.28.0", features = ["bundled"], optional = true } # , "serde_json"
 serde = {version = "1.0.147", default-features = false, features = ["derive"], optional = true}
+serde_json = { version = "1.0.89", optional = true }
 serde_rusqlite = { version = "0.31", git = "https://github.com/twistedfall/serde_rusqlite", branch="master", optional = true }
 fallible-streaming-iterator = {version = "0.1.9", optional = true}
 
@@ -50,4 +51,4 @@ smol_rt = ["smol"]
 esp_idf = ["embedded-svc", "esp-idf-svc", "esp-idf-sys"]
 dao = ["rusqlite", "serde", "serde_rusqlite", "fallible-streaming-iterator"]
 std = ["tokio", "iota-streams/client", "iota-streams/std"]
-iota_bridge = ["dao"]
+iota_bridge = ["dao", "serde_json"]

@@ -36,9 +36,9 @@ pub trait DaoManager {
 
     fn search_item(&self, channel_starts_with: &str) -> Result<Self::ItemType>;
 
-    fn write_item_to_db(&self, item: Self::ItemType) -> Result<usize>;
+    fn write_item_to_db(&self, item: &Self::ItemType) -> Result<usize>;
 
-    fn update_item_in_db(&self, item: Self::ItemType) -> Result<usize>;
+    fn update_item_in_db(&self, item: &Self::ItemType) -> Result<usize>;
 
     fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType;
 }
@@ -191,5 +191,9 @@ impl<DaoManagerT: DaoManager + Clone> DaoDataStore<DaoManagerT> {
 
     pub fn get_serialization_callback(&self, item: &DaoManagerT::ItemType) -> DaoManagerT::SerializationCallbackType {
         self.items.get_serialization_callback(item)
+    }
+
+    pub fn write_item_to_db(&self, item: &DaoManagerT::ItemType) -> Result<usize> {
+        self.items.write_item_to_db(item)
     }
 }

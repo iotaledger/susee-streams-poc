@@ -15,11 +15,11 @@ use crate::{
         http_tools::{
             DispatchedRequestParts,
             RequestBuilderTools,
+            DispatchedRequestStatus,
         }
     },
 };
 use iota_streams::core::async_trait;
-use crate::http::http_tools::DispatchedRequestStatus;
 
 #[derive(Clone)]
 pub struct DispatchLorawanRest {}

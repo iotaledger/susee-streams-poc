@@ -5,6 +5,7 @@ mod helpers;
 mod server_dispatch_command;
 mod server_dispatch_streams;
 mod server_dispatch_confirm;
+mod server_dispatch_lorawan_node;
 mod server_dispatch_lorawan_rest;
 
 pub use {
@@ -18,4 +19,5 @@ pub use {
     server_dispatch_command::DispatchCommand,
     server_dispatch_confirm::DispatchConfirm,
     server_dispatch_lorawan_rest::DispatchLorawanRest,
+    server_dispatch_lorawan_node::DispatchLoraWanNode,
 };

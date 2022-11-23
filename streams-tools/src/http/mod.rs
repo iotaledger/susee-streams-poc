@@ -4,6 +4,7 @@ pub mod http_protocol_command;
 pub mod http_protocol_confirm;
 pub mod http_protocol_lorawan_rest;
 pub mod http_server_dispatch;
+pub mod http_protocol_lorawan_node;
 
 pub use {
     http_protocol_streams::{

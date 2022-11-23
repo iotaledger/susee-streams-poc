@@ -28,6 +28,11 @@ use std::{
     result::Result as StdResult,
 };
 
+use anyhow::{
+    Result as AnyhowResult,
+    bail,
+};
+
 #[derive(Clone)]
 pub struct RequestBuilderTools {
     pub uri_prefix: String,
@@ -228,4 +233,23 @@ pub fn get_dev_eui_from_str(dev_eui_str: &str, api_endpoint_name: &str, query_pa
         dev_eui_str,
     ).as_str());
     Ok(dev_eui_u64.to_le_bytes().to_vec())
+}
+
+#[derive(Clone)]
+pub(crate) struct PathSegments {
+    pub main: String,
+    pub last: String,
+}
+
+impl PathSegments {
+    pub fn new_from_path(path: &str) -> AnyhowResult<Self> {
+        if let Some(parts) = path.rsplit_once('/') {
+            Ok(Self{
+                main: parts.0.to_string(),
+                last: parts.1.to_string()}
+            )
+        } else {
+            bail!("Could not find any trailing segment in url '{}'", path)
+        }
+    }
 }

@@ -73,7 +73,7 @@ impl DaoManager for UserDaoManager {
         get_item_from_db(self, channel_starts_with, Some(true))
     }
 
-    fn write_item_to_db(&self, item: User) -> Result<usize> {
+    fn write_item_to_db(&self, item: &User) -> Result<usize> {
         let rows = self.connection.execute(format!(
             "INSERT INTO {} (streams_channel_id, streams_user_state, seed_derivation_phrase) VALUES (\
                                 :streams_channel_id,\
@@ -85,7 +85,7 @@ impl DaoManager for UserDaoManager {
         Ok(rows)
     }
 
-    fn update_item_in_db(&self, item: User) -> Result<usize> {
+    fn update_item_in_db(&self, item: &User) -> Result<usize> {
         let rows = self.connection.execute(format!(
             "UPDATE {} SET streams_user_state = :streams_user_state\
              WHERE streams_channel_id = ':streams_channel_id'\
@@ -103,7 +103,7 @@ impl DaoManager for UserDaoManager {
             new_user.streams_user_state = user_state;
             new_user.streams_channel_id = streams_channel_id;
             new_user.seed_derivation_phrase = seed_derive_phrase.clone();
-            this.write_item_to_db(new_user)
+            this.write_item_to_db(&new_user)
         })
     }
 }

@@ -151,7 +151,7 @@ pub(crate) fn get_body_bytes_from_enumerated_persistable<T: EnumeratedPersistabl
     Ok(buffer)
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Clone)]
 pub enum DispatchedRequestStatus {
     Initial,
     DeserializedLorawanRest,
@@ -174,6 +174,7 @@ impl Default for DispatchedRequestStatus {
     }
 }
 
+#[derive(Clone)]
 pub struct DispatchedRequestParts {
     pub req_url: Url,
     pub method: Method,
@@ -181,6 +182,7 @@ pub struct DispatchedRequestParts {
     pub binary_body: Vec<u8>,
     pub status: DispatchedRequestStatus,
     pub dev_eui: String,
+    pub needs_registered_lorawan_node: bool,
 }
 
 impl<'a> DispatchedRequestParts {
@@ -203,6 +205,7 @@ impl<'a> DispatchedRequestParts {
 
         let ret_val = DispatchedRequestParts {
             dev_eui: String::new(),
+            needs_registered_lorawan_node: false,
             req_url: req_url.to_owned(),
             status: DispatchedRequestStatus::default(),
             method: method.to_owned(),

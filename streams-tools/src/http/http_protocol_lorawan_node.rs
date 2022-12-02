@@ -12,12 +12,15 @@ use hyper::{
 };
 
 use crate::{
-    http::http_tools::{
-        DispatchedRequestParts,
-        PathSegments,
-        RequestBuilderTools,
-        get_response_400,
-        get_response_500,
+    http::{
+        ScopeConsume,
+        http_tools::{
+            DispatchedRequestParts,
+            PathSegments,
+            RequestBuilderTools,
+            get_response_400,
+            get_response_500,
+        }
     }
 };
 
@@ -90,7 +93,7 @@ impl RequestBuilderLoraWanNode {
 }
 
 #[async_trait(?Send)]
-pub trait ServerDispatchLoraWanNode {
+pub trait ServerDispatchLoraWanNode: ScopeConsume {
     fn get_uri_prefix(&self) -> &'static str;
     async fn create_node(self: &mut Self, dev_eui: &str, channel_id: &str) -> Result<Response<Body>>;
     async fn get_node(self: &mut Self, dev_eui: &str, only_check_existence: bool) -> Result<Response<Body>>;

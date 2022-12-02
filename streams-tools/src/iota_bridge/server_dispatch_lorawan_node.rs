@@ -1,5 +1,6 @@
 use std::{
     clone::Clone,
+    rc::Rc,
 };
 
 use iota_streams::core::async_trait;
@@ -14,6 +15,8 @@ use hyper::{
 
 use crate::{
     http::{
+        ScopeConsume,
+        DispatchScope,
         http_protocol_lorawan_node::{
             ServerDispatchLoraWanNode,
             URI_PREFIX_LORAWAN_NODE,
@@ -31,7 +34,8 @@ use crate::{
 
 #[derive(Clone)]
 pub struct DispatchLoraWanNode {
-    lorawan_nodes: LoraWanNodeDataStore
+    lorawan_nodes: LoraWanNodeDataStore,
+    scope: Option<Rc<dyn DispatchScope>>,
 }
 
 impl DispatchLoraWanNode
@@ -39,6 +43,7 @@ impl DispatchLoraWanNode
     pub fn new(lorawan_nodes: LoraWanNodeDataStore) -> Self {
         Self {
             lorawan_nodes: lorawan_nodes,
+            scope: None,
         }
     }
 }
@@ -81,5 +86,12 @@ impl ServerDispatchLoraWanNode for DispatchLoraWanNode {
             }
             Err(_) => return get_response_404("lorawan_node not found")
         }
+    }
+}
+
+#[async_trait(?Send)]
+impl ScopeConsume for DispatchLoraWanNode {
+    fn set_scope(&mut self, scope: Rc<dyn DispatchScope>) {
+        self.scope = Some(scope);
     }
 }

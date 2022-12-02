@@ -53,12 +53,17 @@ impl DaoManager for LoraWanNodeDaoManager {
 
     fn init_db_schema(&self) -> Result<()> {
         self.connection.execute(format!("CREATE TABLE {} (\
-            dev_eui TEXT NOT NULL PRIMARY KEY,\
-            streams_channel_id  TEXT NOT NULL\
+                {} TEXT NOT NULL PRIMARY KEY,\
+                streams_channel_id  TEXT NOT NULL\
             )
-            ", Self::TABLE_NAME).as_str(), []).expect("Error on executing 'CREATE TABLE' for LoraWanNode");
+            ", Self::TABLE_NAME, Self::PRIMARY_KEY_COLUMN_NAME).as_str(), [])
+            .expect("Error on executing 'CREATE TABLE' for LoraWanNode");
 
-        self.connection.execute("CREATE INDEX idx_sensor_streams_channel_id ON sensor", [])
+        self.connection.execute(format!(
+            "CREATE INDEX idx_{0}_streams_channel_id ON {0} (\
+                streams_channel_id\
+             )",
+            Self::TABLE_NAME).as_str(), [])
             .expect("Error on executing 'CREATE INDEX' for LoraWanNode");
         Ok(())
     }

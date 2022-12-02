@@ -22,24 +22,33 @@ use std::{
     fmt
 };
 
+use crate::esp_rs::hyper_esp_rs_tools::send_hyper_request_via_esp_http;
+
 use streams_tools::{
+    subscriber_manager::Compressed,
     http::{
         RequestBuilderStreams,
         MapStreamsErrors,
     },
-    binary_persist::BinaryPersist,
+    binary_persist::{
+        BinaryPersist,
+        TangleMessageCompressed,
+        TangleAddressCompressed
+    },
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL
-};
-
-use hyper::{
-    http::{
-        StatusCode,
-    }
 };
 
 use iota_client_types::{
     Details,
     SendOptions
+};
+
+use hyper::{
+    http::{
+        StatusCode,
+        Request
+    },
+    Body
 };
 
 use embedded_svc::{
@@ -50,17 +59,13 @@ use embedded_svc::{
     }
 };
 
-use crate::esp_rs::hyper_esp_rs_tools::send_hyper_request_via_esp_http;
-
-
 use esp_idf_svc::{
     http::client::{
         EspHttpClient,
         EspHttpResponse,
-//        EspHttpRequestWrite,
+        EspHttpClientConfiguration,
     },
 };
-use esp_idf_svc::http::client::EspHttpClientConfiguration;
 
 pub struct HttpClientOptions<'a> {
     pub(crate) http_url: &'a str,
@@ -85,6 +90,7 @@ pub struct HttpClient {
     request_builder: RequestBuilderStreams,
     tangle_client_options: SendOptions,
     esp_http_client_opt: EspHttpClientConfiguration,
+    use_compressed_msg: bool,
 }
 
 impl HttpClient
@@ -98,24 +104,45 @@ impl HttpClient
             request_builder: RequestBuilderStreams::new(options.http_url),
             tangle_client_options: SendOptions::default(),
             esp_http_client_opt,
+            use_compressed_msg: false,
         }
     }
 
+    async fn request<'a>(&mut self, request: Request<Body>, http_client: &'a mut EspHttpClient) -> Result<EspHttpResponse<'a>> {
+        let reponse = send_hyper_request_via_esp_http(http_client, request).await?;
+
+        // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
+        // http status which indicates that the iota-bridge has stored all needed
+        // data to use compressed massages further on.
+        if reponse.status() == StatusCode::ALREADY_REPORTED {
+            self.use_compressed_msg = true;
+        }
+        Ok(reponse)
+    }
+
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
-        let req = self.request_builder.send_message(msg)?;
+        let req = if self.use_compressed_msg {
+            let cmpr_message = TangleMessageCompressed::from_tangle_message(msg);
+            self.request_builder.send_compressed_message(&cmpr_message)?
+        } else {
+            self.request_builder.send_message(msg)?
+        };
         let mut http_client = EspHttpClient::new(&self.esp_http_client_opt)?;
-        send_hyper_request_via_esp_http(&mut http_client, req).await?;
+        self.request(req, &mut http_client).await?;
         Ok(())
     }
 
     async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         log::debug!("[HttpClient.recv_message_via_http]");
-        let mut http_client = EspHttpClient::new(&self.esp_http_client_opt)?;
         log::debug!("[HttpClient.recv_message_via_http] EspHttpClient created");
-        let mut response: EspHttpResponse = send_hyper_request_via_esp_http(
-            &mut http_client,
-            self.request_builder.receive_message_from_address(link)?,
-        ).await?;
+        let req = if self.use_compressed_msg {
+            let cmpr_link = TangleAddressCompressed::from_tangle_address(link);
+            self.request_builder.receive_compressed_message_from_address(&cmpr_link)?
+        } else {
+            self.request_builder.receive_message_from_address(link)?
+        };
+        let mut http_client = EspHttpClient::new(&self.esp_http_client_opt)?;
+        let mut response: EspHttpResponse = self.request(req, &mut http_client).await?;
 
         log::debug!("[HttpClient.recv_message_via_http] check for retrials");
         // TODO: Implement following retrials using EspTimerService if needed.
@@ -163,6 +190,16 @@ impl HttpClient
                  Some(link.to_string())
             ))
         }
+    }
+}
+
+impl Compressed for HttpClient {
+    fn set_use_compressed_msg(&mut self, use_compressed_msg: bool) {
+        self.use_compressed_msg = use_compressed_msg;
+    }
+
+    fn get_use_compressed_msg(&self) -> bool {
+        self.use_compressed_msg
     }
 }
 

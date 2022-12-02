@@ -33,7 +33,9 @@ use std::{
 
 use anyhow::bail;
 
-#[derive(Debug)]
+use bitflags::bitflags;
+
+#[derive(Debug, Clone)]
 pub enum HttpMethod {
     POST,
     GET,
@@ -41,10 +43,7 @@ pub enum HttpMethod {
 
 impl fmt::Display for HttpMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            HttpMethod::GET => write!(f, "GET"),
-            HttpMethod::POST => write!(f, "POST"),
-        }
+        write!(f, "{:?}", self)
     }
 }
 
@@ -61,19 +60,56 @@ impl FromStr for HttpMethod {
     }
 }
 
+impl From<HeaderFlags> for HttpMethod {
+    fn from(header_flags: HeaderFlags) -> Self {
+        if header_flags.contains(HeaderFlags::IS_METHOD_POST) && header_flags.contains(HeaderFlags::IS_METHOD_GET) {
+            panic!("Severe Error: IS_METHOD_POST and IS_METHOD_GET are both set to true. These flags are mutually exclusive.")
+        }
+        if !header_flags.contains(HeaderFlags::IS_METHOD_POST) && !header_flags.contains(HeaderFlags::IS_METHOD_GET) {
+            panic!("Severe Error: IS_METHOD_POST and IS_METHOD_GET are both set to false. One of both flags needs to be set.")
+        }
+        if header_flags.contains(HeaderFlags::IS_METHOD_POST) {
+            Self::POST
+        } else {
+            Self::GET
+        }
+    }
+}
+
+pub const HEADER_FLAGS_LEN: usize = 1;
+pub type HeaderFlagsNumericalType = u8;
+
+bitflags! {
+    #[derive(Default)]
+    pub struct HeaderFlags: HeaderFlagsNumericalType {
+        const NEEDS_REGISTERD_LORAWAN_NODE = 0b00000001;
+        const IS_METHOD_POST = 0b00000010;
+        const IS_METHOD_GET = 0b00000100;
+    }
+}
+
+impl From<HttpMethod> for HeaderFlags {
+    fn from(method: HttpMethod) -> Self {
+        match method {
+            HttpMethod::POST => Self::IS_METHOD_POST,
+            HttpMethod::GET => Self::IS_METHOD_GET,
+        }
+    }
+}
+
 pub struct IotaBridgeRequestParts {
     pub method: HttpMethod,
     pub uri: String,
     pub body_bytes: Vec<u8>,
     uri_bytes: Vec<u8>,
-    method_bytes: Vec<u8>,
+    header_flags: HeaderFlags,
 }
 
 impl IotaBridgeRequestParts {
-    pub fn new(method: HttpMethod, uri: String, body_bytes: Vec<u8>) -> Self {
-        let method_bytes = method.to_string().into_bytes();
+    pub fn new(header_flags: HeaderFlags, uri: String, body_bytes: Vec<u8>) -> Self {
+        let method = HttpMethod::from(header_flags);
         let uri_bytes = uri.clone().into_bytes();
-        Self {method, uri, body_bytes, uri_bytes, method_bytes}
+        Self {method, uri, body_bytes, uri_bytes, header_flags}
     }
 
     pub fn into_request(self: Self, request_builder: Builder) -> Result<Request<Body>> {
@@ -101,6 +137,10 @@ impl IotaBridgeRequestParts {
         let (_, _, total_needed_size) = is_request_buffer_length_correct(buffer, buffer.len());
         Ok(total_needed_size)
     }
+
+    pub fn needs_registerd_lorawan_node(&self) -> bool {
+        self.header_flags.contains(HeaderFlags::NEEDS_REGISTERD_LORAWAN_NODE)
+    }
 }
 
 impl fmt::Display for IotaBridgeRequestParts {
@@ -123,12 +163,14 @@ impl BinaryPersist for IotaBridgeRequestParts {
     fn needed_size(&self) -> usize {
         // Request parts will be serialized in the the following order
         // as every Request part has a non static length we need 4 bytes to store the length for each part
-        // 1 - total needed buffer size
-        // 2 - method
-        // 3 - uri
-        // 4 - body
-        let length_values_size = 4 * USIZE_LEN;
-        length_values_size + self.method_bytes.len() + self.uri_bytes.len() + self.body_bytes.len()
+        // # - Property                 - Byte size
+        // ---------------------------------------------------------------
+        // 1 - total needed buffer size - USIZE_LEN
+        // 2 - header_flags             - HEADER_FLAGS_LEN
+        // 3 - uri                      - USIZE_LEN + String length
+        // 4 - body                     - USIZE_LEN + Vec length
+        let length_values_size = 3 * USIZE_LEN;
+        length_values_size + HEADER_FLAGS_LEN + self.uri_bytes.len() + self.body_bytes.len()
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> anyhow::Result<usize> {
@@ -139,9 +181,11 @@ impl BinaryPersist for IotaBridgeRequestParts {
         // total needed buffer size
         let mut range: Range<usize> = RangeIterator::new(USIZE_LEN);
         let total_needed_size = self.needed_size() as u32;
-        u32::to_bytes(&total_needed_size, &mut buffer[range.clone()]).expect("Could not persist total_needed_size");
-        // method
-        serialize_vec_u8("IotaBridgeRequestParts", "method_bytes", &self.method_bytes, buffer, &mut range);
+        total_needed_size.to_bytes(&mut buffer[range.clone()]).expect("Could not persist total_needed_size");
+        // header_flags
+        range.increment(HEADER_FLAGS_LEN);
+        let headerflags_numeric = self.header_flags.bits();
+        headerflags_numeric.to_bytes(&mut buffer[range.clone()]).expect("Could not persist header_flags");
         // uri
         serialize_vec_u8("IotaBridgeRequestParts", "uri_bytes", &self.uri_bytes, buffer, &mut range);
         // body_bytes
@@ -156,15 +200,19 @@ impl BinaryPersist for IotaBridgeRequestParts {
             panic!("[BinaryPersist for IotaBridgeRequestParts - try_from_bytes()] This Request needs {} bytes but \
                     the provided buffer length is only {} bytes.", total_needed_size, buffer.len());
         }
-        // method
-        let method_str = deserialize_string(buffer, &mut range)?;
-        let method = HttpMethod::from_str(method_str.as_str())?;
+        // header_flags
+        range.increment(HEADER_FLAGS_LEN);
+        let header_flags_numerical = HeaderFlagsNumericalType::try_from_bytes(
+            &buffer[range.clone()]).expect("Error while deserializing numerical representation of header_flags");
+        let header_flags = HeaderFlags::from_bits(header_flags_numerical).ok_or_else(
+            || panic!("Error while interpreting header_flags_numerical as binary header_flags: Numerical value is {}", header_flags_numerical ))
+            .expect("Error while unwrapping header_flags");
         // uri
         let uri = deserialize_string(buffer, &mut range)?;
         // body
         let body_bytes = deserialize_vec_u8("IotaBridgeRequestParts", "body_bytes", &buffer, &mut range);
 
-        Ok(IotaBridgeRequestParts::new(method, uri, body_bytes))
+        Ok(IotaBridgeRequestParts::new(header_flags, uri, body_bytes))
     }
 }
 

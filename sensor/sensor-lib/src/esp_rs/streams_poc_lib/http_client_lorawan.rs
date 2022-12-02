@@ -23,16 +23,31 @@ use std::{
 };
 
 use streams_tools::{
+    subscriber_manager::Compressed,
     http::{
         RequestBuilderStreams,
-        http_protocol_streams::MapStreamsErrors,
+        http_protocol_streams::{
+            MapStreamsErrors,
+            EndpointUris,
+            QueryParameters,
+        },
     },
     binary_persist::{
         BinaryPersist,
+        TangleMessageCompressed,
+        TangleAddressCompressed,
         binary_persist_iota_bridge_req::{
             IotaBridgeRequestParts,
+            IotaBridgeResponseParts,
         },
     },
+};
+
+use crate::streams_poc_lib::api_types::{
+    send_request_via_lorawan_t,
+    StreamsError,
+    LoRaWanError,
+    resolve_request_response_t
 };
 
 use hyper::{
@@ -46,8 +61,6 @@ use iota_client_types::{
     SendOptions
 };
 
-use crate::streams_poc_lib::api_types::{send_request_via_lorawan_t, StreamsError, LoRaWanError, resolve_request_response_t};
-
 use anyhow::{
     bail,
 };
@@ -57,10 +70,8 @@ use smol::channel::{
     Sender,
     Receiver,
 };
-use streams_tools::binary_persist::binary_persist_iota_bridge_req::IotaBridgeResponseParts;
+
 use futures_lite::future;
-use streams_tools::http::http_protocol_streams::{EndpointUris, QueryParameters};
-use streams_tools::binary_persist::{TangleMessageCompressed, TangleAddressCompressed};
 
 pub type ResponseCallbackBuffer = Vec<u8>;
 pub type ResponseCallbackSender = Sender<ResponseCallbackBuffer>;
@@ -122,6 +133,7 @@ pub struct HttpClient {
     lorawan_send_callback: send_request_via_lorawan_t,
     request_builder: RequestBuilderStreams,
     tangle_client_options: SendOptions,
+    pub use_compressed_msg: bool,
 }
 
 impl HttpClient {
@@ -131,44 +143,50 @@ impl HttpClient {
         log::debug!("[HttpClient::new()] Creating new HttpClient");
         Self {
             lorawan_send_callback: options.lorawan_send_callback,
+            use_compressed_msg: false,
             request_builder: RequestBuilderStreams::new(""),
             tangle_client_options: SendOptions::default(),
         }
     }
 
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
+        let req_parts = if self.use_compressed_msg {
+            // Please note the comments in fn recv_message_via_http() below
+            // Same principles apply here
+            let cmpr_message = TangleMessageCompressed::from_tangle_message(msg);
+            self.request_builder.get_send_message_request_parts(&cmpr_message, EndpointUris::SEND_COMPRESSED_MESSAGE, true)?
+        } else {
+            self.request_builder.get_send_message_request_parts(msg, EndpointUris::SEND_MESSAGE, false)?
+        };
 
-        // In the current implementation we always send compressed messages.
-        // This implies that the IOTA Bridge already knows the streams channel_id
-        // for our dev_eui.
-        // In a test scenario where the same iota-bridge is used for channel initialization
-        // and send-message usecases this will always be OK because the IOTA Bridge learns
-        // the dev_eui+channel_id pair when the channel is initialized.
-        //
-        // TODO: In case multiple IOTA Bridge instances are used for these usecases
-        //       the http protocol needs to handle this.
-        let compressed_message = TangleMessageCompressed::from_tangle_message(msg);
-        // We do not set the dev_eui here because it will be communicated by the LoraWAN network
-        // and therefore will not be send as lorawan payload.
-        // Please note that due to this BinaryPersist implementation for TangleMessageCompressed
-        // does not serialize/deserialize the dev_eui in general.
-        let req_parts = self.request_builder.get_send_message_request_parts(&compressed_message, EndpointUris::SEND_COMPRESSED_MESSAGE)?;
         self.request(req_parts).await?;
         Ok(())
     }
 
     async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         log::debug!("[HttpClient.recv_message_via_http]");
-        // Please note the comments in fn send_message_via_http() above
-        // Same principles apply here
-        let compressed_tangle_address = TangleAddressCompressed::from_tangle_address(link);
-        let response = self.request(
+        let req_parts = if self.use_compressed_msg {
+            // We do not set the dev_eui here because it will be communicated by the LoraWAN network
+            // and therefore will not be send as lorawan payload.
+            // Please note that due to this BinaryPersist implementation for TangleMessageCompressed
+            // does not serialize/deserialize the dev_eui in general.
+            let cmpr_link = TangleAddressCompressed::from_tangle_address(link);
             self.request_builder.get_receive_message_from_address_request_parts(
-                &compressed_tangle_address,
+                &cmpr_link,
                 EndpointUris::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS,
+                true,
                 QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_MSGID
-            )?,
-        ).await?;
+            )?
+        } else {
+            self.request_builder.get_receive_message_from_address_request_parts(
+                link,
+                EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS,
+                false,
+                QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS
+            )?
+        };
+
+        let response = self.request(req_parts).await?;
 
         log::debug!("[HttpClient.recv_message_via_http] check for retrials");
         // TODO: Implement following retrials for bad LoRaWAN connection using EspTimerService if needed.
@@ -272,16 +290,24 @@ impl<'a> Drop for ResponseCallbackScopeManager<'a> {
 impl HttpClient
 {
     pub async fn request<'a>(&mut self, req_parts: IotaBridgeRequestParts) -> Result<IotaBridgeResponseParts> {
-
-        let _response_callback_scope_manager = ResponseCallbackScopeManager::new();
-
         let mut buffer: Vec<u8> = vec![0; req_parts.needed_size()];
         req_parts.to_bytes(buffer.as_mut_slice())?;
         log::debug!("[HttpClient.request] IotaBridgeRequestParts bytes to send: Length: {}\n    {:02X?}", buffer.len(), buffer);
+        let response_parts = self.request_via_lorawan(buffer).await?;
 
-        let success= (self.lorawan_send_callback)(buffer.as_ptr(), buffer.len(), receive_response);
+        // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
+        // http status which indicates that the iota-bridge has stored all needed
+        // data to use compressed massages further on.
+        if response_parts.status_code == StatusCode::ALREADY_REPORTED {
+            self.use_compressed_msg = true;
+        }
 
-        match success {
+        Ok(response_parts)
+    }
+
+    pub async fn request_via_lorawan(&mut self, buffer: Vec<u8>) -> Result<IotaBridgeResponseParts> {
+        let _response_callback_scope_manager = ResponseCallbackScopeManager::new();
+        match (self.lorawan_send_callback)(buffer.as_ptr(), buffer.len(), receive_response) {
             LoRaWanError::LORAWAN_OK => {
                 log::debug!("[HttpClient.request] Successfully send request via LoRaWAN");
                 let receiver = get_response_receiver()?;
@@ -312,6 +338,16 @@ impl HttpClient
                 bail!("lorawan_send_callback returned error LORAWAN_NO_CONNECTION")
             },
         }
+    }
+}
+
+impl Compressed for HttpClient {
+    fn set_use_compressed_msg(&mut self, use_compressed_msg: bool) {
+        self.use_compressed_msg = use_compressed_msg;
+    }
+
+    fn get_use_compressed_msg(&self) -> bool {
+        self.use_compressed_msg
     }
 }
 

@@ -9,19 +9,26 @@ use hyper::{
 };
 
 use crate::{
-    http::http_tools::{
-        RequestBuilderTools,
-        get_body_bytes_from_enumerated_persistable,
+    http::{
+        ScopeConsume,
+        http_tools::{
+            DispatchedRequestParts,
+            RequestBuilderTools,
+            get_body_bytes_from_enumerated_persistable,
+        }
     },
-    binary_persist::binary_persist_confirmation::{
-        Subscription,
-        Confirmation
+    binary_persist::{
+        SubscriberStatus,
+        SendMessages,
+        binary_persist_confirmation::{
+            Subscription,
+            Confirmation
+        }
     }
 };
 
 use iota_streams::core::async_trait;
-use crate::binary_persist::{SubscriberStatus, SendMessages};
-use crate::http::http_tools::DispatchedRequestParts;
+
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -110,7 +117,7 @@ impl RequestBuilderConfirm {
 }
 
 #[async_trait(?Send)]
-pub trait ServerDispatchConfirm {
+pub trait ServerDispatchConfirm: ScopeConsume {
     fn get_uri_prefix(&self) -> &'static str;
     async fn fetch_next_confirmation(self: &mut Self) -> Result<Response<Body>>;
     async fn register_confirmation(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>>;

@@ -1,5 +1,7 @@
 use std::{
     clone::Clone,
+    collections::VecDeque,
+    rc::Rc,
 };
 
 use iota_streams::core::async_trait;
@@ -18,17 +20,21 @@ use crate::{
         EnumeratedPersistable,
         Confirmation,
     },
-    http::http_protocol_confirm::{
-        ServerDispatchConfirm,
-        URI_PREFIX_CONFIRM,
+    http::{
+        ScopeConsume,
+        DispatchScope,
+        http_protocol_confirm::{
+            ServerDispatchConfirm,
+            URI_PREFIX_CONFIRM,
+        }
     },
 };
-use std::collections::VecDeque;
 
 static mut FIFO_QUEUE: Option<VecDeque<Vec<u8>>> = None;
 
 pub struct DispatchConfirm<'a> {
     fifo: &'a mut VecDeque<Vec<u8>>,
+    scope: Option<Rc<dyn DispatchScope>>,
 }
 
 impl<'a> Clone for DispatchConfirm<'a> {
@@ -45,6 +51,7 @@ impl<'a> Clone for DispatchConfirm<'a> {
         }
         Self {
             fifo: fifo_queue,
+            scope: self.scope.clone(),
         }
     }
 }
@@ -63,6 +70,7 @@ impl<'a> DispatchConfirm<'a>
 
         Self {
             fifo: fifo_queue,
+            scope: None,
         }
     }
 }
@@ -99,5 +107,12 @@ impl<'a> ServerDispatchConfirm for DispatchConfirm<'a> {
                  self.fifo.len(),
         );
         Ok(Response::new(Default::default()))
+    }
+}
+
+#[async_trait(?Send)]
+impl<'a> ScopeConsume for DispatchConfirm<'a> {
+    fn set_scope(&mut self, scope: Rc<dyn DispatchScope>) {
+        self.scope = Some(scope);
     }
 }

@@ -17,13 +17,16 @@ use crate::{
     },
 };
 
-use super::http_tools::{
-    RequestBuilderTools,
-    get_body_bytes_from_enumerated_persistable,
+use super::{
+    http_dispatch_scope::ScopeConsume,
+    http_tools::{
+        RequestBuilderTools,
+        DispatchedRequestParts,
+        get_body_bytes_from_enumerated_persistable,
+    }
 };
 
 use iota_streams::core::async_trait;
-use crate::http::http_tools::DispatchedRequestParts;
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -109,7 +112,7 @@ impl RequestBuilderCommand {
 }
 
 #[async_trait(?Send)]
-pub trait ServerDispatchCommand {
+pub trait ServerDispatchCommand: ScopeConsume {
     fn get_uri_prefix(&self) -> &'static str;
     async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>>;
     async fn register_remote_command(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>>;

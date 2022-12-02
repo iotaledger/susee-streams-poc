@@ -14,7 +14,6 @@ use hyper::{
     }
 };
 use iota_streams::core::async_trait;
-use crate::http::http_tools::DispatchedRequestStatus;
 
 pub struct EndpointUris {}
 
@@ -84,14 +83,7 @@ pub async fn dispatch_request_lorawan_rest<'a>(req_parts: &DispatchedRequestPart
         _ => {
             // Return a copy of the original req_parts and set status to LORAWAN_REST_404.
             log::debug!("[dispatch_request_lorawan_rest] could not dispatch method {} for path '{}'. Returning 404.", req_parts.method, req_parts.path);
-            Ok(DispatchedRequestParts {
-                dev_eui: req_parts.dev_eui.clone(),
-                req_url: req_parts.req_url.clone(),
-                status: DispatchedRequestStatus::LorawanRest404,
-                method: req_parts.method.clone(),
-                path: req_parts.path.clone(),
-                binary_body:  req_parts.binary_body.clone(),
-            })
+            Ok(req_parts.clone())
         }
     }
 }

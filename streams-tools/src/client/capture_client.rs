@@ -18,6 +18,7 @@ use iota_streams::{
         Result,
     },
 };
+use crate::subscriber_manager::Compressed;
 
 #[derive(Clone)]
 pub struct CaptureClient(pub Client);
@@ -25,6 +26,16 @@ pub struct CaptureClient(pub Client);
 impl CaptureClient {
     pub fn new_from_url(url: &str) -> Self {
         Self(Client::new_from_url(url))
+    }
+}
+
+impl Compressed for CaptureClient {
+    fn set_use_compressed_msg(&mut self, _use_compressed_msg: bool) {
+        unimplemented!()
+    }
+
+    fn get_use_compressed_msg(&self) -> bool {
+        unimplemented!()
     }
 }
 

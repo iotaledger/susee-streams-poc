@@ -183,7 +183,7 @@ impl<DaoManagerT: DaoManager + Clone> DaoDataStore<DaoManagerT> {
         Ok((item, serialization_callback))
     }
 
-    pub fn get_item(&mut self, key: &str) -> Result<(DaoManagerT::ItemType, DaoManagerT::SerializationCallbackType)>{
+    pub fn get_item(&self, key: &str) -> Result<(DaoManagerT::ItemType, DaoManagerT::SerializationCallbackType)>{
         let item = self.items.get_item_from_db(key)?;
         let serialization_callback = self.items.get_serialization_callback(&item);
         Ok((item, serialization_callback))

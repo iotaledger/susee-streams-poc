@@ -20,6 +20,7 @@ use iota_streams::{
 use std::{
     clone::Clone,
     str::FromStr,
+    rc::Rc,
 };
 
 use hyper::{
@@ -32,27 +33,39 @@ use hyper::{
 
 use crate::{
     binary_persist::{
+        TangleMessageCompressed,
+        TangleAddressCompressed,
         BinaryPersist,
         TANGLE_ADDRESS_BYTE_LEN,
     },
-    http::http_protocol_streams::{
-        ServerDispatchStreams,
-        URI_PREFIX_STREAMS,
+    http::{
+        ScopeConsume,
+        DispatchScope,
+        http_tools::{
+            get_response_400,
+            get_response_500
+        },
+        http_protocol_streams::{
+            ServerDispatchStreams,
+            URI_PREFIX_STREAMS,
+        }
     },
     iota_bridge::{
-        helpers::log_err_and_respond_500,
+        helpers::{
+            log_err_and_respond_500,
+            DispatchScopeKeys,
+        },
         LoraWanNodeDataStore,
     },
 };
 
 use log;
-use crate::binary_persist::{TangleMessageCompressed, TangleAddressCompressed};
-use crate::http::http_tools::{get_response_400, get_response_500};
 
 #[derive(Clone)]
 pub struct DispatchStreams {
     client: Client,
-    lorawan_nodes: LoraWanNodeDataStore
+    lorawan_nodes: LoraWanNodeDataStore,
+    scope: Option<Rc<dyn DispatchScope>>,
 }
 
 impl DispatchStreams
@@ -60,7 +73,14 @@ impl DispatchStreams
     pub fn new(client: &Client, lorawan_nodes: LoraWanNodeDataStore) -> Self {
         Self {
             client: client.clone(),
-            lorawan_nodes: lorawan_nodes,
+            lorawan_nodes,
+            scope: None,
+        }
+    }
+
+    fn write_channel_id_to_scope(&self, link: &TangleAddress) {
+        if let Some(scope) = &self.scope {
+            scope.set_string(DispatchScopeKeys::STREAMS_CHANNEL_ID, link.appinst.to_string().as_str());
         }
     }
 }
@@ -96,7 +116,10 @@ impl ServerDispatchStreams for DispatchStreams {
         println_send_message_for_incoming_message(message);
         let res = self.client.send_message(message).await;
         match res {
-            Ok(_) => Ok(Response::new(Default::default())),
+            Ok(_) => {
+                self.write_channel_id_to_scope(&message.link);
+                Ok(Response::new(Default::default()))
+            },
             Err(err) => log_err_and_respond_500(err, "send_message")
         }
     }
@@ -109,6 +132,7 @@ impl ServerDispatchStreams for DispatchStreams {
         match message {
             Ok(msg) => {
                 println_receive_message_from_address_for_received_message(&msg);
+                self.write_channel_id_to_scope(&address);
                 let mut buffer: Vec<u8> = vec![0;BinaryPersist::needed_size(&msg)];
                 let size = BinaryPersist::to_bytes(&msg, buffer.as_mut_slice());
                 log::debug!("[HttpClientProxy - DispatchStreams] receive_message_from_address() - Returning binary data via socket connection. length: {} bytes, data:\n\
@@ -156,5 +180,12 @@ impl ServerDispatchStreams for DispatchStreams {
 
         let full_address_str = TangleAddressCompressed::build_tangle_address_str(msgid, lora_wan_node.streams_channel_id.as_str());
         self.receive_message_from_address(full_address_str.as_str()).await
+    }
+}
+
+#[async_trait(?Send)]
+impl ScopeConsume for DispatchStreams {
+    fn set_scope(&mut self, scope: Rc<dyn DispatchScope>) {
+        self.scope = Some(scope);
     }
 }

@@ -53,8 +53,23 @@ use smol::block_on;
 
 type Subscriber<ClientT> = iota_streams::app_channels::api::tangle::Subscriber<ClientT>;
 
-pub trait ClientTTrait: Clone + TransportOptions + Transport<Address, Message> + TransportDetails<Address> {}
-impl<T> ClientTTrait for T where T: Clone + TransportOptions + Transport<Address, Message> + TransportDetails<Address> {}
+// The USE_COMPRESSED_MSG state indicates if a Subscriber is known by the iota-bridge so that
+// compressed messages can be used. Subscribers will send uncompressed messages
+// until the iota-bridge indicates that it has stored all needed data to use
+// compressed massages further on. The Subscriber persists the USE_COMPRESSED_MSG state in its
+// serialization file so that the state will not get lost.
+//
+// Tangle client instances need to implement the Compressed trait to provide the latest state
+// of USE_COMPRESSED_MSG to the Subscriber and to be initialized correctly by the subscriber.
+pub trait Compressed {
+    // Used by the Subscriber to initially set the Tangle client use_compressed_msg state
+    fn set_use_compressed_msg(&mut self, use_compressed_msg: bool);
+    // Used by the Subscriber to query the latest use_compressed_msg state from the Tangle client
+    fn get_use_compressed_msg(&self) -> bool;
+}
+
+pub trait ClientTTrait: Clone + TransportOptions + Transport<Address, Message> + TransportDetails<Address> + Compressed {}
+impl<T> ClientTTrait for T where T: Clone + TransportOptions + Transport<Address, Message> + TransportDetails<Address> + Compressed {}
 
 pub struct SubscriberManager<ClientT: ClientTTrait, WalletT: SimpleWallet>
 {
@@ -215,6 +230,7 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
             let static_sized_buffer_front_length =
                   TANGLE_ADDRESS_BYTE_LEN               // PREV_MSG_LINK
                 + TANGLE_ADDRESS_BYTE_LEN               // SUBSCRIPTION_LINK
+                + 1                                     // use_compressed_msg
             ;
             let mut buffer: Vec<u8> = vec![0; static_sized_buffer_front_length];
             log::debug!("[fn export_to_serialization_file] - buffer.len: {}", buffer.len());
@@ -228,6 +244,12 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
             range.increment(TANGLE_ADDRESS_BYTE_LEN);
             log::debug!("[fn export_to_serialization_file] - persist SUBSCRIPTION_LINK");
             self.persist_optional_tangle_address(&mut buffer, &mut range, self.subscription_link);
+
+            // use_compressed_msg
+            range.increment(1);
+            log::debug!("[fn export_to_serialization_file] - persist use_compressed_msg");
+            let use_compressed_msg = self.client.get_use_compressed_msg();
+            u8::to_bytes(&use_compressed_msg.into(), &mut buffer[range.clone()])?;
 
             // SUBSCRIBER
             log::debug!("[fn export_to_serialization_file] - persist SUBSCRIBER");
@@ -265,6 +287,11 @@ async fn import_from_serialization_file<ClientT: ClientTTrait, WalletT: SimpleWa
     // SUBSCRIPTION_LINK
     range.increment(TANGLE_ADDRESS_BYTE_LEN);
     ret_val.subscription_link = read_optional_tangle_address_from_bytes(&buffer, &range);
+
+    // use_compressed_msg
+    range.increment(1);
+    let use_compressed_msg = u8::try_from_bytes(&buffer[range.clone()])? != 0;
+    ret_val.client.set_use_compressed_msg(use_compressed_msg);
 
     // SUBSCRIBER
     let subscriber_export_len = buffer.len() - range.end;

@@ -2,7 +2,7 @@
 
 ## About
 This project contains five test applications providing command line interfaces (CLI) to evaluate the iota streams
-functionality. Additionally the static library *streams-poc-lib* provides C bindings for the most relevant *Sensor* 
+functionality that is used in the SUSEE project. Additionally, the static library *streams-poc-lib* provides C bindings for the most relevant *Sensor* 
 specific functionality for the SUSEE project.
 
 Following test applications are contained. For more details regarding the general usecase please see below in the 
@@ -249,6 +249,10 @@ as these applications do not need a wallet:
   The *ESP32 Sensor* reads and persists its user state every time a command is received from the *IOTA-Bridge*.
   The state is persisted in a FAT partition located in the SPI flash memory of the ESP32 board.
   This way the user state is secured against power outages of the ESP32.
+  
+* The *IOTA Bridge* stores a map of LoraWAN DevEUIs and Streams Channel IDs in a local SQLite3
+  database "lora-wan-nodes-iota-bridge.sqlite3". More details can be found in the 
+  <a href="#compressed-streams-messages">Compressed Streams Messages</a> section.
 
 ### Management Console CLI
 
@@ -557,8 +561,8 @@ To demonstrate the usage of the API here is a cURL example:
 
 Underlying usecase: Given you are using the streams-poc-lib function
 [send_message()](sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
-in your C code you will receive a binary package via the `lorawan_send_callback` callback function that you need
-to specify to call this function. You'll transmit this binary package e.g. via LoRaWAN. In your LoRaWAN Application
+in your C code you will receive a binary package via the `lorawan_send_callback` function that you need
+to specify to call send_message(). You'll transmit this binary package e.g. via LoRaWAN. In your LoRaWAN Application
 Server you can use the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge* to hand the binary package over to it. 
 
 The body of the resulting HTTP Resonse needs to be returned to the *ESP32 Sensor* via the `response_callback`
@@ -574,6 +578,32 @@ The *LoraWan AppServer Mockup Tool* implements this process but uses a WIFI
 socket connection instead of a LoRaWAN connection. For further details please
 have a look into the
 [*LoraWan AppServer Mockup Tool* README](lora-app-srv-mock/README.md).
+
+## Compressed Streams Messages
+To reduce the payload size a *Sensor* and the *IOTA Bridge* can use compressed streams messages.
+Compressed messages do not contain Streams Channel IDs and other data that can be restored by the
+*IOTA Bridge*.
+
+IMPORTANT: To restore the omitted data of a compressed message the *IOTA Bridge*
+can process on the encrypted message. It would not be possible to process on the decrypted
+message anyway, because in the SUSEE project the encryption key never leaves the
+*Sensor* for security reasons. That said, it would not be possible do decrypt the
+message in the *IOTA Bridge*.
+
+The usage of compressed messages is only possible after one or more normal streams messages have
+been send using the *IOTA Bridge*. The *IOTA Bridge* then learns which Streams Channel ID is used
+by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI. Using LoraWAN, the DevEUI
+is available via the protocol automatically and does not need to be transferred as message payload.
+
+The mapping of LoraWAN DevEUI to Streams Channel ID is stored in a local SQLite3 database.
+The database file "lora-wan-nodes-iota-bridge.sqlite3" is stored in the directory where the
+*IOTA-Bridge* is started. 
+
+In case the *IOTA Bridge* added a *Sensor* to its mapping database the response of the 
+REST call that caused the new *Sensor* entry will have a 208 - ALREADY_REPORTED http status.
+All *Sensor* applications recognise this http status and will only use compressed
+messages further on. The Sensor applications store the state whether to use compressed
+messages or not in their local user-state serialization files.
 
 ## Example Workflows
 There are two ways to initialize a sensor. The easiest way is to use the `--init-sensor` option of
@@ -611,7 +641,7 @@ the *Management Console* application:
 ```
 
 The *Management Console* then will perform all the steps described below fully automatically.
-See the <a href="#management-console-cli">CLI help for the `--init-sensor` option</a> or
+See the <a href="#automatic-sensor-initialization">CLI help for the `--init-sensor` option</a>
 of the *Management Console* for further details.
 
 ### Manual Sensor Initialization

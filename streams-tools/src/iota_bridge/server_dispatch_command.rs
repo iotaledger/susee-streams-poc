@@ -1,5 +1,7 @@
 use std::{
     clone::Clone,
+    collections::VecDeque,
+    rc::Rc,
 };
 
 use iota_streams::core::async_trait;
@@ -18,17 +20,21 @@ use crate::{
         EnumeratedPersistable,
         Command,
     },
-    http::http_protocol_command::{
-        ServerDispatchCommand,
+    http::{
+        DispatchScope,
+        ScopeConsume,
+        http_protocol_command::{
+            ServerDispatchCommand,
+            URI_PREFIX_COMMAND,
+        }
     },
 };
-use std::collections::VecDeque;
-use crate::http::http_protocol_command::URI_PREFIX_COMMAND;
 
 static mut FIFO_QUEUE: Option<VecDeque<Vec<u8>>> = None;
 
 pub struct DispatchCommand<'a> {
     fifo: &'a mut VecDeque<Vec<u8>>,
+    scope: Option<Rc<dyn DispatchScope>>,
 }
 
 impl<'a> Clone for DispatchCommand<'a> {
@@ -45,6 +51,7 @@ impl<'a> Clone for DispatchCommand<'a> {
         }
         Self {
             fifo: fifo_queue,
+            scope: self.scope.clone()
         }
     }
 }
@@ -63,6 +70,7 @@ impl<'a> DispatchCommand<'a>
 
         Self {
             fifo: fifo_queue,
+            scope: None,
         }
     }
 }
@@ -99,5 +107,12 @@ impl<'a> ServerDispatchCommand for DispatchCommand<'a> {
                  self.fifo.len(),
         );
         Ok(Response::new(Default::default()))
+    }
+}
+
+#[async_trait(?Send)]
+impl<'a> ScopeConsume for DispatchCommand<'a> {
+    fn set_scope(&mut self, scope: Rc<dyn DispatchScope>) {
+        self.scope = Some(scope);
     }
 }

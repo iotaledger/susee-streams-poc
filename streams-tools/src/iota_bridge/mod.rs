@@ -7,6 +7,8 @@ mod server_dispatch_streams;
 mod server_dispatch_confirm;
 mod server_dispatch_lorawan_node;
 mod server_dispatch_lorawan_rest;
+mod server_process_finally;
+mod dispatch_scope;
 
 pub use {
     iota_bridge::{
@@ -20,4 +22,6 @@ pub use {
     server_dispatch_confirm::DispatchConfirm,
     server_dispatch_lorawan_rest::DispatchLorawanRest,
     server_dispatch_lorawan_node::DispatchLoraWanNode,
+    server_process_finally::ProcessFinally,
+    dispatch_scope::ServerScopeProvide,
 };

@@ -57,11 +57,12 @@ impl DaoManager for UserDaoManager {
 
     fn init_db_schema(&self) -> Result<()> {
         self.connection.execute(format!("CREATE TABLE {} (\
-            streams_channel_id TEXT NOT NULL PRIMARY KEY,\
+            {} TEXT NOT NULL PRIMARY KEY,\
             streams_user_state BLOB NOT NULL,\
             seed_derivation_phrase TEXT NOT NULL\
             )
-            ", Self::TABLE_NAME).as_str(), []).expect("Error on executing 'CREATE TABLE' for User");
+            ", Self::TABLE_NAME, Self::PRIMARY_KEY_COLUMN_NAME).as_str(), [])
+            .expect("Error on executing 'CREATE TABLE' for User");
         Ok(())
     }
 

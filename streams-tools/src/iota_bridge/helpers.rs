@@ -9,6 +9,12 @@ use iota_streams::core::Errors;
 
 use crate::http::http_protocol_streams::MapStreamsErrors;
 
+pub struct DispatchScopeKeys {}
+
+impl DispatchScopeKeys {
+    pub const STREAMS_CHANNEL_ID: &'static str = "channel-id";
+}
+
 pub fn log_err_and_respond_500(err: anyhow::Error, fn_name: &str) -> Result<Response<Body>> {
     println!("[HttpClientProxy - {}] Error: {}", fn_name, err);
 

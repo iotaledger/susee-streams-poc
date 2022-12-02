@@ -34,15 +34,19 @@ use crate::{
         binary_persist_iota_bridge_req::{
             IotaBridgeRequestParts,
             HttpMethod,
+            HeaderFlags,
         }
     },
-    http::http_tools::{
-        DispatchedRequestParts,
-        DispatchedRequestStatus,
-        get_dev_eui_from_str,
-        StreamsToolsHttpResult,
-        StreamsToolsHttpError,
-        get_response_from_error,
+    http::{
+        ScopeConsume,
+        http_tools::{
+            DispatchedRequestParts,
+            DispatchedRequestStatus,
+            get_dev_eui_from_str,
+            StreamsToolsHttpResult,
+            StreamsToolsHttpError,
+            get_response_from_error,
+        }
     }
 };
 
@@ -138,36 +142,37 @@ impl RequestBuilderStreams {
         }
     }
 
-    pub fn get_send_message_request_parts<MessageT: BinaryPersist>(self: &Self, message: &MessageT, endpoint_uri: &str) -> Result<IotaBridgeRequestParts> {
+    pub fn get_send_message_request_parts<MessageT: BinaryPersist>(self: &Self, message: &MessageT, endpoint_uri: &str, is_compressed: bool) -> Result<IotaBridgeRequestParts> {
         let mut buffer: Vec<u8> = vec![0; message.needed_size()];
         message.to_bytes(buffer.as_mut_slice()).expect("Persisting into binary data failed");
-
+        let header_flags = RequestBuilderStreams::get_header_flags(is_compressed, HttpMethod::POST);
         Ok(IotaBridgeRequestParts::new(
-            HttpMethod::POST,
+            header_flags,
             self.tools.get_uri(endpoint_uri),
             buffer
         ))
     }
 
     pub fn send_message(self: &Self, message: &TangleMessage) -> Result<Request<Body>> {
-        self.get_send_message_request_parts(message, EndpointUris::SEND_MESSAGE)?
+        self.get_send_message_request_parts(message, EndpointUris::SEND_MESSAGE, false)?
             .into_request(RequestBuilderTools::get_request_builder())
     }
 
     pub fn send_compressed_message(self: &Self, message: &TangleMessageCompressed) -> Result<Request<Body>> {
-        self.get_send_message_request_parts(message, EndpointUris::SEND_COMPRESSED_MESSAGE)?
+        self.get_send_message_request_parts(message, EndpointUris::SEND_COMPRESSED_MESSAGE, true)?
             .into_request(RequestBuilderTools::get_request_builder())
     }
 
-    pub fn get_receive_message_from_address_request_parts<AdressT: Display>(self: &Self, address: &AdressT, endpoint_uri: &str, query_param: &str) -> Result<IotaBridgeRequestParts> {
+    pub fn get_receive_message_from_address_request_parts<AdressT: Display>(self: &Self, address: &AdressT, endpoint_uri: &str, is_compressed: bool, query_param: &str) -> Result<IotaBridgeRequestParts> {
         let uri = format!("{}?{}={}",
                           self.tools.get_uri(endpoint_uri).as_str(),
                           query_param,
                           address.to_string()
         );
 
+        let header_flags = RequestBuilderStreams::get_header_flags(is_compressed, HttpMethod::GET);
         Ok(IotaBridgeRequestParts::new(
-            HttpMethod::GET,
+            header_flags,
             uri,
             Vec::<u8>::new()
         ))
@@ -177,6 +182,7 @@ impl RequestBuilderStreams {
         self.get_receive_message_from_address_request_parts(
             address,
             EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS,
+            false,
             QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS
         )?
         .into_request(RequestBuilderTools::get_request_builder())
@@ -186,14 +192,23 @@ impl RequestBuilderStreams {
         self.get_receive_message_from_address_request_parts(
             address,
             EndpointUris::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS,
+            true,
             QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_MSGID
         )?
         .into_request(RequestBuilderTools::get_request_builder())
     }
+
+    fn get_header_flags(is_compressed: bool, method: HttpMethod) -> HeaderFlags {
+        let mut header_flags = HeaderFlags::from(method);
+        if is_compressed {
+            header_flags.insert(HeaderFlags::NEEDS_REGISTERD_LORAWAN_NODE);
+        }
+        header_flags
+    }
 }
 
 #[async_trait(?Send)]
-pub trait ServerDispatchStreams {
+pub trait ServerDispatchStreams: ScopeConsume {
     fn get_uri_prefix(&self) -> &'static str;
     async fn send_message<F: 'static + core::marker::Send + core::marker::Sync>(
         self: &mut Self, message: &TangleMessage) -> Result<Response<Body>>;

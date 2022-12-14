@@ -1,5 +1,6 @@
 use std::{
     clone::Clone,
+    rc::Rc,
 };
 
 use crate::{
@@ -8,6 +9,8 @@ use crate::{
         binary_persist_iota_bridge_req::IotaBridgeRequestParts,
     },
     http::{
+        DispatchScope,
+        ScopeConsume,
         http_protocol_lorawan_rest::{
             ServerDispatchLorawanRest,
             URI_PREFIX_LORAWAN_REST,
@@ -19,15 +22,32 @@ use crate::{
         }
     },
 };
+
+use super::helpers::{
+    DispatchScopeValue,
+    write_to_scope,
+};
+
 use iota_streams::core::async_trait;
 
 #[derive(Clone)]
-pub struct DispatchLorawanRest {}
+pub struct DispatchLorawanRest {
+    scope: Option<Rc<dyn DispatchScope>>,
+}
 
 impl DispatchLorawanRest
 {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            scope: None,
+        }
+    }
+
+    fn write_scope_data(&self, needs_registerd_lorawan_node: bool, dev_eui: &str) {
+        if let Some(scope) = &self.scope {
+            write_to_scope(scope, DispatchScopeValue::LorawanDevEui(dev_eui.to_string()));
+            write_to_scope(scope, DispatchScopeValue::RequestNeedsRegisteredLorawanNode(needs_registerd_lorawan_node));
+        }
     }
 }
 
@@ -46,7 +66,14 @@ impl ServerDispatchLorawanRest for DispatchLorawanRest {
         let mut ret_val = DispatchedRequestParts::new(hyper_request).await?;
         ret_val.status = DispatchedRequestStatus::DeserializedLorawanRest;
         ret_val.dev_eui = String::from(dev_eui);
-        ret_val.needs_registered_lorawan_node = needs_registerd_lorawan_node;
+        self.write_scope_data(needs_registerd_lorawan_node, dev_eui);
         Ok(ret_val)
+    }
+}
+
+#[async_trait(?Send)]
+impl ScopeConsume for DispatchLorawanRest {
+    fn set_scope(&mut self, scope: Rc<dyn DispatchScope>) {
+        self.scope = Some(scope);
     }
 }

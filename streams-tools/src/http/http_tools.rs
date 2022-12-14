@@ -142,6 +142,15 @@ macro_rules! ok_or_bail_http_response {
     }
 }
 
+#[macro_export]
+macro_rules! ok_or_bail_internal_error_response_500 {
+    ($fn_to_call: expr) => {
+        match $fn_to_call {
+            Ok(value) => value,
+            Err(err) => return get_response_500(err.to_string().as_str())
+        }
+    }
+}
 
 
 // Use the the persisted Command::XXXX_XXXX_XXXX instead as Response<Body>
@@ -182,7 +191,6 @@ pub struct DispatchedRequestParts {
     pub binary_body: Vec<u8>,
     pub status: DispatchedRequestStatus,
     pub dev_eui: String,
-    pub needs_registered_lorawan_node: bool,
 }
 
 impl<'a> DispatchedRequestParts {
@@ -205,7 +213,6 @@ impl<'a> DispatchedRequestParts {
 
         let ret_val = DispatchedRequestParts {
             dev_eui: String::new(),
-            needs_registered_lorawan_node: false,
             req_url: req_url.to_owned(),
             status: DispatchedRequestStatus::default(),
             method: method.to_owned(),

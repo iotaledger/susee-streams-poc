@@ -104,6 +104,11 @@ impl ServerDispatchScope {
 }
 
 impl DispatchScope for ServerDispatchScope {
+
+    fn contains_key(&self, key: &'static str) -> bool  {
+        self.map.contains_key(key)
+    }
+
     fn get_bool(&self, key: &'static str) -> Result<bool> {
         self.get_value::<bool>(key)
     }

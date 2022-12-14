@@ -19,7 +19,6 @@ use hyper::{
     body,
     Body,
     client::HttpConnector,
-    http::StatusCode,
 };
 
 use anyhow::{
@@ -130,8 +129,8 @@ impl<'a> RemoteSensor<'a> {
             self.get_request_builder_confirm().fetch_next_confirmation()?
         ).await?;
 
-        if response.status() == StatusCode::OK {
-            log::debug!("[RemoteSensor.fetch_next_confirmation] StatusCode::OK - process confirmation");
+        if response.status().is_success() {
+            log::debug!("[RemoteSensor.fetch_next_confirmation] StatusCode is successful: {}", response.status());
             let bytes = body::to_bytes(response.into_body()).await?;
             let confirmation = <Confirmation as BinaryPersist>::try_from_bytes(&bytes)?;
             Ok((confirmation, bytes.to_vec()))

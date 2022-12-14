@@ -79,6 +79,7 @@ pub async fn dispatch_request<'a, Scope, Streams, Command, Confirm, LorawanNode,
     let scope = normal_callbacks.create_new_scope();
     if let Ok( req_parts) = DispatchedRequestParts::new(req).await {
         if req_parts.path.starts_with(lorawan_rest_callbacks.get_uri_prefix()) {
+            lorawan_rest_callbacks.set_scope(scope.clone());
             ret_val = dispatch_lorawan_rest_request(
                 &req_parts,
                 lorawan_rest_callbacks,
@@ -117,6 +118,7 @@ async fn dispatch_lorawan_rest_request<'a, Scope, Streams, Command, Confirm, Lor
                     log::debug!("[dispatch_lorawan_rest_request] Processing DeserializedLorawanRest now");
                     let response = normal_callbacks.dispatch(&req_parts_inner).await?;
                     let response_parts = IotaBridgeResponseParts::from_hyper_response(response).await;
+                    println!("[dispatch_lorawan_rest_request] Returning response for dev_eui '{}'\n{}", req_parts_inner.dev_eui, response_parts);
                     response_parts.persist_to_hyper_response_200()
                 }
                 DispatchedRequestStatus::LorawanRest404 => {

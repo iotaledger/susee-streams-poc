@@ -48,18 +48,23 @@ use crate::{
         http_protocol_streams::{
             ServerDispatchStreams,
             URI_PREFIX_STREAMS,
-        }
-    },
-    iota_bridge::{
-        helpers::{
-            log_err_and_respond_500,
-            DispatchScopeKeys,
         },
-        LoraWanNodeDataStore,
+        get_final_http_status,
     },
 };
 
+use super::{
+    helpers::{
+        log_err_and_respond_500,
+        DispatchScopeValue,
+        DispatchScopeKey,
+        write_to_scope,
+    },
+    LoraWanNodeDataStore,
+};
+
 use log;
+use hyper::http::StatusCode;
 
 #[derive(Clone)]
 pub struct DispatchStreams {
@@ -80,8 +85,38 @@ impl DispatchStreams
 
     fn write_channel_id_to_scope(&self, link: &TangleAddress) {
         if let Some(scope) = &self.scope {
-            scope.set_string(DispatchScopeKeys::STREAMS_CHANNEL_ID, link.appinst.to_string().as_str());
+            write_to_scope(scope, DispatchScopeValue::StreamsChannelId(link.appinst.to_string()));
         }
+    }
+
+    fn get_success_response_status_code(self: &Self) -> StatusCode {
+        let mut ret_val = StatusCode::OK;
+        // The iota-bridge needs to store a lorawan_node in the database if all needed data are available
+        // and the lorawan_node has not already been stored in the database.
+        // This requires that the ServerDispatchStreams function has been called via a
+        // DispatchLorawanRest::post_binary_request() call because otherwise in case of
+        // send_message() or receive_message_from_address() calls the dev_eui would not be known.
+        //
+        // Calls to the functions send_compressed_message() and receive_compressed_message_from_address()
+        // would provide the dev_eui but these functions shall only be used by sensors in case the
+        // lorawan_node already has been stored in the iota-bridge database.
+        //
+        // As The DispatchScopeKey::REQUEST_NEEDS_REGISTERED_LORAWAN_NODE is only added by
+        // DispatchLorawanRest::post_binary_request() our first condition is that this key must exist on the scope.
+        if let Some(scope) = self.scope.as_ref() {
+            if scope.contains_key(DispatchScopeKey::REQUEST_NEEDS_REGISTERED_LORAWAN_NODE) {
+                let request_needs_registered_lorawan_node = scope.get_bool(DispatchScopeKey::REQUEST_NEEDS_REGISTERED_LORAWAN_NODE)
+                    .expect("Error on getting NEEDS_REGISTERED_LORAWAN_NODE from scope");
+                // If the request needs a registered lorawan_node we don't want to add a new lorawan_node
+                // to the database because this flag is only set when the Sensor already expects the iota-bridge
+                // to know the lorawan_node resp. the lorawan_node is already contained in the iota-bridge database.
+                let add_new_lorawan_node_to_db = !request_needs_registered_lorawan_node;
+                write_to_scope(scope, DispatchScopeValue::AddNewLorawanNodeToDb(add_new_lorawan_node_to_db));
+                ret_val = get_final_http_status(&StatusCode::OK, add_new_lorawan_node_to_db);
+            }
+        }
+
+        ret_val
     }
 }
 
@@ -118,7 +153,8 @@ impl ServerDispatchStreams for DispatchStreams {
         match res {
             Ok(_) => {
                 self.write_channel_id_to_scope(&message.link);
-                Ok(Response::new(Default::default()))
+                Response::builder().status(self.get_success_response_status_code())
+                    .body(Default::default())
             },
             Err(err) => log_err_and_respond_500(err, "send_message")
         }
@@ -137,7 +173,8 @@ impl ServerDispatchStreams for DispatchStreams {
                 let size = BinaryPersist::to_bytes(&msg, buffer.as_mut_slice());
                 log::debug!("[HttpClientProxy - DispatchStreams] receive_message_from_address() - Returning binary data via socket connection. length: {} bytes, data:\n\
 {:02X?}\n", size.unwrap_or_default(), buffer);
-                Ok(Response::new(buffer.into()))
+                Response::builder().status(self.get_success_response_status_code())
+                    .body(buffer.into())
             },
             Err(err) => log_err_and_respond_500(err, "[HttpClientProxy - DispatchStreams] receive_message_from_address()")
         }

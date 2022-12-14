@@ -16,7 +16,6 @@ use hyper::{
     body,
     Body,
     client::HttpConnector,
-    http::StatusCode,
 };
 
 use tokio::{
@@ -34,6 +33,7 @@ use streams_tools::{
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
     http::http_protocol_lorawan_rest::RequestBuilderLorawanRest,
     binary_persist::{
+        BinaryPersist,
         USIZE_LEN,
         binary_persist_iota_bridge_req::IotaBridgeRequestParts,
     },
@@ -92,8 +92,8 @@ impl<'a> LoraWanRestClient {
                 est for api function 'post_binary_request'")
         ).await.expect("Error on sending http request");
 
-        if response.status() == StatusCode::OK {
-            log::debug!("[LoraWanRestClient.post_binary_request_to_iota_bridge] StatusCode::OK - Returning Bytes");
+        if response.status().is_success() {
+            log::debug!("[LoraWanRestClient.post_binary_request_to_iota_bridge] {:?} - Returning Bytes", response.status());
             let bytes = body::to_bytes(response.into_body()).await?;
             Ok(bytes.to_vec())
         } else {
@@ -104,7 +104,7 @@ impl<'a> LoraWanRestClient {
     }
 }
 
-async fn handle_received_iota_bridge_request(stream: &mut TcpStream, buf: &[u8], iota_bridge_url: &str) {
+async fn handle_received_iota_bridge_request(stream: &mut TcpStream, dev_eui: u64, buf: &[u8], iota_bridge_url: &str) {
     println!("[LoraWanAppServerMock - fn handle_received_iota_bridge_request()] Received {} bytes to be send to iota-bridge {}", buf.len(), iota_bridge_url);
     let lorawan_rest_client = LoraWanRestClient::new(
         Some(
@@ -112,7 +112,7 @@ async fn handle_received_iota_bridge_request(stream: &mut TcpStream, buf: &[u8],
         )
     );
 
-    match lorawan_rest_client.post_binary_request_to_iota_bridge(buf.to_vec(), "dev_eui_goes_here").await {
+    match lorawan_rest_client.post_binary_request_to_iota_bridge(buf.to_vec(), dev_eui.to_string().as_str()).await {
         Ok(response) => {
             println!("[LoraWanAppServerMock - fn handle_received_iota_bridge_request()] Received {} bytes from iota-bridge. Sending bytes via socket back to client",
                      response.len());
@@ -133,7 +133,7 @@ async fn handle_received_iota_bridge_request(stream: &mut TcpStream, buf: &[u8],
     }
 }
 
-async fn receive_iota_bridge_request(stream: &mut TcpStream, request_length: usize, address: &SocketAddr, iota_bridge_url: &str) -> Result<()>{
+async fn receive_iota_bridge_request(stream: &mut TcpStream, dev_eui: u64, request_length: usize, address: &SocketAddr, iota_bridge_url: &str) -> Result<()>{
     // In case the request_length exceeds our read buffer size this test application just panics
     // with an appropriate error message.
     // In a production service implementation an additional loop should be used to read the stream
@@ -151,7 +151,7 @@ async fn receive_iota_bridge_request(stream: &mut TcpStream, request_length: usi
                     Current request length is {} bytes but {} bytes have been received.\n\
                     Will return an error to stop the message loop.", request_length, data_size)
             }
-            handle_received_iota_bridge_request(stream, &buf[0..request_length], iota_bridge_url).await;
+            handle_received_iota_bridge_request(stream, dev_eui, &buf[0..request_length], iota_bridge_url).await;
             Ok(())
         }
         Err(e) => {
@@ -160,6 +160,26 @@ async fn receive_iota_bridge_request(stream: &mut TcpStream, request_length: usi
     }
 }
 
+async fn read_request_length_and_process_iota_bridge_request(stream: &mut TcpStream, dev_eui: u64, address: &SocketAddr, iota_bridge_url: &str) -> Result<()>{
+    let mut request_size_buffer = [0; USIZE_LEN];
+    match stream.peek(&mut request_size_buffer).await {
+        Ok(bytes_received) => {
+            if bytes_received == USIZE_LEN {
+                let request_length = IotaBridgeRequestParts::get_request_byte_size(&request_size_buffer).expect("Error on deserializing request_byte_size");
+                println!("             IotaBridgeRequest has {} bytes of data", request_length);
+                receive_iota_bridge_request(stream, dev_eui, request_length, address, iota_bridge_url).await?;
+                Ok(())
+            } else {
+                bail!("[LoraWanAppServerMock - main()] Received only {} bytes while reading request size.", bytes_received);
+            }
+        }
+        Err(e) => {
+            bail!("An error occurred while reading request size. Error: {}", e);
+        }
+    }
+}
+
+const DEV_EUI_LEN_BYTES: usize = 8;
 
 async fn handle_new_tcp_connection(stream: &mut TcpStream, address: &SocketAddr, iota_bridge_url: &str) {
     // In this test application we are using a buffer that is larger than all requests
@@ -168,16 +188,17 @@ async fn handle_new_tcp_connection(stream: &mut TcpStream, address: &SocketAddr,
     println!("New connection to client {}. Starting message loop.", address);
 
     loop {
-        let mut request_size_buffer = [0; USIZE_LEN];
-        match stream.peek(&mut request_size_buffer).await {
+        // The LoraWAN DevEUI is prepended as u64 value
+        let mut dev_eui_read_buffer = [0; DEV_EUI_LEN_BYTES];
+        match stream.read(&mut dev_eui_read_buffer).await {
             Ok(bytes_received) => {
-                if bytes_received == USIZE_LEN {
-                    let request_length = IotaBridgeRequestParts::get_request_byte_size(&request_size_buffer).expect("Error on deserializing request_byte_size");
-                    println!("Received new IotaBridgeRequest with {} bytes of data", request_length);
-                    match receive_iota_bridge_request(stream, request_length, address, iota_bridge_url).await {
+                if bytes_received == DEV_EUI_LEN_BYTES {
+                    let dev_eui = u64::try_from_bytes(&dev_eui_read_buffer).expect("Error on deserializing dev_eui");
+                    println!("Received new IotaBridgeRequest from LoraWAN Node DevEUI {}", dev_eui);
+                    match read_request_length_and_process_iota_bridge_request(stream, dev_eui, address, iota_bridge_url).await {
                         Ok(_) => {}
                         Err(e) => {
-                            log::warn!("[LoraWanAppServerMock - main()] Received an error from receive_iota_bridge_request(). Ending message loop for client {}. Error: {}",
+                            log::warn!("[LoraWanAppServerMock - main()] Received an error from handle_new_iota_bridge_request(). Ending message loop for client {}. Error: {}",
                                        address, e);
                             break;
                         }
@@ -189,7 +210,7 @@ async fn handle_new_tcp_connection(stream: &mut TcpStream, address: &SocketAddr,
                 }
             }
             Err(e) => {
-                println!("An error occurred while reading request size, terminating connection with {}. Error: {}", address, e);
+                println!("An error occurred while reading dev_eui, terminating connection with {}. Error: {}", address, e);
                 stream.shutdown().await.expect("stream.shutdown() returned an Err");
                 break;
             }

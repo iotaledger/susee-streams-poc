@@ -2,6 +2,8 @@ use anyhow::Result;
 use std::rc::Rc;
 
 pub trait DispatchScope {
+    fn contains_key(&self, key: &'static str) -> bool;
+
     fn get_bool(&self, key: &'static str) -> Result<bool>;
     fn get_string(&self, key: &'static str) -> Result<String>;
     fn get_i32(&self, key: &'static str) -> Result<i32>;

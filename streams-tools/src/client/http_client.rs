@@ -39,7 +39,11 @@ use crate::{
         TangleMessageCompressed,
         TangleAddressCompressed
     },
-    subscriber_manager::Compressed,
+    compressed_state::{
+        CompressedStateSend,
+        CompressedStateListen,
+        CompressedStateManager
+    }
 };
 
 use hyper::{
@@ -54,9 +58,12 @@ use hyper::{
         Result as HyperResult,
     },
 };
+
 use tokio::time;
+
 use std::{
     fmt,
+    rc::Rc,
 };
 
 pub struct HttpClientOptions<'a> {
@@ -77,13 +84,12 @@ impl fmt::Display for HttpClientOptions<'_> {
     }
 }
 
-
 #[derive(Clone)]
 pub struct HttpClient {
     tangle_client_options: SendOptions,
     hyper_client: HyperClient<HttpConnector, Body>,
     request_builder: RequestBuilderStreams,
-    use_compressed_msg: bool,
+    compressed: CompressedStateManager,
 }
 
 impl HttpClient
@@ -95,7 +101,7 @@ impl HttpClient
             tangle_client_options: SendOptions::default(),
             hyper_client: HyperClient::new(),
             request_builder: RequestBuilderStreams::new(options.http_url),
-            use_compressed_msg: false,
+            compressed: CompressedStateManager::new(),
         }
     }
 }
@@ -110,13 +116,13 @@ impl HttpClient
         // http status which indicates that the iota-bridge has stored all needed
         // data to use compressed massages further on.
         if reponse.status() == StatusCode::ALREADY_REPORTED {
-            self.use_compressed_msg = true;
+            self.compressed.set_use_compressed_msg(true);
         }
         Ok(reponse)
     }
 
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
-        let req = if self.use_compressed_msg {
+        let req = if self.compressed.get_use_compressed_msg() {
             let cmpr_message = TangleMessageCompressed::from_tangle_message(msg);
             self.request_builder.send_compressed_message(&cmpr_message)?
         } else {
@@ -127,7 +133,7 @@ impl HttpClient
     }
 
     fn get_recv_message_request(&self, link: &TangleAddress) -> HyperResult<Request<Body>> {
-        if self.use_compressed_msg {
+        if self.compressed.get_use_compressed_msg() {
             let cmpr_link = TangleAddressCompressed::from_tangle_address(link);
             self.request_builder.receive_compressed_message_from_address(&cmpr_link)
         } else {
@@ -150,7 +156,7 @@ impl HttpClient
             }
         }
 
-        if response.status() == StatusCode::OK {
+        if response.status().is_success() {
             let bytes = hyper_body::to_bytes(response.into_body()).await?;
             Ok(<TangleMessage as BinaryPersist>::try_from_bytes(&bytes).unwrap())
         } else {
@@ -159,13 +165,13 @@ impl HttpClient
     }
 }
 
-impl Compressed for HttpClient {
-    fn set_use_compressed_msg(&mut self, use_compressed_msg: bool) {
-        self.use_compressed_msg = use_compressed_msg;
+impl CompressedStateSend for HttpClient {
+    fn subscribe_listener(&mut self, listener: Rc<dyn CompressedStateListen>) -> Result<usize> {
+        self.compressed.subscribe_listener(listener)
     }
 
-    fn get_use_compressed_msg(&self) -> bool {
-        self.use_compressed_msg
+    fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
+        self.compressed.set_initial_use_compressed_msg_state(use_compressed_msg)
     }
 }
 

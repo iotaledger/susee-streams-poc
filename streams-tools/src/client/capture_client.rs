@@ -18,7 +18,10 @@ use iota_streams::{
         Result,
     },
 };
-use crate::subscriber_manager::Compressed;
+
+use crate::compressed_state::{CompressedStateListen, CompressedStateSend};
+
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct CaptureClient(pub Client);
@@ -29,12 +32,12 @@ impl CaptureClient {
     }
 }
 
-impl Compressed for CaptureClient {
-    fn set_use_compressed_msg(&mut self, _use_compressed_msg: bool) {
+impl CompressedStateSend for CaptureClient {
+    fn subscribe_listener(&mut self, _listener: Rc<dyn CompressedStateListen>) -> Result<usize> {
         unimplemented!()
     }
 
-    fn get_use_compressed_msg(&self) -> bool {
+    fn set_initial_use_compressed_msg_state(&self, _use_compressed_msg: bool) {
         unimplemented!()
     }
 }

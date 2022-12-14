@@ -19,13 +19,18 @@ use iota_streams::{
 
 use std::{
     clone::Clone,
-    fmt
+    fmt,
+    rc::Rc,
 };
 
 use crate::esp_rs::hyper_esp_rs_tools::send_hyper_request_via_esp_http;
 
 use streams_tools::{
-    subscriber_manager::Compressed,
+    compressed_state::{
+        CompressedStateSend,
+        CompressedStateListen,
+        CompressedStateManager
+    },
     http::{
         RequestBuilderStreams,
         MapStreamsErrors,
@@ -67,6 +72,10 @@ use esp_idf_svc::{
     },
 };
 
+fn is_http_status_success(status: u16) -> bool {
+    300 > status && status >= 200
+}
+
 pub struct HttpClientOptions<'a> {
     pub(crate) http_url: &'a str,
 }
@@ -90,7 +99,7 @@ pub struct HttpClient {
     request_builder: RequestBuilderStreams,
     tangle_client_options: SendOptions,
     esp_http_client_opt: EspHttpClientConfiguration,
-    use_compressed_msg: bool,
+    compressed: CompressedStateManager,
 }
 
 impl HttpClient
@@ -104,7 +113,7 @@ impl HttpClient
             request_builder: RequestBuilderStreams::new(options.http_url),
             tangle_client_options: SendOptions::default(),
             esp_http_client_opt,
-            use_compressed_msg: false,
+            compressed: CompressedStateManager::new(),
         }
     }
 
@@ -115,13 +124,14 @@ impl HttpClient
         // http status which indicates that the iota-bridge has stored all needed
         // data to use compressed massages further on.
         if reponse.status() == StatusCode::ALREADY_REPORTED {
-            self.use_compressed_msg = true;
+            log::debug!("[HttpClient::request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
+            self.compressed.set_use_compressed_msg(true);
         }
         Ok(reponse)
     }
 
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
-        let req = if self.use_compressed_msg {
+        let req = if self.compressed.get_use_compressed_msg() {
             let cmpr_message = TangleMessageCompressed::from_tangle_message(msg);
             self.request_builder.send_compressed_message(&cmpr_message)?
         } else {
@@ -135,7 +145,7 @@ impl HttpClient
     async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         log::debug!("[HttpClient.recv_message_via_http]");
         log::debug!("[HttpClient.recv_message_via_http] EspHttpClient created");
-        let req = if self.use_compressed_msg {
+        let req = if self.compressed.get_use_compressed_msg() {
             let cmpr_link = TangleAddressCompressed::from_tangle_address(link);
             self.request_builder.receive_compressed_message_from_address(&cmpr_link)?
         } else {
@@ -164,8 +174,8 @@ impl HttpClient
             // }
         }
 
-        if response.status() == StatusCode::OK {
-            log::debug!("[HttpClient.recv_message_via_http] StatusCode::OK");
+        if is_http_status_success(response.status()) {
+            log::debug!("[HttpClient.recv_message_via_http] StatusCode is successful: {}", response.status());
             if let Some(content_len) = response.content_len() {
                 log::info!("[HttpClient.recv_message_via_http] Received response with content length of {}", content_len);
                 let mut buffer = Vec::new();
@@ -193,13 +203,14 @@ impl HttpClient
     }
 }
 
-impl Compressed for HttpClient {
-    fn set_use_compressed_msg(&mut self, use_compressed_msg: bool) {
-        self.use_compressed_msg = use_compressed_msg;
+impl CompressedStateSend for HttpClient {
+    fn subscribe_listener(&mut self, listener: Rc<dyn CompressedStateListen>) -> Result<usize> {
+        self.compressed.subscribe_listener(listener)
     }
 
-    fn get_use_compressed_msg(&self) -> bool {
-        self.use_compressed_msg
+    fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
+        log::debug!("[HttpClient::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
+        self.compressed.set_initial_use_compressed_msg_state(use_compressed_msg)
     }
 }
 

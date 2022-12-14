@@ -16,7 +16,6 @@ use hyper::{
     Body,
     client::HttpConnector,
     http::{
-        StatusCode,
         Response,
         request::{
             Request,
@@ -84,8 +83,8 @@ impl CommandFetcher {
 
     pub async fn fetch_next_command(& self) -> Result<(Command, Vec<u8>)> {
         let response = self.submit_request().await;
-        if response.status()  == StatusCode::OK {
-            log::debug!("[CommandFetcher.fetch_next_command] StatusCode::OK - Received HttpResponse");
+        if response.status().is_success() {
+            log::debug!("[CommandFetcher.fetch_next_command] StatusCode is successful: {}", response.status());
             self.deserialize_command(response).await
         } else {
             log::error!("[CommandFetcher.fetch_next_command] HTTP Error. Status: {}", response.status());
@@ -103,8 +102,8 @@ impl CommandFetcher {
         let http_client = HttpClient::new();
         let response = http_client.request(confirmation_request).await?;
         log::debug!("[CommandFetcher.send_confirmation] Received HttpResponse");
-        if response.status() == StatusCode::OK {
-            log::debug!("[CommandFetcher.send_confirmation] StatusCode::OK");
+        if response.status().is_success() {
+            log::debug!("[CommandFetcher.send_confirmation] StatusCode is successful: {}", response.status());
             Ok(())
         } else {
             bail!("[CommandFetcher.send_confirmation] Received HTTP Error as response for confirmation transmission. Status: {}", response.status())

@@ -1,4 +1,5 @@
 pub mod subscriber_manager;
+pub mod compressed_state;
 
 #[cfg(feature = "std")]
 pub mod channel_manager;

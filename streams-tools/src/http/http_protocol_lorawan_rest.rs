@@ -1,8 +1,9 @@
-use crate::{
-    http::http_tools::{
+use super::{
+    ScopeConsume,
+    http_tools::{
         RequestBuilderTools,
         DispatchedRequestParts,
-    },
+    }
 };
 
 use hyper::{
@@ -55,7 +56,7 @@ impl RequestBuilderLorawanRest {
 }
 
 #[async_trait(?Send)]
-pub trait ServerDispatchLorawanRest {
+pub trait ServerDispatchLorawanRest: ScopeConsume {
     fn get_uri_prefix(&self) -> &'static str;
     async fn post_binary_request(self: &mut Self, dev_eui: &str, request_bytes: &[u8] ) -> anyhow::Result<DispatchedRequestParts>;
 }

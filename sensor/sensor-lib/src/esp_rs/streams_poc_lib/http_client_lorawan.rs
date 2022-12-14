@@ -20,10 +20,10 @@ use iota_streams::{
 use std::{
     clone::Clone,
     slice,
+    rc::Rc,
 };
 
 use streams_tools::{
-    subscriber_manager::Compressed,
     http::{
         RequestBuilderStreams,
         http_protocol_streams::{
@@ -40,6 +40,11 @@ use streams_tools::{
             IotaBridgeRequestParts,
             IotaBridgeResponseParts,
         },
+    },
+    compressed_state::{
+        CompressedStateSend,
+        CompressedStateListen,
+        CompressedStateManager
     },
 };
 
@@ -133,7 +138,7 @@ pub struct HttpClient {
     lorawan_send_callback: send_request_via_lorawan_t,
     request_builder: RequestBuilderStreams,
     tangle_client_options: SendOptions,
-    pub use_compressed_msg: bool,
+    compressed: CompressedStateManager,
 }
 
 impl HttpClient {
@@ -143,14 +148,14 @@ impl HttpClient {
         log::debug!("[HttpClient::new()] Creating new HttpClient");
         Self {
             lorawan_send_callback: options.lorawan_send_callback,
-            use_compressed_msg: false,
             request_builder: RequestBuilderStreams::new(""),
             tangle_client_options: SendOptions::default(),
+            compressed: CompressedStateManager::new(),
         }
     }
 
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
-        let req_parts = if self.use_compressed_msg {
+        let req_parts = if self.compressed.get_use_compressed_msg() {
             // Please note the comments in fn recv_message_via_http() below
             // Same principles apply here
             let cmpr_message = TangleMessageCompressed::from_tangle_message(msg);
@@ -165,7 +170,7 @@ impl HttpClient {
 
     async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         log::debug!("[HttpClient.recv_message_via_http]");
-        let req_parts = if self.use_compressed_msg {
+        let req_parts = if self.compressed.get_use_compressed_msg() {
             // We do not set the dev_eui here because it will be communicated by the LoraWAN network
             // and therefore will not be send as lorawan payload.
             // Please note that due to this BinaryPersist implementation for TangleMessageCompressed
@@ -196,7 +201,8 @@ impl HttpClient {
             log::warn!("[HttpClient.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
         }
 
-        if response.status_code == StatusCode::OK {
+        if response.status_code.is_success() {
+            log::debug!("[HttpClient.recv_message_via_http] StatusCode is successful: {}", response.status_code);
             log::info!("[HttpClient.recv_message_via_http] Received response with content length of {}", response.body_bytes.len());
             let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&response.body_bytes.as_slice()).unwrap();
             log::debug!("[HttpClient.recv_message_via_http] return ret_val");
@@ -294,14 +300,17 @@ impl HttpClient
         req_parts.to_bytes(buffer.as_mut_slice())?;
         log::debug!("[HttpClient.request] IotaBridgeRequestParts bytes to send: Length: {}\n    {:02X?}", buffer.len(), buffer);
         let response_parts = self.request_via_lorawan(buffer).await?;
+        log::debug!("[HttpClient::request()] response_parts.status_code is {}", response_parts.status_code);
 
         // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
         // http status which indicates that the iota-bridge has stored all needed
         // data to use compressed massages further on.
         if response_parts.status_code == StatusCode::ALREADY_REPORTED {
-            self.use_compressed_msg = true;
+            log::debug!("[HttpClient::request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
+            self.compressed.set_use_compressed_msg(true);
         }
 
+        log::debug!("[HttpClient::request()] ==================================== use_compressed_msg = '{}'", self.compressed.get_use_compressed_msg());
         Ok(response_parts)
     }
 
@@ -309,19 +318,19 @@ impl HttpClient
         let _response_callback_scope_manager = ResponseCallbackScopeManager::new();
         match (self.lorawan_send_callback)(buffer.as_ptr(), buffer.len(), receive_response) {
             LoRaWanError::LORAWAN_OK => {
-                log::debug!("[HttpClient.request] Successfully send request via LoRaWAN");
+                log::debug!("[HttpClient.request_via_lorawan] Successfully send request via LoRaWAN");
                 let receiver = get_response_receiver()?;
                 match receiver.recv().await {
                     Ok(response) => {
-                        log::debug!("[HttpClient.request] Received response via LoRaWAN");
+                        log::debug!("[HttpClient.request_via_lorawan] Received response via LoRaWAN");
                         if response.len() > 0 {
                             match IotaBridgeResponseParts::try_from_bytes(response.as_slice()) {
                                 Ok(response_parts) => {
-                                    log::debug!("[HttpClient.request] Successfully deserialized response_parts");
+                                    log::debug!("[HttpClient.request_via_lorawan] Successfully deserialized response_parts");
                                     Ok(response_parts)
                                 },
                                 Err(e) => {
-                                    log::debug!("[HttpClient.request] Error on deserializing response_parts: {}", e );
+                                    log::debug!("[HttpClient.request_via_lorawan] Error on deserializing response_parts: {}", e );
                                     bail!("Could not deserialize response binary to valid IotaBridgeResponseParts: {}", e)
                                 }
                             }
@@ -341,13 +350,14 @@ impl HttpClient
     }
 }
 
-impl Compressed for HttpClient {
-    fn set_use_compressed_msg(&mut self, use_compressed_msg: bool) {
-        self.use_compressed_msg = use_compressed_msg;
+impl CompressedStateSend for HttpClient {
+    fn subscribe_listener(&mut self, listener: Rc<dyn CompressedStateListen>) -> Result<usize> {
+        self.compressed.subscribe_listener(listener)
     }
 
-    fn get_use_compressed_msg(&self) -> bool {
-        self.use_compressed_msg
+    fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
+        log::debug!("[HttpClient::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
+        self.compressed.set_initial_use_compressed_msg_state(use_compressed_msg)
     }
 }
 

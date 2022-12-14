@@ -16,6 +16,7 @@ use std::{
     fmt,
     fmt::Formatter,
     ops::Range,
+    str::FromStr,
 };
 
 use crate::binary_persist::{
@@ -25,10 +26,6 @@ use crate::binary_persist::{
     deserialize_string,
     serialize_vec_u8,
     deserialize_vec_u8
-};
-
-use std::{
-    str::FromStr
 };
 
 use anyhow::bail;
@@ -223,7 +220,6 @@ pub struct IotaBridgeResponseParts {
 }
 
 impl IotaBridgeResponseParts {
-
     pub fn new_for_closed_socket_connection() -> Self {
         IotaBridgeResponseParts {
             body_bytes: vec![],
@@ -293,3 +289,13 @@ impl BinaryPersist for IotaBridgeResponseParts {
         })
     }
 }
+
+impl fmt::Display for IotaBridgeResponseParts {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "IotaBridgeResponseParts:
+                     status: {}
+                     body length: {}
+                ", self.status_code, self.body_bytes.len())
+    }
+}
+

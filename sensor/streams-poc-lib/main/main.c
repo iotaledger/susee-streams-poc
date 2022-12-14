@@ -360,6 +360,16 @@ void shut_down_socket(int sock_handle) {
     }
 }
 
+void prepare_socket_and_send_message(dest_addr_t* dest_addr ) {
+    s_socket_handle = get_handle_of_prepared_socket(dest_addr);
+
+    ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Calling send_message for message_data of length %d \n\n", MESSAGE_DATA_LENGTH);
+    send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket);
+
+    ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Shutting down socket");
+    shut_down_socket(s_socket_handle);
+}
+
 void send_message_via_streams_poc_lib(void) {
     ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Preparing WIFI");
     esp_err_t ret = nvs_flash_init();
@@ -382,13 +392,11 @@ void send_message_via_streams_poc_lib(void) {
 #endif    
     
     if( 0 == parse_lora_app_srv_mock_address(&dest_addr) ) {
-        s_socket_handle = get_handle_of_prepared_socket(&dest_addr);
-
-        ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Calling send_message for message_data of length %d \n\n", MESSAGE_DATA_LENGTH);
-        send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket);
-
-        ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Shutting down socket");
-        shut_down_socket(s_socket_handle);
+        while (1) {
+            prepare_socket_and_send_message(&dest_addr);
+            ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Waiting 5 seconds to send message again");
+            sleep(5);
+        }
     } else {
         ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Could not parse address of lorawan application-server-mock");
     }

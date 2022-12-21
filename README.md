@@ -471,12 +471,13 @@ The *streams-poc-lib* test application can only bee remote controlled if the str
 not already been initialized (further details can be found in the
 [streams-poc-lib README](sensor/streams-poc-lib/README.md)).
 
-The x86/PC Sensor application can also be used to mock (or imitate) an ESP32 Sensor
-application. This is especially usefull to test the *IOTA Bridge* and the *Management Console*
+The x86/PC Sensor application can also be used to act as a remote controlled Sensor or let's say
+to mock (or imitate) an ESP32 Sensor application.
+This is especially usefull to test the *IOTA Bridge* and the *Management Console*
 without the need to run ESP32 Hardware. The CLI command to mock an ESP32 Sensor is:
 
-    -m, --mock-remote-sensor
-            Imitate (or mock) a remote sensor resp. an ESP32-Sensor
+    -m, --act-as-remote-controlled-sensor
+            Imitate a remote sensor resp. an ESP32-Sensor awaiting remote control commands.
             ESP32-Sensor here means the 'sensor/main-rust-esp-rs' application or the
             test app of the streams-poc-lib in an initial Streams channel state.
             
@@ -490,6 +491,17 @@ without the need to run ESP32 Hardware. The CLI command to mock an ESP32 Sensor 
             address of the device that runs the iota-bridge) e.g. because some ESP32
             sensors are also used, you need to use the CLI argument '--iota-bridge-url'
             to specify this ip address.
+
+The x86/PC Sensor application can be used to test the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge*
+application. This is done using the `--use-lorawan-rest-api` argument:
+
+    -l, --use-lorawan-rest-api
+            If used the Sensor application will not call iota-bridge API functions directly
+            but will use its lorawan-rest API instead.
+            This way the Sensor application imitates the behavior of an ESP32-Sensor connected
+            via LoRaWAN and a package transceiver connected to the LoRaWAN application server
+            that hands over binary packages to the iota-bridge.
+
 
 ### LoraWan AppServer Mockup Tool
 

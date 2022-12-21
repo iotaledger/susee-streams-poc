@@ -42,13 +42,8 @@ Therefore in case you are using 'act-as-remote-control' you will also need to us
 the 'iota-bridge' option to connect to the iota-bridge.
 ";
 
-static IOTA_BRIDGE_URL_ABOUT_FMT_STR: &str = "The url of the iota-bridge to connect to.
-See --act-as-remote-control for further information.
-Default value is {}
-
-Example: --iota-bridge-url=\"http://192.168.47.11:50000\"";
-
-static MOCK_REMOTE_SENSOR_ABOUT: &str = "Imitate (or mock) a remote sensor resp. an ESP32-Sensor
+static ACT_AS_REMOTE_CONTROLLED_SENSOR_ABOUT: &str = "\
+Imitate a remote sensor resp. an ESP32-Sensor awaiting remote control commands.
 ESP32-Sensor here means the 'sensor/main-rust-esp-rs' application or the
 test app of the streams-poc-lib in an initial Streams channel state.
 
@@ -63,6 +58,19 @@ address of the device that runs the iota-bridge) e.g. because some ESP32
 sensors are also used, you need to use the CLI argument '--iota-bridge-url'
 to specify this ip address.
 ";
+
+static USE_LORAWAN_REST_API_ABOUT: &str = "\
+If used the Sensor application will not call iota-bridge API functions directly
+but will use its lorawan-rest API instead.
+This way the Sensor application imitates the behavior of an ESP32-Sensor connected
+via LoRaWAN and a package transceiver connected to the LoRaWAN application server
+that hands over binary packages to the iota-bridge.";
+
+static IOTA_BRIDGE_URL_ABOUT_FMT_STR: &str = "The url of the iota-bridge to connect to.
+See --act-as-remote-control for further information.
+Default value is {}
+
+Example: --iota-bridge-url=\"http://192.168.47.11:50000\"";
 
 static PRINTLN_SUBSCRIBER_STATUS_ABOUT: &str = "Print information about the current client status of the sensor.
 In streams the sensor is a subscriber so that this client status is called subscriber status.
@@ -82,11 +90,14 @@ pub struct ArgKeys {
     pub subscribe_announcement_link: &'static str,
     pub register_keyload_msg: &'static str,
     pub act_as_remote_control: &'static str,
+    pub act_as_remote_controlled_sensor: &'static str,
     pub println_subscriber_status: &'static str,
     pub clear_client_state: &'static str,
     pub iota_bridge_url: &'static str,
-    pub mock_remote_sensor: &'static str,
+    pub use_lorawan_rest_api: &'static str,
 }
+
+
 
 pub static ARG_KEYS: ArgKeys = ArgKeys {
     base: &BASE_ARG_KEYS,
@@ -94,10 +105,11 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     subscribe_announcement_link: "subscribe-announcement-link",
     register_keyload_msg: "register-keyload-msg",
     act_as_remote_control: "act-as-remote-control",
+    act_as_remote_controlled_sensor: "act-as-remote-controlled-sensor",
     iota_bridge_url: "iota-bridge-url",
     clear_client_state: "clear-client-state",
     println_subscriber_status: "println-subscriber-status",
-    mock_remote_sensor: "mock-remote-sensor",
+    use_lorawan_rest_api: "use-lorawan-rest-api",
 };
 
 pub type SensorCli<'a> = Cli<'a, ArgKeys>;
@@ -148,24 +160,31 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
                 .long_help(ACT_AS_REMOTE_CONTROL_ABOUT)
                 .takes_value(false)
             )
+            .arg(Arg::new(ARG_KEYS.act_as_remote_controlled_sensor)
+                .long(ARG_KEYS.act_as_remote_controlled_sensor)
+                .short('m')
+                .value_name("ACT_AS_REMOTE_CONTROLLED_SENSOR")
+                .long_help(ACT_AS_REMOTE_CONTROLLED_SENSOR_ABOUT)
+                .takes_value(false)
+            )
             .arg(Arg::new(ARG_KEYS.iota_bridge_url)
                 .long(ARG_KEYS.iota_bridge_url)
                 .short('b')
                 .value_name("IOTA_BRIDGE_URL")
                 .help(iota_bridge_url_about.as_str())
             )
-            .arg(Arg::new(ARG_KEYS.mock_remote_sensor)
-                .long(ARG_KEYS.mock_remote_sensor)
-                .short('m')
-                .value_name("MOCK_REMOTE_SENSOR")
-                .long_help(MOCK_REMOTE_SENSOR_ABOUT)
-                .takes_value(false)
-            )
             .arg(Arg::new(ARG_KEYS.println_subscriber_status)
                 .long(ARG_KEYS.println_subscriber_status)
                 .short('p')
                 .value_name("PRINTLN_SUBSCRIBER_STATUS")
                 .long_help(PRINTLN_SUBSCRIBER_STATUS_ABOUT)
+                .takes_value(false)
+            )
+            .arg(Arg::new(ARG_KEYS.use_lorawan_rest_api)
+                .long(ARG_KEYS.use_lorawan_rest_api)
+                .short('l')
+                .value_name("USE_LORAWAN_REST_API")
+                .long_help(USE_LORAWAN_REST_API_ABOUT)
                 .takes_value(false)
             )
             .arg(Arg::new(ARG_KEYS.clear_client_state)

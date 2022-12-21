@@ -142,34 +142,40 @@ impl RequestBuilderStreams {
         }
     }
 
-    pub fn get_send_message_request_parts<MessageT: BinaryPersist>(self: &Self, message: &MessageT, endpoint_uri: &str, is_compressed: bool) -> Result<IotaBridgeRequestParts> {
+    pub fn get_send_message_request_parts<MessageT: BinaryPersist>(self: &Self, message: &MessageT, endpoint_uri: &str, is_compressed: bool, dev_eui: Option<String>) -> Result<IotaBridgeRequestParts> {
+        let mut uri = self.tools.get_uri(endpoint_uri);
+        if let Some(eui) = dev_eui {
+            uri = format!("{}?{}={}", uri, QueryParameters::SEND_COMPRESSED_MESSAGE_DEV_EUI, eui)
+        }
         let mut buffer: Vec<u8> = vec![0; message.needed_size()];
         message.to_bytes(buffer.as_mut_slice()).expect("Persisting into binary data failed");
         let header_flags = RequestBuilderStreams::get_header_flags(is_compressed, HttpMethod::POST);
         Ok(IotaBridgeRequestParts::new(
             header_flags,
-            self.tools.get_uri(endpoint_uri),
+            uri,
             buffer
         ))
     }
 
     pub fn send_message(self: &Self, message: &TangleMessage) -> Result<Request<Body>> {
-        self.get_send_message_request_parts(message, EndpointUris::SEND_MESSAGE, false)?
+        self.get_send_message_request_parts(message, EndpointUris::SEND_MESSAGE, false, None)?
             .into_request(RequestBuilderTools::get_request_builder())
     }
 
-    pub fn send_compressed_message(self: &Self, message: &TangleMessageCompressed) -> Result<Request<Body>> {
-        self.get_send_message_request_parts(message, EndpointUris::SEND_COMPRESSED_MESSAGE, true)?
+    pub fn send_compressed_message(self: &Self, message: &TangleMessageCompressed, dev_eui: Option<String>) -> Result<Request<Body>> {
+        self.get_send_message_request_parts(message, EndpointUris::SEND_COMPRESSED_MESSAGE, true, dev_eui)?
             .into_request(RequestBuilderTools::get_request_builder())
     }
 
-    pub fn get_receive_message_from_address_request_parts<AdressT: Display>(self: &Self, address: &AdressT, endpoint_uri: &str, is_compressed: bool, query_param: &str) -> Result<IotaBridgeRequestParts> {
-        let uri = format!("{}?{}={}",
+    pub fn get_receive_message_from_address_request_parts<AdressT: Display>(self: &Self, address: &AdressT, endpoint_uri: &str, is_compressed: bool, query_param: &str, dev_eui: Option<String>) -> Result<IotaBridgeRequestParts> {
+        let mut uri = format!("{}?{}={}",
                           self.tools.get_uri(endpoint_uri).as_str(),
                           query_param,
                           address.to_string()
         );
-
+        if let Some(eui) = dev_eui {
+            uri = format!("{}&{}={}", uri, QueryParameters::SEND_COMPRESSED_MESSAGE_DEV_EUI, eui)
+        }
         let header_flags = RequestBuilderStreams::get_header_flags(is_compressed, HttpMethod::GET);
         Ok(IotaBridgeRequestParts::new(
             header_flags,
@@ -183,17 +189,19 @@ impl RequestBuilderStreams {
             address,
             EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS,
             false,
-            QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS
+            QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS,
+            None,
         )?
         .into_request(RequestBuilderTools::get_request_builder())
     }
 
-    pub fn receive_compressed_message_from_address(self: &Self, address: &TangleAddressCompressed) -> Result<Request<Body>> {
+    pub fn receive_compressed_message_from_address(self: &Self, address: &TangleAddressCompressed, dev_eui: Option<String>) -> Result<Request<Body>> {
         self.get_receive_message_from_address_request_parts(
             address,
             EndpointUris::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS,
             true,
-            QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_MSGID
+            QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_MSGID,
+            dev_eui,
         )?
         .into_request(RequestBuilderTools::get_request_builder())
     }

@@ -17,6 +17,7 @@ default = ["std"]
 std = [
     "tokio",
     "clap",
+    "rand",
     "streams-tools/std",
     "susee-tools/std",
     "iota-streams/std",
@@ -63,6 +64,7 @@ payloads = { version = "0.1.2", path = "../../test/payloads", optional = true }
 
 # std dependencies
 tokio = {version = "1.5", optional = true}
+rand = {version = "0.7.3", optional = true}
 
 [dependencies.iota-streams]
 git = "https://github.com/iotaledger/streams"

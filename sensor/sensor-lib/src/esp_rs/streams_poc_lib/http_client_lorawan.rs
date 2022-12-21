@@ -159,9 +159,9 @@ impl HttpClient {
             // Please note the comments in fn recv_message_via_http() below
             // Same principles apply here
             let cmpr_message = TangleMessageCompressed::from_tangle_message(msg);
-            self.request_builder.get_send_message_request_parts(&cmpr_message, EndpointUris::SEND_COMPRESSED_MESSAGE, true)?
+            self.request_builder.get_send_message_request_parts(&cmpr_message, EndpointUris::SEND_COMPRESSED_MESSAGE, true, None)?
         } else {
-            self.request_builder.get_send_message_request_parts(msg, EndpointUris::SEND_MESSAGE, false)?
+            self.request_builder.get_send_message_request_parts(msg, EndpointUris::SEND_MESSAGE, false, None)?
         };
 
         self.request(req_parts).await?;
@@ -180,14 +180,16 @@ impl HttpClient {
                 &cmpr_link,
                 EndpointUris::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS,
                 true,
-                QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_MSGID
+                QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_MSGID,
+                None
             )?
         } else {
             self.request_builder.get_receive_message_from_address_request_parts(
                 link,
                 EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS,
                 false,
-                QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS
+                QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS,
+                None
             )?
         };
 

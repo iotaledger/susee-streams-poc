@@ -41,6 +41,7 @@ use hyper::{
 
 use iota_streams::core::async_trait;
 use streams_tools::remote::command_processor::{process_sensor_commands, run_command_fetch_loop, CommandFetchLoopOptions};
+use rand::Rng;
 
 fn get_wallet(cli: &SensorCli) -> Result<PlainTextWallet> {
     let wallet_filename= get_wallet_filename(
@@ -56,24 +57,35 @@ fn get_wallet(cli: &SensorCli) -> Result<PlainTextWallet> {
     ))
 }
 
-pub async fn create_subscriber_manager<'a>(cli: &SensorCli<'a>) -> Result<SubscriberManagerPlainTextWalletHttpClient> {
-    let wallet = get_wallet(&cli)?;
-
-    let mut http_client_options: Option<HttpClientOptions> = None;
-    if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
-        http_client_options = Some(HttpClientOptions{
-            http_url: iota_bridge_url
-        });
+pub fn manage_mocked_lorawan_dev_eui(wallet: &mut PlainTextWallet) {
+    if wallet.persist.misc_other_data.len() == 0 {
+        let new_dev_eui = rand::thread_rng().gen_range(0, u64::MAX);
+        wallet.persist.misc_other_data = new_dev_eui.to_string();
+        wallet.write_wallet_file();
     }
+    log::debug!("[Sensor - fn manage_mocked_lorawan_dev_eui()] Mocked LoRaWAN DevEUI is {}", wallet.persist.misc_other_data);
+}
 
-    let client = ClientType::new(http_client_options);
+pub async fn create_subscriber_manager<'a>(cli: &SensorCli<'a>) -> Result<SubscriberManagerPlainTextWalletHttpClient> {
+    let mut wallet = get_wallet(&cli)?;
+    let mut http_client_options: HttpClientOptions = HttpClientOptions::default();
+    if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
+        http_client_options.http_url = iota_bridge_url;
+    }
+    manage_mocked_lorawan_dev_eui(&mut wallet);
+    if wallet.persist.misc_other_data.len() > 0 {
+        http_client_options.dev_eui = Some(wallet.persist.misc_other_data.clone());
+    }
+    if cli.matches.is_present(cli.arg_keys.act_as_remote_control) {
+        http_client_options.use_lorawan_rest = true;
+    }
+    let client = ClientType::new(Some(http_client_options));
     Ok(SubscriberManagerPlainTextWalletHttpClient::new(
         client,
         wallet,
         Some(String::from("user-state-sensor.bin")),
     ).await)
 }
-
 
 pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 
@@ -109,7 +121,7 @@ pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
     Ok(())
 }
 
-pub async fn process_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
+pub async fn process_act_as_remote_control<'a>(cli: SensorCli<'a>) -> Result<()> {
     let mut show_subscriber_state = cli.matches.is_present(cli.arg_keys.println_subscriber_status);
 
     let mut remote_manager_options: Option<RemoteSensorOptions> = None;
@@ -249,6 +261,7 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
     }
 
     async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
+        println!("Received Command::{}", command);
         let mut subscriber= create_subscriber_manager(&self.cli).await?;
 
         let confirmation_request = process_sensor_commands(
@@ -259,7 +272,7 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
     }
 }
 
-pub async fn process_mock_remote_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
+pub async fn process_act_as_remote_controlled_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
     let iota_bridge_url = cli.matches.value_of(cli.arg_keys.iota_bridge_url)
         .unwrap_or(STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL);
     let cmd_processor = CmdProcessor::new(iota_bridge_url, cli);
@@ -279,9 +292,9 @@ pub async fn process_main() -> Result<()> {
     let cli = SensorCli::new(&matches_and_options, &ARG_KEYS) ;
 
     if cli.matches.is_present(cli.arg_keys.act_as_remote_control) {
-        process_remote_sensor(cli).await
-    } else if cli.matches.is_present(cli.arg_keys.mock_remote_sensor) {
-        process_mock_remote_sensor(cli).await
+        process_act_as_remote_control(cli).await
+    } else if cli.matches.is_present(cli.arg_keys.act_as_remote_controlled_sensor) {
+        process_act_as_remote_controlled_sensor(cli).await
     } else {
         process_local_sensor(cli).await
     }

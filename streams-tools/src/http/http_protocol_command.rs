@@ -46,6 +46,10 @@ impl EndpointUris {
     pub const PRINTLN_SUBSCRIBER_STATUS: &'static str  = "/command/println_subscriber_status";
     pub const CLEAR_CLIENT_STATE: &'static str  = "/command/clear_client_state";
     pub const SEND_MESSAGES: &'static str  = "/command/send_messages";
+    // TODO: Currently there is no endpoint for the STOP_FETCHING_COMMANDS command because it is used
+    //       only internally in the X86/PC sensor application. In case the mangement-console should be able
+    //       to exit the fetch_message loop on the remote controlled ESP32 Sensor the REST function for
+    //       STOP_FETCHING_COMMANDS needs to be implemented.
 }
 
 pub struct QueryParameters {}

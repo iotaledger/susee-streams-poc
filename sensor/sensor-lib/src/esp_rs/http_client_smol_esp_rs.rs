@@ -133,7 +133,7 @@ impl HttpClient
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
         let req = if self.compressed.get_use_compressed_msg() {
             let cmpr_message = TangleMessageCompressed::from_tangle_message(msg);
-            self.request_builder.send_compressed_message(&cmpr_message)?
+            self.request_builder.send_compressed_message(&cmpr_message, None)?
         } else {
             self.request_builder.send_message(msg)?
         };
@@ -147,7 +147,7 @@ impl HttpClient
         log::debug!("[HttpClient.recv_message_via_http] EspHttpClient created");
         let req = if self.compressed.get_use_compressed_msg() {
             let cmpr_link = TangleAddressCompressed::from_tangle_address(link);
-            self.request_builder.receive_compressed_message_from_address(&cmpr_link)?
+            self.request_builder.receive_compressed_message_from_address(&cmpr_link, None)?
         } else {
             self.request_builder.receive_message_from_address(link)?
         };

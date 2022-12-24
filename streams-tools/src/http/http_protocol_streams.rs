@@ -273,7 +273,7 @@ pub async fn dispatch_request_streams(req_parts: &DispatchedRequestParts, callba
 fn get_query_params_receive_compressed_message_from_address_msgid_deveui(req_parts: &DispatchedRequestParts, dev_eui_is_optional: bool) -> StreamsToolsHttpResult<(String, String)>{
     let address_key_val: Vec<_> = req_parts.req_url.query_pairs().collect();
     if (!dev_eui_is_optional && address_key_val.len() != 2) ||
-       (dev_eui_is_optional && !(1..2).contains(&(address_key_val.len() as i32))) {
+        (dev_eui_is_optional && address_key_val.len() != 1 && address_key_val.len() != 2) {
         return_err_bad_request!("[http_protocoll - RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS] Wrong number of query parameters.\
                 Specify the message_id and device_eui using /{}?{}={}&{}={}",
                EndpointUris::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS,

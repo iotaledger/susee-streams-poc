@@ -492,7 +492,22 @@ without the need to run ESP32 Hardware. The CLI command to mock an ESP32 Sensor 
             sensors are also used, you need to use the CLI argument '--iota-bridge-url'
             to specify this ip address.
 
-The x86/PC Sensor application can be used to test the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge*
+The `--act-as-remote-controlled-sensor` argument is especially useful to automatically initialize the x86/PC Sensor
+in interaction with the <a href="#automatic-sensor-initialization">*Management Console* (`--init-sensor` argument)</a>.
+If you want to exit the *Sensor* application after the initialization has been finished you can use 
+the `--exit-after-successful-initialization` argument:
+
+    -e, --exit-after-successful-initialization
+            If specified in combination with --act-as-remote-controlled-sensor the command poll loop
+            will be stopped after a KEYLOAD_REGISTRATION confirmation has been send to confirm
+            a successfully processed REGISTER_KEYLOAD_MESSAGE command.
+            This argument is useful when the sensor app runs in automation scripts to allow the
+            initialization of the Sensor and the Sensor app should exit after successful
+            initialization.
+
+
+
+The x86/PC Sensor application can also be used to test the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge*
 application. This is done using the `--use-lorawan-rest-api` argument:
 
     -l, --use-lorawan-rest-api
@@ -616,6 +631,11 @@ REST call that caused the new *Sensor* entry will have a 208 - ALREADY_REPORTED 
 All *Sensor* applications recognise this http status and will only use compressed
 messages further on. The Sensor applications store the state whether to use compressed
 messages or not in their local user-state serialization files.
+
+## Test Scripts
+The folder [test/scripts](test/scripts) contains script files to perform automatic
+tests for the *SUSEE Streams POC* applications and libraries. Have a look into the
+[test scripts README](test/scripts/README.md) for more details.
 
 ## Example Workflows
 There are two ways to initialize a sensor. The easiest way is to use the `--init-sensor` option of

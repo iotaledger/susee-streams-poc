@@ -32,6 +32,7 @@ impl Command {
     pub const REGISTER_KEYLOAD_MESSAGE: Command = Command(EnumeratedPersistableInner(3));
     pub const PRINTLN_SUBSCRIBER_STATUS: Command = Command(EnumeratedPersistableInner(4));
     pub const CLEAR_CLIENT_STATE: Command = Command(EnumeratedPersistableInner(5));
+    pub const STOP_FETCHING_COMMANDS: Command = Command(EnumeratedPersistableInner(6));
 }
 
 impl EnumeratedPersistable for Command {
@@ -45,6 +46,7 @@ impl EnumeratedPersistable for Command {
             &Command::REGISTER_KEYLOAD_MESSAGE => "REGISTER_KEYLOAD_Message",
             &Command::PRINTLN_SUBSCRIBER_STATUS => "PRINTLN_SUBSCRIBER_STATUS",
             &Command::CLEAR_CLIENT_STATE => "CLEAR_CLIENT_STATE",
+            &Command::STOP_FETCHING_COMMANDS => "STOP_FETCHING_COMMANDS",
             _ => "Unknown Command",
         };
     }

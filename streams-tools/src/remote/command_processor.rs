@@ -52,20 +52,27 @@ pub async fn run_command_fetch_loop(command_processor: impl CommandProcessor, op
     let opt = options.unwrap_or_default();
     loop {
         if let Ok((command, buffer)) = command_processor.fetch_next_command().await {
-            if command != Command::NO_COMMAND {
-                log::info!("[fn run_command_fetch_loop] Starting process_command for command: {}.", command);
-                match command_processor.process_command(command, buffer).await {
-                    Ok(confirmation_request) => {
-                        // TODO: Retries in case of errors could be useful
-                        log::debug!("[fn process_main_esp_rs] Calling command_processor.send_confirmation for confirmation_request");
-                        command_processor.send_confirmation(confirmation_request).await?;
-                    },
-                    Err(err) => {
-                        log::error!("[fn run_command_fetch_loop] process_command() returned error: {}", err);
-                    }
-                };
-            } else {
-                println!("Received Command::NO_COMMAND    ");
+            match command {
+                Command::NO_COMMAND => {
+                    println!("Received Command::NO_COMMAND    ");
+                },
+                Command::STOP_FETCHING_COMMANDS => {
+                    println!("Received Command::STOP_FETCHING_COMMANDS - Will exit command fetch loop.");
+                    return Ok(());
+                },
+                _ => {
+                    log::info!("[fn run_command_fetch_loop] Starting process_command for command: {}.", command);
+                    match command_processor.process_command(command, buffer).await {
+                        Ok(confirmation_request) => {
+                            // TODO: Retries in case of errors could be useful
+                            log::debug!("[fn process_main_esp_rs] Calling command_processor.send_confirmation for confirmation_request");
+                            command_processor.send_confirmation(confirmation_request).await?;
+                        },
+                        Err(err) => {
+                            log::error!("[fn run_command_fetch_loop] process_command() returned error: {}", err);
+                        }
+                    };
+                }
             }
         } else {
             log::error!("[fn run_command_fetch_loop] command_processor.fetch_next_command() failed.");

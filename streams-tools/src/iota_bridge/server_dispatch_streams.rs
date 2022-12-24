@@ -124,7 +124,7 @@ static LINK_AND_PREVLINK_LENGTH: usize = 2 * TANGLE_ADDRESS_BYTE_LEN;
 
 fn println_send_message_for_incoming_message(message: &TangleMessage) {
     println!(
-        "\
+        "-----------------------------------------------------------------\n\
 [HttpClientProxy - DispatchStreams] send_message() - Incoming Message to attach to tangle with absolut length of {} bytes. Data:
 {}
 ", message.body.as_bytes().len() + LINK_AND_PREVLINK_LENGTH, message.to_string()
@@ -133,7 +133,7 @@ fn println_send_message_for_incoming_message(message: &TangleMessage) {
 
 fn println_receive_message_from_address_for_received_message(message: &TangleMessage) {
     println!(
-        "\
+        "-----------------------------------------------------------------\n\
 [HttpClientProxy - DispatchStreams] receive_message_from_address() - Received Message from tangle with absolut length of {} bytes. Data:
 {}
 ", message.body.as_bytes().len() + LINK_AND_PREVLINK_LENGTH, message.to_string()

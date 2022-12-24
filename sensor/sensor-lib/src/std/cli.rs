@@ -59,6 +59,16 @@ sensors are also used, you need to use the CLI argument '--iota-bridge-url'
 to specify this ip address.
 ";
 
+
+
+static EXIT_AFTER_SUCCESSFUL_INITIALIZATION_ABOUT: &str = "\
+If specified in combination with --act-as-remote-controlled-sensor the command poll loop
+will be stopped after a KEYLOAD_REGISTRATION confirmation has been send to confirm
+a successfully processed REGISTER_KEYLOAD_MESSAGE command.
+This argument is useful when the sensor app runs in automation scripts to allow the
+initialization of the Sensor and the Sensor app should exit after successful initialization.
+";
+
 static USE_LORAWAN_REST_API_ABOUT: &str = "\
 If used the Sensor application will not call iota-bridge API functions directly
 but will use its lorawan-rest API instead.
@@ -95,6 +105,7 @@ pub struct ArgKeys {
     pub clear_client_state: &'static str,
     pub iota_bridge_url: &'static str,
     pub use_lorawan_rest_api: &'static str,
+    pub exit_after_successful_initialization: &'static str,
 }
 
 
@@ -110,6 +121,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     clear_client_state: "clear-client-state",
     println_subscriber_status: "println-subscriber-status",
     use_lorawan_rest_api: "use-lorawan-rest-api",
+    exit_after_successful_initialization: "exit-after-successful-initialization",
 };
 
 pub type SensorCli<'a> = Cli<'a, ArgKeys>;
@@ -186,6 +198,14 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
                 .value_name("USE_LORAWAN_REST_API")
                 .long_help(USE_LORAWAN_REST_API_ABOUT)
                 .takes_value(false)
+            )
+            .arg(Arg::new(ARG_KEYS.exit_after_successful_initialization)
+                .long(ARG_KEYS.exit_after_successful_initialization)
+                .short('e')
+                .value_name("EXIT_AFTER_SUCCESSFUL_INITIALIZATION")
+                .long_help(EXIT_AFTER_SUCCESSFUL_INITIALIZATION_ABOUT)
+                .takes_value(false)
+                .requires(ARG_KEYS.act_as_remote_controlled_sensor)
             )
             .arg(Arg::new(ARG_KEYS.clear_client_state)
                 .long(ARG_KEYS.clear_client_state)

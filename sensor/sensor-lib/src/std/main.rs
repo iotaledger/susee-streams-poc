@@ -21,18 +21,32 @@ use crate::{
     }
 };
 
-use streams_tools::{PlainTextWallet, http_client::HttpClientOptions, http::http_protocol_confirm::RequestBuilderConfirm, binary_persist::Command, remote::{
-    remote_sensor::{
-        RemoteSensor,
-        RemoteSensorOptions,
+use streams_tools::{
+    PlainTextWallet,
+    http_client::HttpClientOptions,
+    http::http_protocol_confirm::RequestBuilderConfirm,
+    binary_persist::Command,
+    STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
+    remote::{
+        remote_sensor::{
+            RemoteSensor,
+            RemoteSensorOptions,
+        },
+        command_processor::{
+            CommandProcessor,
+            SensorFunctions,
+            process_sensor_commands,
+            run_command_fetch_loop,
+            CommandFetchLoopOptions,
+        }
     },
-    command_processor::{
-        CommandProcessor,
-        SensorFunctions
-    }
-}, STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL};
+};
 
-use susee_tools::{SUSEE_CONST_SECRET_PASSWORD, get_wallet_filename, SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC};
+use susee_tools::{
+    SUSEE_CONST_SECRET_PASSWORD,
+    get_wallet_filename,
+    SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC
+};
 
 use hyper::{
     Body,
@@ -40,8 +54,8 @@ use hyper::{
 };
 
 use iota_streams::core::async_trait;
-use streams_tools::remote::command_processor::{process_sensor_commands, run_command_fetch_loop, CommandFetchLoopOptions};
 use rand::Rng;
+use std::cell::Cell;
 
 fn get_wallet(cli: &SensorCli) -> Result<PlainTextWallet> {
     let wallet_filename= get_wallet_filename(
@@ -76,7 +90,7 @@ pub async fn create_subscriber_manager<'a>(cli: &SensorCli<'a>) -> Result<Subscr
     if wallet.persist.misc_other_data.len() > 0 {
         http_client_options.dev_eui = Some(wallet.persist.misc_other_data.clone());
     }
-    if cli.matches.is_present(cli.arg_keys.act_as_remote_control) {
+    if cli.matches.is_present(cli.arg_keys.use_lorawan_rest_api) {
         http_client_options.use_lorawan_rest = true;
     }
     let client = ClientType::new(Some(http_client_options));
@@ -182,6 +196,7 @@ struct CmdProcessor<'a> {
     command_fetcher: CommandFetcher,
     iota_bridge_url: String,
     cli: SensorCli<'a>,
+    initialization_has_been_completed: Cell<bool>,
 }
 
 impl<'a> CmdProcessor<'a> {
@@ -192,6 +207,7 @@ impl<'a> CmdProcessor<'a> {
             ),
             iota_bridge_url: String::from(iota_bridge_url),
             cli,
+            initialization_has_been_completed: Cell::new(false),
         }
     }
 }
@@ -228,6 +244,7 @@ impl<'a> SensorFunctions for CmdProcessor<'a> {
     {
         SensorManager::register_keyload_msg(keyload_msg_link_str, subscriber_mngr).await
             .expect("Error on calling SensorManager::register_keyload_msg");
+        self.initialization_has_been_completed.set(true);
         confirm_req_builder.keyload_registration()
     }
 
@@ -253,7 +270,12 @@ impl<'a> SensorFunctions for CmdProcessor<'a> {
 #[async_trait(?Send)]
 impl<'a> CommandProcessor for CmdProcessor<'a> {
     async fn fetch_next_command(&self) -> Result<(Command, Vec<u8>)> {
-        self.command_fetcher.fetch_next_command().await
+        if !self.cli.matches.is_present(self.cli.arg_keys.exit_after_successful_initialization)
+            || !self.initialization_has_been_completed.get() {
+            self.command_fetcher.fetch_next_command().await
+        } else {
+            Ok((Command::STOP_FETCHING_COMMANDS, Vec::<u8>::new()))
+        }
     }
 
     async fn send_confirmation(&self, confirmation_request: Request<Body>) -> Result<()> {

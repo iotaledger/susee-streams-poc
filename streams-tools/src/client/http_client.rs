@@ -180,8 +180,15 @@ impl HttpClient
             if bytes.len() > 0 {
                 match IotaBridgeResponseParts::try_from_bytes(bytes.to_vec().as_slice()) {
                     Ok(response_parts) => {
-                        log::debug!("[HttpClient.request] Successfully deserialized response_parts");
-                        ret_val = response_parts.persist_to_hyper_response_200()?;
+                        log::debug!("[HttpClient.request] Successfully deserialized response_parts:\n{}", response_parts);
+                        if !response_parts.status_code.is_success() {
+                            let err_msg = String::from_utf8(response_parts.body_bytes.clone())
+                                .unwrap_or(String::from("Could not deserialize Error message from response Body"));
+                            log::debug!("[HttpClient.request] Response status is not successful: Error message is:\n{}", err_msg);
+                        }
+                        ret_val = Response::builder()
+                            .status(response_parts.status_code)
+                            .body(Body::from(response_parts.body_bytes))?;
                     },
                     Err(e) => {
                         log::debug!("[HttpClient.request] Error on deserializing response_parts: {}", e);

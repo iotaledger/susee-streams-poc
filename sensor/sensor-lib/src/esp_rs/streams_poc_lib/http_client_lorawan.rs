@@ -328,7 +328,12 @@ impl HttpClient
                         if response.len() > 0 {
                             match IotaBridgeResponseParts::try_from_bytes(response.as_slice()) {
                                 Ok(response_parts) => {
-                                    log::debug!("[HttpClient.request_via_lorawan] Successfully deserialized response_parts");
+                                    log::debug!("[HttpClient.request_via_lorawan] Successfully deserialized response_parts:\n{}", response_parts);
+                                    if !response_parts.status_code.is_success() {
+                                        let err_msg = String::from_utf8(response_parts.body_bytes.clone())
+                                            .unwrap_or(String::from("Could not deserialize Error message from response Body"));
+                                        log::debug!("[HttpClient.request] Response status is not successful: Error message is:\n{}", err_msg);
+                                    }
                                     Ok(response_parts)
                                 },
                                 Err(e) => {

@@ -75,4 +75,4 @@ Have a look into the following documentation for more details:
 The *LoraWan AppServer Mockup Tool* implements this process but uses a WIFI
 socket connection instead of a LoRaWAN connection. For further details please
 have a look into the
-[*LoraWan AppServer Mockup Tool* README](lora-app-srv-mock/README.md).
+[*LoraWan AppServer Mockup Tool* README](../lora-app-srv-mock/README.md).

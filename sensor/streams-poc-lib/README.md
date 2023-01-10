@@ -77,8 +77,10 @@ The easiest way is to use the `--init-sensor` option of the *Management Console*
 which uses the *IOTA Bridge* application ([project directory](../../iota-bridge)) to remote control the Sensor.
 
 After you've built the *Management Console* and *IOTA Bridge* as being
-described in the [main README.md file of the susee-streams-poc repository](../../README.md)
-please follow the instructions of the *Automatic Sensor Initialization* section of the README to initialize the Sensor.
+described in the [main README.md file of the susee-streams-poc repository](../../README.md#build)
+please follow the instructions of the *Automatic Sensor Initialization* section of the
+[README](../../README.md#automatic-sensor-initialization)
+to initialize the Sensor.
 
 In the **Initialized** mode the application sends an example message using the 'send_message()' function of the
 *streams-poc-lib*. This is followed by calls of the 'send_request_via_lorawan_t' and 'resolve_request_response_t'

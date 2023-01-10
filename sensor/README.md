@@ -114,7 +114,7 @@ without the need to run ESP32 Hardware. The CLI command to mock an ESP32 Sensor 
 
 The `--act-as-remote-controlled-sensor` argument is especially useful to automatically initialize the x86/PC Sensor
 in interaction with the 
-[*Management Console* (`--init-sensor` argument)](management-console/README.md#automatic-sensor-initialization).
+[*Management Console* (`--init-sensor` argument)](../management-console/README.md#automatic-sensor-initialization).
 If you want to exit the *Sensor* application after the initialization has been finished you can use 
 the `--exit-after-successful-initialization` argument:
 

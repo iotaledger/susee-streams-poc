@@ -294,10 +294,11 @@ tests for the *SUSEE Streams POC* applications and libraries. Have a look into t
 [test scripts README](test/scripts/README.md) for more details.
 
 ## Example Workflows
-There are two ways to initialize a sensor. The easiest way is to use the `--init-sensor` option of
-the *Management Console* application which will perform an automatic sensor initialization.
+There are two ways to initialize a sensor. The easiest way is to use the
+[`--init-sensor` option](management-console/README.md#automatic-sensor-initialization)
+of the *Management Console* application which will perform an automatic sensor initialization.
 
-If you prefer to have a more insights into the initialization process you can do the sensor initialization
+If you prefer to have more insights into the initialization process you can do the sensor initialization
 manually using the *Management Console* application CLI.
 
 ### Automatic Sensor Initialization

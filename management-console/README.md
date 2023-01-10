@@ -1,6 +1,6 @@
 # Management Console
 
-The *Management Console* is used to create new Streams channels and to add Sensors(a.k.a. Streams subscribers)
+The *Management Console* is used to create new Streams channels and to add Sensors (a.k.a. Streams subscribers)
 to those channels. Management of multiple channels is possible. The user states of the
 Streams channels are stored in a local SQLite3 database file (user-states-database).
 
@@ -79,7 +79,7 @@ CLI command --subscribe-announcement-link of the *Sensor* app is used. This appl
 of the *Sensor* app (*Sensor remote control*) and to the *ESP32 Sensor* application. In case of the *ESP32 Sensor*
 these properties are also logged to the console of the *Sensor* app that is used as *Sensor remote control*.
 
-#### Automatic *Sensor* initialization
+#### Automatic *Sensor* Initialization
 
 Instead of creating a Streams chanel and subscribing a Sensor manually
 the whole process (called *Sensor* initialization) can be done automatically:

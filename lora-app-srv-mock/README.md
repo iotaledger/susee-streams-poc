@@ -14,3 +14,25 @@ via the socket connection back to the *ESP32 Sensor*.
 In a real world scenario a service running on the LoRaWAN Application Server (or tightly connected to it) would
 post the binary packages received via LoRaWAN to the *IOTA-Bridge* via the `lorawan-rest` API endpoints.
 Therefore this application is called *LoraWan AppServer Mockup Tool*.
+
+## Prerequisites and Build
+Please have a look at the [Prerequisites](sensor/streams-poc-lib/README.md#prerequisites)
+and [Build](sensor/streams-poc-lib/README.md#build) section of the main README of this repository.
+
+## LoraWan AppServer Mockup Tool CLI
+
+Additionally to those commands described in the
+[CLI API section of the main README file](sensor/streams-poc-lib/README.md#common-cli-options-and-io-files) the
+*LoraWan AppServer Mockup Tool* provides these CLI commands:
+
+    -b, --iota-bridge-url <IOTA_BRIDGE_URL>
+            The url of the iota-bridge to connect to.
+            Default value is http://localhost:50000
+            Example: iota-bridge-url="http://192.168.47.11:50000" [default: http://localhost:50000]
+
+    -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
+            IP address and port to listen to.
+            Example: listener-ip-address="192.168.47.11:50001"
+            
+            DO NOT USE THE SAME PORT FOR THE IOTA-BRIDGE AND THIS APPLICATION
+             [default: localhost:50001]

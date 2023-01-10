@@ -7,7 +7,7 @@ specific functionality for the SUSEE project.
 
 Following test applications are contained. For more details regarding the general usecase please see below in the 
 <a href="#applications-and-workflows">Applications and workflows</a> section:
-* *IOTA Bridge*<br>
+* [IOTA Bridge](iota-bridge)<br>
   * Needed by all Sensor applications to access the IOTA Tangle
     * Provides an http rest api used by the *Sensor* applications to access the tangle<br>
     * Attaches the Streams packages received from the *Sensor* applications to the tangle
@@ -16,31 +16,30 @@ Following test applications are contained. For more details regarding the genera
   * Imitates processes
     * in the SUSEE Application Server (*Sensor Processing*) and
     * processes used by the initialization software that performs the Sensor *Initialization*
-* *ESP32 Sensor*<br>
+* [ESP32 Sensor](sensor/main-rust-esp-rs)<br>
   * Imitates the processes running in the smart meter (a.k.a. *Sensor*)
   * Runs on ESP32-C3 devices
   * Can be remote controlled by the *Sensor remote control*
-* *streams-poc-lib*<br>
+* [streams-poc-lib](sensor/streams-poc-lib)<br>
   * provides C bindings for most functionalities of the *ESP32 Sensor*
   * can be used with Espressifs ESP-IDF build process for ESP32-C3 devices
   * includes a test application written in C to test the library functionality using a WIFI socket instead of
     a LoRaWAN connection
   * Provides most features of the *ESP32 Sensor* via its library interface
-* *LoraWan AppServer Mockup Tool*<br>
+* [LoraWan AppServer Mockup Tool](lora-app-srv-mock)<br>
   * test tool to receive & send binary packages from/to the streams-poc-lib test application via a socket
     connection and transmit these packages to the *IOTA-Bridge* via its `lorawan-rest` API functions.
   * a real world service would run on the LoRaWAN Application Server (or tightly connected to it).
     Like this test tool it would transceive binary packages from a LoRaWan connection to the *IOTA-Bridge*.
-* *Sensor remote control*<br>
+* [Sensor remote control](sensor/main-rust)<br>
   * Runs on X86/PC
   * Used to send commands to the *ESP32 Sensor* or *streams-poc-lib* test app
   * Can also be used to imitate an *ESP32 Sensor* on X86/PC platforms including
-    the possibility to be remotes controlled
-* *Management Console*<br>
+    the possibility to be remote controlled
+* [Management Console](management-console)<br>
   * Imitates the processes needed for *Initialization* of the sensor and the monitoring of *Sensor Processing*
   * Manages the *Add/Remove Subscriber* workflows
   * Manages multiple channels resp. *Sensors* using a local SQLite3 database
-   
 
 The Streams Channel used for the SUSEE project generally can be described as follows:
 * One single branch per sensor
@@ -254,357 +253,14 @@ as these applications do not need a wallet:
   database "lora-wan-nodes-iota-bridge.sqlite3". More details can be found in the 
   <a href="#compressed-streams-messages">Compressed Streams Messages</a> section.
 
-### Management Console CLI
+### Application specific CLIs
 
-The *Management Console* is used to create new Streams channels and to add Sensors(a.k.a. Streams subscribers)
-to those channels. Management of multiple channels is possible. The user states of the
-Streams channels are stored in a local SQLite3 database file (user-states-database).
+Please have a look at the application specific README files:
 
-    -c, --create-channel
-            Use this option to create (announce) a new Streams channel.
-            The announcement link will be logged to the console.
-            The ID and user_state of the new Streams channel will be stored in in the
-            user-states-database.
-
-    -n, --node <NODE_URL>
-            The url of the iota node to connect to.
-            Use 'https://chrysalis-nodes.iota.org' for the mainnet.
-            
-            As there are several testnets have a look at
-                https://wiki.iota.org/learn/networks/testnets
-            for alternative testnet urls.
-            
-            Example:
-                The iota chrysalis devnet:
-                https://api.lb-0.h.chrysalis-devnet.iota.cafe
-             [default: https://chrysalis-nodes.iota.org]
-             
-    -p, --println-channel-status
-            Print information about currently existing channels.
-            Each sensor is a subscriber in a dedicated Streams channel. The management-console
-            manages these channels and stores the channel state information in its
-            'user-states-management-console.sqlite3' database file. Use this CLI option to print
-            the relevant channel state information from the SQLite database to console.
-            Use CLI argument '--channel-starts-with' to select the Streams channel you want to
-            investigate.             
-
-    -s, --channel-starts-with <CHANNEL_STARTS_WITH>
-            Specify the Streams channel when processing a management-console
-            CLI command. As the Streams channels ID has 40 byte length and is
-            not easy to handle manually you only need to specify the beginning
-            of the channels ID so that it can be found in the user-states-database.
-            If there are more than one channels that can be found by the provided search string
-            the command will fail.
-            
-            Example:
-            
-                >   ./management-console --channel-starts-with=6f5aa6cb --println-channel-status
-
-#### Subscribe *Sensors*
-Following CLI arguments are used to subscribe *Sensors* to an existing channel:
-
-    -k, --subscription-pub-key <SUBSCRIPTION_PUB_KEY>
-            Add a Sensor to a Streams channel.
-            The CLI argument defines the public key of the sensor subscriber.
-            The public key of the sensor is logged to its console by the Sensor when the
-            --subscribe-announcement-link CLI command is used.
-            For more details have a look at the --subscription-link argument
-
-    -l, --subscription-link <SUBSCRIPTION_LINK>
-            Add a Sensor to a Streams channel.
-            The CLI argument defines the subscription message link for the sensor subscriber.
-            The subscription message link is logged to its console by the Sensor when the
-            --subscribe-announcement-link CLI command is used.
-            As the subscription message link contains the Streams channel ID the correct
-            user state is fetched automatically out of the user-states-database.
-
-The SUBSCRIPTION_PUB_KEY and SUBSCRIPTION_LINK will be logged to the console by the *Sensor* app when the 
-CLI command --subscribe-announcement-link of the *Sensor* app is used. This applies to the x86/PC version 
-of the *Sensor* app (*Sensor remote control*) and to the *ESP32 Sensor* application. In case of the *ESP32 Sensor*
-these properties are also logged to the console of the *Sensor* app that is used as *Sensor remote control*.
-
-#### Automatic *Sensor* initialization
-
-Instead of creating a Streams chanel and subscribing a Sensor manually
-the whole process (called *Sensor* initialization) can be done automatically:
-
-    -i, --init-sensor
-            Initialize the streams channel of a remote sensor.
-            The whole channel initialization is done automatically following the process described
-            below. Management-console and remote sensor are communicating via the IOTA-Bridge.
-            Therefore you also need to use the '--iota-bridge' option to connect the management-
-            console to a running IOTA-Bridge.
-            
-            Example:
-            
-              > ./management-console --init-sensor --iota-bridge-url="http://192.168.47.11:50000"
-            
-            Please make sure that the remote sensor and the management-console have a working
-            connection to the running iota-bridge.
-            
-            Initialization Process
-            ----------------------
-            The process consists of the following steps that could also be run manually using
-            the CLI of the management-console and the sensor/ESP32-Sensor application:
-            
-                    ------------------------------------------------------
-                    | management-console | --create-channel              |
-                    |--------------------|--------------------------------
-                    | sensor             | --subscribe-announcement-link |
-                    |--------------------|-------------------------------|
-                    | management-console | --subscription-link           |
-                    |                    | --subscription-pub-key        |
-                    |--------------------|-------------------------------|
-                    | sensor             | --register-keyload-msg        |
-                    ---------------------|--------------------------------
-            
-            In the automated initialization process all CLI commands and the data that are written
-            to console log by the applications are transported using Command and Confirmation
-            packages that are defined in the binary_persist module of the streams-tools library.
-            
-            Here is an overview which Command and Confirmation packages are used for communication
-            with the remote sensor via the IOTA-Bridge:
-            
-             * management-console: --create-channel
-                --> Announcement Link       # Send to the sensor using the SubscribeToAnnouncement
-                                            # Command
-             * sensor: --subscribe-announcement-link
-                --> Subscription Link       # Send to the management-console using
-                --> Public Key              # the SubscribeToAnnouncement Confirmation
-            
-             * management-console: --subscription-link --subscription-pub-key
-                --> Keyload Link            # Send to the sensor using the RegisterKeyloadMessage
-                                            # Command
-            
-             * sensor: --register-keyload-msg
-                                            # Successful keyload registration is acknowledged with
-                                            # a KEYLOAD_REGISTRATION Confirmation
-
-    -b, --iota-bridge-url <IOTA_BRIDGE_URL>
-            The url of the iota-bridge to connect to.
-            See --init-sensor for further information.
-            Default value is http://localhost:50000
-            
-            Example: iota-bridge-url="http://192.168.47.11:50000"
-
-To allow fully automated channel initializations the SUSEE Streams POC applications and the streams-poc-lib
-are using an own communication protocol consisting of `commands` and `confirmations` where a `confirmation`
-always carries the relevant data resulting from a command executed by a remote sensor.
-
-Alternatively to see the log output of the *ESP32 Sensor* app you can use a serial port monitor like `idf.py monitor`
-or [cargo espmonitor](https://github.com/esp-rs/espmonitor).
-
-If you use the `--init-sensor` option all relevant Streams channel properties like announcement-link,
-subscription_pub_key, ... are logged to the console of the *Management Console* app equivalent to
-the usage of the *Sensor* app when it's used as a *Sensor remote control*. 
-
-### Sensor CLI
-
-There are three different Sensor applications for different purposes:
-
-| Application  |  Platform | Purpose                       | Progr. Language |
-|--------------|-----------|-------------------------------|-----------------|
-| *streams-poc-lib* test application | ESP32  | Test the streams-poc-lib functionality using its C binding| C |
-| *ESP32 Sensor*                     | ESP32  | Test the Rust code that builds the foundation of the streams-poc-lib without the limitations of a foreign function interface | Rust |
-| *Sensor remote control*            | X86/PC | Test the Rust code of *ESP32 Sensor* on X86/PC | Rust |
-
-All Sensor applications provide CLI commands to manage the Streams usage:
- 
-    -s, --subscribe-announcement-link <SUBSCRIBE_ANNOUNCEMENT_LINK>
-            Subscribe to the channel via the specified announcement link.
-            
-    -r, --register-keyload-msg <KEYLOAD_MSG_LINK>
-            Register the specified keyload message so that it can be used
-            as root of the branch used to send messages later on.
-
-    -f, --file-to-send [<FILE_TO_SEND>...]
-            A message file that will be encrypted and send using the streams channel.
-            The message will be resend every 10 Seconds in an endless loop.
-            Use CTRL-C to stop processing.
-            
-    -p, --println-subscriber-status
-            Print information about the current client status of the sensor.
-            In streams the sensor is a subscriber so that this client status is called subscriber
-            status.
-            
-        --clear-client-state
-            Deletes the current client status of the sensor so that
-            all subscriptions get lost and the sensor can be used to subscribe to a new Streams
-            channel.
-            TODO: In future versions the seed will also be replaced by a new generated seed.
-            TODO: -----------------------------
-                  --------  WARNING  ---------- Currently there is no confirmation cli dialog
-                  -----------------------------       use this option carefully!
-                              
-As both Sensor applications running on ESP32 do not provide an interactive terminal, the 
-x86/PC Sensor application (a.k.a *Sensor remote control*) can be used to remote control the ESP32
-applications. The x86/PC Sensor provides following CLI commands to manage the
-remote control functionality:
-
-    -t, --iota-bridge-url <IOTA_BRIDGE_URL>
-            The url of the iota-bridge to connect to.
-            Default value is http://localhost:50000
-            
-            Example: iota-bridge-url="http://192.168.47.11:50000"
-
-    -c, --act-as-remote-control
-            Use this argument to remotely control a running sensor application on
-            an embedded device. For example this
-            
-              > ./sensor --subscribe-announcement-link "c67551dade.....6daff2"\
-                         --act-as-remote-control
-            
-            will make the remote sensor subscribe the channel via the specified
-            announcement-link. This sensor app instance communicates with the remote sensor
-            app via the iota-bridge application. Please make sure that both sensor
-            app instances have a working connection to the running iota-bridge.
-            
-            If sensor and iota-bridge run on the same machine they can communicate over the
-            loopback IP address (localhost). This is not possible in case the sensor runs on an
-            external device (embedded MCU). In this case the iota-bridge needs to listen to
-            the ip address of the network interface (the ip address of the device that runs
-            the iota-bridge) so that the embedded sensor can access the iota-bridge.
-            Therefore in case you are using 'act-as-remote-control' you will also need to use
-            the 'iota-bridge' option to connect to the iota-bridge.
-
-The *streams-poc-lib* test application can only bee remote controlled if the streams channel has
-not already been initialized (further details can be found in the
-[streams-poc-lib README](sensor/streams-poc-lib/README.md)).
-
-The x86/PC Sensor application can also be used to act as a remote controlled Sensor or let's say
-to mock (or imitate) an ESP32 Sensor application.
-This is especially usefull to test the *IOTA Bridge* and the *Management Console*
-without the need to run ESP32 Hardware. The CLI command to mock an ESP32 Sensor is:
-
-    -m, --act-as-remote-controlled-sensor
-            Imitate a remote sensor resp. an ESP32-Sensor awaiting remote control commands.
-            ESP32-Sensor here means the 'sensor/main-rust-esp-rs' application or the
-            test app of the streams-poc-lib in an initial Streams channel state.
-            
-            This command is used to test the iota-bridge and the management-console application
-            in case there are not enough ESP32 devices available. The sensor application will
-            periodically fetch and process commands from the iota-bridge.
-            
-            If the iota-bridge runs on the same machine as this application, they can
-            communicate over the loopback IP address (localhost). In case the sensor
-            iota-bridge listens to the ip address of the network interface (the ip
-            address of the device that runs the iota-bridge) e.g. because some ESP32
-            sensors are also used, you need to use the CLI argument '--iota-bridge-url'
-            to specify this ip address.
-
-The `--act-as-remote-controlled-sensor` argument is especially useful to automatically initialize the x86/PC Sensor
-in interaction with the <a href="#automatic-sensor-initialization">*Management Console* (`--init-sensor` argument)</a>.
-If you want to exit the *Sensor* application after the initialization has been finished you can use 
-the `--exit-after-successful-initialization` argument:
-
-    -e, --exit-after-successful-initialization
-            If specified in combination with --act-as-remote-controlled-sensor the command poll loop
-            will be stopped after a KEYLOAD_REGISTRATION confirmation has been send to confirm
-            a successfully processed REGISTER_KEYLOAD_MESSAGE command.
-            This argument is useful when the sensor app runs in automation scripts to allow the
-            initialization of the Sensor and the Sensor app should exit after successful
-            initialization.
-
-
-
-The x86/PC Sensor application can also be used to test the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge*
-application. This is done using the `--use-lorawan-rest-api` argument:
-
-    -l, --use-lorawan-rest-api
-            If used the Sensor application will not call iota-bridge API functions directly
-            but will use its lorawan-rest API instead.
-            This way the Sensor application imitates the behavior of an ESP32-Sensor connected
-            via LoRaWAN and a package transceiver connected to the LoRaWAN application server
-            that hands over binary packages to the iota-bridge.
-
-
-### LoraWan AppServer Mockup Tool
-
-Additionally to those commands described in the
-<a href="#common-cli-options-and-io-files">Common CLI options section</a> section the
-*LoraWan AppServer Mockup Tool* provides these CLI commands:
-
-    -b, --iota-bridge-url <IOTA_BRIDGE_URL>
-            The url of the iota-bridge to connect to.
-            Default value is http://localhost:50000
-            Example: iota-bridge-url="http://192.168.47.11:50000" [default: http://localhost:50000]
-
-    -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
-            IP address and port to listen to.
-            Example: listener-ip-address="192.168.47.11:50001"
-            
-            DO NOT USE THE SAME PORT FOR THE IOTA-BRIDGE AND THIS APPLICATION
-             [default: localhost:50001]
-
-For further details please also have a look into the 
-[README of the *LoraWan AppServer Mockup Tool*](lora-app-srv-mock/README.md) project.
-
-### IOTA Bridge CLI
-
-The *IOTA Bridge* acts as a proxy for messages from/to the
-* *Management Console* and *Sensor* applications
-* *ESP32 Sensor*
-* IOTA Tangle
-
-It provides a REST API to:
-* send/receive streams packages that will_be/are attached to the tangle using an IOTA Node
-* Send remote control commands from the *Sensor* or *Management Console* application to the *ESP32 Sensor*
-* Send remote control confirmations from the *ESP32 Sensor* to the *Sensor* or *Management Console* application
-* receive IotaBridgeRequests containing one of the above described REST API requests as binary serialized package
-  which can be used to use the IOTA Bridge e.g. via LoRaWAN
-
-Additionally to those commands described in the
-<a href="#common-cli-options-and-io-files">Common CLI options section</a> section the
-*IOTA Bridge* provides these CLI commands:
-
-    -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
-            IP address and port to listen to.
-            Example: listener-ip-address="192.168.47.11:50000"
-            
-
-    -n, --node <NODE_URL>
-            The url of the iota node to connect to.
-            Use 'https://chrysalis-nodes.iota.org' for the mainnet.
-            
-            As there are several testnets have a look at
-                https://wiki.iota.org/learn/networks/testnets
-            for alternative testnet urls.
-            
-            Example:
-                The iota chrysalis devnet:
-                https://api.lb-0.h.chrysalis-devnet.iota.cafe
-             [default: https://chrysalis-nodes.iota.org]
-            
-## IOTA Bridge REST API
-Most of the REST API is used internally by the accompanying susee-streams-poc applications. The only endpoint relevant
-for public use is the IotaBridgeRequests API which can be called via the `lorawan-rest/binary_request` endpoints.
-
-To demonstrate the usage of the API here is a cURL example:
-```bash
-    curl --location --request POST 'http://192.168.47.11:50000/lorawan-rest/binary_request?deveui=4711' \
-         --header 'Content-Type: application/octet-stream' \
-         --data-binary '@~/path-to-my-develop-folder/susee-streams-poc/test/iota-bridge/request_parts.bin'
-```
-
-Underlying usecase: Given you are using the streams-poc-lib function
-[send_message()](sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
-in your C code you will receive a binary package via the `lorawan_send_callback` function that you need
-to specify to call send_message(). You'll transmit this binary package e.g. via LoRaWAN. In your LoRaWAN Application
-Server you can use the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge* to hand the binary package over to it. 
-
-The body of the resulting HTTP Resonse needs to be returned to the *ESP32 Sensor* via the `response_callback`
-function that is provided by the streams-poc-lib.
-
-Have a look into the following documentation for more details:
-
-* Interface of the streams-poc-lib: 
-  [streams_poc_lib.h](sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
-* Readme of the [streams-poc-lib](sensor/streams-poc-lib/README.md)
-
-The *LoraWan AppServer Mockup Tool* implements this process but uses a WIFI
-socket connection instead of a LoRaWAN connection. For further details please
-have a look into the
-[*LoraWan AppServer Mockup Tool* README](lora-app-srv-mock/README.md).
+* [Management Console CLI](management-console/README.md#management-console-cli)
+* [CLI of the Sensor Applications](sensor/README.md#cli-of-the-sensor-applications)
+* [IOTA-Bridge Console CLI](iota-bridge/README.md#iota-bridge-console-cli)
+* [LoraWan AppServer Mockup Tool CLI](lora-app-srv-mock/README.md#lorawan-appserver-mockup-tool-cli)
 
 ## Compressed Streams Messages
 To reduce the payload size a *Sensor* and the *IOTA Bridge* can use compressed streams messages.
@@ -646,8 +302,9 @@ manually using the *Management Console* application CLI.
 
 ### Automatic Sensor Initialization
 
-To automatically initialize a sensor we need to use the `--init-sensor` option of
-the *Management Console* application:
+To automatically initialize a sensor we need to use the
+[`--init-sensor` option](management-console/README.md#automatic-sensor-initialization)
+of the *Management Console* application:
 
 * Start the *Sensor*, *ESP32 Sensor* or *streams-poc-lib* test application with an unitialized streams channel.
   * *Sensor* and *ESP32 Sensor*:<br>
@@ -673,7 +330,7 @@ the *Management Console* application:
 ```
 
 The *Management Console* then will perform all the steps described below fully automatically.
-See the <a href="#automatic-sensor-initialization">CLI help for the `--init-sensor` option</a>
+See the [CLI help for the `--init-sensor` option](management-console/README.md#automatic-sensor-initialization)
 of the *Management Console* for further details.
 
 ### Manual Sensor Initialization

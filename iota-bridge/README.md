@@ -18,13 +18,13 @@ It provides a REST API to:
   a binary serialized package which can be used to interact with the IOTA Bridge e.g. via LoRaWAN
 
 ## Prerequisites and Build
-Please have a look at the [Prerequisites](sensor/streams-poc-lib/README.md#prerequisites)
-and [Build](sensor/streams-poc-lib/README.md#build) section of the main README of this repository.
+Please have a look at the [Prerequisites](../README.md#prerequisites)
+and [Build](../README.md#build) section of the main README of this repository.
 
 ## IOTA-Bridge Console CLI
 
 In addition to the common CLI options described in the
-[CLI API section of the main README file](sensor/streams-poc-lib/README.md#common-cli-options-and-io-files)
+[CLI API section of the main README file](../README.md#common-cli-options-and-io-files)
 the *IOTA-Bridge* offers the following CLI arguments.
 
     -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
@@ -58,7 +58,7 @@ To demonstrate the usage of the API here is a cURL example:
 
 **Underlying usecase:**<br>
 Given you are using the streams-poc-lib function
-[send_message()](sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
+[send_message()](../sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
 in your C code you will receive a binary package via the `lorawan_send_callback` function that you need
 to specify to call send_message(). You'll transmit this binary package e.g. via LoRaWAN. In your LoRaWAN Application
 Server you can use the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge* to hand the binary package over to it. 
@@ -69,8 +69,8 @@ function that is provided by the streams-poc-lib.
 Have a look into the following documentation for more details:
 
 * Interface of the streams-poc-lib: 
-  [streams_poc_lib.h](sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
-* Readme of the [streams-poc-lib](sensor/streams-poc-lib/README.md)
+  [streams_poc_lib.h](../sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
+* Readme of the [streams-poc-lib](../sensor/streams-poc-lib/README.md)
 
 The *LoraWan AppServer Mockup Tool* implements this process but uses a WIFI
 socket connection instead of a LoRaWAN connection. For further details please

@@ -5,13 +5,13 @@ to those channels. Management of multiple channels is possible. The user states 
 Streams channels are stored in a local SQLite3 database file (user-states-database).
 
 ## Prerequisites and Build
-Please have a look at the [Prerequisites](sensor/streams-poc-lib/README.md#prerequisites)
-and [Build](sensor/streams-poc-lib/README.md#build) section of the main README of this repository.
+Please have a look at the [Prerequisites](../README.md#prerequisites)
+and [Build](../README.md#build) section of the main README of this repository.
 
 ## Management Console CLI
 
 In addition to the common CLI options described in the
-[CLI API section of the main README file](sensor/streams-poc-lib/README.md#common-cli-options-and-io-files)
+[CLI API section of the main README file](../README.md#common-cli-options-and-io-files)
 the *Management Console* offers the following CLI arguments.
 
 #### Streams Channel Management

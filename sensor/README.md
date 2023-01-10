@@ -27,7 +27,7 @@ There are three different Sensor applications for different purposes:
 | *Sensor remote control*            | X86/PC | Test the Rust code of *ESP32 Sensor* on X86/PC | Rust |
 
 In addition to the common CLI options described in the
-[CLI API section of the main README file](sensor/streams-poc-lib/README.md#common-cli-options-and-io-files)
+[CLI API section of the main README file](../README.md#common-cli-options-and-io-files)
 all Sensor applications provide CLI commands to manage the Streams usage:
  
     -s, --subscribe-announcement-link <SUBSCRIBE_ANNOUNCEMENT_LINK>
@@ -89,7 +89,7 @@ remote control functionality:
 
 The *streams-poc-lib* test application can only bee remote controlled if the streams channel has
 not already been initialized (further details can be found in the
-[streams-poc-lib README](sensor/streams-poc-lib/README.md)).
+[streams-poc-lib README](../sensor/streams-poc-lib/README.md)).
 
 The x86/PC Sensor application can also be used to act as a remote controlled Sensor or let's say
 to mock (or imitate) an ESP32 Sensor application.

@@ -51,12 +51,12 @@ Most of the REST API is used internally by the accompanying susee-streams-poc ap
 
 The only endpoints relevant for public use are the following:
 
-* <a href="#lorawan-rest">/lorawan-rest</a> <br>
+* <a href="#lorawan-rest-endpoints">/lorawan-rest</a> <br>
   Post binary IotaBridgeRequest packages received e.g. via LoRaWAN
-* <a href="#lorawan-node">/lorawan-node</a> <br>
+* <a href="#lorawan-node-endpoints">/lorawan-node</a> <br>
   Manage LoRaWAN nodes (Sensors) cached by the *IOTA Bridge* to allow compressed Streams message usage
 
-### lorawan-rest
+### lorawan-rest Endpoints
 
 IotaBridgeRequest packages can be posted to the *IOTA Bridge* using the `lorawan-rest/binary_request` endpoints
 

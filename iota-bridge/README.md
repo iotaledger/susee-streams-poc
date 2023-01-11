@@ -51,9 +51,9 @@ Most of the REST API is used internally by the accompanying susee-streams-poc ap
 
 The only endpoints relevant for public use are the following:
 
-* <a href="#/lorawan-rest">/lorawan-rest</a> <br>
+* <a href="#lorawan-rest">/lorawan-rest</a> <br>
   Post binary IotaBridgeRequest packages received e.g. via LoRaWAN
-* <a href="#/lorawan-node">/lorawan-node</a> <br>
+* <a href="#lorawan-node">/lorawan-node</a> <br>
   Manage LoRaWAN nodes (Sensors) cached by the *IOTA Bridge* to allow compressed Streams message usage
 
 ### lorawan-rest
@@ -90,7 +90,7 @@ have a look into the
 
 ### lorawan-node Endpoints
 To allow [compressed Streams message](../sensor/README.md#deveuis-and-compressed-streams-messages)
-usage the *IOTA Bridge* stores LoRaWAN nodes (a.k.a. Sensors in the SUSEE project)
+usage, the *IOTA Bridge* stores LoRaWAN nodes (a.k.a. Sensors in the SUSEE project)
 in its <a href="#caching-of-lorawan-deveuis-and-streams-channel-meta-data">local SQLite3 database</a>.
 
 The stored Sensors can be managed by the following API endpoints.

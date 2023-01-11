@@ -11,15 +11,15 @@ Following test applications are contained. For more details regarding the genera
   * Needed by all Sensor applications to access the IOTA Tangle
     * Provides an http rest api used by the *Sensor* applications to access the tangle<br>
     * Attaches the Streams packages received from the *Sensor* applications to the tangle
-  * Forwards remote control commands from the *Sensor remote control* or *Management Console* to the Sensor applications
-  * Forwards command confirmations from Sensor applications to the *Sensor remote control* or *Management Console*
+  * Forwards remote control commands from the *x86/PC Sensor* or *Management Console* to the Sensor applications
+  * Forwards command confirmations from Sensor applications to the *x86/PC Sensor* or *Management Console*
   * Imitates processes
     * in the SUSEE Application Server (*Sensor Processing*) and
     * processes used by the initialization software that performs the Sensor *Initialization*
 * [ESP32 Sensor](sensor/main-rust-esp-rs)<br>
   * Imitates the processes running in the smart meter (a.k.a. *Sensor*)
   * Runs on ESP32-C3 devices
-  * Can be remote controlled by the *Sensor remote control*
+  * Can be remote controlled by the *x86/PC Sensor*
 * [streams-poc-lib](sensor/streams-poc-lib)<br>
   * provides C bindings for most functionalities of the *ESP32 Sensor*
   * can be used with Espressifs ESP-IDF build process for ESP32-C3 devices
@@ -31,10 +31,10 @@ Following test applications are contained. For more details regarding the genera
     connection and transmit these packages to the *IOTA-Bridge* via its `lorawan-rest` API functions.
   * a real world service would run on the LoRaWAN Application Server (or tightly connected to it).
     Like this test tool it would transceive binary packages from a LoRaWan connection to the *IOTA-Bridge*.
-* [Sensor remote control](sensor/main-rust)<br>
-  * Runs on X86/PC
+* [x86/PC Sensor](sensor/main-rust)<br>
+  * Runs on x86/PC
   * Used to send commands to the *ESP32 Sensor* or *streams-poc-lib* test app
-  * Can also be used to imitate an *ESP32 Sensor* on X86/PC platforms including
+  * Can also be used to imitate an *ESP32 Sensor* on x86/PC platforms including
     the possibility to be remote controlled
 * [Management Console](management-console)<br>
   * Imitates the processes needed for *Initialization* of the sensor and the monitoring of *Sensor Processing*
@@ -251,7 +251,8 @@ as these applications do not need a wallet:
   
 * The *IOTA Bridge* stores a map of LoraWAN DevEUIs and Streams Channel IDs in a local SQLite3
   database "lora-wan-nodes-iota-bridge.sqlite3". More details can be found in the 
-  <a href="#compressed-streams-messages">Compressed Streams Messages</a> section.
+  [Compressed Streams Messages](sensor/README.md#deveuis-and-compressed-streams-messages)
+  section.
 
 ### Application specific CLIs
 
@@ -261,32 +262,6 @@ Please have a look at the application specific README files:
 * [CLI of the Sensor Applications](sensor/README.md#cli-of-the-sensor-applications)
 * [IOTA-Bridge Console CLI](iota-bridge/README.md#iota-bridge-console-cli)
 * [LoraWan AppServer Mockup Tool CLI](lora-app-srv-mock/README.md#lorawan-appserver-mockup-tool-cli)
-
-## Compressed Streams Messages
-To reduce the payload size a *Sensor* and the *IOTA Bridge* can use compressed streams messages.
-Compressed messages do not contain Streams Channel IDs and other data that can be restored by the
-*IOTA Bridge*.
-
-IMPORTANT: To restore the omitted data of a compressed message the *IOTA Bridge*
-can process on the encrypted message. It would not be possible to process on the decrypted
-message anyway, because in the SUSEE project the encryption key never leaves the
-*Sensor* for security reasons. That said, it would not be possible do decrypt the
-message in the *IOTA Bridge*.
-
-The usage of compressed messages is only possible after one or more normal streams messages have
-been send using the *IOTA Bridge*. The *IOTA Bridge* then learns which Streams Channel ID is used
-by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI. Using LoraWAN, the DevEUI
-is available via the protocol automatically and does not need to be transferred as message payload.
-
-The mapping of LoraWAN DevEUI to Streams Channel ID is stored in a local SQLite3 database.
-The database file "lora-wan-nodes-iota-bridge.sqlite3" is stored in the directory where the
-*IOTA-Bridge* is started. 
-
-In case the *IOTA Bridge* added a *Sensor* to its mapping database the response of the 
-REST call that caused the new *Sensor* entry will have a 208 - ALREADY_REPORTED http status.
-All *Sensor* applications recognise this http status and will only use compressed
-messages further on. The Sensor applications store the state whether to use compressed
-messages or not in their local user-state serialization files.
 
 ## Test Scripts
 The folder [test/scripts](test/scripts) contains script files to perform automatic
@@ -496,7 +471,7 @@ delivered to the *ESP32 Sensor*:
     Blob length: 110
     Queue length: 0
  ```
-As with the X86/PC version of the *Sensor* app the console log of *IOTA-Bridge* and the *ESP32 Sensor* will contain the
+As with the x86/PC version of the *Sensor* app the console log of *IOTA-Bridge* and the *ESP32 Sensor* will contain the
 length of transferred binary data (*IOTA-Bridge*) and the subscription link and subscriber public key (*ESP32 Sensor*).  
 
 The subscription link and public key then must be used with the management-console to accept the subscription as being
@@ -594,7 +569,7 @@ The services are characterized by following properties/aspects:
      * Announcement Messages: Used in the *Initialization* workflow 
      * Keyload Messages: Used in the *Add/Remove Subscriber* and *Initialization* workflows
    * In the current POC implementation the *IOTA-Bridge* also forwards remote control commands from
-     the *Sensor remote control* to the *ESP32 Sensor*. In a later production system for the *Sensor Processing* workflow
+     the *x86/PC Sensor* to the *ESP32 Sensor*. In a later production system for the *Sensor Processing* workflow
      this service will probably be implemented as an independent service while for the *Initialization* workflow an integration
      of Tangle- and Command-Communication can be of advantage.
 

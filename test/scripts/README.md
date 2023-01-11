@@ -1,6 +1,6 @@
 # Scripts for automatic SUSEE Streams POC tests
 
-This folder contains two Python3 scripts, and an .env file to perform a multi *Sensor* test on X86/PC
+This folder contains two Python3 scripts, and an .env file to perform a multi *Sensor* test on x86/PC
 xUnix systems. In this test a number of Sensors are initialized using a single `management-console`
 and the *Sensor* instances send messages periodically to test the `iota-bridge` under conditions,
 similar to real world conditions.

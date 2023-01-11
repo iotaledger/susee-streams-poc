@@ -3,16 +3,16 @@
 The *IOTA Bridge* is a REST service for messages transferred between the following list of actors:
 
 * *Management Console*
-* All kinds of *Sensor* applications like *ESP32 Sensor* and *X86/PC Sensor*
+* All kinds of *Sensor* applications like *ESP32 Sensor* and *x86/PC Sensor*
 * *IOTA Tangle* nodes
 * Services accessing the LoRaWAN AP-Server
 
 It provides a REST API to:
 * Send streams packages that will be attached to the tangle using an IOTA Node
   or receive existing streams packages from the tangle
-* Send remote control commands from a *Sensor Remote Controll* or *Management Console*
+* Send remote control commands from a *x86/PC Sensor* or *Management Console*
   application to a *Sensor* application
-* Send remote control confirmations from a *Sensor* application to the *Sensor Remote Controll*
+* Send remote control confirmations from a *Sensor* application to the *x86/PC Sensor*
   or *Management Console* application
 * Receive IotaBridgeRequests containing one of the above described REST API requests as
   a binary serialized package which can be used to interact with the IOTA Bridge e.g. via LoRaWAN
@@ -76,3 +76,17 @@ The *LoraWan AppServer Mockup Tool* implements this process but uses a WIFI
 socket connection instead of a LoRaWAN connection. For further details please
 have a look into the
 [*LoraWan AppServer Mockup Tool* README](../lora-app-srv-mock/README.md).
+
+## Caching of LoRaWAN DevEUIs and Streams Channel Meta Data
+
+As been descibed in the
+[Sensor README](../sensor/README.md#deveuis-and-compressed-streams-messages)
+compressed streams messages can be used to
+reduce the LoRaWAN payload size.
+The usage of compressed messages is only possible after one or more normal streams messages have
+been send. The *IOTA Bridge* then learns which Streams Channel ID is used
+by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI.
+
+The mapping of LoraWAN DevEUI to Streams Channel meta data is stored in a local SQLite3 database.
+The database file "lora-wan-nodes-iota-bridge.sqlite3" is stored in the directory where the
+*IOTA-Bridge* is started.

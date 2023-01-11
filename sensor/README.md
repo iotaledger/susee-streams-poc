@@ -1,12 +1,14 @@
 # Sensor Resources
 
-This folder contains several *Sensor* specific projects for X86/PC and ESP32-C3
+This folder contains several *Sensor* specific projects for x86/PC and ESP32-C3
 platforms. Here is an overview about the contained sub folders:
 
 * main-rust<br>
-  A *Sensor* application for X86/PC written in Rust
+  A *Sensor* application for x86/PC written in Rust
 * main-rust-esp-rs<br>
-  A *Sensor* application for ESP32-C3 written in Rust using the Espressif IDF SDK
+  A *Sensor* application for ESP32-C3 written in Rust using
+  [esp-rs/esp-idf-sys](https://github.com/esp-rs/esp-idf-sys) and the
+  [Espressif IDF SDK](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/about.html)
 * main-rust-pio<br>
   A *Sensor* application for ESP32-C3 written in Rust using Platform IO (currently not working)
 * sensor-lib<br>
@@ -24,7 +26,7 @@ There are three different Sensor applications for different purposes:
 |--------------|-----------|-------------------------------|-----------------|
 | *streams-poc-lib* test application | ESP32  | Test the streams-poc-lib functionality using its C binding| C |
 | *ESP32 Sensor*                     | ESP32  | Test the Rust code that builds the foundation of the streams-poc-lib without the limitations of a foreign function interface | Rust |
-| *Sensor remote control*            | X86/PC | Test the Rust code of *ESP32 Sensor* on X86/PC | Rust |
+| *x86/PC Sensor*            | x86/PC | Test the *Sensor* Rust code on x86/PC platforms and mock *ESP32 Sensors* for integration tests on x86/PCs | Rust |
 
 In addition to the common CLI options described in the
 [CLI API section of the main README file](../README.md#common-cli-options-and-io-files)
@@ -56,8 +58,8 @@ all Sensor applications provide CLI commands to manage the Streams usage:
                   --------  WARNING  ---------- Currently there is no confirmation cli dialog
                   -----------------------------       use this option carefully!
                               
-As both Sensor applications running on ESP32 do not provide an interactive terminal, the 
-x86/PC Sensor application (a.k.a *Sensor remote control*) can be used to remote control the ESP32
+As all Sensor applications running on ESP32 do not provide an interactive terminal, the 
+*x86/PC Sensor* can be used to remote control the ESP32
 applications. The x86/PC Sensor provides following CLI commands to manage the
 remote control functionality:
 
@@ -114,7 +116,7 @@ without the need to run ESP32 Hardware. The CLI command to mock an ESP32 Sensor 
 
 The `--act-as-remote-controlled-sensor` argument is especially useful to automatically initialize the x86/PC Sensor
 in interaction with the 
-[*Management Console* (`--init-sensor` argument)](../management-console/README.md#automatic-sensor-initialization).
+[*Management Console* `--init-sensor` argument](../management-console/README.md#automatic-sensor-initialization).
 If you want to exit the *Sensor* application after the initialization has been finished you can use 
 the `--exit-after-successful-initialization` argument:
 
@@ -137,3 +139,72 @@ application. This is done using the `--use-lorawan-rest-api` argument:
             This way the Sensor application imitates the behavior of an ESP32-Sensor connected
             via LoRaWAN and a package transceiver connected to the LoRaWAN application server
             that hands over binary packages to the iota-bridge.
+
+## DevEUIs and Compressed Streams Messages
+
+#### Compressed Streams Messages
+To reduce the LoRaWAN payload size, compressed streams messages can be used to communicate
+between a *Sensor* and the *IOTA Bridge*.
+Compressed messages do not contain Streams Channel IDs and other data that can be restored by the
+*IOTA Bridge*.
+
+**IMPORTANT NOTE:** To restore the omitted data of a compressed message, the *IOTA Bridge*
+can process on the encrypted message because the omitted parts of the message are plain text
+metadata. This means that using compressed messages has no impact on data privacy. 
+It would not be even possible to decrypt messages in the *IOTA Bridge*,
+because in the SUSEE project the encryption key never leaves the
+*Sensor* for security reasons.
+
+#### Interaction with the IOTA Bridge
+The usage of compressed messages is only possible after one or more normal streams messages have
+been send using the *IOTA Bridge*. The *IOTA Bridge* then learns which Streams Channel ID is used
+by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI.
+Using LoraWAN, the DevEUI is available via the protocol automatically and does not need 
+to be transferred as message payload.
+
+The mapping of LoraWAN DevEUI to Streams Channel ID is stored in a 
+[local SQLite3 database](../iota-bridge/README.md#caching-of-lorawan-deveuis-and-streams-channel-meta-data)
+managed by the *IOTA Bridge*.
+
+In case the *IOTA Bridge* added a *Sensor* to its mapping database, the response of the 
+REST call that caused the new *Sensor* database entry will have a 208 - ALREADY_REPORTED http status.
+All *Sensor* applications recognise this http response status and will only use compressed
+messages further on. The Sensor applications store the state whether to use compressed
+messages or not in their local user-state serialization files.
+
+#### Mocked DevEUIs
+
+The *Sensor* applications provided in this repository do not interact with LoRaWAN themselves.
+Therefore, the DevEUIs are mocked for test purposes.
+The following list explains how each *Sensor* application mocks the LoRaWAN DevEUI
+and how the DevEUI is transfered to the *IOTA Bridge*:
+
+* **Streams POC Library Test Application**<br>
+  The LoraWAN DevEUI is mocked using the base MAC address of the ESP32 MCU
+  (EUI-48 - formerly known as MAC-48).
+  Espressif provides a universally administered EUI-48 address (UAA) for each
+  network interface controller (NIC) e.g. WIFI, BT, ethernet, and so on.<br>
+  To be independent from the used NIC we mock the LoraWAN DevEUI using
+  the base MAC address that is used
+  [to generate all other NIC specific MAC addresses](https://docs.espressif.com/projects/esp-idf/en/v3.1.7/api-reference/system/base_mac_address.html).
+  <br>
+  To make sure the mocked LoraWAN DevEUI is received by the
+  [lora-app-srv-mock test application](../lora-app-srv-mock)
+  the DevEUI is prepended to the request data that are send via the socket connection.
+  The *lora-app-srv-mock* application later reads the mocked DevEUI from the socket
+  stream and uses it to access the iota-bridge `/lorawan-rest` endpoints.
+  <br><br>
+* **x86/PC Sensor**<br>
+  The LoRaWAN DevEUI is mocked using a persistent random value. The random value is stored
+  in the wallet file together with the Streams channel
+  [plain text seed](../README.md#common-cli-options-and-io-files).
+  The *x86/PC Sensor* application does not use the 
+  [lora-app-srv-mock test application](../lora-app-srv-mock)
+  to access the `/lorawan-rest` endpoints of the *IOTA Bridge*. Instead, it uses the
+  `/lorawan-rest` endpoints directly in case the `--use-lorawan-rest-api` CLI argument
+  is used.
+  <br><br>
+* **ESP32 Sensor**<br>
+  Currently the *ESP32 Sensor* does not use `/lorawan-rest` endpoints of the *IOTA Bridge*
+  and therefore does not need a mocked LoRaWAN DevEUI.
+

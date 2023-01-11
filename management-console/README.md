@@ -76,7 +76,7 @@ Following CLI arguments are used to subscribe *Sensors* to an existing channel:
 
 The SUBSCRIPTION_PUB_KEY and SUBSCRIPTION_LINK will be logged to the console by the *Sensor* app when the 
 CLI command --subscribe-announcement-link of the *Sensor* app is used. This applies to the x86/PC version 
-of the *Sensor* app (*Sensor remote control*) and to the *ESP32 Sensor* application. In case of the *ESP32 Sensor*
+of the *Sensor* app and to the *ESP32 Sensor* application. In case of the *ESP32 Sensor*
 these properties are also logged to the console of the *Sensor* app that is used as *Sensor remote control*.
 
 #### Automatic *Sensor* Initialization

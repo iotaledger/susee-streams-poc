@@ -14,7 +14,7 @@ It provides a REST API to:
   application to a *Sensor* application
 * Send remote control confirmations from a *Sensor* application to the *x86/PC Sensor*
   or *Management Console* application
-* Receive IotaBridgeRequests containing one of the above described REST API requests as
+* Receive IotaBridgeRequest packages containing one of the above described REST API requests as
   a binary serialized package which can be used to interact with the IOTA Bridge e.g. via LoRaWAN
 
 ## Prerequisites and Build
@@ -46,8 +46,19 @@ the *IOTA-Bridge* offers the following CLI arguments.
              [default: https://chrysalis-nodes.iota.org]
             
 ## IOTA Bridge REST API
-Most of the REST API is used internally by the accompanying susee-streams-poc applications. The only endpoint relevant
-for public use is the IotaBridgeRequests API which can be called via the `lorawan-rest/binary_request` endpoints.
+
+Most of the REST API is used internally by the accompanying susee-streams-poc applications.
+
+The only endpoints relevant for public use are the following:
+
+* <a href="#/lorawan-rest">/lorawan-rest</a> <br>
+  Post binary IotaBridgeRequest packages received e.g. via LoRaWAN
+* <a href="#/lorawan-node">/lorawan-node</a> <br>
+  Manage LoRaWAN nodes (Sensors) cached by the *IOTA Bridge* to allow compressed Streams message usage
+
+### lorawan-rest
+
+IotaBridgeRequest packages can be posted to the *IOTA Bridge* using the `lorawan-rest/binary_request` endpoints
 
 To demonstrate the usage of the API here is a cURL example:
 ```bash
@@ -77,6 +88,72 @@ socket connection instead of a LoRaWAN connection. For further details please
 have a look into the
 [*LoraWan AppServer Mockup Tool* README](../lora-app-srv-mock/README.md).
 
+### lorawan-node Endpoints
+To allow [compressed Streams message](../sensor/README.md#deveuis-and-compressed-streams-messages)
+usage the *IOTA Bridge* stores LoRaWAN nodes (a.k.a. Sensors in the SUSEE project)
+in its <a href="#caching-of-lorawan-deveuis-and-streams-channel-meta-data">local SQLite3 database</a>.
+
+The stored Sensors can be managed by the following API endpoints.
+
+##### CREATE_NODE
+Create a *Sensor* entry in the caching database.
+
+    POST/lorawan-node/{devEui} ? channel-id = {channelId}
+
+    devEui:     LoRaWAN DevEUI of the Sensor
+    channelId:  Streams channel-id of the Sensor
+
+Examples:<br>
+
+* http://127.0.0.1:50000/lorawan-node/4711?channel-id=12345678 <br>
+  Status 200 OK
+  
+##### GET_NODE
+Query data of a specific Sensor
+
+    GET /lorawan-node/{devEui}
+    
+    devEui: LoRaWAN DevEUI of the Sensor
+    
+Examples:<br>
+Expecting that a Sensor with dev_eui 4711 is stored in the database.
+
+* http://127.0.0.1:50000/lorawan-node/9876 <br>
+  Status 404 Not Found<br>
+  Body:
+  
+        Not Found
+        Description: lorawan_node not found
+  
+* http://127.0.0.1:50000/lorawan-node/4711 <br>
+  Status 200 OK<br>
+  Body:
+  
+      {"dev_eui":"4711","streams_channel_id":"12345678"}
+  
+##### IS_NODE_KNOWN
+Query if a specific Sensor is known by the *IOTA Bridge*
+
+    GET /lorawan-node/{devEui} ? exist
+    
+    devEui: LoRaWAN DevEUI of the Sensor
+    
+Examples:<br>
+Expecting that a Sensor with dev_eui 4711 is stored in the database.
+
+* http://127.0.0.1:50000/lorawan-node/9876?exist <br>
+  Status 404 Not Found<br>
+  Body:
+  
+        Not Found
+        Description: lorawan_node not found
+  
+* http://127.0.0.1:50000/lorawan-node/4711?exist <br>
+  Status 200 OK<br>
+  Body:
+  
+      1
+
 ## Caching of LoRaWAN DevEUIs and Streams Channel Meta Data
 
 As been descibed in the
@@ -90,3 +167,6 @@ by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI.
 The mapping of LoraWAN DevEUI to Streams Channel meta data is stored in a local SQLite3 database.
 The database file "lora-wan-nodes-iota-bridge.sqlite3" is stored in the directory where the
 *IOTA-Bridge* is started.
+
+To review the data stored in the local SQLite3 database we recommend the
+[DB Browser for SQLite](https://sqlitebrowser.org/) application.

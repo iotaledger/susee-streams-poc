@@ -33,19 +33,19 @@ folder of this repository.
 You can also follow the [esp-idf-template Readme](https://github.com/esp-rs/esp-idf-template/blob/master/README-cmake.md)
 for mixed Rust/C ESP-IDF projects (driven by idf.py and CMake).
 
-Please checkout the "*tag:v5.1-dev*"
-[version of the esp-idf build tools](https://github.com/espressif/esp-idf/releases/tag/v5.1-dev)
+Please checkout "release/v4.4.3"
+[version of the esp-idf build tools](https://github.com/espressif/esp-idf/releases/tag/v4.4.3)
 using the 
 [git-workflow](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/versions.html#git-workflow)
 .
 
 ## Build for ESP32
 
-After having installed the "*tag:v5.1-dev*"
-[version of the esp-idf build tools](https://github.com/espressif/esp-idf/releases/tag/v5.1-dev)
+After having installed the "*release/v4.4.3*"
+[version of the esp-idf build tools](https://github.com/espressif/esp-idf/releases/tag/v4.4.3)
 you are ready to start building.
 
-Please note that the "*tag:v5.1-dev*" is also used in the
+Please note that the "*release/v4.4.3*" is also used in the
 
 * sensor/main-rust-esp-rs/.cargo/config.toml
 * sensor/streams-poc-lib/.cargo/config.toml
@@ -70,8 +70,13 @@ The test application runs in two different modes:
 * Uninitialized
 * Initialized
 
-In the **Uninitialized** mode the application behaves like the standalone *ESP32 Sensor* application. In this mode
-the *Management Console* or *Sensor Remote Cotrol* application can be used to initialize the sensor. 
+##### Uninitialized mode
+In the Uninitialized mode the application behaves like the standalone *ESP32 Sensor* application. 
+It communicates directly with the *IOTA Bridge* using a WiFi socket connection that is managed
+by the *streams-poc-lib* [start_sensor_manager()](components/streams-poc-lib/include/streams_poc_lib.h)
+function.
+
+In this mode the *Management Console* or *Sensor Remote Cotrol* application can be used to initialize the sensor.
 
 The easiest way is to use the `--init-sensor` option of the *Management Console* ([project directory](../../management-console))
 which uses the *IOTA Bridge* application ([project directory](../../iota-bridge)) to remote control the Sensor.
@@ -82,7 +87,8 @@ please follow the instructions of the *Automatic Sensor Initialization* section 
 [README](../../README.md#automatic-sensor-initialization)
 to initialize the Sensor.
 
-In the **Initialized** mode the application sends an example message using the 'send_message()' function of the
+##### Initialized mode
+In the Initialized mode the application sends an example message using the 'send_message()' function of the
 *streams-poc-lib*. This is followed by calls of the 'send_request_via_lorawan_t' and 'resolve_request_response_t'
 functions as they have been declared in the 'streams_poc_lib.h' interface and as they are defined in the `src/main.c` file.
 

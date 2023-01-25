@@ -35,11 +35,11 @@ pub(crate) const IOTA_BRIDGE_URL: &str = env!("SENSOR_MAIN_POC_IOTA_BRIDGE_URL")
 pub fn setup_vfs_fat_filesystem() -> Result<wl_handle_t> {
     log::debug!("[fn setup_vfs_fat_filesystem] Starting setup_vfs_fat_filesystem");
 
-    let mount_config = esp_vfs_fat_mount_config_t{
+    let mount_config = esp_vfs_fat_mount_config_t {
         max_files: 2,
         format_if_mount_failed: true,
-        allocation_unit_size: CONFIG_WL_SECTOR_SIZE,
-        disk_status_check_enable: true,
+        allocation_unit_size: CONFIG_WL_SECTOR_SIZE as usize,
+        // disk_status_check_enable: true,  // Only available with esp_idf >= 5.0
     };
 
     let mut ret_val: wl_handle_t = WL_INVALID_HANDLE;

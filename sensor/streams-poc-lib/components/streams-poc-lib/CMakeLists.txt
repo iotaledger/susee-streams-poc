@@ -5,7 +5,7 @@ include(CMakePrintHelpers)
 # Here's a non-minimal, reasonable set of ESP-IDF components that one might want enabled for Rust:
 #    set(RUST_DEPS "pthread" "esp_http_client" "esp_http_server" "espcoredump" "app_update" "esp_serial_slave_link" "nvs_flash" "spi_flash" "esp_adc_cal" "mqtt")
 
-set(RUST_DEPS "pthread" "driver" "espcoredump" "fatfs" "nvs_flash" "vfs" "esp_wifi" "esp_netif" "lwip" "esp_http_client" "wear_levelling" "esp_event")
+set(RUST_DEPS "pthread" "driver" "espcoredump" "fatfs" "nvs_flash" "vfs" "esp_wifi" "esp_netif" "lwip" "esp_http_client" "wear_levelling" "esp_event" "esp_websocket_client")
 
 idf_component_register(
     SRCS "placeholder.c"

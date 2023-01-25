@@ -21,9 +21,22 @@ use std::{
     clone::Clone,
     fmt,
     rc::Rc,
+    time::Duration,
 };
 
-use crate::esp_rs::hyper_esp_rs_tools::send_hyper_request_via_esp_http;
+use hyper::{
+    http::{
+        StatusCode,
+        Request
+    },
+    Body
+};
+
+use esp_idf_svc::{
+    http::client::{
+        Configuration as HttpConfiguration,
+    },
+};
 
 use streams_tools::{
     compressed_state::{
@@ -48,29 +61,13 @@ use iota_client_types::{
     SendOptions
 };
 
-use hyper::{
-    http::{
-        StatusCode,
-        Request
-    },
-    Body
-};
-
-use embedded_svc::{
-    io::Read,
-    http::{
-        Status,
-        Headers,
+use crate::{
+    esp_rs::hyper_esp_rs_tools::{
+        HyperEsp32Client,
+        UserAgentName,
     }
 };
-
-use esp_idf_svc::{
-    http::client::{
-        EspHttpClient,
-        EspHttpResponse,
-        EspHttpClientConfiguration,
-    },
-};
+use crate::esp_rs::hyper_esp_rs_tools::SimpleHttpResponse;
 
 fn is_http_status_success(status: u16) -> bool {
     300 > status && status >= 200
@@ -98,7 +95,7 @@ impl fmt::Display for HttpClientOptions<'_> {
 pub struct HttpClient {
     request_builder: RequestBuilderStreams,
     tangle_client_options: SendOptions,
-    esp_http_client_opt: EspHttpClientConfiguration,
+    esp_http_client_opt: HttpConfiguration,
     compressed: CompressedStateManager,
 }
 
@@ -107,8 +104,8 @@ impl HttpClient
     pub fn new(options: Option<HttpClientOptions>) -> Self {
         let options = options.unwrap_or_default();
         log::debug!("[HttpClient::new()] Creating new HttpClient using options: {}", options);
-        let mut esp_http_client_opt = EspHttpClientConfiguration::default();
-        esp_http_client_opt.timeout_ms = Some(60000);
+        let mut esp_http_client_opt = HttpConfiguration::default();
+        esp_http_client_opt.timeout = Some(Duration::from_secs(60));
         Self {
             request_builder: RequestBuilderStreams::new(options.http_url),
             tangle_client_options: SendOptions::default(),
@@ -117,17 +114,17 @@ impl HttpClient
         }
     }
 
-    async fn request<'a>(&mut self, request: Request<Body>, http_client: &'a mut EspHttpClient) -> Result<EspHttpResponse<'a>> {
-        let reponse = send_hyper_request_via_esp_http(http_client, request).await?;
+    async fn request<'a>(&mut self, request: Request<Body>, http_client: &'a mut HyperEsp32Client) -> Result<SimpleHttpResponse> {
+        let response = http_client.send(request).await?;
 
         // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
         // http status which indicates that the iota-bridge has stored all needed
         // data to use compressed massages further on.
-        if reponse.status() == StatusCode::ALREADY_REPORTED {
+        if response.status == StatusCode::ALREADY_REPORTED {
             log::debug!("[HttpClient::request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
             self.compressed.set_use_compressed_msg(true);
         }
-        Ok(reponse)
+        Ok(response)
     }
 
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
@@ -137,7 +134,8 @@ impl HttpClient
         } else {
             self.request_builder.send_message(msg)?
         };
-        let mut http_client = EspHttpClient::new(&self.esp_http_client_opt)?;
+
+        let mut http_client = HyperEsp32Client::new(&self.esp_http_client_opt, UserAgentName::Main);
         self.request(req, &mut http_client).await?;
         Ok(())
     }
@@ -151,13 +149,16 @@ impl HttpClient
         } else {
             self.request_builder.receive_message_from_address(link)?
         };
-        let mut http_client = EspHttpClient::new(&self.esp_http_client_opt)?;
-        let mut response: EspHttpResponse = self.request(req, &mut http_client).await?;
+        let mut http_client = HyperEsp32Client::new(&self.esp_http_client_opt, UserAgentName::Main);
+        let response = self.request(req, &mut http_client).await?;
+        self.handle_recv_message_response(response, link).await
+    }
 
+    async fn handle_recv_message_response<'a>(&mut self, response: SimpleHttpResponse, link: &TangleAddress) -> Result<TangleMessage> {
         log::debug!("[HttpClient.recv_message_via_http] check for retrials");
         // TODO: Implement following retrials using EspTimerService if needed.
         // May be StatusCode::CONTINUE is handled by the EspHttpClient
-        if response.status() == StatusCode::CONTINUE {
+        if response.status == StatusCode::CONTINUE {
             log::warn!("[HttpClient.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
             // let periodic = getPeriodicTimer(Duration::from_millis(500), move || {
             //     response = send_hyper_request_via_esp_http(
@@ -174,30 +175,20 @@ impl HttpClient
             // }
         }
 
-        if is_http_status_success(response.status()) {
-            log::debug!("[HttpClient.recv_message_via_http] StatusCode is successful: {}", response.status());
-            if let Some(content_len) = response.content_len() {
-                log::info!("[HttpClient.recv_message_via_http] Received response with content length of {}", content_len);
-                let mut buffer = Vec::new();
-                buffer.resize(content_len, 0);
-                log::debug!("[HttpClient.recv_message_via_http] read");
-                (&mut response).read(&mut buffer)?;
-                log::info!("[HttpClient.recv_message_via_http] create TangleMessage ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}", buffer.len(), buffer.as_slice());
-                let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&buffer).unwrap();
-                log::debug!("[HttpClient.recv_message_via_http] return ret_val");
-                Ok(ret_val)
-            } else {
-                log::error!("[HttpClient.recv_message_via_http] response.content_len() is None");
-                err!(MapStreamsErrors::from_http_status_codes(
-                    StatusCode::from_u16(response.status())?,
-                     Some(link.to_string())
-                ))
-            }
+        if is_http_status_success(response.status.as_u16()) {
+            log::debug!("[HttpClient.recv_message_via_http] StatusCode is successful: {}", response.status);
+            log::info!("[HttpClient.recv_message_via_http] create TangleMessage ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}",
+                       response.body.len(),
+                       response.body.as_slice()
+            );
+            let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&response.body).unwrap();
+            log::debug!("[HttpClient.recv_message_via_http] return ret_val");
+            Ok(ret_val)
         } else {
             log::error!("[HttpClient.recv_message_via_http] StatusCode is not OK");
             err!(MapStreamsErrors::from_http_status_codes(
-                StatusCode::from_u16(response.status())?,
-                 Some(link.to_string())
+                response.status,
+                Some(link.to_string())
             ))
         }
     }

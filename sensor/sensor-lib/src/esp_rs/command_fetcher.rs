@@ -1,3 +1,10 @@
+use hyper::{
+    Body as HyperBody,
+    http::{
+        StatusCode as HyperStatusCode,
+        Request as HyperRequest,
+    }
+};
 
 use embedded_svc::{
     io::Read,
@@ -5,16 +12,23 @@ use embedded_svc::{
         Status,
         Headers,
         client::{
-            Client,
-            Request,
+            Client as HttpClient,
         }
     }
 };
 
 use esp_idf_svc::http::client::{
-    EspHttpClient,
-    EspHttpResponse
+    EspHttpConnection,
 };
+
+use anyhow::{
+    Result,
+    bail,
+};
+
+use std::fmt;
+
+use log;
 
 use streams_tools::{
     binary_persist::{
@@ -28,21 +42,13 @@ use streams_tools::{
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
 };
 
-use hyper::{
-    Body as HyperBody,
-    http::{
-        StatusCode as HyperStatusCode,
-        Request as HyperRequest,
+use crate::{
+    esp_rs::hyper_esp_rs_tools::{
+        HyperEsp32Client,
+        EspHttpResponse,
+        UserAgentName,
     }
 };
-
-use anyhow::{
-    Result,
-    bail,
-};
-use std::fmt;
-use log;
-use crate::esp_rs::hyper_esp_rs_tools::send_hyper_request_via_esp_http;
 
 pub struct CommandFetcherOptions<'a> {
     pub(crate) http_url: &'a str,
@@ -81,17 +87,22 @@ impl<'a> CommandFetcher<'a> {
     }
 
     pub fn fetch_next_command(& self) -> Result<(Command, Vec<u8>)> {
-        let mut http_client = EspHttpClient::new_default()?;
+        let mut http_client = HttpClient::wrap(
+            EspHttpConnection::new(&Default::default())?
+        );
+
+        let headers = [("user-agent", "main-esp-rs/command-fetcher")];
         let url = self.get_iota_bridge_url(EndpointUrisCommand::FETCH_NEXT_COMMAND);
 
         let esp_http_req = http_client.request(
             embedded_svc::http::Method::Get,
-            &url.to_string(),
+            url.as_str(),
+            &headers,
         )?;
 
         match esp_http_req.submit() {
             Ok(response) => {
-                log::debug!("[CommandFetcher.fetch_next_command] Received EspHttpResponse");
+                log::debug!("[CommandFetcher.fetch_next_command] Received Response");
                 if response.status() == HyperStatusCode::OK {
                     log::debug!("[CommandFetcher.fetch_next_command] StatusCode::OK - deserializing command");
                     self.deserialize_command(response)
@@ -108,7 +119,8 @@ impl<'a> CommandFetcher<'a> {
 
     fn deserialize_command(& self, mut response: EspHttpResponse) -> Result<(Command, Vec<u8>)> {
         let mut ret_val = (Command::NO_COMMAND, Vec::<u8>::default());
-        if let Some(content_len) = response.content_len() {
+        if let Some(content_len_u64) = response.content_len() {
+            let content_len: usize = content_len_u64 as usize;
             if content_len >= Command::LENGTH_BYTES {
                 log::debug!("[CommandFetcher.deserialize_command] response.content_len()={}", content_len);
                 let mut buffer = Vec::new();
@@ -129,14 +141,14 @@ impl<'a> CommandFetcher<'a> {
     }
 
     pub async fn send_confirmation(&self, confirmation_request: HyperRequest<HyperBody>) -> Result<()> {
-        let mut http_client = EspHttpClient::new_default()?;
-        let response = send_hyper_request_via_esp_http(&mut http_client, confirmation_request).await?;
+        let mut http_client = HyperEsp32Client::new(&Default::default(), UserAgentName::CommandFetcher);
+        let response = http_client.send(confirmation_request).await?;
         log::debug!("[CommandFetcher.send_confirmation] Received EspHttpResponse");
-        if response.status() == HyperStatusCode::OK {
+        if response.status == HyperStatusCode::OK {
             log::debug!("[CommandFetcher.send_confirmation] StatusCode::OK");
             Ok(())
         } else {
-            bail!("[CommandFetcher.send_confirmation] Received HTTP Error as response for confirmation transmission. Status: {}", response.status())
+            bail!("[CommandFetcher.send_confirmation] Received HTTP Error as response for confirmation transmission. Status: {}", response.status)
         }
     }
 }

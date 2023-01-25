@@ -20,7 +20,6 @@ use payloads::{
     get_message_bytes,
 };
 
-#[cfg(feature = "wifi")]
 use super::{
     wifi_utils::init_wifi,
 };
@@ -305,10 +304,8 @@ pub async fn process_main_esp_rs() -> Result<()> {
 
     print_heap_info();
 
-    #[cfg(feature = "wifi")]
-        log::debug!("[fn process_main_esp_rs] init_wifi");
-    #[cfg(feature = "wifi")]
-        let (_wifi_hdl, _client_settings) = init_wifi()?;
+    log::debug!("[fn process_main_esp_rs] init_wifi");
+    let _wifi_hdl = init_wifi()?;
 
     log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", IOTA_BRIDGE_URL);
     let command_processor = CmdProcessor::new();

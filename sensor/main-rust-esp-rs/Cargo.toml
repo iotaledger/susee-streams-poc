@@ -9,11 +9,11 @@ default = ["native"]
 native = ["esp-idf-sys/native"]
 
 [dependencies]
-esp-idf-sys = { version = "0.31.7", features = ["binstart"] }
-esp-idf-svc = { version = "0.42.3", features = ["experimental"] }
+esp-idf-sys = { version = "0.32.1", features = ["binstart"] }
+esp-idf-svc = { version = "0.45.0", features = ["experimental"] }
 smol = { version = "1.2"}
 streams-tools = { version = "0.1.2", path = "../../streams-tools", default-features = false, features=["smol_rt", "esp_idf"] }
-sensor-lib = { version = "0.1.2", path = "../sensor-lib", default-features = false, features = ["smol_rt", "esp_idf", "wifi"] }
+sensor-lib = { version = "0.1.2", path = "../sensor-lib", default-features = false, features = ["smol_rt", "esp_idf"] }
 log = "0.4"
 anyhow = "1.0.40"
 

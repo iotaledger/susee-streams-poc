@@ -369,8 +369,8 @@ Follow these steps to automatically initialize a *Sensor*:
     In an additional shell in the `/target/debug` or `/target/release` folder:<br>
     `> ./sensor --act-as-remote-controlled-sensor`
   * *ESP32 Sensor*:<br>
-    In an additional shell in the folder `/sensor/main-rust-esp-rs`
-    `cargo espmonitor --chip=esp32c3 /dev/ttyYOURPORT`
+    In an additional shell in the folder `/sensor/main-rust-esp-rs`<br>
+    `> cargo espmonitor --chip=esp32c3 /dev/ttyYOURPORT`
   * *streams-poc-lib* test application:<br>
     In an additional shell in the root folder of the *streams-poc-lib*
     [sensor/streams-poc-lib](./sensor/streams-poc-lib) start the *Sensor*

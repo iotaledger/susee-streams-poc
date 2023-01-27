@@ -78,7 +78,7 @@ in your *PlatformIO* project:
 
 ## Prerequisites and Build
 Before this project can be build you need to build the *streams-poc-lib*.
-Have a look into the [streams-poc-lib README](../streams-poc-lib/build/esp-idf/streams-poc-lib)
+Have a look into the [streams-poc-lib README](../streams-poc-lib/README.md#prerequisites-for-building-for-esp32)
 for more details.
 
 The `build_flags` configuration in the `platformio.ini` file of this project references the

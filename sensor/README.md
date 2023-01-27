@@ -9,14 +9,16 @@ platforms. Here is an overview about the contained sub folders:
   A *Sensor* application for ESP32-C3 written in Rust using
   [esp-rs/esp-idf-sys](https://github.com/esp-rs/esp-idf-sys) and the
   [Espressif IDF SDK](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/about.html)
-* main-rust-pio<br>
-  A *Sensor* application for ESP32-C3 written in Rust using Platform IO (currently not working)
 * sensor-lib<br>
   A Rust library containing shared sources for all *Sensor* applications and the
   *streams-poc-lib*
 * streams-poc-lib<br>
   A static library providing C bindings for all functions needed in the SUSEE-Module
   and a test application written in C to test the library
+* main-streams-poc-lib-pio<br>
+  A [PlatformIO](https://platformio.org/) project to build the *streams-poc-lib* test
+  application. This project demonstrates how to integrate the *streams-poc-lib* files
+  in a PlatformIO project.
   
 ## CLI of the Sensor Applications
 

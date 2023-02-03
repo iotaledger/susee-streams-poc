@@ -10,7 +10,6 @@ members = [
     "sensor/main-rust",
     # optional members (not included in default-members - see below)
     "sensor/main-rust-esp-rs",
-    "sensor/main-rust-pio",
     "test/payloads",
 ]
 

@@ -28,15 +28,22 @@
    ############################ Test CONFIG ###############################################
    ######################################################################################## */
 
-/* This test application uses several settings that are defined as environment variables
-   at compile time:
-   * SENSOR_MAIN_POC_WIFI_SSID
-   * SENSOR_MAIN_POC_WIFI_PASS
-   * SENSOR_MAIN_POC_TANGLE_PROXY_URL
+// Please edit your Wifi credentials here. Needed for Sensor initialization.
+#define STREAMS_POC_LIB_TEST_WIFI_SSID "Susee Demo"
+#define STREAMS_POC_LIB_TEST_WIFI_PASS "susee-rocks"
+// The url of the iota-bridge to connect to. Needed for Sensor initialization.
+#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.0.101:50000")
 
-   Have a look at the main README.md file of this repository for an example how
-   to define these variables.
-*/
+// IP address and port of the LoraWan AppServer Mockup Tool to connect to.
+// Needed for sending messages.
+#define STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS ("192.168.0.101:50001")
+
+// Currently we can not test a specified vfs_fat_path.
+// Therefore we set it to NULL here, in case it has not already been defined
+// TODO: Implement test code to test custom vfs_fat_path usage
+#ifndef STREAMS_POC_LIB_TEST_VFS_FAT_PATH
+    #define STREAMS_POC_LIB_TEST_VFS_FAT_PATH NULL
+#endif
 
 #define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_PSK
 #define STREAMS_POC_LIB_TEST_MAXIMUM_RETRY 5
@@ -364,7 +371,7 @@ void prepare_socket_and_send_message(dest_addr_t* dest_addr ) {
     s_socket_handle = get_handle_of_prepared_socket(dest_addr);
 
     ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Calling send_message for message_data of length %d \n\n", MESSAGE_DATA_LENGTH);
-    send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket);
+    send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket, STREAMS_POC_LIB_TEST_VFS_FAT_PATH);
 
     ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Shutting down socket");
     shut_down_socket(s_socket_handle);
@@ -422,12 +429,17 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Free heap: %ld\n", esp_get_free_heap_size());
 
-    if (is_streams_channel_initialized()) {
+    if (is_streams_channel_initialized(STREAMS_POC_LIB_TEST_VFS_FAT_PATH)) {
         ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn app_main()] Streams channel already initialized. Calling C function send_message_via_streams_poc_lib()");
         send_message_via_streams_poc_lib();
     } else {
         ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn app_main()] Streams channel for this sensor has not been initialized. Calling start_sensor_manager()");
-        start_sensor_manager();
+        start_sensor_manager(
+            STREAMS_POC_LIB_TEST_WIFI_SSID,
+            STREAMS_POC_LIB_TEST_WIFI_PASS,
+            STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,
+            STREAMS_POC_LIB_TEST_VFS_FAT_PATH
+        );
     }
 
     ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn app_main()] Exiting Sensor App");

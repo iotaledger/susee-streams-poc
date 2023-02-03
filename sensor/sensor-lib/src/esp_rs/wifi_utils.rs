@@ -40,9 +40,6 @@ use anyhow::{
 
 use smol::net::Ipv4Addr;
 
-const SSID: &str = env!("SENSOR_MAIN_POC_WIFI_SSID");
-const PASS: &str = env!("SENSOR_MAIN_POC_WIFI_PASS");
-
 // *************************************************************************************************
 // *                                                                                               *
 // *    Wifi utility functions taken from                                                          *
@@ -50,7 +47,7 @@ const PASS: &str = env!("SENSOR_MAIN_POC_WIFI_PASS");
 // *                                                                                               *
 // *************************************************************************************************
 
-pub fn init_wifi() -> Result<Box<EspWifi<'static>>> {
+pub fn init_wifi(wifi_ssid: &str, wifi_pass: &str) -> Result<Box<EspWifi<'static>>> {
     let sys_loop = EspSystemEventLoop::take()?;
     let peripherals = Peripherals::take().unwrap();
     let default_nvs_part = EspDefaultNvsPartition::take()?;
@@ -65,26 +62,26 @@ pub fn init_wifi() -> Result<Box<EspWifi<'static>>> {
 
     let ap_infos = wifi.scan()?;
 
-    let ours = ap_infos.into_iter().find(|a| a.ssid == SSID);
+    let ours = ap_infos.into_iter().find(|a| a.ssid == wifi_ssid);
 
     let channel = if let Some(ours) = ours {
         println!(
             "Found configured access point {} on channel {}",
-            SSID, ours.channel
+            wifi_ssid, ours.channel
         );
         Some(ours.channel)
     } else {
         println!(
             "Configured access point {} not found during scanning, will go with unknown channel",
-            SSID
+            wifi_ssid
         );
         None
     };
 
     wifi.set_configuration(&Configuration::Mixed(
         ClientConfiguration {
-            ssid: SSID.into(),
-            password: PASS.into(),
+            ssid: wifi_ssid.into(),
+            password: wifi_pass.into(),
             channel,
             ..Default::default()
         },

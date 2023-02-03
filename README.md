@@ -43,6 +43,7 @@ applications and workflows of the SUSEE project please see below in the
   * Manages the *Add/Remove Subscriber* workflows
   * Manages multiple channels resp. *Sensors* using a local SQLite3 database
 
+###### How is IOTA Streams used?
 The *Streams* channel used for the SUSEE project generally can be described as follows:
 * One single branch per *Sensor*
 * The Sensor will be a subscriber and will be the only publishing actor in the single branch
@@ -74,59 +75,10 @@ rustup update stable
 
 ### For ESP32
 
-To build the *ESP32 Sensor* application for ESP32 platforms (currently only ESP32-C3 provided), you need the following:
-
-* If you want to flash the *Sensor* app on an ESP32-C3 device you need to install the Espressif software development environment.
-  This is not needed if you only want to build the *ESP32 Sensor* app into an ELF file that can be flashed later on. 
-  The Rust based build process for the *ESP32 Sensor* app uses its own copy of the needed Espressif tools that is
-  automatically downloaded.<br>
-  These are the main steps to install the Espressif software development environment:
-  * Please follow the *Espressif Install Guide* for
-    [manual instalation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/linux-macos-setup.html)
-    or via [IDE install](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/index.html#ide)
-    for the ESP32-C3 - master branch(latest).
-  * If you have not flashed an ESP32 application before you should also follow the
-    [First Steps on ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/linux-macos-setup.html#get-started-first-steps)
-    section of the 
-    [Espressif Get Startet](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/index.html#) guide
-  * You should also [Check your serial port on Linux and macOS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/establish-serial-connection.html#check-port-on-linux-and-macos)
-    to find out how to access the serial port connection to the ESP32. Please replace the port identifier `/dev/ttyYOURPORT`
-    used in this readme always with your port identifier.
-* Make sure your installed python3 version is >= 3.8 and pip is already installed
-  (`sudo apt install python3-pip`).
-* Check that your rustc version is >= 1.58.0 (see Rust install hints in the section above).
-* Use the stock nightly Rust compiler:
-```bash
-    rustup install nightly
-    rustup default nightly
-    # For future daily/weekly updates
-    rustup update
-```
-* We also need rust-src to install cargo-espflash in one of the next steps
-```bash
-    rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
-```
-* Install clang version >= 12
-```bash
-    sudo apt-get update
-    sudo apt-get install clang-12 --install-suggests
-```
-* Install [Cargo-Espflash](https://github.com/esp-rs/espflash)
-```bash
-    sudo apt-get install libudev-dev
-    sudo apt-get install pkg-config
-    cargo install cargo-espflash
-    cargo install espflash
-```
-* Install [ldproxy](https://github.com/esp-rs/embuild/tree/master/ldproxy)
-```bash
-    cargo install ldproxy
-```
-
-The fundamentals of these build Prerequisites are taken from the
-[Rust on ESP32 STD demo app](https://github.com/ivmarkov/rust-esp32-std-demo) project by Ivan Markov.
-If you want to build the *ESP32 Sensor* for other ESP32 devices than ESP32-C3 you can try to follow the
-instructions there to build for Extensa core based MCUs (ESP32-C3 is a Risc-V core based MCU).
+Please follow the steps described in the ESP32 specific application projects:
+* [ESP32 Sensor](sensor/main-rust-esp-rs#prerequisites)
+* [streams-poc-lib](sensor/streams-poc-lib#prerequisites)
+* [PlatformIO Example for streams-poc-lib](sensor/main-streams-poc-lib-pio#prerequisites-and-build)
 
 ## Build
 
@@ -153,38 +105,10 @@ The next section describes how to build it.
 
 ### For ESP32
 
-The *ESP32 Sensor* project is contained in the folder [sensor/main-rust-esp-rs](sensor/main-rust-esp-rs). All build steps must be
-executed in this project folder:
-```bash
-cd sensor/main-rust-esp-rs/
-```
-Before building we need to specify the WiFi SSID, the WiFi password and the url of the used *IOTA-Bridge* as
-environment variables. These variables will be hard coded into the *ESP32 Sensor*.
-Currently this is the only way to initiate a socket connection to the ESP32.
-This also means that currently you need to compile the ESP32 *Sensor* app yourself to test it:
-```bash
-export SENSOR_MAIN_POC_WIFI_SSID=NameOfMyWifiGoesHere
-export SENSOR_MAIN_POC_WIFI_PASS=SecureWifiPassword
-export SENSOR_MAIN_POC_IOTA_BRIDGE_URL="http://192.168.47.11:50000" 
-```
-
-If you have no ESP32-C3 device you can just start the build using cargo-espflash.
-The ELF file will be created in the project folder.
-```bash
-cargo espflash save-image ESP32-C3 sensor-esp-rs.elf --release
-```
-
-If you have an ESP32-C3 device you can plug in the usb (or other serial bus) cable of your board
-and start the build (with or without `--release`):
-```bash
-cargo espflash --monitor --partition-table="partitions.csv" --release
-```
-Given you already installed all needed drivers to access the serial port of your board, the port will be
-detected automatically by cargo-espflash. After the application has been build and flashed the log output
-of the *ESP32 Sensor* app is displayed on the console. This is controlled by the `--monitor` option used above. 
-
-### For the *streams-poc-lib*
-Have a look into the [streams-poc-lib README](sensor/streams-poc-lib/README.md)
+Please follow the steps described in the ESP32 specific application projects:
+* [ESP32 Sensor](sensor/main-rust-esp-rs#build)
+* [streams-poc-lib](sensor/streams-poc-lib#build)
+* [PlatformIO Example for streams-poc-lib](sensor/main-streams-poc-lib-pio#prerequisites-and-build)
 
 ## CLI API reference
 

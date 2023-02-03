@@ -5,8 +5,6 @@ use super::{
     },
     esp32_subscriber_tools::{
         create_subscriber,
-        drop_vfs_fat_filesystem,
-        IOTA_BRIDGE_URL,
         SubscriberManagerDummyWalletHttpClientEspRs,
     },
     http_client_smol_esp_rs::{
@@ -212,14 +210,19 @@ async fn register_keyload_msg(
 
 struct CmdProcessor<'a> {
     command_fetcher: CommandFetcher<'a>,
+    iota_bridge_url: String,
+    vfs_fat_path: Option<String>,
 }
 
 impl<'a> CmdProcessor<'a> {
-    pub fn new() -> CmdProcessor<'a> {
+    pub fn new(iota_bridge_url: &'a str, vfs_fat_path: Option<String>) -> CmdProcessor<'a> {
         CmdProcessor {
+            iota_bridge_url: String::from(iota_bridge_url),
             command_fetcher: CommandFetcher::new(
-                Some(CommandFetcherOptions{ http_url: IOTA_BRIDGE_URL })
-        )}
+                Some(CommandFetcherOptions{ http_url: iota_bridge_url })
+            ),
+            vfs_fat_path,
+        }
     }
 }
 
@@ -228,7 +231,7 @@ impl<'a> SensorFunctions for CmdProcessor<'a> {
     type SubscriberManager = SubscriberManagerDummyWalletHttpClientEspRs;
 
     fn get_iota_bridge_url(&self) -> &str {
-        IOTA_BRIDGE_URL
+        self.iota_bridge_url.as_str()
     }
 
     async fn subscribe_to_channel(
@@ -278,9 +281,9 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
     }
 
     async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
-        let client = HttpClient::new(Some(HttpClientOptions{ http_url: IOTA_BRIDGE_URL }));
-        let (mut subscriber, vfs_fat_handle) =
-            create_subscriber::<HttpClient, DummyWallet>(client).await?;
+        let client = HttpClient::new(Some(HttpClientOptions{ http_url: self.iota_bridge_url.as_str() }));
+        let (mut subscriber, mut vfs_fat_handle) =
+            create_subscriber::<HttpClient, DummyWallet>(client, self.vfs_fat_path.clone()).await?;
 
         print_heap_info();
 
@@ -290,25 +293,23 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
 
         log::debug!("[fn process_command]  Safe subscriber client_status to disk");
         subscriber.safe_client_status_to_disk().await?;
-        log::debug!("[fn process_command]  drop_vfs_fat_filesystem");
-        drop_vfs_fat_filesystem(vfs_fat_handle)?;
+        log::debug!("[fn process_command]  vfs_fat_handle.drop_filesystem()");
+        vfs_fat_handle.drop_filesystem()?;
 
         confirmation_request.ok_or(anyhow!("No confirmation_request received"))
     }
 }
 
-
-
-pub async fn process_main_esp_rs() -> Result<()> {
+pub async fn process_main_esp_rs(wifi_ssid: &str, wifi_pass: &str, iota_bridge_url: &str, vfs_fat_path: Option<String>) -> Result<()> {
     log::debug!("[fn process_main_esp_rs] process_main() entry");
 
     print_heap_info();
 
     log::debug!("[fn process_main_esp_rs] init_wifi");
-    let _wifi_hdl = init_wifi()?;
+    let _wifi_hdl = init_wifi(wifi_ssid, wifi_pass)?;
 
-    log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", IOTA_BRIDGE_URL);
-    let command_processor = CmdProcessor::new();
+    log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", iota_bridge_url);
+    let command_processor = CmdProcessor::new(iota_bridge_url, vfs_fat_path);
     run_command_fetch_loop(
         command_processor,
         Some(

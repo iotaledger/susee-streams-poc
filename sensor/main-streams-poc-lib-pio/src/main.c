@@ -23,13 +23,4 @@
 
 #include <inttypes.h>
 
-/* ########################################################################################
-   ############################ Test CONFIG ###############################################
-   ######################################################################################## */
-
-// Please edit your Wifi credentials here
-#define STREAMS_POC_LIB_TEST_WIFI_SSID "Susee Demo"
-#define STREAMS_POC_LIB_TEST_WIFI_PASS "susee-rocks"
-#define STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS ("192.168.0.100:50001")
-
 #include "../../streams-poc-lib/main/main.c"

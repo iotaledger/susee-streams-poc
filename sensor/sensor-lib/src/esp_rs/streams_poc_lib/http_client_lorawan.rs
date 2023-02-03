@@ -308,11 +308,11 @@ impl HttpClient
         // http status which indicates that the iota-bridge has stored all needed
         // data to use compressed massages further on.
         if response_parts.status_code == StatusCode::ALREADY_REPORTED {
-            log::debug!("[HttpClient::request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
+            log::info!("[HttpClient::request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
             self.compressed.set_use_compressed_msg(true);
         }
 
-        log::debug!("[HttpClient::request()] ==================================== use_compressed_msg = '{}'", self.compressed.get_use_compressed_msg());
+        log::info!("[HttpClient::request()] use_compressed_msg = '{}'", self.compressed.get_use_compressed_msg());
         Ok(response_parts)
     }
 

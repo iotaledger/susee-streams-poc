@@ -3,7 +3,7 @@
 The *streams-poc-lib* provides C bindings for all functions needed in the SUSEE-Module (a.k.a. *Sensor*) to
 use IOTA Streams for energy meter data transmissions.
 
-This project contains the *streams-poc-lib* RUST library and a test application - implemented in the `src/main.c` file - to test the library functionality
+This project contains the *streams-poc-lib* RUST library and a test application - implemented in the `main/main.c` file - to test the library functionality
 using a WIFI socket instead of a LoRaWAN connection
 
 The API of the *streams-poc-lib* can be found in the file `components/streams-poc-lib/include/streams_poc_lib.h`
@@ -24,11 +24,24 @@ which is a successor of the original [rust-esp32-example by Espressif](https://g
 Especially the CMake integration has been taken from the
 [esp-idf-template CMakeLists.txt](https://github.com/esp-rs/esp-idf-template/blob/master/cmake/components/rust-%7B%7Bproject-name%7D%7D/CMakeLists.txt)
 
-## Prerequisites for building for ESP32
+## Prerequisites
 
-Please follow the instructions given in the
-["Prerequisites / For ESP32" section of the main README file](../../README.md#for-esp32) in the root 
-folder of this repository. 
+To build the test application and the *Streams POC library* for ESP32 platforms (currently only ESP32-C3 provided),
+you need to install the Espressif software development environment called esp-idf. 
+
+These are the main steps to install the Espressif software development environment:
+  * Please follow the *Espressif Install Guide* for
+    [manual instalation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/linux-macos-setup.html)
+    or via [IDE install](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/index.html#ide)
+    for the ESP32-C3 - master branch(latest).
+  * If you have not flashed an ESP32 application before you should also follow the
+    [First Steps on ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/linux-macos-setup.html#get-started-first-steps)
+    section of the 
+    [Espressif Get Startet](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/index.html#) guide
+  * You should also [Check your serial port on Linux and macOS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/establish-serial-connection.html#check-port-on-linux-and-macos)
+    to find out how to access the serial port connection to the ESP32.
+    Please replace the port identifier `/dev/ttyYOURPORT`
+    used in the README files of this repository always with your port identifier.
 
 You can also follow the [esp-idf-template Readme](https://github.com/esp-rs/esp-idf-template/blob/master/README-cmake.md)
 for mixed Rust/C ESP-IDF projects (driven by idf.py and CMake).
@@ -39,7 +52,7 @@ using the
 [git-workflow](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/versions.html#git-workflow)
 .
 
-## Build for ESP32
+## Build
 
 After having installed the "*release/v4.4.3*"
 [version of the esp-idf build tools](https://github.com/espressif/esp-idf/releases/tag/v4.4.3)

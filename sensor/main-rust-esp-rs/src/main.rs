@@ -6,6 +6,10 @@ use sensor_lib::{
     process_main_esp_rs,
 };
 
+const WIFI_SSID: &str = env!("SENSOR_MAIN_POC_WIFI_SSID");
+const WIFI_PASS: &str = env!("SENSOR_MAIN_POC_WIFI_PASS");
+const IOTA_BRIDGE_URL: &str = env!("SENSOR_MAIN_POC_IOTA_BRIDGE_URL");
+
 fn main() -> Result<(), EspError> {
     // Called to ensure that needed esp_idf_sys patches are linked to our binary.
     esp_idf_sys::link_patches();
@@ -27,7 +31,7 @@ fn main() -> Result<(), EspError> {
 
     match smol::block_on(async {
         info!("Start smol::block_on");
-        process_main_esp_rs().await
+        process_main_esp_rs(WIFI_SSID, WIFI_PASS, IOTA_BRIDGE_URL, None).await
     }){
         Ok(_) => {},
         Err(error) => {

@@ -69,10 +69,15 @@ const char *streams_error_to_string(enum StreamsError error);
  * @param length                    Length of message_data
  * @param lorawan_send_callback     Callback function allowing the Streams POC library to send requests via LoRaWAN.
  *                                  See send_request_via_lorawan_t help above for more details.
+ * @param vfs_fat_path              Optional.
+ *                                  Path of the directory where the streams channel user state data and
+ *                                  other files shall be read/written by the Streams POC library.
+ *                                  See function is_streams_channel_initialized() below for further details.
  */
 enum StreamsError send_message(const uint8_t *message_data,
                                size_t length,
-                               send_request_via_lorawan_t lorawan_send_callback);
+                               send_request_via_lorawan_t lorawan_send_callback,
+                               const char *vfs_fat_path);
 
 /**
  * Start an interactive app that can be used to automatically initialize the Streams channel or
@@ -83,8 +88,20 @@ enum StreamsError send_message(const uint8_t *message_data,
  * (project sensor/main-rust) or the 'management-console' app.
  * For more details about the possible remote commands have a look into the CLI help of those
  * two applications.
+ * @param wifi_ssid        Name (Service Set Identifier) of the WiFi to login.
+ * @param wifi_pass        Password of the WiFi to login.
+ * @param iota_bridge_url  URL of the iota-bridge instance to connect to.
+ *                         Example:
+ *                            start_sensor_manager("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
+ * @param vfs_fat_path     Optional.
+ *                         Path of the directory where the streams channel user state data and
+ *                         other files shall be read/written by the Streams POC library.
+ *                         See function is_streams_channel_initialized() below for further details.
  */
-int32_t start_sensor_manager(void);
+int32_t start_sensor_manager(const char *wifi_ssid,
+                             const char *wifi_pass,
+                             const char *iota_bridge_url,
+                             const char *vfs_fat_path);
 
 /**
  * Indicates if this sensor instance has already been initialized.
@@ -95,7 +112,48 @@ int32_t start_sensor_manager(void);
  * the management-console (project /management console) like this:
  *
  *     $ ./management-console --init-sensor --iota-bridge-url "http://192.168.47.11:50000"
+ *
+ * @param vfs_fat_path     Optional.
+ *                         Path of the directory where the streams channel user state data and
+ *                         other files shall be read/written by the Streams POC library.
+ *
+ *                         If no FAT filesystem is provided by the caller of this function
+ *                         set vfs_fat_path = NULL.
+ *
+ *                         If a vfs_fat_path value path is defined, a FAT filesystem needs to be
+ *                         provided by the caller of this function and following preconditions
+ *                         have to be fulfilled:
+ *                         * vfs_fat_path must start with the base_path of the vfs_fat data partition
+ *                           followed by optional subfolders. The Streams POC library will not
+ *                           create any subfolders that are part of vfs_fat_path so all needed
+ *                           subfolders must have been created before Streams POC library is used.
+ *                         * the FAT filesystem must have been initialized in the SPI flash and
+ *                           registered in the VFS e.g. by using esp_vfs_fat_spiflash_mount()
+ *                           or equivalent esp-idf functions
+ *                           https://docs.espressif.com/projects/esp-idf/en/v4.3/esp32/api-reference/storage/wear-levelling.html
+ *
+ *                         In case no FAT filesystem is provided resp. vfs_fat_path is set to NULL:
+ *                         * the Streams POC library will initialize and use its default
+ *                           '/spiflash' data partition.
+ *                         * the default '/spiflash' data partition needs to be configured in
+ *                           the 'partitions.scv' file of the applications build project.
+ *                           See /sensor/streams-poc-lib/partitions.scv as an example.
+ *                           https://docs.espressif.com/projects/esp-idf/en/v4.3/esp32/api-guides/partition-tables.html
+ *
+ *                         Examples:
+ *
+ *                            // Use the default '/spiflash' partition managed by the Streams POC library
+ *                            is_streams_channel_initialized(NULL)
+ *
+ *                            // Use the root folder of the 'great-spi-flash' partition
+ *                            // that has already been initialized using esp_vfs_fat_spiflash_mount()
+ *                            // or equivalent esp-idf functions.
+ *                            is_streams_channel_initialized("/great-spi-flash")
+ *
+ *                            // Use the EXISTING subfolder 'streams-folder' in the
+ *                            // already initialized data partition 'other-flash-partition'.
+ *                            is_streams_channel_initialized("/other-flash-partition/streams-folder")
  */
-bool is_streams_channel_initialized(void);
+bool is_streams_channel_initialized(const char *vfs_fat_path);
 
 #endif /* streams_poc_lib_h */

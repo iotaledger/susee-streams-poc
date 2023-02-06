@@ -19,7 +19,7 @@ use anyhow::{
 };
 
 use crate::esp_rs::streams_poc_lib::api_types::send_request_via_lorawan_t;
-use streams_tools::DummyWallet;
+use streams_tools::PlainTextWallet;
 
 pub async fn send_message(message_bytes: &[u8], lorawan_send_callback: send_request_via_lorawan_t, vfs_fat_path: Option<String>) -> Result<()>{
 
@@ -27,7 +27,7 @@ pub async fn send_message(message_bytes: &[u8], lorawan_send_callback: send_requ
         Some(HttpClientOptions{lorawan_send_callback})
     );
     let (mut subscriber, mut vfs_fat_handle) =
-        create_subscriber::<HttpClient, DummyWallet>(client, vfs_fat_path).await?;
+        create_subscriber::<HttpClient, PlainTextWallet>(client, vfs_fat_path).await?;
 
     log::info!("[fn - send_message()] Sending {} bytes payload\n", message_bytes.len());
     log::debug!("[fn - send_message()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
@@ -46,7 +46,8 @@ pub async fn send_message(message_bytes: &[u8], lorawan_send_callback: send_requ
 pub async fn is_streams_channel_initialized(vfs_fat_path: Option<String>) -> Result<bool>{
     log::debug!("[fn - is_streams_channel_initialized()] Creating subscriber");
     let client = HttpClient::new(None);
-    let (subscriber, mut vfs_fat_handle) = create_subscriber::<HttpClient, DummyWallet>(client, vfs_fat_path).await?;
+    let (subscriber, mut vfs_fat_handle) =
+        create_subscriber::<HttpClient, PlainTextWallet>(client, vfs_fat_path).await?;
 
     let ret_val = subscriber.subscription_link.is_some();
     log::debug!("[fn - is_streams_channel_initialized()] subscriber.subscription_link.is_some() == {}", ret_val);

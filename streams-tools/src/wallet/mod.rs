@@ -1,6 +1,5 @@
 pub mod simple_wallet;
 pub mod dummy_wallet;
-#[cfg(feature = "std")]
 pub mod plain_text_wallet;
 
 pub use {
@@ -8,7 +7,6 @@ pub use {
     dummy_wallet::DummyWallet,
 };
 
-#[cfg(feature = "std")]
 pub use {
     plain_text_wallet::*
 };

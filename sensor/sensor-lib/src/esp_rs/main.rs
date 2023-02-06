@@ -5,7 +5,7 @@ use super::{
     },
     esp32_subscriber_tools::{
         create_subscriber,
-        SubscriberManagerDummyWalletHttpClientEspRs,
+        SubscriberManagerPlainTextWalletHttpClientEspRs,
     },
     http_client_smol_esp_rs::{
         HttpClient,
@@ -31,7 +31,7 @@ use streams_tools::{
         SubscriberStatus,
         Command,
     },
-    DummyWallet,
+    PlainTextWallet,
     http::http_protocol_confirm::RequestBuilderConfirm,
     remote::command_processor::{
         CommandProcessor,
@@ -96,7 +96,7 @@ fn println_subscription_details(subscriber: &Subscriber<ClientType>, subscriptio
 }
 
 fn println_subscriber_status<'a> (
-    subscriber_manager: &SubscriberManagerDummyWalletHttpClientEspRs,
+    subscriber_manager: &SubscriberManagerPlainTextWalletHttpClientEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -147,7 +147,7 @@ fn println_subscriber_status<'a> (
 }
 
 async fn clear_client_state<'a> (
-    subscriber_manager: &mut SubscriberManagerDummyWalletHttpClientEspRs,
+    subscriber_manager: &mut SubscriberManagerPlainTextWalletHttpClientEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -157,7 +157,7 @@ async fn clear_client_state<'a> (
 
 pub async fn send_content_as_msg(
     message_key: String,
-    subscriber: &mut SubscriberManagerDummyWalletHttpClientEspRs,
+    subscriber: &mut SubscriberManagerPlainTextWalletHttpClientEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -170,7 +170,7 @@ pub async fn send_content_as_msg(
 
 async fn subscribe_to_channel(
     announcement_link_str: &str,
-    subscriber_mngr: &mut SubscriberManagerDummyWalletHttpClientEspRs,
+    subscriber_mngr: &mut SubscriberManagerPlainTextWalletHttpClientEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -191,7 +191,7 @@ async fn subscribe_to_channel(
 
 async fn register_keyload_msg(
     keyload_msg_link_str: &str,
-    subscriber_mngr: &mut SubscriberManagerDummyWalletHttpClientEspRs,
+    subscriber_mngr: &mut SubscriberManagerPlainTextWalletHttpClientEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -228,7 +228,7 @@ impl<'a> CmdProcessor<'a> {
 
 #[async_trait(?Send)]
 impl<'a> SensorFunctions for CmdProcessor<'a> {
-    type SubscriberManager = SubscriberManagerDummyWalletHttpClientEspRs;
+    type SubscriberManager = SubscriberManagerPlainTextWalletHttpClientEspRs;
 
     fn get_iota_bridge_url(&self) -> &str {
         self.iota_bridge_url.as_str()
@@ -283,7 +283,7 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
     async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
         let client = HttpClient::new(Some(HttpClientOptions{ http_url: self.iota_bridge_url.as_str() }));
         let (mut subscriber, mut vfs_fat_handle) =
-            create_subscriber::<HttpClient, DummyWallet>(client, self.vfs_fat_path.clone()).await?;
+            create_subscriber::<HttpClient, PlainTextWallet>(client, self.vfs_fat_path.clone()).await?;
 
         print_heap_info();
 

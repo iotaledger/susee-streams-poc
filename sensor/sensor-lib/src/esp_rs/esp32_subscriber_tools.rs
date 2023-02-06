@@ -16,7 +16,7 @@ use esp_idf_sys::{
     esp,
 };
 
-use streams_tools::{DummyWallet, SubscriberManager, SimpleWallet};
+use streams_tools::{PlainTextWallet, SubscriberManager, SimpleWallet};
 
 pub use esp_idf_sys::wl_handle_t;
 
@@ -28,7 +28,7 @@ use streams_tools::subscriber_manager::ClientTTrait;
 pub static BASE_PATH: &str = "/spiflash";
 pub static SENSOR_STREAMS_USER_STATE_FILE_NAME: &str = "user-state-sensor.bin";
 
-pub type SubscriberManagerDummyWalletHttpClientEspRs = SubscriberManager<HttpClientEspRs, DummyWallet>;
+pub type SubscriberManagerPlainTextWalletHttpClientEspRs = SubscriberManager<HttpClientEspRs, PlainTextWallet>;
 
 pub struct VfsFatHandle {
     pub is_vfs_managed_by_others: bool,
@@ -97,13 +97,15 @@ impl VfsFatHandle {
 pub async fn create_subscriber<ClientT, WalletT>(client: ClientT, opt_vfs_fat_path: Option<String>) -> Result<(SubscriberManager<ClientT, WalletT>, VfsFatHandle)>
 where
     ClientT: ClientTTrait,
-    WalletT: SimpleWallet + Default
+    WalletT: SimpleWallet
 {
-    log::debug!("[fn - create_subscriber()] Creating DummyWallet");
-    let wallet = WalletT::default();
-
+    log::debug!("[fn - create_subscriber()] setup_filesystem");
     let mut vfs_fat_handle = VfsFatHandle::new(opt_vfs_fat_path);
     vfs_fat_handle.setup_filesystem()?;
+
+    log::debug!("[fn - create_subscriber()] Creating Wallet");
+    let wallet_path = vfs_fat_handle.base_path.clone() + "/wallet_sensor.txt";
+    let wallet = WalletT::new(wallet_path.as_str());
 
     log::debug!("[fn - create_subscriber()] Creating HttpClient");
     log::debug!("[fn - create_subscriber()] Creating subscriber");

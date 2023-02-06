@@ -26,7 +26,6 @@ pub use {
     user_manager::*,
 };
 
-#[cfg(feature = "std")]
 pub use {
     wallet::plain_text_wallet::{
         PlainTextWallet,

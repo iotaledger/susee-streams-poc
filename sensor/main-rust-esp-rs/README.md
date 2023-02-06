@@ -23,7 +23,7 @@ To build the *ESP32 Sensor* application for ESP32 platforms (currently only ESP3
   [Prerequisites section of the Streams POC library](../streams-poc-lib#prerequisites). 
 * Make sure your installed python3 version is >= 3.8 and pip is already installed
   (`sudo apt install python3-pip`).
-* Check that your rustc version is >= 1.58.0 (see [Rust install hints in the main README](../../#for-x86pc)).
+* Check that your rustc version is >= 1.58.0 (see [Rust install hints in the main README](../../README.md#for-x86pc)).
 * Use the stock nightly Rust compiler:
 ```bash
     rustup install nightly

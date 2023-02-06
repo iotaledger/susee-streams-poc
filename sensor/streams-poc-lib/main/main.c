@@ -15,6 +15,12 @@
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
 
+#include "esp_flash.h"
+#include "esp_flash_spi_init.h"
+#include "esp_partition.h"
+#include "esp_vfs.h"
+#include "esp_vfs_fat.h"
+
 #include <http_parser.h>
 
 #include "esp_chip_info.h"
@@ -38,12 +44,16 @@
 // Needed for sending messages.
 #define STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS ("192.168.0.101:50001")
 
-// Currently we can not test a specified vfs_fat_path.
-// Therefore we set it to NULL here, in case it has not already been defined
-// TODO: Implement test code to test custom vfs_fat_path usage
-#ifndef STREAMS_POC_LIB_TEST_VFS_FAT_PATH
-    #define STREAMS_POC_LIB_TEST_VFS_FAT_PATH NULL
-#endif
+// Setting STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH to NULL will make the streams-poc-lib
+// using its own vfs_fate partition as been described in streams-poc-lib.h
+// (sensor/streams-poc-lib/components/streams-poc-lib/include/streams-poc-lib.h)
+//
+// Specifying a STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH here will make the streams-poc-lib
+// using a prepared file system. This test application can only handle vfs_fate base_path
+// names so no subfolders are allowed.
+// Example:
+//          #define STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH ("/awesome-data")
+#define STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH NULL
 
 #define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_PSK
 #define STREAMS_POC_LIB_TEST_MAXIMUM_RETRY 5
@@ -58,6 +68,7 @@
    ############################ END of test CONFIG ########################################
    ######################################################################################## */
 
+static const char *TAG = "test_streams_poc_lib";
 
 #ifdef CONFIG_EXAMPLE_IPV4
     typedef struct sockaddr_in dest_addr_t;
@@ -73,8 +84,6 @@ static EventGroupHandle_t s_wifi_event_group;
  * - we failed to connect after the maximum amount of retries */
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
-
-static const char *TAG = "wifi station";
 
 static int s_retry_num = 0;
 
@@ -121,18 +130,40 @@ static void wifi_init_event_handler(void* arg, esp_event_base_t event_base,
         if (s_retry_num < STREAMS_POC_LIB_TEST_MAXIMUM_RETRY) {
             esp_wifi_connect();
             s_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP");
+            ESP_LOGI(TAG, "[fn wifi_init_event_handler] Retry to connect to the AP");
         } else {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
-        ESP_LOGI(TAG,"connect to the AP fail");
+        ESP_LOGI(TAG,"[fn wifi_init_event_handler] Connect to the AP fail");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG, "[fn wifi_init_event_handler] Got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
+
+static bool mount_fatfs(wl_handle_t* p_wl_handle)
+{
+    ESP_LOGI(TAG, "[fn mount_fatfs] Mounting FAT filesystem with base_path '%s'", STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH);
+    const esp_vfs_fat_mount_config_t mount_config = {
+            .max_files = 4,
+            .format_if_mount_failed = true,
+            .allocation_unit_size = CONFIG_WL_SECTOR_SIZE
+    };
+    esp_err_t err = esp_vfs_fat_spiflash_mount(
+        STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
+        "storage",
+        &mount_config,
+        p_wl_handle
+    );
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "[fn mount_fatfs] Failed to mount FATFS (%s)", esp_err_to_name(err));
+        return false;
+    }
+    return true;
+}
+
 
 void wifi_init_sta(void)
 {
@@ -176,7 +207,7 @@ void wifi_init_sta(void)
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
     ESP_ERROR_CHECK(esp_wifi_start() );
 
-    ESP_LOGI(TAG, "wifi_init_sta finished.");
+    ESP_LOGI(TAG, "[fn wifi_init_sta] wifi_init_sta finished.");
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by wifi_init_event_handler() (see above) */
@@ -189,13 +220,13 @@ void wifi_init_sta(void)
     /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
      * happened. */
     if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
+        ESP_LOGI(TAG, "[fn wifi_init_sta] connected to wifi SSID:%s password:%s",
                  STREAMS_POC_LIB_TEST_WIFI_SSID, STREAMS_POC_LIB_TEST_WIFI_PASS);
     } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
+        ESP_LOGI(TAG, "[fn wifi_init_sta] Failed to connect to SSID:%s, password:%s",
                  STREAMS_POC_LIB_TEST_WIFI_SSID, STREAMS_POC_LIB_TEST_WIFI_PASS);
     } else {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
+        ESP_LOGE(TAG, "[fn wifi_init_sta] UNEXPECTED EVENT");
     }
 }
 
@@ -213,12 +244,12 @@ void log_binary_data(const uint8_t *data, size_t length) {
 uint64_t get_base_mac_48_as_mocked_u64_dev_eui() {
     uint64_t mac_id;
     ESP_ERROR_CHECK(esp_efuse_mac_get_default((uint8_t*)&mac_id));
-    ESP_LOGD(TAG, "[streams-poc-lib/main.c - fn get_mac_id_as_u64_dev_eui_mock()] mac_id as u64 is %" PRIu64 "\n", mac_id);
+    ESP_LOGD(TAG, "[fn get_mac_id_as_u64_dev_eui_mock] mac_id as u64 is %" PRIu64 "\n", mac_id);
     return mac_id;
 }
 
 LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback) {
-    ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_request_via_socket()] is called with %d bytes of request_data", length);
+    ESP_LOGI(TAG, "[fn send_request_via_socket] is called with %d bytes of request_data", length);
 
     log_binary_data(request_data, length);
 
@@ -242,7 +273,7 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
 
     int err = send(s_socket_handle, send_buffer, send_buffer_len, 0);
     if (err < 0) {
-        ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
+        ESP_LOGE(TAG, "[fn send_request_via_socket] Error occurred during sending: errno %d", errno);
         return LORAWAN_NO_CONNECTION;
     }
 
@@ -250,17 +281,17 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
     int rx_len = recv(s_socket_handle, rx_buffer, sizeof(rx_buffer), 0);
     // Error occurred during receiving
     if (rx_len < 0) {
-        ESP_LOGE(TAG, "recv failed: errno %d", errno);
+        ESP_LOGE(TAG, "[fn send_request_via_socket] recv failed: errno %d", errno);
         return LORAWAN_NO_CONNECTION;
     }
 
     // Data received
-    ESP_LOGI(TAG, "Received %d bytes from %s:", rx_len, STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS);
+    ESP_LOGI(TAG, "[fn send_request_via_socket] Received %d bytes from %s:", rx_len, STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS);
     log_binary_data(rx_buffer, rx_len);
 
     StreamsError streams_err = response_callback(rx_buffer, rx_len);
     if (streams_err < 0) {
-        ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_request_via_socket()] response_callback returned with error code: %s, ", streams_error_to_string(streams_err));
+        ESP_LOGI(TAG, "[fn send_request_via_socket] response_callback returned with error code: %s, ", streams_error_to_string(streams_err));
     }
 
     // We arrived at this point so we assume that no LoRaWanError occurred.
@@ -275,7 +306,7 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
     char app_srv_mock_address_as_url[256];
     strcpy(app_srv_mock_address_as_url, url_prefix);
     strcat(app_srv_mock_address_as_url, STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS);
-    ESP_LOGD(TAG, "[streams-poc-lib/main.c - fn parse_lora_app_srv_mock_address()] app_srv_mock_address_as_url is '%s'", app_srv_mock_address_as_url);
+    ESP_LOGD(TAG, "[fn parse_lora_app_srv_mock_address] app_srv_mock_address_as_url is '%s'", app_srv_mock_address_as_url);
 
     int parser_status = http_parser_parse_url(
         app_srv_mock_address_as_url,
@@ -284,7 +315,7 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
         &parsed_url);
 
     if (parser_status != 0) {
-        ESP_LOGE(TAG, "Error parse socket address %s", STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS);
+        ESP_LOGE(TAG, "[fn parse_lora_app_srv_mock_address] Error parse socket address %s", STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS);
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -296,7 +327,7 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
             app_srv_mock_address_as_url + parsed_url.field_data[UF_HOST].off,
             parsed_url.field_data[UF_HOST].len
         );
-        ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn parse_lora_app_srv_mock_address()] parsed host is '%s'", parsed_host);
+        ESP_LOGI(TAG, "[fn parse_lora_app_srv_mock_address] parsed host is '%s'", parsed_host);
     } else {
         return ESP_ERR_INVALID_ARG;
     }
@@ -311,7 +342,7 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
             parsed_url.field_data[UF_PORT].len
         );
         parsed_port_u16 = parsed_url.port;
-        ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn parse_lora_app_srv_mock_address()] parsed port string is '%s'. Port u16 = %d", parsed_port, parsed_port_u16);
+        ESP_LOGI(TAG, "[fn parse_lora_app_srv_mock_address] parsed port string is '%s'. Port u16 = %d", parsed_port, parsed_port_u16);
     } else {
         return ESP_ERR_INVALID_ARG;
     }
@@ -345,23 +376,23 @@ int get_handle_of_prepared_socket(dest_addr_t *p_dest_addr)
 
     int sock =  socket(addr_family, SOCK_STREAM, ip_protocol);
     if (sock < 0) {
-        ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+        ESP_LOGE(TAG, "[fn get_handle_of_prepared_socket] Unable to create socket: errno %d", errno);
         return sock;
     }
-    ESP_LOGI(TAG, "Socket created, connecting to %s", STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS);
+    ESP_LOGI(TAG, "[fn get_handle_of_prepared_socket] Socket created, connecting to %s", STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS);
 
     int err = connect(sock, (struct sockaddr *)p_dest_addr, sizeof(dest_addr_t));
     if (err != 0) {
-        ESP_LOGE(TAG, "Socket unable to connect: errno %d", errno);
+        ESP_LOGE(TAG, "[fn get_handle_of_prepared_socket] Socket unable to connect: errno %d", errno);
         return sock;
     }
-    ESP_LOGI(TAG, "Successfully connected");
+    ESP_LOGI(TAG, "[fn get_handle_of_prepared_socket] Successfully connected");
     return sock;
 }
 
 void shut_down_socket(int sock_handle) {
     if (sock_handle != -1) {
-        ESP_LOGE(TAG, "Shutting down socket");
+        ESP_LOGI(TAG, "[fn shut_down_socket] Shutting down socket");
         shutdown(sock_handle, 0);
         close(sock_handle);
     }
@@ -370,28 +401,28 @@ void shut_down_socket(int sock_handle) {
 void prepare_socket_and_send_message(dest_addr_t* dest_addr ) {
     s_socket_handle = get_handle_of_prepared_socket(dest_addr);
 
-    ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Calling send_message for message_data of length %d \n\n", MESSAGE_DATA_LENGTH);
-    send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket, STREAMS_POC_LIB_TEST_VFS_FAT_PATH);
+    ESP_LOGI(TAG, "[fn prepare_socket_and_send_message] Calling send_message for message_data of length %d \n\n", MESSAGE_DATA_LENGTH);
+    send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket, STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH);
 
-    ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Shutting down socket");
+    ESP_LOGI(TAG, "[fn prepare_socket_and_send_message] Shutting down socket");
     shut_down_socket(s_socket_handle);
 }
 
 void send_message_via_streams_poc_lib(void) {
-    ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Preparing WIFI");
+    ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Preparing WIFI");
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
       ESP_ERROR_CHECK(nvs_flash_erase());
       ret = nvs_flash_init();
     }
 
-    ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
+    ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] ESP_WIFI_MODE_STA");
     wifi_init_sta();
 
-    ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Preparing netif and creating default event loop\n");
+    ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Preparing netif and creating default event loop\n");
     ESP_ERROR_CHECK(esp_netif_init());
 
-    ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Preparing socket for future send_request_via_socket() calls");
+    ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Preparing socket for future send_request_via_socket() calls");
 #if defined(CONFIG_EXAMPLE_IPV4)
     dest_addr_t dest_addr;
 #elif defined(CONFIG_EXAMPLE_IPV6)
@@ -401,46 +432,56 @@ void send_message_via_streams_poc_lib(void) {
     if( 0 == parse_lora_app_srv_mock_address(&dest_addr) ) {
         while (1) {
             prepare_socket_and_send_message(&dest_addr);
-            ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Waiting 5 seconds to send message again");
+            ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Waiting 5 seconds to send message again");
             sleep(5);
         }
     } else {
-        ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn send_message_via_streams_poc_lib()] Could not parse address of lorawan application-server-mock");
+        ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Could not parse address of lorawan application-server-mock");
     }
 }
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn app_main()] Sensor App is starting!\n");
+    ESP_LOGI(TAG, "[fn app_main] Sensor App is starting!\n");
 
     /* Print chip information */
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
-    ESP_LOGI(TAG, "This is %s chip with %d CPU cores, WiFi%s%s, ",
+    ESP_LOGI(TAG, "[fn app_main] This is %s chip with %d CPU cores, WiFi%s%s, ",
             CONFIG_IDF_TARGET,
             chip_info.cores,
             (chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
             (chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "");
 
-    ESP_LOGI(TAG, "silicon revision %d, ", chip_info.revision);
+    ESP_LOGI(TAG, "[fn app_main] silicon revision %d, ", chip_info.revision);
 
-//    ESP_LOGI(TAG, "%dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
+//    ESP_LOGI(TAG, "[fn app_main] %dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
 //            (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
-    ESP_LOGI(TAG, "Free heap: %ld\n", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "[fn app_main] Free heap: %ld\n", esp_get_free_heap_size());
 
-    if (is_streams_channel_initialized(STREAMS_POC_LIB_TEST_VFS_FAT_PATH)) {
-        ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn app_main()] Streams channel already initialized. Calling C function send_message_via_streams_poc_lib()");
+    wl_handle_t wl_handle = WL_INVALID_HANDLE;
+    if (STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH) {
+        mount_fatfs(&wl_handle);
+    }
+
+    if (is_streams_channel_initialized(STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH)) {
+        ESP_LOGI(TAG, "[fn app_main] Streams channel already initialized. Calling C function send_message_via_streams_poc_lib()");
         send_message_via_streams_poc_lib();
     } else {
-        ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn app_main()] Streams channel for this sensor has not been initialized. Calling start_sensor_manager()");
+        ESP_LOGI(TAG, "[fn app_main] Streams channel for this sensor has not been initialized. Calling start_sensor_manager()");
         start_sensor_manager(
             STREAMS_POC_LIB_TEST_WIFI_SSID,
             STREAMS_POC_LIB_TEST_WIFI_PASS,
             STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,
-            STREAMS_POC_LIB_TEST_VFS_FAT_PATH
+            STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH
         );
     }
 
-    ESP_LOGI(TAG, "[streams-poc-lib/main.c - fn app_main()] Exiting Sensor App");
+    if (STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH != NULL && wl_handle != WL_INVALID_HANDLE) {
+        ESP_LOGI(TAG, "[fn app_main] unmounting vfs_fat");
+        ESP_ERROR_CHECK( esp_vfs_fat_spiflash_unmount(STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH, wl_handle));
+    }
+
+    ESP_LOGI(TAG, "[fn app_main] Exiting Sensor App");
 }

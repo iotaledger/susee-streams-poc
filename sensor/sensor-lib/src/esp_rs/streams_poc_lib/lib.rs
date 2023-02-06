@@ -31,9 +31,10 @@ pub async fn send_message(message_bytes: &[u8], lorawan_send_callback: send_requ
 
     log::info!("[fn - send_message()] Sending {} bytes payload\n", message_bytes.len());
     log::debug!("[fn - send_message()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
-    let msg_link = subscriber.send_signed_packet(&Bytes(message_bytes.to_vec())).await?;
-    log::debug!("[fn - send_message()] Message sent: {}, tangle index: {:#}\n", msg_link, msg_link.to_msg_index());
-
+    let msg_link_result = subscriber.send_signed_packet(&Bytes(message_bytes.to_vec())).await;
+    if let Ok(msg_link) = msg_link_result {
+        log::debug!("[fn - send_message()] Message sent: {}, tangle index: {:#}\n", msg_link, msg_link.to_msg_index());
+    }
     log::debug!("[fn - send_message()] Safe subscriber client_status to disk");
     subscriber.safe_client_status_to_disk().await?;
     log::debug!("[fn - send_message()] vfs_fat_handle.drop_filesystem()");

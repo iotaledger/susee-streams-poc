@@ -5,9 +5,9 @@ This project contains five test applications providing command line interfaces (
 functionality that is used in the SUSEE project. Additionally, the static library *streams-poc-lib* provides C bindings for the most relevant *Sensor* 
 specific functionality for the SUSEE project.
 
-Following test applications are contained. For more details regarding the general usecases, actors,
-applications and workflows of the SUSEE project please see below in the 
-<a href="#applications-and-workflows">Applications and workflows</a> section:
+Following test applications are contained. For more details regarding the general workflows, actors,
+roles and modules of the SUSEE project please see below in the 
+<a href="#workflow-model">Workflow Model</a> section:
 
 * [IOTA Bridge](iota-bridge)<br>
   * Needed by all Sensor applications to access the IOTA Tangle
@@ -15,24 +15,21 @@ applications and workflows of the SUSEE project please see below in the
     * Attaches the *Streams* packages received from the *Sensor* applications to the tangle
   * Forwards remote control commands from the *x86/PC Sensor* or *Management Console* to the Sensor applications
   * Forwards command confirmations from Sensor applications to the *x86/PC Sensor* or *Management Console*
-  * Imitates processes
-    * in the SUSEE Application Server (*Sensor Processing*) and
-    * processes used by the initialization software that performs the Sensor *Initialization*
 * [ESP32 Sensor](sensor/main-rust-esp-rs)<br>
   * Imitates the processes running in the smart meter (a.k.a. *Sensor*)
   * Runs on ESP32-C3 devices
   * Can be remote controlled by the *x86/PC Sensor*
 * [streams-poc-lib](sensor/streams-poc-lib)<br>
-  * provides C bindings for most functionalities of the *ESP32 Sensor*
-  * can be used with Espressifs ESP-IDF build process for ESP32-C3 devices
-  * includes a test application written in C to test the library functionality using a WIFI socket instead of
+  * Provides C bindings for most functionalities of the *ESP32 Sensor*
+  * Can be used with Espressifs ESP-IDF build process for ESP32-C3 devices
+  * Includes a test application written in C to test the library functionality using a WIFI socket instead of
     a LoRaWAN connection
   * Provides most features of the *ESP32 Sensor* via its library interface
 * [LoraWan AppServer Mockup Tool](lora-app-srv-mock)<br>
-  * test tool to receive & send binary packages from/to the streams-poc-lib test application via a socket
-    connection and transmit these packages to the *IOTA-Bridge* via its `lorawan-rest` API functions.
-  * a real world service would run on the LoRaWAN Application Server (or tightly connected to it).
-    Like this test tool it would transceive binary packages from a LoRaWan connection to the *IOTA-Bridge*.
+  * Acts as *Application Server Connector* for the *streams-poc-lib* test application
+  * Receives & sends binary packages from/to the streams-poc-lib test application via a socket
+    connection and transmits these packages to the *IOTA-Bridge* via its `lorawan-rest` API functions.
+  * A real world service would run on the LoRaWAN Application Server (or tightly connected to it).
 * [x86/PC Sensor](sensor/main-rust)<br>
   * Runs on x86/PC
   * Used to send commands to the *ESP32 Sensor* or *streams-poc-lib* test app
@@ -54,7 +51,7 @@ The *Streams* channel used for the SUSEE project generally can be described as f
     *Sensor* and the channel author will be done before a *Sensor* is installed in a home, which means for
     the initial handshake the limitations of LoRaWAN don't apply
   * If anything changes in the single branch channel setup, e.g. the addition of a new reading subscriber,
-    the *Sensor* will have to be able to receive new keyload information downstream via LoRaWAN
+    the *Sensor* will have to be able to receive new keyload information downstream via LoRaWAN 
 
 ## Prerequisites
 
@@ -153,7 +150,7 @@ as these applications do not need a wallet:
   <br><br>
   The *Management Console* uses the seed to derive seeds for each managed channel.
   The channel seed is derived from the main seed, stored in the wallet file, and a seed-derivation-phrase,
-  stored in the the local SQLite3 database file.<br>
+  stored in the local SQLite3 database file.<br>
   
   *ESP32 Sensor*<br>
   Currently a dummy wallet providing a static seed phrase is used. For production purposes this needs to be
@@ -272,7 +269,7 @@ Follow these steps to automatically initialize a *Sensor*:
   in case there is no existing initialized streams channel.
   * *x86/PC Sensor* and *ESP32 Sensor*:<br>
     If the *Sensor* has already been initialized use the ` --clear-client-state` option of the
-    *Sensor* app to set its state back to an uninitialized state (use the the `--act-as-remote-control`
+    *Sensor* app to set its state back to an uninitialized state (use the `--act-as-remote-control`
     option in case of an *ESP32 Sensor*).
   * *streams-poc-lib* test application:<br>
     If the *Sensor* has already been initialized you need to run `idf.py erase-flash` and to flash the
@@ -522,73 +519,207 @@ Here the filename acts as a key or identifier for the file content that is hardc
 If you want to add additionally files you need to add those files to `test/payloads/lib.rs` and recompile the
 *ESP32 Sensor* app.
 
-## Applications and workflows 
-### Applications
-For each service being part in the different workflows a console application is provided to test the
-streams channel management and data transmission in the SUSEE project. These services (or apps) are 
-* *Sensor*<br>
-  Running on the smart meter device
-* *Management Console*<br>
-  Running at the energy provider
-* *IOTA Bridge*<br>
-  Running in the application server or as part of the initialization software at the energy provider
- 
-Lorawan and other inter process communication is simulated using a socket connection. The applications can be run in
-three shells in parallel or using the *ESP32 Sensor* on a connected ESP32 board together with the *Sensor Remote Cotrol*
-app so that the applications can react to new LoRaWAN or tangle messages.
+## Workflow Model
 
-The services are characterized by following properties/aspects:
+In the SUSEE project the *Sensor* lifecycle consists of the following workflows:
+* [Sensor Initialization](#initialization)
+* [Sensor Processing](#sensor-processing)
+* [Add/Remove Subscriber](#addremove-subscriber)
+
+In the next sections these workflows, the roles of the participating actors
+and the software used to fulfill the associated activities are described in more detail. As this README focuses on the technical
+implementation using the *IOTA Streams* library, only those aspects that
+have an impact on the way *IOTA Streams* is used are described.    
+
+### Actors
+
+* End Customer<br>
+  Energy consumer that can also be an energy producer (a.k.a. Prosumer).
+  Has a contract with an energy provider or metering point operator.
+  Usually the *Sensor* (a.k.a. smart meter) is located at the facility
+  (house, company site, ...) of the *End Customer*.
+* Energy provider or metering point operator<br>
+  The company that runs the smart meter at the facility of the *End Customer*
+  and is responsible that the metering complies to all regulatory standards. 
+* Sensor Manufacturer<br>
+  Produces the Sensor hardware.
+
+### Roles
+
+Here are the roles of the *SUSEE Workflows* that are impacted by *IOTA Streams*:
+* *Sensor*
+  * Sends meter data messages as encrypted *IOTA Streams* packages via LoRaWAN
+  * Is the only participant in an *IOTA Streams* channel
+    that sends meter data, so it uses a communication channel that is dedicated to it
+  * Stores the identity of the *End Customer*
+  * Allows the *End Customer* to directly manage the participation in the data transfer
+    (e.g. to activate or cancel the participation)
+  * Sends and receives control data (*Commands* and *Confirmations*)
+    to participate in the management of the used *IOTA Streams* channel (these
+    control data are not transfered via the *IOTA Streams* channel) 
+* *Read Only Participant*<br>
+  Can read meter data messages from a *Sensor* specific *IOTA Streams* channel
+  (this could be for example the *End Customer* where the *Sensor* is installed)
+* *Admin*
+  * Administrates the *IOTA Streams* channel for each *Sensor*
+  * Inserts or removes *Sensors* from the administrative system and creates
+    dedicated *IOTA Streams* channels for them
+  * Inserts or removes *Read Only Participants* to/from the Sensor dedicated *IOTA Streams* channel
+
+### Modules
+
+The following modules are needed for the SUSEE system to implement the workflows:
 
 * *Sensor*
-  * Online access:
-    * *Initialization*: Wifi or wired using peripherals (e.g. usb)
-    * *Sensor Processing*: Wireless via LoRaWAN
-    * *Add/Remove Subscriber*: Wireless via LoRaWAN
-  * Low processing capabilities<br>
-    Following applies to all workflows (*Initialization*, *Sensor Processing*, *Add/Remove Subscriber*):
-    Due to the low processing capabilities the *Sensor* does not send the streams packages to the tangle directly but sends
-    the packages to the *IOTA Bridge*. This way it does not need to process the adaptive POW.<br>
-    *Streams* packages coming from the tangle are also received via the *IOTA Bridge*.
-  * The current *ESP32 Sensor* POC uses the Rust standard library. This means `no_std` is not used for the Rust
-    implementation. Currently there is no need to use a supplementary C++ implementation of parts of the streams library.
-    The curent POC is based on a FreeRTOS adoption provided by Espressif
-    ([ESP-IDF FreeRTOS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-guides/freertos-smp.html)).
+  * Behaves as been described for the *Sensor* role (see above)
+  * Runs on an embedded MCU which can be the smart meter device itself, or a
+    closely connected extension unit (e.g. the SUSEE Module)
+* *Management Console*
+  * Application used by the *Admin* role, providing all needed functionality
+    (described for the *Admin* role) to manage the *IOTA Streams* channels
+    of all *Sensors* of an *Energy provider or metering point operator*
+  * Runs at the *Energy provider or metering point operator*
+* *LoRaWAN Application Server*
+  * Handles the LoRaWAN application layer payloads from and to the Sensor
+  * Provides data received via LoRaWAN from a *Sensor*
+  * Sends data to a *Sensor* via LoRaWAN
+  * Part of the LoRaWAN infrastructure that is run by the
+    *Energy provider or metering point operator*
+  * End point of the LoRaWAN network infrastructure from application layer perspective
+    resp. *IOTA Streams* usage perspective
+* *IOTA Bridge*
+  * Receives encrypted Streams packages and sends them into the *IOTA Tangle*
+  * Receives Tangle messages from the *IOTA Tangle* and sends them to the Sensor
+  * Transfers control data between the Sensor
+    and the *Management-Console*
+  * When used for [Sensor Processing](#sensor-processing):<br>
+    * Closely connected to the *Application Server Connector*
+      (same device or intranet or at least a very fast connection to it)
+    * Receives meter data messages as encrypted *IOTA Streams* packages
+      from the *Sensor* via the *LoRaWAN Application Server* and the
+      *Application Server Connector* and sends *IOTA Tangle* messages in
+      the opposite direction vice versa
+    * Transfers control data in the same way as *IOTA Streams* packages and
+      *IOTA Tangle* messages are transferred 
+    * Offers a REST API for the *Application Server Connector*
+      to manage the *IOTA Streams* package and *IOTA Tangle* message transfer
+  * When used for [Sensor Initialization](#initialization):<br>
+    * Runs at the actor which is responsible for the *Sensor Initialization*
+      (energy provider, metering point operator, *Sensor* producer, ...)
+    * Offers a REST API to receive *IOTA Streams* packages and send
+      *IOTA Tangle* messages directly from resp. to the *Sensor* 
+    * Offers a REST API to transfer control data directly from resp. to
+      the *Sensor* and the *Management Console*
+* *Application Server Connector*
+  * A service connecting the *LoRaWAN Application Server* and the *IOTA Bridge*
+  * Only used for the [Sensor Processing](#sensor-processing) workflow
+  * Closely connected to the *LoRaWAN Application Server*
+    (same device or intranet or at least a very fast connection to it)
+  * Receives LoRaWAN payloads from the *LoRaWAN Application Server*
+    (e.g. via MQTT) and provides the data to the *IOTA Bridge* using the
+    REST API provided by the *IOTA Bridge* for this purpose
+  * Sends LoRaWAN payloads to the *LoRaWAN Application Server* (e.g. via MQTT)
+    that it has received by the *IOTA Bridge*
+* [IOTA Tangle](https://wiki.iota.org/learn/about-iota/tangle/)
+  * A distributed ledger consisting of a Directed Acyclic Graph (DAG)
+    of [messages](https://wiki.iota.org/learn/about-iota/messages/)
+    (a.k.a. blocks) that can bee accessed via *IOTA Nodes*
 
- * *Management Console*<br>
-   Software needed for *Initialization* of the *Sensor*, monitoring of *Sensor Processing* and managing the 
-   *Add/Remove Subscriber* workflow. No Hardware or performance restrictions. 
+This code repository provides [console applications](#about) for several of the
+modules listed above (*Sensor*, *Management Console* and *IOTA Bridge*) to evaluate
+the needed functionality in terms of technical feasibility.
+Additionally, the [LoraWan AppServer Mockup Tool](lora-app-srv-mock) is provided to
+act as an *Application Server Connector* for *Streams POC Library* tests.
 
+Due to different target platforms and online access the roles resp. applications
+underlay the following restrictions:
+
+* *Sensor*
+  * Connectivity
+    * *Initialization*: Wifi or wired using peripherals (e.g. usb).
+    * *Sensor Processing*: Wireless via LoRaWAN.
+    * *Add/Remove Subscriber*: Wireless via LoRaWAN.
+  * Platform: Embedded low cost MCU.
+    * Low processing capabilities.<br>
+      Due to the low processing capabilities the *Sensor* does not send the streams packages
+      to the tangle directly but sends the packages to the *IOTA Bridge*.
+      This way it does not need to process the adaptive POW.<br>
+      *Streams* packages coming from the tangle are also received via the *IOTA Bridge*.<br>
+      This applies to all workflows (*Initialization*, *Sensor Processing*, *Add/Remove Subscriber*)
+      and for incoming and outgoing packages.
+ * *Management Console*
+    * Connectivity:<br>
+      Fast (typical office online access).
+    * Platform: X86/PC, standard PC hardware.
+    * No hardware or performance restrictions for all workflows.
  * *IOTA Bridge*
-   * Is used in the 
-     * Application Server for *Sensor Processing* and *Add/Remove Subscriber* workflows
-     * Initialization software as part of the *Management Console* for the *Initialization* of the *Sensor*
-   * Fast online access
-   * Connected to the *Sensor* via
-     * LoRaWAN for *Sensor Processing* and *Add/Remove Subscriber* workflows
-     * Wifi or wired for the *Initialization* workflow
-   * Receives prepared *IOTA Streams* packages from the *Sensor* and sends these packages to the tangle performing the adaptive POW.
-   * Listens to new tangle messages and sends the encrypted streams packages to the *Sensor*:
-     * Announcement Messages: Used in the *Initialization* workflow 
-     * Keyload Messages: Used in the *Add/Remove Subscriber* and *Initialization* workflows
-   * In the current POC implementation the *IOTA-Bridge* also forwards remote control commands from
-     the *x86/PC Sensor* to the *ESP32 Sensor*. In a later production system for the *Sensor Processing* workflow
-     this service will probably be implemented as an independent service while for the *Initialization* workflow an integration
-     of Tangle- and Command-Communication can be of advantage.
+   * Connectivity:<br>
+     * For connections to the *Application Server Connector* and *Management Console*:<br>
+       Fast (at least typical office online access).
+     * For connections to the *Sensor*:<br>
+       For *Sensor Processing* and *Add/Remove Subscriber* workflows, the *IOTA Bridge*
+       and the *Sensor* communicate via the *LoRaWAN Application Server* and the
+       *Application Server Connector*. Therefore the
+       [LoRaWAN restrictions](#restrictions-of-the-provided-tests)
+       regarding payload size, message count and message delays apply here.<br>
+       As the communication with the *Application Server Connector* is fast,
+       the time needed to transfer request- and response-packages is normal.
+       Long lasting connections can be a problem for web servers in general,
+       as the server needs to handle each request in a dedicated thread
+       (e.g. GPRS mobile clients).
+       Due to the fast connection to the *Application Server Connector*
+       no measures have to be taken to handle slow clients
+       (e.g. no nginx proxy needed).
+       For the *IOTA Bridge* the connection timespan is mainly impacted
+       by the communication with the *IOTA Tangle*.<a>
+       During the *Initialization* workflow a fast Wifi or wired connection
+       is given.
+    * Platform: X86/PC, standard server or edge computing hardware depending
+      on the chosen topology. 
+    * In the current POC implementation the *IOTA-Bridge* forwards remote 
+      control data (*Commands* and *Confirmations*) from the *Sensor*
+      to the remote control (*x86/PC Sensor* or *Management Console*).
+      In a later production system for the *Sensor Processing* workflow
+      this service will probably be implemented as an independent service
+      while for the *Initialization* workflow an integration
+      of Tangle- and Command-Communication can be of advantage.
 
-Following workflows will exist for each channel. Every *Sensor* uses its own exclusive channel:
+### Workflows
+
+Following workflows will exist for each *IOTA Streams*
+channel. Every *Sensor* uses its own exclusive channel:
 
 #### Initialization
-  * Limitations of LoRaWAN don't apply. Sensor is connected via Wifi or wired using peripherals (e.g. usb).
-  * Performs the initial handshake (announcement/subscription/keyload) between *Sensor* and the channel author (*Management Console*)
-    via the *IOTA Bridge*.
-<img src="workflow_initialization.png" alt="drawing" width="650"/>
 
-#### Add/Remove Subscriber
-  Adding or removing subscribers from the channel. Here LoRaWAN is also used for a back channel from application server
-  to the *Sensor*.
-<img src="workflow_add_remove_subscriber.png" alt="drawing" width="800"/>
+The *Sensor* initialization is the initial handshake between *management-console*
+and *Sensor*. It will be done before a *Sensor* is installed in an
+*End Customers* facility.
+
+Regarding the *IOTA Streams* channel used to manage the communication between
+all participants following *Streams* specific actions have to be performed:
+
+| Module               | Streams Action                |
+| -------------------- | ------------------------------| 
+| *Management Console* | Create new *IOTA Streams* Channel |
+| *Sensor*             | Subscribe to the Channel using an Announcement Link |
+| *Management Console* | Add Sensor to the Channel using its *Subscription Link* and *Public Key* |
+| *Sensor*             | Register the *Keyload Message* cteated by the *Management Console* |
+
+Dataflow of the *Initialization Workflow*:
+<img src="sensor-init-diagram.jpg" alt="drawing" width="650"/>
   
 #### Sensor Processing
-  Smart meter messages are created and encrypted in streams packages by the *Sensor*. The packages are send via LoRaWAN to the application server.
-<img src="workflow_sensor_processing.png" alt="drawing" width="800" class="center"/>
-  
+
+Smart meter messages are created and encrypted in streams packages by the *Sensor*.
+The packages are send via LoRaWAN to the application server.
+
+Dataflow of the *Sensor Processing Workflow*:
+<img src="sensor-processing-diagram.jpg" alt="drawing" width="650"/>
+
+#### Add/Remove Subscriber
+
+Adding or removing subscribers from the channel.
+Here LoRaWAN is also used for a back channel from application server
+to the *Sensor*.
+
+The dataflow is the same as the dataflow of the *Sensor Processing Workflow*.

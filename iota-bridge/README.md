@@ -170,3 +170,24 @@ The database file "lora-wan-nodes-iota-bridge.sqlite3" is stored in the director
 
 To review the data stored in the local SQLite3 database we recommend the
 [DB Browser for SQLite](https://sqlitebrowser.org/) application.
+
+## Use in Production
+
+A network of LoRaWAN connected *Sensors* can consist of multiple millions of *Sensors*.
+Given these *Sensors* would send messages every 15 minutes this leads to ~1.11 K request/s
+per million users.
+
+Despite all limitations that are caused by the available
+[performance of the IOTA mainnet](https://blog.iota.org/chrysalis-iota-1-5-phase-1-now-live-on-mainnet-958ec4a4a415/),
+this means that in a large scale scenario the *IOTA Bridge* would have to run in an industrial
+web server tech stack including load-balancers, auto-scaling and so on.
+
+In case [compressed streams messages](#caching-of-lorawan-deveuis-and-streams-channel-meta-data)
+are used the *IOTA Bridge* needs an appropriately fast central or distributed
+high availability data storage solution like (e.g. mariadb, postgres, mongodb, couchdb, ...).
+
+Alternatively to handle thousands of requests per second using a high performance *IOTA Bridge*
+the service could run on edge devices to handle only dozens or hundreds of requests in a specific
+region resp. sector oft the LoRaWAN network. 
+
+

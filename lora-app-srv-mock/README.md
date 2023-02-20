@@ -1,6 +1,7 @@
 # LoraWan AppServer Mockup Tool
 
-This application is needed to test the *streams-poc-lib* for the *ESP32 Sensor*. 
+This application acts as *Application Server Connector* and is needed to test
+the *streams-poc-lib* for the *ESP32 Sensor*. 
 The *streams-poc-lib* provides a test application in its main.c file (sensor/streams-poc-lib/main/main.c)
 that can be used to test the library via a WIFI connection instead of a LoRaWAN connection.
 
@@ -13,7 +14,6 @@ via the socket connection back to the *ESP32 Sensor*.
 
 In a real world scenario a service running on the LoRaWAN Application Server (or tightly connected to it) would
 post the binary packages received via LoRaWAN to the *IOTA-Bridge* via the `lorawan-rest` API endpoints.
-Therefore this application is called *LoraWan AppServer Mockup Tool*.
 
 ## Prerequisites and Build
 Please have a look at the [Prerequisites](../README.md#prerequisites)

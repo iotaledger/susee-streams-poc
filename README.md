@@ -29,7 +29,6 @@ roles and modules of the SUSEE project please see below in the
   * Acts as *Application Server Connector* for the *streams-poc-lib* test application
   * Receives & sends binary packages from/to the streams-poc-lib test application via a socket
     connection and transmits these packages to the *IOTA-Bridge* via its `lorawan-rest` API functions.
-  * A real world service would run on the LoRaWAN Application Server (or tightly connected to it).
 * [x86/PC Sensor](sensor/main-rust)<br>
   * Runs on x86/PC
   * Used to send commands to the *ESP32 Sensor* or *streams-poc-lib* test app
@@ -695,8 +694,8 @@ The *Sensor* initialization is the initial handshake between *Management Console
 and *Sensor*. It will be done before a *Sensor* is installed in an
 *End Customers* facility.
 
-Regarding the *IOTA Streams* channel used to manage the communication between
-all participants following *Streams* specific actions have to be performed:
+Regarding the *IOTA Streams* channel that is used to manage the communication
+between all communication participants, following *Streams* specific actions have to be performed:
 
 | Module               | Streams Action                |
 | -------------------- | ------------------------------| 
@@ -704,19 +703,22 @@ all participants following *Streams* specific actions have to be performed:
 | *Sensor*             | Subscribe to the Channel using the Announcement Link created by the *Management Console*|
 | *Management Console* | Add the Sensor to the Channel using its *Subscription Link* and *Public Key* |
 | *Sensor*             | Register the *Keyload Message* created by the *Management Console* |
+<br>
 
 Dataflow of the *Initialization Workflow*:
 
-<img src="sensor-init-diagram.jpg" alt="Sensor Initialization Workflow" width="800" margin="20px 0 0 0"/>
+<img src="sensor-init-diagram.jpg" alt="Sensor Initialization Workflow" width="800"/>
   
 #### Sensor Processing
 
-Smart meter messages are created and encrypted in streams packages by the *Sensor*.
-The packages are send via LoRaWAN to the application server.
+Smart meter messages are created and encrypted into *IOTA Streams* packages by the *Sensor*.
+The packages are send via LoRaWAN to the *LoRaWAN Application Server*. An *Application Server Connector*
+receives the packages from the *LoRaWAN Application Server* e.g. using MQTT. The *Application Server Connector*
+transfers the packages to the *IOTA Bridge* using its `lorawan-rest` API endpoints.
 
 Dataflow of the *Sensor Processing Workflow*:
 
-<img src="sensor-processing-diagram.jpg" alt="Sensor Processing Workflow" width="800" margin="20px 0 0 0"/>
+<img src="sensor-processing-diagram.jpg" alt="Sensor Processing Workflow" width="800"/>
 
 #### Add/Remove Subscriber
 

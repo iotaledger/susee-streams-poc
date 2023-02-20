@@ -48,7 +48,7 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
         use_wallet: false,
     };
     let arg_matches = LoraWanAppServerMockCli::get_app(
-            "LoraWan AppServer Mockup Tool",
+            "AppServer Connector Mockup Tool",
             "
             This is a test tool to receive binary packages from an 'ESP32 Sensor' via a socket
             connection and post the package to the *IOTA-Bridge* via its `lorawan-rest`

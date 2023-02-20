@@ -2,7 +2,7 @@
 members = [
     "management-console",
     "iota-bridge",
-    "lora-app-srv-mock",
+    "app-srv-connector-mock",
     "streams-tools",
     "susee-tools",
     "iota-client-types",
@@ -16,7 +16,7 @@ members = [
 default-members = [
     "management-console",
     "iota-bridge",
-    "lora-app-srv-mock",
+    "app-srv-connector-mock",
     "streams-tools",
     "susee-tools",
     "iota-client-types",

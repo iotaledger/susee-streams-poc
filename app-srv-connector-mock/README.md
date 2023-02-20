@@ -1,4 +1,4 @@
-# LoraWan AppServer Mockup Tool
+# AppServer Connector Mockup Tool
 
 This application acts as *Application Server Connector* and is needed to test
 the *streams-poc-lib* for the *ESP32 Sensor*. 
@@ -8,22 +8,22 @@ that can be used to test the library via a WIFI connection instead of a LoRaWAN 
 The binary packages that are send via WIFI cannot be sent directly to the *IOTA-Bridge*. The packages need to
 be posted to the *IOTA-Bridge* using the `lorawan-rest` API endpoints of the *IOTA-Bridge*.
 
-This *LoraWan AppServer Mockup Tool* receives the binary packages from an *ESP32 Sensor* via a socket connection
+This *AppServer Connector Mockup Tool* receives the binary packages from an *ESP32 Sensor* via a socket connection
 and posts these packages to the *IOTA-Bridge* `lorawan-rest` API functions. The resulting response is transmitted
 via the socket connection back to the *ESP32 Sensor*.
 
 In a real world scenario a service running on the LoRaWAN Application Server (or tightly connected to it) would
-post the binary packages received via LoRaWAN to the *IOTA-Bridge* via the `lorawan-rest` API endpoints.
+post the binary packages received via LoRaWAN & e.g. MQTT to the *IOTA-Bridge* via the `lorawan-rest` API endpoints.
 
 ## Prerequisites and Build
 Please have a look at the [Prerequisites](../README.md#prerequisites)
 and [Build](../README.md#build) section of the main README of this repository.
 
-## LoraWan AppServer Mockup Tool CLI
+## AppServer Connector Mockup Tool CLI
 
 Additionally to those commands described in the
 [CLI API section of the main README file](../README.md#common-cli-options-and-io-files)
-the *LoraWan AppServer Mockup Tool* provides these CLI commands:
+the *AppServer Connector Mockup Tool* provides these CLI commands:
 
     -b, --iota-bridge-url <IOTA_BRIDGE_URL>
             The url of the iota-bridge to connect to.

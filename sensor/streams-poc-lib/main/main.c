@@ -40,9 +40,9 @@
 // The url of the iota-bridge to connect to. Needed for Sensor initialization.
 #define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.0.101:50000")
 
-// IP address and port of the LoraWan AppServer Mockup Tool to connect to.
+// IP address and port of the LoRaWAN AppServer Connector Mockup Tool to connect to.
 // Needed for sending messages.
-#define STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS ("192.168.0.101:50001")
+#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.0.101:50001")
 
 // Setting STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH to NULL will make the streams-poc-lib
 // using its own vfs_fate partition as been described in streams-poc-lib.h
@@ -59,7 +59,7 @@
 #define STREAMS_POC_LIB_TEST_MAXIMUM_RETRY 5
 #define SEND_BUFFER_SIZE 4096
 
-/*Comment one of the following flags according to your SENSOR_MAIN_POC_TANGLE_PROXY_URL.
+/*Comment one of the following flags according to your STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL.
   BTW: The value of the flag is not of importance.*/
 #define CONFIG_EXAMPLE_IPV4 true
 // #define CONFIG_EXAMPLE_IPV6 true
@@ -261,7 +261,7 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
     // all other NIC specific MAC addresses.
     // https://docs.espressif.com/projects/esp-idf/en/v3.1.7/api-reference/system/base_mac_address.html
     //
-    // To make sure the mocked LoraWAN DevEUI is received by the lora-app-srv-mock test application we will prepend the
+    // To make sure the mocked LoraWAN DevEUI is received by the app-srv-connector-mock test application we will prepend the
     // request_data with the mocked_dev_eui.
     uint64_t mocked_dev_eui = get_base_mac_48_as_mocked_u64_dev_eui();
     assert(SEND_BUFFER_SIZE > (length + sizeof(uint64_t)));
@@ -286,7 +286,7 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
     }
 
     // Data received
-    ESP_LOGI(TAG, "[fn send_request_via_socket] Received %d bytes from %s:", rx_len, STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS);
+    ESP_LOGI(TAG, "[fn send_request_via_socket] Received %d bytes from %s:", rx_len, STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
     log_binary_data(rx_buffer, rx_len);
 
     StreamsError streams_err = response_callback(rx_buffer, rx_len);
@@ -298,24 +298,24 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
     return LORAWAN_OK;
 }
 
- int parse_lora_app_srv_mock_address(dest_addr_t *p_dest_addr) {
+ int parse_app_srv_connector_mock_address(dest_addr_t *p_dest_addr) {
     struct http_parser_url parsed_url;
     http_parser_url_init(&parsed_url);
 
     const char* url_prefix = "http://";
-    char app_srv_mock_address_as_url[256];
-    strcpy(app_srv_mock_address_as_url, url_prefix);
-    strcat(app_srv_mock_address_as_url, STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS);
-    ESP_LOGD(TAG, "[fn parse_lora_app_srv_mock_address] app_srv_mock_address_as_url is '%s'", app_srv_mock_address_as_url);
+    char app_srv_connector_mock_address_as_url[256];
+    strcpy(app_srv_connector_mock_address_as_url, url_prefix);
+    strcat(app_srv_connector_mock_address_as_url, STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
+    ESP_LOGD(TAG, "[fn parse_app_srv_connector_mock_address] app_srv_connector_mock_address_as_url is '%s'", app_srv_connector_mock_address_as_url);
 
     int parser_status = http_parser_parse_url(
-        app_srv_mock_address_as_url,
-        strlen(app_srv_mock_address_as_url),
+        app_srv_connector_mock_address_as_url,
+        strlen(app_srv_connector_mock_address_as_url),
         0,
         &parsed_url);
 
     if (parser_status != 0) {
-        ESP_LOGE(TAG, "[fn parse_lora_app_srv_mock_address] Error parse socket address %s", STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS);
+        ESP_LOGE(TAG, "[fn parse_app_srv_connector_mock_address] Error parse socket address %s", STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -324,10 +324,10 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
     if (parsed_url.field_data[UF_HOST].len) {
         strncpy(
             parsed_host,
-            app_srv_mock_address_as_url + parsed_url.field_data[UF_HOST].off,
+            app_srv_connector_mock_address_as_url + parsed_url.field_data[UF_HOST].off,
             parsed_url.field_data[UF_HOST].len
         );
-        ESP_LOGI(TAG, "[fn parse_lora_app_srv_mock_address] parsed host is '%s'", parsed_host);
+        ESP_LOGI(TAG, "[fn parse_app_srv_connector_mock_address] parsed host is '%s'", parsed_host);
     } else {
         return ESP_ERR_INVALID_ARG;
     }
@@ -338,11 +338,11 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
     if (parsed_url.field_data[UF_PORT].len) {
         strncpy(
             parsed_port,
-            app_srv_mock_address_as_url + parsed_url.field_data[UF_PORT].off,
+            app_srv_connector_mock_address_as_url + parsed_url.field_data[UF_PORT].off,
             parsed_url.field_data[UF_PORT].len
         );
         parsed_port_u16 = parsed_url.port;
-        ESP_LOGI(TAG, "[fn parse_lora_app_srv_mock_address] parsed port string is '%s'. Port u16 = %d", parsed_port, parsed_port_u16);
+        ESP_LOGI(TAG, "[fn parse_app_srv_connector_mock_address] parsed port string is '%s'. Port u16 = %d", parsed_port, parsed_port_u16);
     } else {
         return ESP_ERR_INVALID_ARG;
     }
@@ -379,7 +379,7 @@ int get_handle_of_prepared_socket(dest_addr_t *p_dest_addr)
         ESP_LOGE(TAG, "[fn get_handle_of_prepared_socket] Unable to create socket: errno %d", errno);
         return sock;
     }
-    ESP_LOGI(TAG, "[fn get_handle_of_prepared_socket] Socket created, connecting to %s", STREAMS_POC_LIB_TEST_LORA_APP_SRV_MOCK_ADDRESS);
+    ESP_LOGI(TAG, "[fn get_handle_of_prepared_socket] Socket created, connecting to %s", STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
 
     int err = connect(sock, (struct sockaddr *)p_dest_addr, sizeof(dest_addr_t));
     if (err != 0) {
@@ -429,14 +429,14 @@ void send_message_via_streams_poc_lib(void) {
     dest_addr_t dest_addr = { 0 };
 #endif    
     
-    if( 0 == parse_lora_app_srv_mock_address(&dest_addr) ) {
+    if( 0 == parse_app_srv_connector_mock_address(&dest_addr) ) {
         while (1) {
             prepare_socket_and_send_message(&dest_addr);
             ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Waiting 5 seconds to send message again");
             sleep(5);
         }
     } else {
-        ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Could not parse address of lorawan application-server-mock");
+        ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Could not parse address of lorawan application-server-connector-mock");
     }
 }
 

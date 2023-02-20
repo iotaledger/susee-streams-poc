@@ -191,9 +191,9 @@ and how the DevEUI is transfered to the *IOTA Bridge*:
   [to generate all other NIC specific MAC addresses](https://docs.espressif.com/projects/esp-idf/en/v3.1.7/api-reference/system/base_mac_address.html).
   <br>
   To make sure the mocked LoraWAN DevEUI is received by the
-  [lora-app-srv-mock test application](../lora-app-srv-mock)
+  [AppServer Connector Mockup Tool](../app-srv-connector-mock)
   the DevEUI is prepended to the request data that are send via the socket connection.
-  The *lora-app-srv-mock* application later reads the mocked DevEUI from the socket
+  The *AppServer Connector Mockup Tool* application later reads the mocked DevEUI from the socket
   stream and uses it to access the iota-bridge `/lorawan-rest` endpoints.
   <br><br>
 * **x86/PC Sensor**<br>
@@ -201,7 +201,7 @@ and how the DevEUI is transfered to the *IOTA Bridge*:
   in the wallet file together with the Streams channel
   [plain text seed](../README.md#common-cli-options-and-io-files).
   The *x86/PC Sensor* application does not use the 
-  [lora-app-srv-mock test application](../lora-app-srv-mock)
+  [AppServer Connector Mockup Tool](../app-srv-connector-mock)
   to access the `/lorawan-rest` endpoints of the *IOTA Bridge*. Instead, it uses the
   `/lorawan-rest` endpoints directly in case the `--use-lorawan-rest-api` CLI argument
   is used.

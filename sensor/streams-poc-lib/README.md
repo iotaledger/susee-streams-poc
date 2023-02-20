@@ -68,14 +68,10 @@ for the ESP_IDF_VERSION environment variable.
 To build the `main.c` file and *streams-poc-lib* you will need to do the following:
 ```bash
 get_idf
-export SENSOR_MAIN_POC_WIFI_SSID=NameOfMyWifiGoesHere
-export SENSOR_MAIN_POC_WIFI_PASS=SecureWifiPassword
-export SENSOR_MAIN_POC_IOTA_BRIDGE_URL="http://192.168.47.11:50000" 
-export SENSOR_STREAMS_POC_LIB_LORA_APP_SRV_MOCK_ADDRESS="192.168.47.11:50001" 
 idf.py flash monitor
 ``` 
 Please replace the ip address in the above given example with the ip address of the machine
-that runs the specific application (*Iota Bridge* & *LoraWan AppServer Mockup Tool*).
+that runs the specific application (*Iota Bridge* & *AppServer Connector Mockup Tool*).
 
 ## Using the test application
 
@@ -105,9 +101,9 @@ In the Initialized mode the application sends an example message using the 'send
 *streams-poc-lib*. This is followed by calls of the 'send_request_via_lorawan_t' and 'resolve_request_response_t'
 functions as they have been declared in the 'streams_poc_lib.h' interface and as they are defined in the `src/main.c` file.
 
-To run the test application in the *Initialized* mode you need to run the *LoraWan AppServer Mockup Tool*
+To run the test application in the *Initialized* mode you need to run the *AppServer Connector Mockup Tool*
 which will mock the behavior of the LoRaWan Application Server.
-Have a look into the [*LoraWan AppServer Mockup Tool README*](../../lora-app-srv-mock/README.md) for further details.
+Have a look into the [*AppServer Connector Mockup Tool README*](../../app-srv-connector-mock/README.md) for further details.
 
 Additionally the *Iota Bridge* is needed. Start both applications in the `target/release` folder.
 We recommend to use only binaries build in release mode because the needed *proof of work* needs a lot of time
@@ -117,7 +113,7 @@ In this example we start both applications on the same machine in separate shell
 
 In the first shell:
 ```bash
-    > ./lora-app-srv-mock -l 192.168.47.11:50001
+    > ./app-srv-connector-mock -l 192.168.47.11:50001
     > Listening on: 192.168.47.11:50001
 ```
 
@@ -129,10 +125,9 @@ In the second shell:
     > Listening on http://127.0.0.1:50000
 ```
 
-*Iota Bridge* and *LoraWan AppServer Mockup Tool* are communicating via 127.0.0.1:50000 which is the default value
+*Iota Bridge* and *AppServer Connector Mockup Tool* are communicating via 127.0.0.1:50000 which is the default value
 for both applications. 
 
-The *streams-poc-lib* test application will communicate with the *LoraWan AppServer Mockup Tool*
+The *streams-poc-lib* test application will communicate with the *AppServer Connector Mockup Tool*
 via 192.168.47.11:50001. Please note that, for the *streams-poc-lib* test application this has been defined at compile
-time using the `SENSOR_STREAMS_POC_LIB_LORA_APP_SRV_MOCK_ADDRESS` environment variable as been described above.
- 
+time using a `STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS` #define in the `main/main.c` file.

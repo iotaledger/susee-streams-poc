@@ -83,10 +83,10 @@ Have a look into the following documentation for more details:
   [streams_poc_lib.h](../sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
 * Readme of the [streams-poc-lib](../sensor/streams-poc-lib/README.md)
 
-The *LoraWan AppServer Mockup Tool* implements this process but uses a WIFI
+The *AppServer Connector Mockup Tool* implements this process but uses a WIFI
 socket connection instead of a LoRaWAN connection. For further details please
 have a look into the
-[*LoraWan AppServer Mockup Tool* README](../lora-app-srv-mock/README.md).
+[*AppServer Connector Mockup Tool* README](../app-srv-connector-mock/README.md).
 
 ### lorawan-node Endpoints
 To allow [compressed Streams message](../sensor/README.md#deveuis-and-compressed-streams-messages)

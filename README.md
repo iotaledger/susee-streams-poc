@@ -25,7 +25,7 @@ roles and modules of the SUSEE project please see below in the
   * Includes a test application written in C to test the library functionality using a WIFI socket instead of
     a LoRaWAN connection
   * Provides most features of the *ESP32 Sensor* via its library interface
-* [LoraWan AppServer Mockup Tool](lora-app-srv-mock)<br>
+* [AppServer Connector Mockup Tool](app-srv-connector-mock)<br>
   * Acts as *Application Server Connector* for the *streams-poc-lib* test application
   * Receives & sends binary packages from/to the streams-poc-lib test application via a socket
     connection and transmits these packages to the *IOTA-Bridge* via its `lorawan-rest` API functions.
@@ -113,11 +113,11 @@ Please follow the steps described in the ESP32 specific application projects:
 
 Using the --help option of all four x86/PC applications will show the app specific help text:
 ```bash
-target/release/management-console --help # Use 'sensor', 'lora-app-srv-mock' or "iota-bridge" instead of 'management-console' for the other apps
+target/release/management-console --help # Use 'sensor', 'app-srv-connector-mock' or "iota-bridge" instead of 'management-console' for the other apps
 ```
 
 *Management Console* and *Sensor* provide the following options.
-*IOTA-Bridge* and *LoraWan AppServer Mockup Tool* are using the same options expect `--wallet-file`
+*IOTA-Bridge* and *AppServer Connector Mockup Tool* are using the same options expect `--wallet-file`
 as these applications do not need a wallet:
 
     -h, --help
@@ -181,7 +181,7 @@ Please have a look at the application specific README files:
 * [Management Console CLI](management-console/README.md#management-console-cli)
 * [CLI of the Sensor Applications](sensor/README.md#cli-of-the-sensor-applications)
 * [IOTA-Bridge Console CLI](iota-bridge/README.md#iota-bridge-console-cli)
-* [LoraWan AppServer Mockup Tool CLI](lora-app-srv-mock/README.md#lorawan-appserver-mockup-tool-cli)
+* [AppServer Connector Mockup Tool CLI](app-srv-connector-mock/README.md#lorawan-appserver-mockup-tool-cli)
 
 ## Test
 
@@ -205,7 +205,7 @@ done in the *IOTA Bridge*, is very time-consuming otherwise.
 A LoRaWAN communication infrastructure for test purposes is often not available.
 Therefore the current POC *Sensor* applications (*ESP32 Sensor*, *x86/PC Sensor* and the 
 *streams-poc-lib* test application) are using WiFi to connect to the *IOTA Bridge*
-or the *LoraWan AppServer Mockup Tool*. This implies that the provided test
+or the *AppServer Connector Mockup Tool*. This implies that the provided test
 applications can not simulate a real world system due to the different
 communication channel behaviors.  
 
@@ -295,7 +295,7 @@ Follow these steps to automatically initialize a *Sensor*:
   * *streams-poc-lib* test application:<br>
     In an additional shell in the root folder of the *streams-poc-lib*
     [sensor/streams-poc-lib](./sensor/streams-poc-lib) start the *Sensor*
-    using `idf.py monitor`. We don't need to run the *LoraWan AppServer Mockup Tool* here
+    using `idf.py monitor`. We don't need to run the *AppServer Connector Mockup Tool* here
     because the *streams-poc-lib* directly communicates with the *IOTA Bridge* as been described
     in the [*streams-poc-lib* README](./sensor/streams-poc-lib#using-the-test-application)
 * Run the *Management Console* with the following options
@@ -628,7 +628,7 @@ The following modules are needed for the SUSEE system to implement the workflows
 This code repository provides [console applications](#about) for several of the
 modules listed above (*Sensor*, *Management Console* and *IOTA Bridge*) to evaluate
 the needed functionality in terms of technical feasibility.
-Additionally, the [LoraWan AppServer Mockup Tool](lora-app-srv-mock) is provided to
+Additionally, the [AppServer Connector Mockup Tool](app-srv-connector-mock) is provided to
 act as an *Application Server Connector* for *Streams POC Library* tests.
 
 Due to different target platforms and online access the roles resp. applications
@@ -691,7 +691,7 @@ channel. Every *Sensor* uses its own exclusive channel:
 
 #### Initialization
 
-The *Sensor* initialization is the initial handshake between *management-console*
+The *Sensor* initialization is the initial handshake between *Management Console*
 and *Sensor*. It will be done before a *Sensor* is installed in an
 *End Customers* facility.
 
@@ -700,13 +700,14 @@ all participants following *Streams* specific actions have to be performed:
 
 | Module               | Streams Action                |
 | -------------------- | ------------------------------| 
-| *Management Console* | Create new *IOTA Streams* Channel |
-| *Sensor*             | Subscribe to the Channel using an Announcement Link |
-| *Management Console* | Add Sensor to the Channel using its *Subscription Link* and *Public Key* |
-| *Sensor*             | Register the *Keyload Message* cteated by the *Management Console* |
+| *Management Console* | Create a new *IOTA Streams* Channel |
+| *Sensor*             | Subscribe to the Channel using the Announcement Link created by the *Management Console*|
+| *Management Console* | Add the Sensor to the Channel using its *Subscription Link* and *Public Key* |
+| *Sensor*             | Register the *Keyload Message* created by the *Management Console* |
 
 Dataflow of the *Initialization Workflow*:
-<img src="sensor-init-diagram.jpg" alt="drawing" width="650"/>
+
+<img src="sensor-init-diagram.jpg" alt="Sensor Initialization Workflow" width="800" margin="20px 0 0 0"/>
   
 #### Sensor Processing
 
@@ -714,7 +715,8 @@ Smart meter messages are created and encrypted in streams packages by the *Senso
 The packages are send via LoRaWAN to the application server.
 
 Dataflow of the *Sensor Processing Workflow*:
-<img src="sensor-processing-diagram.jpg" alt="drawing" width="650"/>
+
+<img src="sensor-processing-diagram.jpg" alt="Sensor Processing Workflow" width="800" margin="20px 0 0 0"/>
 
 #### Add/Remove Subscriber
 

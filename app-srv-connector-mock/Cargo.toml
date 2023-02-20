@@ -1,5 +1,5 @@
 [package]
-name = "lora-app-srv-mock"
+name = "app-srv-connector-mock"
 version = "0.1.2"
 edition = "2018"
 readme = "README.md"

@@ -6,7 +6,7 @@ functionality that is used in the SUSEE project. Additionally, the static librar
 specific functionality for the SUSEE project.
 
 Following test applications are contained. For more details regarding the general workflows, actors,
-roles and modules of the SUSEE project please see below in the 
+roles and technical components of the SUSEE project please see below in the 
 <a href="#workflow-model">Workflow Model</a> section:
 
 * [IOTA Bridge](iota-bridge)<br>
@@ -565,9 +565,9 @@ Here are the roles of the *SUSEE Workflows* that are impacted by *IOTA Streams*:
     dedicated *IOTA Streams* channels for them
   * Inserts or removes *Read Only Participants* to/from the Sensor dedicated *IOTA Streams* channel
 
-### Modules
+### Technical Components
 
-The following modules are needed for the SUSEE system to implement the workflows:
+The following technical components are needed for the SUSEE system to implement the workflows:
 
 * *Sensor*
   * Behaves as been described for the *Sensor* role (see above)
@@ -625,7 +625,7 @@ The following modules are needed for the SUSEE system to implement the workflows
     (a.k.a. blocks) that can bee accessed via *IOTA Nodes*
 
 This code repository provides [console applications](#about) for several of the
-modules listed above (*Sensor*, *Management Console* and *IOTA Bridge*) to evaluate
+components listed above (*Sensor*, *Management Console* and *IOTA Bridge*) to evaluate
 the needed functionality in terms of technical feasibility.
 Additionally, the [AppServer Connector Mockup Tool](app-srv-connector-mock) is provided to
 act as an *Application Server Connector* for *Streams POC Library* tests.
@@ -692,29 +692,41 @@ channel. Every *Sensor* uses its own exclusive channel:
 
 The *Sensor* initialization is the initial handshake between *Management Console*
 and *Sensor*. It will be done before a *Sensor* is installed in an
-*End Customers* facility.
+*End Customers* facility and is controlled by the *Admin* role.
 
 Regarding the *IOTA Streams* channel that is used to manage the communication
-between all communication participants, following *Streams* specific actions have to be performed:
+between all communication participants, the following *Streams* specific actions have to be performed:
 
-| Module               | Streams Action                |
-| -------------------- | ------------------------------| 
-| *Management Console* | Create a new *IOTA Streams* Channel |
-| *Sensor*             | Subscribe to the Channel using the Announcement Link created by the *Management Console*|
-| *Management Console* | Add the Sensor to the Channel using its *Subscription Link* and *Public Key* |
-| *Sensor*             | Register the *Keyload Message* created by the *Management Console* |
+| Module               | Streams Action                                                                 | Result        |
+| -------------------- | ------------------------------------------------------------------------------ | ------------- |
+| *Management Console* | Create a new *IOTA Streams* channel                                            | *Announcement Link* |
+| *Sensor*             | Subscribe to the channel using the *Announcement Link*                         | *Subscription Link*, *Public Key* |
+| *Management Console* | Add the Sensor to the channel using its *Subscription Link* and *Public Key*   | *Keyload Message* |
+| *Sensor*             | Register the *Keyload Message* which specifies all participants of the channel | - |
 <br>
 
 Dataflow of the *Initialization Workflow*:
 
 <img src="sensor-init-diagram.jpg" alt="Sensor Initialization Workflow" width="800"/>
+
+Although in the above diagram the *IOTA Bridge* and *Management Console* are used on the same system,
+both components could be connected using the internet. For example, the *IOTA Bridge* could be located
+at the *Sensor Manufacturer* and the *Management Console* could be located and controlled by the
+*Energy provider or metering point operator*.
   
 #### Sensor Processing
 
-Smart meter messages are created and encrypted into *IOTA Streams* packages by the *Sensor*.
-The packages are send via LoRaWAN to the *LoRaWAN Application Server*. An *Application Server Connector*
-receives the packages from the *LoRaWAN Application Server* e.g. using MQTT. The *Application Server Connector*
+Meter data are send by the *Sensor* to the *IOTA Tangle*. The *Sensor* is typically
+located at the *End Customer*.
+
+The meter data messages are created and encrypted into *IOTA Streams* packages by the *Sensor*.
+The encrypted packages are send via LoRaWAN to the *LoRaWAN Application Server*.
+An *Application Server Connector* receives the packages from the *LoRaWAN Application Server*
+e.g. using MQTT. The *Application Server Connector*
 transfers the packages to the *IOTA Bridge* using its `lorawan-rest` API endpoints.
+
+The *Application Server Connector* and *Application Server Connector* are controlled by the
+*Energy provider or metering point operator*.
 
 Dataflow of the *Sensor Processing Workflow*:
 
@@ -722,8 +734,12 @@ Dataflow of the *Sensor Processing Workflow*:
 
 #### Add/Remove Subscriber
 
-Adding or removing subscribers from the channel.
-Here LoRaWAN is also used for a back channel from application server
-to the *Sensor*.
+Participants of the *Sensors* *IOTA Streams* channel are added or removed by the *Admin*.
+For this purpose a new *Keyload Message* message is send from the *Management-Console* to the *Sensor*.
 
-The dataflow is the same as the dataflow of the *Sensor Processing Workflow*.
+Contrary to the *Initialization* workflow, here LoRaWAN is also used for a back channel from the
+*LoRaWAN Application Server* to the *Sensor*.
+
+The dataflow matches the dataflow of the *Sensor Processing* workflow.
+
+

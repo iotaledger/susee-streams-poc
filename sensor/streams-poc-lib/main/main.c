@@ -121,6 +121,29 @@ const uint8_t message_data[MESSAGE_DATA_LENGTH] = {
 //        0x2e, 0x30, 0x32, 0x0a, 0x7d
 };
 
+// Function that will be called in send_request_via_socket() to test p_caller_user_data
+void test_p_caller_user_data(const char* function_name) {
+    ESP_LOGI(TAG, "[fn test_p_caller_user_data] This function has successfully been called from within the %s() function", function_name);
+}
+
+// To test p_caller_user_data we can not use a raw function pointer because function pointers are handled differently compared
+// to void pointers.
+//
+// https://stackoverflow.com/questions/13696918/c-cast-void-pointer-to-function-pointer
+//      The C99 standard does not allow to convert between pointers to data (in the standard, “objects or
+//      incomplete types” e.g. char* or void*) and pointers to functions.
+//      ...  pointers to objects and pointers to functions do not have to be the same size.
+//      On an example architecture, the former can be 64-bit and the latter 32-bit.
+//
+// Therefore we use a wrapper struct called test_p_caller_user_data_wrapper
+
+typedef void (*test_p_caller_user_data_t)(const char*);
+
+typedef struct test_p_caller_user_data_wrapper {
+    test_p_caller_user_data_t fun_ptr;
+} test_p_caller_user_data_wrapper_t;
+
+
 static void wifi_init_event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
 {
@@ -248,7 +271,7 @@ uint64_t get_base_mac_48_as_mocked_u64_dev_eui() {
     return mac_id;
 }
 
-LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback) {
+LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void* p_caller_user_data) {
     ESP_LOGI(TAG, "[fn send_request_via_socket] is called with %d bytes of request_data", length);
 
     log_binary_data(request_data, length);
@@ -292,6 +315,14 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
     StreamsError streams_err = response_callback(rx_buffer, rx_len);
     if (streams_err < 0) {
         ESP_LOGI(TAG, "[fn send_request_via_socket] response_callback returned with error code: %s, ", streams_error_to_string(streams_err));
+    }
+
+    // Before we leave this function we need to test the p_caller_user_data that should point to a test_p_caller_user_data_wrapper_t instance now
+    if (p_caller_user_data != NULL) {
+        test_p_caller_user_data_wrapper_t* callable = (test_p_caller_user_data_wrapper_t*)(p_caller_user_data);
+        callable->fun_ptr("send_request_via_socket");
+    } else {
+        ESP_LOGE(TAG, "[fn send_request_via_socket] p_caller_user_data has been set in prepare_socket_and_send_message() but now it's NULL");
     }
 
     // We arrived at this point so we assume that no LoRaWanError occurred.
@@ -401,8 +432,12 @@ void shut_down_socket(int sock_handle) {
 void prepare_socket_and_send_message(dest_addr_t* dest_addr ) {
     s_socket_handle = get_handle_of_prepared_socket(dest_addr);
 
+    // Prepare testing p_caller_user_data
+    test_p_caller_user_data_wrapper_t some_caller_user_data;
+    some_caller_user_data.fun_ptr = &test_p_caller_user_data;
+
     ESP_LOGI(TAG, "[fn prepare_socket_and_send_message] Calling send_message for message_data of length %d \n\n", MESSAGE_DATA_LENGTH);
-    send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket, STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH);
+    send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket, STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH, &some_caller_user_data);
 
     ESP_LOGI(TAG, "[fn prepare_socket_and_send_message] Shutting down socket");
     shut_down_socket(s_socket_handle);

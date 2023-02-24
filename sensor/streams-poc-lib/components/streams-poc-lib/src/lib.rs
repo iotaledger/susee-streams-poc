@@ -50,12 +50,18 @@ pub extern "C" fn streams_error_to_string(error: StreamsError) -> *const cty::c_
 ///                                  Path of the directory where the streams channel user state data and
 ///                                  other files shall be read/written by the Streams POC library.
 ///                                  See function is_streams_channel_initialized() below for further details.
+/// @param p_caller_user_data        Optional.
+///                                  Pointer to arbitrary data used by the caller of this function
+///                                  to communicate with the lorawan_send_callback implementation.
+///                                  See send_request_via_lorawan_t help above for more details.
+///                                  If no p_caller_user_data is provided set p_caller_user_data = NULL.
 #[no_mangle]
 pub extern "C" fn send_message(
     message_data: *const cty::uint8_t,
     length: cty::size_t,
     lorawan_send_callback: send_request_via_lorawan_t,
-    vfs_fat_path: *const c_char
+    vfs_fat_path: *const c_char,
+    p_caller_user_data: *mut cty::c_void
 ) -> StreamsError {
     info!("[fn send_message()] Starting");
     init_esp_idf_sys_and_logger();
@@ -73,7 +79,8 @@ pub extern "C" fn send_message(
             let ret_val = streams_poc_lib::send_message(
                 message_slice,
                 lorawan_send_callback,
-                opt_string_vfs_fat_path
+                opt_string_vfs_fat_path,
+                p_caller_user_data,
             ).await;
             debug!("[fn send_message()] streams_poc_lib::send_message() ret_val.is_ok() == {}", ret_val.is_ok());
             ret_val

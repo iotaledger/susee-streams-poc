@@ -80,6 +80,45 @@ pub type resolve_request_response_t = extern fn(response_data: *const cty::uint8
 ///                                  data to the Streams POC library.
 ///                                  These data  have been received via LoRaWAN as a response for the request.
 ///                                  See resolve_request_response_t help above for more details.
-#[allow(non_camel_case_types)]
-pub type send_request_via_lorawan_t = extern fn(request_data: *const cty::uint8_t, length: cty::size_t, response_callback: resolve_request_response_t) -> LoRaWanError;
+/// @param p_caller_user_data        Pointer to arbitrary data specified by the caller of the send_message()
+///                                  function that resulted in the call of this function.
+///                                  p_caller_user_data can be used by the scope that calls send_message()
+///                                  to communicate with this callback function implementation.
+///
+///                                  If you are using C++ and you have a class that implements the
+///                                  lorawan_send_callback function, containing all logic needed
+///                                  for a send_request_via_lorawan_t implementation, and this class
+///                                  also uses the send_message() function, you may want to
+///                                  set set the p_caller_user_data argument of the send_message() function
+///                                  to the this pointer of your class instance.
+///                                  Here is an Example for a socket connection:
+///
+///                                       class MySocketHandler;
+///
+///                                       LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void* p_caller_user_data) {
+///                                          MySocketHandler* p_socket_handler = static_cast<MySocketHandler*>(p_caller_user_data);
+///                                          return p_socket_handler->send_request(request_data, length, response_callback);
+///                                       }
+///
+///                                       class MySocketHandler {
+///                                          ....
+///                                          ....
+///                                          void call_send_message() {
+///                                              send_message(message_data, msg_data_len, send_request_via_socket, NULL, this);     // Here we set p_caller_user_data = this
+///                                          }
+///
+///                                          LoRaWanError send_request(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback) {
+///                                              ....
+///                                          }
+///                                       };
+///
+///                                  Please note that p_caller_user_data is optional and may be NULL in
+///                                  case the caller of the send_message() function specified it to be NULL.
 
+#[allow(non_camel_case_types)]
+pub type send_request_via_lorawan_t = extern fn(
+    request_data: *const cty::uint8_t,
+    length: cty::size_t,
+    response_callback: resolve_request_response_t,
+    p_caller_user_data: *mut cty::c_void
+) -> LoRaWanError;

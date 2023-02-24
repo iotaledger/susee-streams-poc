@@ -21,10 +21,15 @@ use anyhow::{
 use crate::esp_rs::streams_poc_lib::api_types::send_request_via_lorawan_t;
 use streams_tools::PlainTextWallet;
 
-pub async fn send_message(message_bytes: &[u8], lorawan_send_callback: send_request_via_lorawan_t, vfs_fat_path: Option<String>) -> Result<()>{
+pub async fn send_message(
+    message_bytes: &[u8],
+    lorawan_send_callback: send_request_via_lorawan_t,
+    vfs_fat_path: Option<String>,
+    p_caller_user_data: *mut cty::c_void
+) -> Result<()>{
 
     let client = HttpClient::new(
-        Some(HttpClientOptions{lorawan_send_callback})
+        Some(HttpClientOptions{lorawan_send_callback, p_caller_user_data})
     );
     let (mut subscriber, mut vfs_fat_handle) =
         create_subscriber::<HttpClient, PlainTextWallet>(client, vfs_fat_path).await?;

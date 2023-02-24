@@ -53,8 +53,42 @@ typedef enum StreamsError (*resolve_request_response_t)(const uint8_t *response_
  *                                  data to the Streams POC library.
  *                                  These data  have been received via LoRaWAN as a response for the request.
  *                                  See resolve_request_response_t help above for more details.
+ * @param p_caller_user_data        Pointer to arbitrary data specified by the caller of the send_message()
+ *                                  function that resulted in the call of this function.
+ *                                  p_caller_user_data can be used by the scope that calls send_message()
+ *                                  to communicate with this callback function implementation.
+ *
+ *                                  If you are using C++ and you have a class that implements the
+ *                                  lorawan_send_callback function, containing all logic needed
+ *                                  for a send_request_via_lorawan_t implementation, and this class
+ *                                  also uses the send_message() function, you may want to
+ *                                  set set the p_caller_user_data argument of the send_message() function
+ *                                  to the this pointer of your class instance.
+ *                                  Here is an Example for a socket connection:
+ *
+ *                                       class MySocketHandler;
+ *
+ *                                       LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void* p_caller_user_data) {
+ *                                          MySocketHandler* p_socket_handler = static_cast<MySocketHandler*>(p_caller_user_data);
+ *                                          return p_socket_handler->send_request(request_data, length, response_callback);
+ *                                       }
+ *
+ *                                       class MySocketHandler {
+ *                                          ....
+ *                                          ....
+ *                                          void call_send_message() {
+ *                                              send_message(message_data, msg_data_len, send_request_via_socket, NULL, this);     // Here we set p_caller_user_data = this
+ *                                          }
+ *
+ *                                          LoRaWanError send_request(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback) {
+ *                                              ....
+ *                                          }
+ *                                       };
+ *
+ *                                  Please note that p_caller_user_data is optional and may be NULL in
+ *                                  case the caller of the send_message() function specified it to be NULL.
  */
-typedef enum LoRaWanError (*send_request_via_lorawan_t)(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback);
+typedef enum LoRaWanError (*send_request_via_lorawan_t)(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void *p_caller_user_data);
 
 /**
  * Convert a StreamsError value into a static C string
@@ -73,11 +107,17 @@ const char *streams_error_to_string(enum StreamsError error);
  *                                  Path of the directory where the streams channel user state data and
  *                                  other files shall be read/written by the Streams POC library.
  *                                  See function is_streams_channel_initialized() below for further details.
+ * @param p_caller_user_data        Optional.
+ *                                  Pointer to arbitrary data used by the caller of this function
+ *                                  to communicate with the lorawan_send_callback implementation.
+ *                                  See send_request_via_lorawan_t help above for more details.
+ *                                  If no p_caller_user_data is provided set p_caller_user_data = NULL.
  */
 enum StreamsError send_message(const uint8_t *message_data,
                                size_t length,
                                send_request_via_lorawan_t lorawan_send_callback,
-                               const char *vfs_fat_path);
+                               const char *vfs_fat_path,
+                               void *p_caller_user_data);
 
 /**
  * Start an interactive app that can be used to automatically initialize the Streams channel or

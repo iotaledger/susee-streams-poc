@@ -21,6 +21,7 @@ use std::{
     clone::Clone,
     slice,
     rc::Rc,
+    ptr
 };
 
 use streams_tools::{
@@ -115,7 +116,9 @@ static mut RESPONSE_CALLBACK_SCOPE: Option<ResponseCallbackScope> = None;
 extern fn dummy_lorawan_send_callback_for_httpclientoptions_default (
     _request_data: *const cty::uint8_t,
     _length: cty::size_t,
-    _response_callback: resolve_request_response_t) -> LoRaWanError
+    _response_callback: resolve_request_response_t,
+    _p_caller_user_data: *mut cty::c_void,
+) -> LoRaWanError
 {
     LoRaWanError::LORAWAN_NO_CONNECTION
 }
@@ -123,12 +126,14 @@ extern fn dummy_lorawan_send_callback_for_httpclientoptions_default (
 
 pub struct HttpClientOptions {
     pub lorawan_send_callback: send_request_via_lorawan_t,
+    pub p_caller_user_data: *mut cty::c_void,
 }
 
 impl Default for HttpClientOptions {
     fn default() -> Self {
         HttpClientOptions {
             lorawan_send_callback: dummy_lorawan_send_callback_for_httpclientoptions_default,
+            p_caller_user_data: ptr::null_mut::<cty::c_void>()
         }
     }
 }
@@ -139,6 +144,7 @@ pub struct HttpClient {
     request_builder: RequestBuilderStreams,
     tangle_client_options: SendOptions,
     compressed: CompressedStateManager,
+    p_caller_user_data: *mut cty::c_void,
 }
 
 impl HttpClient {
@@ -148,6 +154,7 @@ impl HttpClient {
         log::debug!("[HttpClient::new()] Creating new HttpClient");
         Self {
             lorawan_send_callback: options.lorawan_send_callback,
+            p_caller_user_data: options.p_caller_user_data,
             request_builder: RequestBuilderStreams::new(""),
             tangle_client_options: SendOptions::default(),
             compressed: CompressedStateManager::new(),
@@ -318,7 +325,7 @@ impl HttpClient
 
     pub async fn request_via_lorawan(&mut self, buffer: Vec<u8>) -> Result<IotaBridgeResponseParts> {
         let _response_callback_scope_manager = ResponseCallbackScopeManager::new();
-        match (self.lorawan_send_callback)(buffer.as_ptr(), buffer.len(), receive_response) {
+        match (self.lorawan_send_callback)(buffer.as_ptr(), buffer.len(), receive_response, self.p_caller_user_data) {
             LoRaWanError::LORAWAN_OK => {
                 log::debug!("[HttpClient.request_via_lorawan] Successfully send request via LoRaWAN");
                 let receiver = get_response_receiver()?;

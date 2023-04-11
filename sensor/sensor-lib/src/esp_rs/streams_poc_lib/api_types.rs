@@ -57,8 +57,8 @@ impl fmt::Display for StreamsError {
 pub enum LoRaWanError {
     LORAWAN_OK = 1,
     LORAWAN_NO_CONNECTION = -1,
+    EXIT_SENSOR_MANAGER = -100,
 }
-
 
 /// Signature of the callback function allowing the Streams POC library to receive the response for a
 /// request that has been send using a send_request_via_lorawan_t function instance.

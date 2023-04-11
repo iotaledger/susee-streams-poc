@@ -109,6 +109,7 @@ pub extern "C" fn send_message(
     ret_val
 }
 
+
 /// Start an interactive app that can be used to automatically initialize the Streams channel or
 /// to query the subscription status of the Streams client.
 /// The "sensor_manager" provides the same functionality as the stand alone sensor application
@@ -117,27 +118,35 @@ pub extern "C" fn send_message(
 /// (project sensor/main-rust) or the 'management-console' app.
 /// For more details about the possible remote commands have a look into the CLI help of those
 /// two applications.
-/// @param wifi_ssid        Name (Service Set Identifier) of the WiFi to login.
-/// @param wifi_pass        Password of the WiFi to login.
-/// @param iota_bridge_url  URL of the iota-bridge instance to connect to.
-///                         Example:
-///                            start_sensor_manager("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
-/// @param vfs_fat_path     Optional.
-///                         Path of the directory where the streams channel user state data and
-///                         other files shall be read/written by the Streams POC library.
-///                         See function is_streams_channel_initialized() below for further details.
+///
+/// The "sensor_manager" repetitively polls commands from the IOTA-Bridge and executes them. To stop
+/// the sensor_manager command poll loop please return LoRaWanError::EXIT_SENSOR_MANAGER in your
+/// implementation of the lorawan_send_callback.
+///
+/// @param lorawan_send_callback    Callback function allowing the Streams POC library to send requests via LoRaWAN.
+///                                 See send_request_via_lorawan_t help above for more details.
+/// @param iota_bridge_url          URL of the iota-bridge instance to connect to.
+///                                 Example:
+///                                    start_sensor_manager("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
+/// @param vfs_fat_path             Optional.
+///                                 Path of the directory where the streams channel user state data and
+///                                 other files shall be read/written by the Streams POC library.
+///                                 See function is_streams_channel_initialized() below for further details.
+/// @param p_caller_user_data       Optional.
+///                                 Pointer to arbitrary data used by the caller of this function
+///                                 to communicate with the lorawan_send_callback implementation.
+///                                 See send_request_via_lorawan_t help above for more details.
+///                                 If no p_caller_user_data is provided set p_caller_user_data = NULL.
 #[no_mangle]
 pub extern "C" fn start_sensor_manager(
-    wifi_ssid: *const c_char,
-    wifi_pass: *const c_char,
+    lorawan_send_callback: send_request_via_lorawan_t,
     iota_bridge_url: *const c_char,
-    vfs_fat_path: *const c_char
+    vfs_fat_path: *const c_char,
+    p_caller_user_data: *mut cty::c_void
 ) -> i32 {
     init_esp_idf_sys_and_logger();
     info!("[fn start_sensor_manager()] Starting");
 
-    let c_wifi_ssid: &CStr = unsafe { CStr::from_ptr(wifi_ssid) };
-    let c_wifi_pass: &CStr = unsafe { CStr::from_ptr(wifi_pass) };
     let c_iota_bridge_url: &CStr = unsafe { CStr::from_ptr(iota_bridge_url) };
     let opt_vfs_fat_path = get_optional_string_from_c_char_ptr(vfs_fat_path, "vfs_fat_path")
         .expect("Error on converting null terminated C string into utf8 rust String");
@@ -145,8 +154,7 @@ pub extern "C" fn start_sensor_manager(
     match future::block_on(async {
         debug!("[fn start_sensor_manager()] Start future::block_on");
         process_main_esp_rs(
-            c_wifi_ssid.to_str().expect("wifi_ssid contains invalid utf8 code"),
-            c_wifi_pass.to_str().expect("wifi_pass contains invalid utf8 code"),
+            lorawan_send_callback,
             c_iota_bridge_url.to_str().expect("iota_bridge_url contains invalid utf8 code"),
             opt_vfs_fat_path
         ).await

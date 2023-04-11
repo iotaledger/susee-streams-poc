@@ -13,6 +13,8 @@ use super::{
     },
 };
 
+use crate::esp_rs::streams_poc_lib::api_types::send_request_via_lorawan_t;
+
 use payloads::{
     Message,
     get_message_bytes,
@@ -300,7 +302,24 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
     }
 }
 
-pub async fn process_main_esp_rs(wifi_ssid: &str, wifi_pass: &str, iota_bridge_url: &str, vfs_fat_path: Option<String>) -> Result<()> {
+pub async fn process_main_esp_rs(lorawan_send_callback: send_request_via_lorawan_t, iota_bridge_url: &str, vfs_fat_path: Option<String>) -> Result<()> {
+    log::debug!("[fn process_main_esp_rs] process_main() entry");
+
+    print_heap_info();
+
+    log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", iota_bridge_url);
+    let command_processor = CmdProcessor::new(iota_bridge_url, vfs_fat_path);
+    run_command_fetch_loop(
+        command_processor,
+        Some(
+            CommandFetchLoopOptions{
+                confirm_fetch_wait_sec: SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC
+            })
+    ).await
+}
+
+
+pub async fn process_main_esp_rs_wifi(wifi_ssid: &str, wifi_pass: &str, iota_bridge_url: &str, vfs_fat_path: Option<String>) -> Result<()> {
     log::debug!("[fn process_main_esp_rs] process_main() entry");
 
     print_heap_info();

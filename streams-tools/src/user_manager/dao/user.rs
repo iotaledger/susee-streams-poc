@@ -16,7 +16,7 @@ use serde::{
 use rusqlite::{Connection};
 use serde_rusqlite::to_params_named;
 use std::rc::Rc;
-use crate::helpers::SerializationCallbackRefToClosure;
+use crate::helpers::SerializationCallbackRefToClosureString;
 use crate::dao_helpers::DaoDataStore;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default, Clone)]
@@ -33,7 +33,8 @@ pub struct UserDaoManager{
 
 impl DaoManager for UserDaoManager {
     type ItemType = User;
-    type SerializationCallbackType = SerializationCallbackRefToClosure;
+    type PrimaryKeyType = String;
+    type SerializationCallbackType = SerializationCallbackRefToClosureString;
 
     const ITEM_TYPE_NAME: &'static str = "User";
     const DAO_MANAGER_NAME: &'static str = "UserDaoManager";
@@ -66,16 +67,16 @@ impl DaoManager for UserDaoManager {
         Ok(())
     }
 
-    fn get_item_from_db(&self, key: &str) -> Result<User> {
+    fn get_item_from_db(&self, key: &Self::PrimaryKeyType) -> Result<User> {
         get_item_from_db(self, key, None)
     }
 
     fn search_item(&self, channel_starts_with: &str) -> Result<User>{
-        get_item_from_db(self, channel_starts_with, Some(true))
+        get_item_from_db(self, &channel_starts_with.to_string(), Some(true))
     }
 
-    fn write_item_to_db(&self, item: &User) -> Result<usize> {
-        let rows = self.connection.execute(format!(
+    fn write_item_to_db(&self, item: &User) -> Result<Self::PrimaryKeyType> {
+        let _rows = self.connection.execute(format!(
             "INSERT INTO {} (streams_channel_id, streams_user_state, seed_derivation_phrase) VALUES (\
                                 :streams_channel_id,\
                                 :streams_user_state,\
@@ -83,7 +84,7 @@ impl DaoManager for UserDaoManager {
             )", Self::TABLE_NAME).as_str(),
                                            to_params_named(item).unwrap().to_slice().as_slice())
             .expect("Error on executing 'INSERT INTO' for User");
-        Ok(rows)
+        Ok(item.streams_channel_id.clone())
     }
 
     fn update_item_in_db(&self, item: &User) -> Result<usize> {
@@ -101,11 +102,17 @@ impl DaoManager for UserDaoManager {
         let seed_derive_phrase = item.seed_derivation_phrase.clone();
         Box::new( move |streams_channel_id: String, user_state: Vec<u8>| -> Result<usize> {
             let mut new_user = User::default();
+            let ret_val = user_state.len();
             new_user.streams_user_state = user_state;
             new_user.streams_channel_id = streams_channel_id;
             new_user.seed_derivation_phrase = seed_derive_phrase.clone();
-            this.write_item_to_db(&new_user)
+            this.write_item_to_db(&new_user)?;
+            Ok(ret_val)
         })
+    }
+
+    fn delete_item_in_db(&self, _key: &Self::PrimaryKeyType) -> Result<()> {
+        unimplemented!();
     }
 }
 

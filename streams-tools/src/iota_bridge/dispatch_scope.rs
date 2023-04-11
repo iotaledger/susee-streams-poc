@@ -17,6 +17,7 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub enum DispatchScopeValue {
     String(String),
+    VecU8(Vec<u8>),
     I32(i32),
     Bool(bool),
 }
@@ -43,6 +44,16 @@ impl AccessDispatchScopeValue for String {
 
     fn move_out(wrapped_value: DispatchScopeValue) -> Result<Self> {
         unwrap_scope_value!(DispatchScopeValue::String, wrapped_value)
+    }
+}
+
+impl AccessDispatchScopeValue for Vec<u8> {
+    fn unwrap(wrapped_value: &DispatchScopeValue) -> Result<&Self> {
+        unwrap_scope_value!(DispatchScopeValue::VecU8, wrapped_value)
+    }
+
+    fn move_out(wrapped_value: DispatchScopeValue) -> Result<Self> {
+        unwrap_scope_value!(DispatchScopeValue::VecU8, wrapped_value)
     }
 }
 
@@ -117,6 +128,8 @@ impl DispatchScope for ServerDispatchScope {
         self.get_value::<String>(key)
     }
 
+    fn get_vec_u8(&self, key: &'static str) -> Result<Vec<u8>> { self.get_value::<Vec<u8>>(key) }
+
     fn get_i32(&self, key: &'static str) -> Result<i32> {
         self.get_value::<i32>(key)
     }
@@ -129,7 +142,11 @@ impl DispatchScope for ServerDispatchScope {
         self.set_value(key, DispatchScopeValue::String(value.to_string()))
     }
 
-    fn set_32(&self, key: &'static str, value: &i32) -> Option<i32> {
+    fn set_vec_u8(&self, key: &'static str, value: Vec<u8>) -> Option<Vec<u8>> {
+        self.set_value(key, DispatchScopeValue::VecU8(value.clone()))
+    }
+
+    fn set_i32(&self, key: &'static str, value: &i32) -> Option<i32> {
         self.set_value(key, DispatchScopeValue::I32(value.clone()))
     }
 }
@@ -175,6 +192,46 @@ impl ScopeProvide for ServerScopeProvide {
             }
             Some(ret_val) => ret_val.clone()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_access_dispatch_scope_value_multiple() {
+        let mut scope_provide = ServerScopeProvide::new();
+        let scope = scope_provide.create_new_scope();
+
+        scope.set_bool("bool-value", &true);
+        scope.set_string("string-value", "Some string");
+        scope.set_vec_u8("vec-u8-value", vec![1, 2, 3]);
+        scope.set_i32("i32-value", &123);
+
+        assert_eq!(scope.get_bool("bool-value").unwrap(), true);
+        assert_eq!(scope.get_string("string-value").unwrap(), "Some string");
+        assert_eq!(scope.get_vec_u8("vec-u8-value").unwrap(), vec![1, 2, 3]);
+        assert_eq!(scope.get_i32("i32-value").unwrap(), 123);
+
+        assert_eq!(scope.contains_key("i32-value"), true);
+        assert_eq!(scope.contains_key("nonsense key"), false);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_multiple_scopes() {
+        let mut scope_provide = ServerScopeProvide::new();
+        let scope = scope_provide.create_new_scope();
+
+        scope.set_bool("bool-value", &true);
+
+        let scope_2 = scope_provide.create_new_scope();
+        assert_eq!(scope.get_bool("bool-value").unwrap(), true);
+
+        scope_2.set_bool("bool-value", &false);
+        // we should not arrive here because having multiple scopes is not allowed
+        assert_eq!(scope_2.get_bool("bool-value").unwrap(), false);
     }
 }
 

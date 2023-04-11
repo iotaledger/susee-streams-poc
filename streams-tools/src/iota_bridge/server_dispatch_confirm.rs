@@ -83,14 +83,14 @@ impl<'a> ServerDispatchConfirm for DispatchConfirm<'a> {
     async fn fetch_next_confirmation(self: &mut Self) -> Result<Response<Body>> {
         if let Some(req_body_binary) = self.fifo.pop_front() {
             let confirm = Confirmation::try_from_bytes(req_body_binary.as_slice()).expect("Could not deserialize confirmation from outgoing binary http body.");
-            println!("[HttpClientProxy - DispatchConfirm] fetch_next_confirmation() - Returning confirmation {}.\nBlob length: {}\nQueue length: {}",
+            println!("[IOTA-Bridge - DispatchConfirm] fetch_next_confirmation() - Returning confirmation {}.\nBlob length: {}\nQueue length: {}",
                     confirm,
                     req_body_binary.len(),
                     self.fifo.len(),
             );
             Ok(Response::new(req_body_binary.into()))
         } else {
-            println!("[HttpClientProxy - DispatchConfirm] fetch_next_confirmation() - No confirmation available. Returning Confirmation::NO_CONFIRMATION.\n");
+            println!("[IOTA-Bridge - DispatchConfirm] fetch_next_confirmation() - No confirmation available. Returning Confirmation::NO_CONFIRMATION.\n");
             let mut buffer: [u8; Confirmation::LENGTH_BYTES] = [0; Confirmation::LENGTH_BYTES];
             Confirmation::NO_CONFIRMATION.to_bytes(&mut buffer).unwrap();
             Ok(Response::new(Body::from(buffer.to_vec())))
@@ -100,7 +100,7 @@ impl<'a> ServerDispatchConfirm for DispatchConfirm<'a> {
     async fn register_confirmation(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>> {
         self.fifo.push_back(req_body_binary.to_vec());
         let confirm = Confirmation::try_from_bytes(req_body_binary).expect("Could not deserialize confirmation from incoming binary http body.");
-        println!("[HttpClientProxy - DispatchConfirm] {}() - Received confirmation {}.\nBinary length: {}\nQueue length: {}",
+        println!("[IOTA-Bridge - DispatchConfirm] {}() - Received confirmation {}.\nBinary length: {}\nQueue length: {}",
                  api_fn_name,
                  confirm,
                  req_body_binary.len(),

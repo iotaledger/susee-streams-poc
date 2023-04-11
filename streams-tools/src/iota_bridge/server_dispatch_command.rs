@@ -83,14 +83,14 @@ impl<'a> ServerDispatchCommand for DispatchCommand<'a> {
     async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>> {
         if let Some(req_body_binary) = self.fifo.pop_front() {
             let cmd = Command::try_from_bytes(req_body_binary.as_slice()).expect("Could not deserialize command from outgoing binary http body.");
-            println!("[HttpClientProxy - DispatchCommand] fetch_next_command() - Returning command {}.\nBlob length: {}\nQueue length: {}",
+            println!("[IOTA-Bridge - DispatchCommand] fetch_next_command() - Returning command {}.\nBlob length: {}\nQueue length: {}",
                     cmd,
                     req_body_binary.len(),
                     self.fifo.len(),
             );
             Ok(Response::new(req_body_binary.into()))
         } else {
-            println!("[HttpClientProxy - DispatchCommand] fetch_next_command() - No command available. Returning Command::NO_COMMAND.\n");
+            println!("[IOTA-Bridge - DispatchCommand] fetch_next_command() - No command available. Returning Command::NO_COMMAND.\n");
             let mut buffer: [u8; Command::LENGTH_BYTES] = [0; Command::LENGTH_BYTES];
             Command::NO_COMMAND.to_bytes(&mut buffer).unwrap();
             Ok(Response::new(Body::from(buffer.to_vec())))
@@ -100,7 +100,7 @@ impl<'a> ServerDispatchCommand for DispatchCommand<'a> {
     async fn register_remote_command(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>> {
         self.fifo.push_back(req_body_binary.to_vec());
         let cmd = Command::try_from_bytes(req_body_binary).expect("Could not deserialize command from incoming binary http body.");
-        println!("[HttpClientProxy - DispatchCommand] {}() - Received command {}.\nBinary length: {}\nQueue length: {}",
+        println!("[IOTA-Bridge - DispatchCommand] {}() - Received command {}.\nBinary length: {}\nQueue length: {}",
                  api_fn_name,
                  cmd,
                  req_body_binary.len(),

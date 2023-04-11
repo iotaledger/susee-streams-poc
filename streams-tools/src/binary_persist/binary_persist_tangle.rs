@@ -21,7 +21,13 @@ use anyhow::{
 };
 use log;
 
-use crate::binary_persist::{RangeIterator, BinaryPersist, USIZE_LEN};
+use crate::binary_persist::{
+    RangeIterator,
+    BinaryPersist,
+    USIZE_LEN,
+    serialize_string,
+    deserialize_string,
+};
 use iota_streams::app::transport::tangle::AppInst;
 use std::str::FromStr;
 
@@ -121,8 +127,9 @@ impl BinaryPersist for TangleMessage {
 }
 
 // Replaces TangleAddress in case LoraWAN DevEUI is used instead of streams channel ID
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub struct TangleAddressCompressed {
-    msgid: MsgId,
+    pub msgid: MsgId,
 }
 
 impl fmt::Display for TangleAddressCompressed {
@@ -144,6 +151,14 @@ impl TangleAddressCompressed {
 
     pub fn build_tangle_address_str(msg_id: &str, channel_id: &str) -> String {
         format!("{}:{}", channel_id, msg_id)
+    }
+}
+
+impl Default for TangleAddressCompressed {
+    fn default() -> Self {
+        TangleAddressCompressed {
+            msgid: MsgId::from_str("").expect("Error on deserializing MsgId from empty string")
+        }
     }
 }
 
@@ -174,6 +189,7 @@ impl BinaryPersist for TangleAddressCompressed {
 }
 
 // Replaces TangleMessage in case LoraWAN DevEUI is used instead of streams channel ID
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub struct TangleMessageCompressed {
     // Although dev_eui is specified to be a 64bit integer we use Vec<u8> here to be more flexible
     pub dev_eui: Vec<u8>,
@@ -197,6 +213,16 @@ impl TangleMessageCompressed {
             TangleAddress::default(),
             self.body.clone()
         ))
+    }
+}
+
+impl Default for TangleMessageCompressed {
+    fn default() -> Self {
+        TangleMessageCompressed {
+            dev_eui: vec![],
+            link: TangleAddressCompressed::default(),
+            body: Default::default(),
+        }
     }
 }
 
@@ -259,5 +285,134 @@ impl BinaryPersist for TangleMessageCompressed {
             link,
             body
         })
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum StreamsApiFunction {
+    SendCompressedMessage = 3,
+    ReceiveCompressedMessageFromAddress = 4,
+}
+
+impl StreamsApiFunction {
+    const SELF_LEN: usize = 4;
+
+    pub fn from_u32(value: u32) -> Result<Self> {
+        match value {
+            3 => Ok(StreamsApiFunction::SendCompressedMessage),
+            4 => Ok(StreamsApiFunction::ReceiveCompressedMessageFromAddress),
+            _ => panic!("Unknown StreamsApiFunction value: {}", value)
+        }
+    }
+}
+
+impl BinaryPersist for StreamsApiFunction {
+
+    fn needed_size(&self) -> usize {
+        Self::SELF_LEN
+    }
+
+    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
+        if buffer.len() < self.needed_size() {
+            panic!("[BinarySerialize for StreamsApiFunction] This StreamsApiFunction needs {} bytes but \
+                    the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
+        }
+        let range: Range<usize> = RangeIterator::new(Self::SELF_LEN);
+        let api_function = self.clone() as u32;
+        BinaryPersist::to_bytes(&api_function, &mut buffer[range.clone()]).expect("Could not persist api_function");
+        Ok(range.end)
+    }
+
+    fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
+        let range: Range<usize> = RangeIterator::new(Self::SELF_LEN);
+        let api_function = <u32 as BinaryPersist>::try_from_bytes(&buffer[range.clone()]).expect("Could not deserialize api_function");
+        StreamsApiFunction::from_u32(api_function)
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct StreamsApiRequest {
+    pub api_function: StreamsApiFunction,
+    pub address: String,
+    pub message: TangleMessageCompressed,
+}
+
+impl BinaryPersist for StreamsApiRequest {
+    fn needed_size(&self) -> usize {
+        self.api_function.needed_size() + USIZE_LEN + self.address.len() + USIZE_LEN + self.message.needed_size()
+    }
+
+    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
+        if buffer.len() < self.needed_size() {
+            panic!("[BinarySerialize for StreamsApiRequest] This StreamsApiRequest needs {} bytes but \
+                    the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
+        }
+        // API_FUNCTION
+        let mut range: Range<usize> = RangeIterator::new(self.api_function.needed_size());
+        BinaryPersist::to_bytes(&self.api_function, &mut buffer[range.clone()]).expect("Could not persist api_function");
+        // ADDRESS
+        serialize_string(&self.address, buffer, &mut range)?;
+        // MESSAGE
+        let message_len = self.message.needed_size() as u32;
+        range.increment(USIZE_LEN);
+        BinaryPersist::to_bytes(&message_len, &mut buffer[range.clone()]).expect("Could not persist message length");
+        range.increment(message_len as usize);
+        self.message.to_bytes(&mut buffer[range.clone()]).expect("Could not persist message");
+        
+        Ok(range.end)
+    }
+
+    fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
+        let mut range: Range<usize> = RangeIterator::new(StreamsApiFunction::SELF_LEN);
+        // API_FUNCTION
+        let api_function = <StreamsApiFunction as BinaryPersist>::try_from_bytes(&buffer[range.clone()]).expect("Could not deserialize api_function");
+        // ADDRESS
+        let address = deserialize_string(buffer, &mut range).expect("Could not deserialize address");
+        // MESSAGE
+        range.increment(USIZE_LEN);
+        let message_size = u32::try_from_bytes(&buffer[range.clone()]).expect("Could not deserialize message length");
+        range.increment(message_size as usize);
+        let message = <TangleMessageCompressed as BinaryPersist>::try_from_bytes(&buffer[range.clone()]).expect("Could not deserialize message");
+
+        Ok(StreamsApiRequest {
+            api_function,
+            address,
+            message,
+        })
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_streams_api_function() {
+        let api_function = StreamsApiFunction::SendCompressedMessage;
+        let mut buffer: Vec<u8> = vec![0; api_function.needed_size()];
+        api_function.to_bytes(&mut buffer).expect("Could not serialize api_function");
+        let api_function2 = StreamsApiFunction::try_from_bytes(&buffer).expect("Could not deserialize api_function");
+        assert_eq!(api_function, api_function2);
+    }
+
+    #[test]
+    fn test_streams_api_request() {
+        let message = TangleMessageCompressed {
+            dev_eui: vec![], // Currently the dev_eui is not persisted. See TangleMessageCompressed::to_bytes() for more info
+            link: TangleAddressCompressed {
+                msgid: MsgId::from_str("f2fceded12d9c7363e0ae9db").expect("Could not build MsgId from string"),
+            },
+            body: BinaryBody::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+        };
+        let api_request = StreamsApiRequest {
+            api_function: StreamsApiFunction::SendCompressedMessage,
+            address: "address".to_string(),
+            message,
+        };
+        let mut buffer: Vec<u8> = vec![0; api_request.needed_size()];
+        api_request.to_bytes(&mut buffer).expect("Could not serialize api_request");
+        let api_request2 = StreamsApiRequest::try_from_bytes(&buffer).expect("Could not deserialize api_request");
+        assert_eq!(api_request, api_request2);
     }
 }

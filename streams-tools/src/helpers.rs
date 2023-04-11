@@ -37,20 +37,21 @@ pub fn get_channel_id_from_link(streams_link: &str) -> Option<String> {
 // https://stevedonovan.github.io/rustifications/2018/08/18/rust-closures-are-hard.html
 // -------------------------------------------------------------------------------------
 
-pub trait SerializationCallbackCloneBox: FnOnce(String, Vec<u8>) -> Result<usize> {
-    fn clone_box(&self) -> Box<dyn SerializationCallbackCloneBox>;
+pub trait SerializationCallbackCloneBox<PrimaryKeyType: Clone>: FnOnce(PrimaryKeyType, Vec<u8>) -> Result<usize> {
+    fn clone_box(&self) -> Box<dyn SerializationCallbackCloneBox<PrimaryKeyType>>;
 }
 
-impl<T> SerializationCallbackCloneBox for T
+impl<T, PrimaryKeyType> SerializationCallbackCloneBox<PrimaryKeyType> for T
     where
-        T: 'static + FnOnce(String, Vec<u8>) -> Result<usize> + Clone,
+        T: 'static + FnOnce(PrimaryKeyType, Vec<u8>) -> Result<usize> + Clone,
+        PrimaryKeyType: Clone,
 {
-    fn clone_box(&self) -> Box<dyn SerializationCallbackCloneBox> {
+    fn clone_box(&self) -> Box<dyn SerializationCallbackCloneBox<PrimaryKeyType>> {
         Box::new(self.clone())
     }
 }
 
-impl Clone for Box<dyn SerializationCallbackCloneBox> {
+impl<PrimaryKeyType: Clone> Clone for Box<dyn SerializationCallbackCloneBox<PrimaryKeyType>> {
     fn clone(&self) -> Self {
         (**self).clone_box()
     }
@@ -60,5 +61,6 @@ impl Clone for Box<dyn SerializationCallbackCloneBox> {
 // String - pub streams_channel_id
 // Vec<u8> - pub streams_user_state
 // -> Result<usize> - number of rows or bytes
-pub type SerializationCallbackRefToClosure = Box<dyn SerializationCallbackCloneBox>;
+pub type SerializationCallbackRefToClosureString = Box<dyn SerializationCallbackCloneBox<String>>;
+pub type SerializationCallbackRefToClosureI64 = Box<dyn SerializationCallbackCloneBox<i64>>;
 

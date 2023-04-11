@@ -5,22 +5,24 @@ use iota_streams::{
             tangle::{
                 TangleAddress,
                 TangleMessage,
+                AppInst,
                 client::{
                     Client,
                 }
             },
         },
     },
+    app_channels::api::tangle::MsgId,
     core::{
         async_trait,
     }
 };
 
-
 use std::{
     clone::Clone,
     str::FromStr,
     rc::Rc,
+    convert::TryInto,
 };
 
 use hyper::{
@@ -28,30 +30,33 @@ use hyper::{
     http::{
         Response,
         Result,
+        StatusCode,
     }
 };
 
-use crate::{
-    binary_persist::{
-        TangleMessageCompressed,
-        TangleAddressCompressed,
-        BinaryPersist,
-        TANGLE_ADDRESS_BYTE_LEN,
-    },
-    http::{
-        ScopeConsume,
-        DispatchScope,
-        http_tools::{
-            get_response_400,
-            get_response_500
-        },
-        http_protocol_streams::{
-            ServerDispatchStreams,
-            URI_PREFIX_STREAMS,
-        },
-        get_final_http_status,
-    },
+use base64::engine::{
+    general_purpose::STANDARD,
+    Engine,
 };
+
+use crate::{binary_persist::{
+    TangleMessageCompressed,
+    TangleAddressCompressed,
+    BinaryPersist,
+    TANGLE_ADDRESS_BYTE_LEN,
+}, dao_helpers, http::{
+    ScopeConsume,
+    DispatchScope,
+    http_tools::{
+        get_response_400,
+        get_response_500
+    },
+    http_protocol_streams::{
+        ServerDispatchStreams,
+        URI_PREFIX_STREAMS,
+    },
+    get_final_http_status,
+}, ok_or_bail_internal_error_response_500};
 
 use super::{
     helpers::{
@@ -61,24 +66,35 @@ use super::{
         write_to_scope,
     },
     LoraWanNodeDataStore,
+    PendingRequestDataStore,
+    dao::{
+        pending_request::MsgIdTransferType,
+    }
 };
 
 use log;
-use hyper::http::StatusCode;
+use crate::binary_persist::{StreamsApiFunction, StreamsApiRequest};
+use crate::iota_bridge::dao::{LoraWanNode, pending_request, PendingRequest};
+use anyhow::bail;
+use iota_streams::app_channels::api::DefaultF;
+use crate::http::http_tools::get_dev_eui_from_str;
+
 
 #[derive(Clone)]
 pub struct DispatchStreams {
     client: Client,
     lorawan_nodes: LoraWanNodeDataStore,
+    pending_requests: PendingRequestDataStore,
     scope: Option<Rc<dyn DispatchScope>>,
 }
 
 impl DispatchStreams
 {
-    pub fn new(client: &Client, lorawan_nodes: LoraWanNodeDataStore) -> Self {
+    pub fn new(client: &Client, lorawan_nodes: LoraWanNodeDataStore, pending_requests: PendingRequestDataStore) -> Self {
         Self {
             client: client.clone(),
             lorawan_nodes,
+            pending_requests,
             scope: None,
         }
     }
@@ -118,6 +134,96 @@ impl DispatchStreams
 
         ret_val
     }
+
+    fn handle_lora_wan_node_not_known(&self, dev_eui: String, msgid: MsgIdTransferType, streams_api_request: StreamsApiRequest) -> Result<Response<Body>> {
+        log::error!("[IOTA-Bridge - handle_lora_wan_node_not_known] \
+            The lorawan_node with dev_eui {} is not known by this iota-bridge instance. \
+            The current request will be stored by this IOTA-Bridge for later retransmit. \
+            Please provide the missing streams channel ID using the '/streams/retransmit' api function.",
+            dev_eui
+        );
+
+        let mut streams_api_request_bytes = Vec::<u8>::with_capacity(streams_api_request.needed_size());
+        streams_api_request.to_bytes(streams_api_request_bytes.as_mut_slice()).expect("Error on persisting streams_api_request");
+
+        let new_pending_request = PendingRequest::new(
+            dev_eui,
+            msgid,
+            streams_api_request_bytes,
+        );
+
+        let resp_body = match self.pending_requests.write_item_to_db(&new_pending_request) {
+            Ok(request_key) => {
+                Body::from(request_key.to_le_bytes().to_vec())
+            }
+            Err(err) => return get_response_500(format!("Could not write new pending_request to local database: {}", err).as_str())
+        };
+        Response::builder()
+            .status(StatusCode::UNPROCESSABLE_ENTITY)
+            .body(resp_body)
+    }
+
+    fn decode_request_key_for_retransmit(request_key: String) -> anyhow::Result<i64> {
+        let request_key_base64_decoded = STANDARD.decode(request_key.as_str())?;
+        let request_key: <pending_request::PendingRequestDaoManager as dao_helpers::DaoManager>::PrimaryKeyType =
+            i64::from_le_bytes(request_key_base64_decoded.try_into().expect("u64 slice with incorrect length"));
+        Ok(request_key)
+    }
+
+    fn get_pending_request(self: &mut Self, request_key_i64: &i64) -> anyhow::Result<PendingRequest> {
+        let pending_request = match self.pending_requests.get_item(&request_key_i64) {
+            Ok(req_and_cb) => req_and_cb.0,
+            Err(err) => {
+                bail!("[IOTA-Bridge - get_pending_request] pending_requests.get_item returned an error for request_key_i64 {}. Error: {}", request_key_i64, err);
+            }
+        };
+        Ok(pending_request)
+    }
+
+    fn write_new_lorawan_node_to_db(self: &mut Self, pending_request: &PendingRequest, channel_id: &AppInst) -> anyhow::Result<()> {
+        let lorawan_node = LoraWanNode {
+            dev_eui: pending_request.dev_eui.clone(),
+            streams_channel_id: channel_id.to_string()
+        };
+        self.lorawan_nodes.write_item_to_db(&lorawan_node)?;
+        Ok(())
+    }
+
+    fn remove_pending_request_from_db(self: &mut Self, pending_request: &PendingRequest) -> anyhow::Result<()> {
+        if let Some(req_key) = pending_request.request_key {
+            self.pending_requests.delete_item_in_db(&req_key)?;
+        } else {
+            bail!("Provided pending_request.request_key is None")
+        }
+        Ok(())
+    }
+
+    fn set_request_needs_registered_lorawan_node_on_scope_to_true(self: &mut Self) {
+        if let Some(scope) = self.scope.as_ref() {
+            // This is normally controlled by the iota_bridge_request header flags.
+            // For compressed messages this flag is set to true.
+            // See Self::get_success_response_status_code() for more details.
+            write_to_scope(scope, DispatchScopeValue::RequestNeedsRegisteredLorawanNode(true));
+        }
+    }
+
+    async fn retransmit_send_compressed_message(self: &mut Self, pending_request: PendingRequest, mut message: TangleMessageCompressed) -> Result<Response<Body>> {
+        if pending_request.request_key.is_none() {
+            let err = anyhow::anyhow!("Received pending_request without request_key");
+            return Ok(log_err_and_respond_500(err, "retransmit_send_compressed_message").unwrap());
+        };
+        message.dev_eui = get_dev_eui_from_str(pending_request.dev_eui.as_str(), "RETRANSMIT",
+                                           "pending_request.dev_eui. request_id = '{pending_request.id}'. dev_eui = '{request_key}' ")?;
+
+        self.set_request_needs_registered_lorawan_node_on_scope_to_true();
+        self.send_compressed_message::<DefaultF>(&message).await
+    }
+
+    async fn retransmit_receive_compressed_message_from_address(self: &mut Self, pending_request: PendingRequest) -> Result<Response<Body>> {
+        let msg_id = MsgId::from(pending_request.msg_id.as_slice()).to_string();
+        self.set_request_needs_registered_lorawan_node_on_scope_to_true();
+        self.receive_compressed_message_from_address(msg_id.as_str(), pending_request.dev_eui.as_str()).await
+    }
 }
 
 static LINK_AND_PREVLINK_LENGTH: usize = 2 * TANGLE_ADDRESS_BYTE_LEN;
@@ -125,7 +231,7 @@ static LINK_AND_PREVLINK_LENGTH: usize = 2 * TANGLE_ADDRESS_BYTE_LEN;
 fn println_send_message_for_incoming_message(message: &TangleMessage) {
     println!(
         "-----------------------------------------------------------------\n\
-[HttpClientProxy - DispatchStreams] send_message() - Incoming Message to attach to tangle with absolut length of {} bytes. Data:
+[IOTA-Bridge - DispatchStreams] send_message() - Incoming Message to attach to tangle with absolut length of {} bytes. Data:
 {}
 ", message.body.as_bytes().len() + LINK_AND_PREVLINK_LENGTH, message.to_string()
     );
@@ -134,7 +240,7 @@ fn println_send_message_for_incoming_message(message: &TangleMessage) {
 fn println_receive_message_from_address_for_received_message(message: &TangleMessage) {
     println!(
         "-----------------------------------------------------------------\n\
-[HttpClientProxy - DispatchStreams] receive_message_from_address() - Received Message from tangle with absolut length of {} bytes. Data:
+[IOTA-Bridge - DispatchStreams] receive_message_from_address() - Received Message from tangle with absolut length of {} bytes. Data:
 {}
 ", message.body.as_bytes().len() + LINK_AND_PREVLINK_LENGTH, message.to_string()
     );
@@ -161,7 +267,7 @@ impl ServerDispatchStreams for DispatchStreams {
     }
 
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
-        log::debug!("[HttpClientProxy - DispatchStreams] receive_message_from_address() - Incoming request for address: {}", address_str);
+        log::debug!("[IOTA-Bridge - DispatchStreams] receive_message_from_address() - Incoming request for address: {}", address_str);
         let address = TangleAddress::from_str(address_str).unwrap();
         let message = Transport::<TangleAddress, TangleMessage>::
             recv_message(&mut self.client, &address).await;
@@ -171,12 +277,12 @@ impl ServerDispatchStreams for DispatchStreams {
                 self.write_channel_id_to_scope(&address);
                 let mut buffer: Vec<u8> = vec![0;BinaryPersist::needed_size(&msg)];
                 let size = BinaryPersist::to_bytes(&msg, buffer.as_mut_slice());
-                log::debug!("[HttpClientProxy - DispatchStreams] receive_message_from_address() - Returning binary data via socket connection. length: {} bytes, data:\n\
+                log::debug!("[IOTA-Bridge - DispatchStreams] receive_message_from_address() - Returning binary data via socket connection. length: {} bytes, data:\n\
 {:02X?}\n", size.unwrap_or_default(), buffer);
                 Response::builder().status(self.get_success_response_status_code())
                     .body(buffer.into())
             },
-            Err(err) => log_err_and_respond_500(err, "[HttpClientProxy - DispatchStreams] receive_message_from_address()")
+            Err(err) => log_err_and_respond_500(err, "[IOTA-Bridge - DispatchStreams] receive_message_from_address()")
         }
     }
 
@@ -194,10 +300,17 @@ impl ServerDispatchStreams for DispatchStreams {
         };
 
         let dev_eui_str = dev_eui.to_string();
-        let lora_wan_node = match self.lorawan_nodes.get_item(dev_eui_str.as_str()) {
+        let lora_wan_node = match self.lorawan_nodes.get_item(&dev_eui_str) {
             Ok(node_and_cb) => node_and_cb.0,
-            Err(err) => return get_response_400(format!(
-                "The provided dev_eui {} is not known. Please use REST function 'send_message' instead. Error: {}", dev_eui_str, err).as_str())
+            Err(err) => {
+                log::error!("[IOTA-Bridge - send_compressed_message] lorawan_nodes.get_item returned an error for dev_eui {}. Error: {}", dev_eui_str, err);
+                let streams_api_request = StreamsApiRequest{
+                    api_function: StreamsApiFunction::SendCompressedMessage,
+                    address: "".to_string(),
+                    message: message.clone(),
+                };
+                return self.handle_lora_wan_node_not_known(dev_eui_str, message.link.msgid.as_bytes().try_into().unwrap(), streams_api_request)
+            }
         };
 
         let uncompressed_message = match message.to_tangle_message(lora_wan_node.streams_channel_id.as_str()) {
@@ -209,14 +322,47 @@ impl ServerDispatchStreams for DispatchStreams {
     }
 
     async fn receive_compressed_message_from_address(self: &mut Self, msgid: &str, dev_eui_str: &str) -> Result<Response<Body>> {
-        let lora_wan_node = match self.lorawan_nodes.get_item(dev_eui_str) {
+        let lora_wan_node = match self.lorawan_nodes.get_item(&dev_eui_str.to_string()) {
             Ok(node_and_cb) => node_and_cb.0,
-            Err(err) => return get_response_400(format!(
-                "The provided dev_eui {} is not known. Please use REST function 'receive_message_from_address' instead. Error: {}", dev_eui_str, err).as_str())
+            Err(err) => {
+                log::error!("[IOTA-Bridge - receive_compressed_message_from_address] lorawan_nodes.get_item returned an error for dev_eui {}. Error: {}", dev_eui_str, err);
+                let msg_id_instance = MsgId::from_str(msgid).expect(format!("Error on deserializing msg_id from string value '{}'", msgid).as_str());
+                let streams_api_request = StreamsApiRequest{
+                    api_function: StreamsApiFunction::ReceiveCompressedMessageFromAddress,
+                    address: msgid.to_string(),
+                    message: TangleMessageCompressed::default(),
+                };
+                return self.handle_lora_wan_node_not_known(dev_eui_str.to_string(), msg_id_instance.as_bytes().to_vec(), streams_api_request);
+            }
         };
 
         let full_address_str = TangleAddressCompressed::build_tangle_address_str(msgid, lora_wan_node.streams_channel_id.as_str());
         self.receive_message_from_address(full_address_str.as_str()).await
+    }
+
+    async fn retransmit(self: &mut Self, request_key: String, channel_id: AppInst) -> Result<Response<Body>> {
+        let request_key_i64 = ok_or_bail_internal_error_response_500!(Self::decode_request_key_for_retransmit(request_key));
+        let pending_request = ok_or_bail_internal_error_response_500!(self.get_pending_request(&request_key_i64));
+        ok_or_bail_internal_error_response_500!(self.write_new_lorawan_node_to_db(&pending_request, &channel_id));
+
+        let streams_req = StreamsApiRequest::try_from_bytes(pending_request.streams_api_request.as_slice())
+            .expect("Error on deserializing StreamsApiRequest");
+
+        let mut ret_val = match streams_req.api_function {
+            StreamsApiFunction::SendCompressedMessage => {
+                self.retransmit_send_compressed_message(pending_request.clone(), streams_req.message).await?
+            }
+            StreamsApiFunction::ReceiveCompressedMessageFromAddress => {
+                self.retransmit_receive_compressed_message_from_address(pending_request.clone()).await?
+            }
+        };
+
+        if StatusCode::is_success(&ret_val.status()) {
+            ok_or_bail_internal_error_response_500!(self.remove_pending_request_from_db(&pending_request));
+            *ret_val.status_mut() = get_final_http_status(&ret_val.status(), true);
+        }
+
+        Ok(ret_val)
     }
 }
 

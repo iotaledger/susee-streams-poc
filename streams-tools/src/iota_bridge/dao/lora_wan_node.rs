@@ -15,7 +15,7 @@ use serde_rusqlite::to_params_named;
 
 use anyhow::Result;
 use std::rc::Rc;
-use crate::helpers::SerializationCallbackRefToClosure;
+use crate::helpers::SerializationCallbackRefToClosureString;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default, Clone)]
 pub struct LoraWanNode {
@@ -30,7 +30,9 @@ pub struct LoraWanNodeDaoManager {
 
 impl DaoManager for LoraWanNodeDaoManager {
     type ItemType = LoraWanNode;
-    type SerializationCallbackType = SerializationCallbackRefToClosure;
+    type PrimaryKeyType = String;
+    type SerializationCallbackType = SerializationCallbackRefToClosureString;
+
     const ITEM_TYPE_NAME: &'static str = "LoraWanNode";
     const DAO_MANAGER_NAME: &'static str = "LoraWanNodeDaoManager";
     const TABLE_NAME: &'static str = "lora_wan_node";
@@ -68,19 +70,19 @@ impl DaoManager for LoraWanNodeDaoManager {
         Ok(())
     }
 
-    fn get_item_from_db(&self, key: &str) -> Result<LoraWanNode> {
+    fn get_item_from_db(&self, key: &Self::PrimaryKeyType) -> Result<LoraWanNode> {
         get_item_from_db(self, key, None)
     }
 
     fn search_item(&self, channel_starts_with: &str) -> Result<LoraWanNode>{
-        get_item_from_db(self, channel_starts_with, Some(true))
+        get_item_from_db(self, &channel_starts_with.to_string(), Some(true))
     }
 
-    fn write_item_to_db(&self, item: &LoraWanNode) -> Result<usize> {
-        let rows = self.connection.execute(format!(
+    fn write_item_to_db(&self, item: &LoraWanNode) -> Result<Self::PrimaryKeyType> {
+        let _rows = self.connection.execute(format!(
             "INSERT INTO {} (dev_eui, streams_channel_id) VALUES (:dev_eui, :streams_channel_id)", Self::TABLE_NAME).as_str(),
                            to_params_named(item).unwrap().to_slice().as_slice()).unwrap();
-        Ok(rows)
+        Ok(item.dev_eui.clone())
     }
 
     fn update_item_in_db(&self, _item: &LoraWanNode) -> Result<usize> {
@@ -91,13 +93,19 @@ impl DaoManager for LoraWanNodeDaoManager {
     fn get_serialization_callback(&self, _item: &Self::ItemType) -> Self::SerializationCallbackType {
         let this = self.clone();
         Box::new( move |dev_eui: String, streams_channel_id_utf8_bytes: Vec<u8>| -> Result<usize> {
+            let ret_val = streams_channel_id_utf8_bytes.len();
             let new_node = LoraWanNode {
                 dev_eui,
                 streams_channel_id: String::from_utf8(streams_channel_id_utf8_bytes)
                     .expect("Error while reading streams_channel_id_utf8_bytes into String instance.")
             };
-            this.write_item_to_db(&new_node)
+            this.write_item_to_db(&new_node)?;
+            Ok(ret_val)
         })
+    }
+
+    fn delete_item_in_db(&self, _key: &Self::PrimaryKeyType) -> Result<()> {
+        unimplemented!();
     }
 }
 

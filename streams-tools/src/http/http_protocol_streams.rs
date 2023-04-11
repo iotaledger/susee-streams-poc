@@ -9,12 +9,17 @@ use hyper::{
     }
 };
 
+use base64::engine::{
+    general_purpose::STANDARD,
+    Engine,
+};
+
 use iota_streams::{
-    app::
-    {
+    app::{
         transport::tangle::{
             TangleMessage,
-            TangleAddress
+            TangleAddress,
+            AppInst
         },
     },
     app_channels::api::DefaultF,
@@ -74,6 +79,7 @@ impl EndpointUris {
     pub const RECEIVE_MESSAGE_FROM_ADDRESS: &'static str  = "/message";
     pub const SEND_COMPRESSED_MESSAGE: &'static str = "/message/compressed/send";
     pub const RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS: &'static str  = "/message/compressed";
+    pub const RETRANSMIT: &'static str  = "/message/retransmit";
 }
 
 pub struct QueryParameters {}
@@ -83,6 +89,7 @@ impl QueryParameters {
     pub const RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_MSGID: &'static str  = "msgid";
     pub const RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_DEV_EUI: &'static str  = "deveui";
     pub const SEND_COMPRESSED_MESSAGE_DEV_EUI: &'static str  = "deveui";
+    pub const RETRANSMIT_REQUEST_KEY: &'static str  = "request_key";
 }
 
 // Maps Streams Errors to http status codes
@@ -213,6 +220,18 @@ impl RequestBuilderStreams {
         }
         header_flags
     }
+
+    // @param request_key:  Received by the original REST call via response body.
+    pub fn retransmit(self: &Self, channel_id: AppInst, request_key: &Vec<u8>) -> Result<Request<Body>> {
+        let mut uri = self.tools.get_uri(EndpointUris::RETRANSMIT);
+        let request_key_b64 = STANDARD.encode(request_key);
+        uri = format!("{}?{}={}", uri, QueryParameters::RETRANSMIT_REQUEST_KEY, request_key_b64);
+        let body_bytes = channel_id.as_bytes().to_owned();
+        RequestBuilderTools::get_request_builder()
+            .method("POST")
+            .uri(uri)
+            .body(Body::from(body_bytes.clone()))
+    }
 }
 
 #[async_trait(?Send)]
@@ -225,6 +244,7 @@ pub trait ServerDispatchStreams: ScopeConsume {
     async fn send_compressed_message<F: 'static + core::marker::Send + core::marker::Sync>(
         self: &mut Self, message: &TangleMessageCompressed) -> Result<Response<Body>>;
     async fn receive_compressed_message_from_address(self: &mut Self, msgid: &str, dev_eui_str: &str) -> Result<Response<Body>>;
+    async fn retransmit(self: &mut Self, request_key: String, channel_id: AppInst) -> Result<Response<Body>>;
 }
 
 pub async fn dispatch_request_streams(req_parts: &DispatchedRequestParts, callbacks: &mut impl ServerDispatchStreams ) -> Result<Response<Body>> {
@@ -263,6 +283,13 @@ pub async fn dispatch_request_streams(req_parts: &DispatchedRequestParts, callba
                 dev_eui_from_url
             };
             callbacks.receive_compressed_message_from_address(msgid.as_str(), dev_eui_str.as_str()).await
+        },
+
+        (&Method::POST, EndpointUris::RETRANSMIT) => {
+            let request_key = ok_or_bail_http_response!(get_query_param_retransmit(req_parts));
+            let channel_id: AppInst = AppInst::from(req_parts.binary_body.as_slice());
+
+            callbacks.retransmit(request_key, channel_id).await
         },
 
         // Return the 404 Not Found for other routes.
@@ -350,4 +377,50 @@ fn get_query_param_receive_message_from_address(req_parts: &DispatchedRequestPar
                QueryParameters::RECEIVE_MESSAGE_FROM_ADDRESS);
     }
     Ok(String::from(&*address_key_val[0].1))
+}
+
+fn get_query_param_retransmit(req_parts: &DispatchedRequestParts) -> StreamsToolsHttpResult<String> {
+    let request_key_val: Vec<_> = req_parts.req_url.query_pairs().collect();
+    if request_key_val.len() != 1 {
+        return_err_bad_request!("[http_protocoll - RETRANSMIT] Wrong number of query parameters.\
+                Specify the request_key using /{}?{}={}",
+               EndpointUris::RETRANSMIT,
+               QueryParameters::RETRANSMIT_REQUEST_KEY,
+               "<REQUEST-KEY-GOES-HERE>");
+    }
+    if request_key_val[0].0 != QueryParameters::RETRANSMIT_REQUEST_KEY {
+        return_err_bad_request!("[http_protocoll - RETRANSMIT] Query parameter {} is not specified",
+               QueryParameters::RETRANSMIT_REQUEST_KEY);
+    }
+    Ok(String::from(&*request_key_val[0].1))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+    use hyper::body;
+    use super::*;
+
+    const URI_PREFIX: &str = "http://test.test";
+
+    #[tokio::test]
+    async fn test_request_builder_streams_retransmit() {
+        let req_builder = RequestBuilderStreams::new(URI_PREFIX);
+        let channel_id: AppInst = AppInst::from_str("83cedf5cd9b605cc457ec7cb7c5d6f3c2fa339ae864246e8854782185413fd9d0000000000000000").unwrap();
+        const REQUST_KEY_BYTES: [u8;8] = [1, 2, 3, 4, 5, 6, 7, 8];
+        let request_key_str = STANDARD.encode(REQUST_KEY_BYTES);
+
+        let request = req_builder.retransmit(channel_id, &REQUST_KEY_BYTES.to_vec()).expect("Failed to build request");
+
+        let (parts, req_body) = request.into_parts();
+        let body_bytes = body::to_bytes(req_body).await.expect("Failed to read body");
+        let channel_id_bytes = channel_id.as_bytes();
+
+        let expected_uri = format!("{URI_PREFIX}{}?{}={request_key_str}", EndpointUris::RETRANSMIT, QueryParameters::RETRANSMIT_REQUEST_KEY);
+        println!("Expected URI is '{}'", expected_uri);
+
+        assert_eq!(body_bytes, channel_id_bytes);
+        assert_eq!(parts.uri.to_string(), expected_uri);
+        assert_eq!(parts.method, Method::POST)
+    }
 }

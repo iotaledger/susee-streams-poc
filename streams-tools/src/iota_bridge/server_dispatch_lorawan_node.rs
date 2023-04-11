@@ -59,8 +59,8 @@ impl ServerDispatchLoraWanNode for DispatchLoraWanNode {
             streams_channel_id: channel_id.to_string()
         };
         match self.lorawan_nodes.write_item_to_db(&new_node) {
-            Ok(rows_count) => {
-                if rows_count > 0 {
+            Ok(primary_key) => {
+                if primary_key == new_node.dev_eui {
                     Ok(Response::new(Default::default()))
                 } else {
                     get_response_500("Unknown database error")
@@ -71,7 +71,7 @@ impl ServerDispatchLoraWanNode for DispatchLoraWanNode {
     }
 
     async fn get_node(self: &mut Self, dev_eui: &str, only_check_existence: bool) -> Result<Response<Body>> {
-        match self.lorawan_nodes.get_item(dev_eui) {
+        match self.lorawan_nodes.get_item(&dev_eui.to_string()) {
             Ok(node_and_cb) => {
                 if only_check_existence {
                     Ok(Response::new(Default::default()))

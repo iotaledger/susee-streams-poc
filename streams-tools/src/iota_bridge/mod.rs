@@ -14,8 +14,13 @@ pub use {
     iota_bridge::{
         IotaBridge,
     },
-    dao::lora_wan_node::{
-        LoraWanNodeDataStore
+    dao::{
+        lora_wan_node::{
+            LoraWanNodeDataStore
+        },
+        pending_request::{
+            PendingRequestDataStore
+        },
     },
     server_dispatch_streams::DispatchStreams,
     server_dispatch_command::DispatchCommand,

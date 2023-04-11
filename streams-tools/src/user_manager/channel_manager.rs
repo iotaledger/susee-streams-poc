@@ -11,7 +11,7 @@ use iota_streams::{
 use crate::{
     wallet::plain_text_wallet::PlainTextWallet,
     SimpleWallet,
-    helpers::SerializationCallbackRefToClosure,
+    helpers::SerializationCallbackRefToClosureString,
 };
 
 use std::{
@@ -39,7 +39,7 @@ pub struct ChannelManager<WalletT: SimpleWallet> {
     client: Client,
     wallet: WalletT,
     serialization_file: Option<String>,
-    serialize_user_state_callback: Option<SerializationCallbackRefToClosure>,
+    serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
     pub author: Option<Author>,
     pub announcement_link: Option<Address>,
     pub keyload_link: Option<Address>,
@@ -72,7 +72,7 @@ pub struct ChannelManagerOptions {
     pub serialization_file: Option<String>,
     pub user_state: Option<Vec<u8>>,
     // If specified will be called on drop to serialize the user state
-    pub serialize_user_state_callback: Option<SerializationCallbackRefToClosure>,
+    pub serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
 }
 
 impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
@@ -175,7 +175,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
         Ok(())
     }
 
-    async fn export_to_serialize_callback(&mut self, serialize_callback: SerializationCallbackRefToClosure) -> Result<Option<usize>> {
+    async fn export_to_serialize_callback(&mut self, serialize_callback: SerializationCallbackRefToClosureString) -> Result<Option<usize>> {
         let mut ret_val = None;
         if let Some(author) = &self.author {
             let buffer = author.export( self.wallet.get_serialization_password()).await?;

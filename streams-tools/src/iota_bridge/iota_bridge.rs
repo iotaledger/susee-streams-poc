@@ -24,6 +24,7 @@ use crate::{
         LoraWanNodeDataStore,
         ProcessFinally,
         ServerScopeProvide,
+        PendingRequestDataStore,
     },
     http::{
         dispatch_request,
@@ -44,15 +45,15 @@ pub struct IotaBridge<'a> {
 
 impl<'a> IotaBridge<'a>
 {
-    pub fn new(url: &str, lora_wan_node_store: LoraWanNodeDataStore) -> Self {
+    pub fn new(url: &str, lora_wan_node_store: LoraWanNodeDataStore, pending_request_store: PendingRequestDataStore) -> Self {
         let client = Client::new_from_url(url);
 
         Self {
             scope_provide: ServerScopeProvide::new(),
-            dispatch_streams: DispatchStreams::new(&client, lora_wan_node_store.clone()),
+            dispatch_streams: DispatchStreams::new(&client, lora_wan_node_store.clone(), pending_request_store),
             dispatch_command: DispatchCommand::new(),
             dispatch_confirm: DispatchConfirm::new(),
-            dispatch_lorawan_node: DispatchLoraWanNode::new(lora_wan_node_store.clone()),
+            dispatch_lorawan_node: DispatchLoraWanNode::new(lora_wan_node_store.clone()),//, pending_request_store.clone()),
             dispatch_lorawan_rest: DispatchLorawanRest::new(),
             process_finally: ProcessFinally::new(lora_wan_node_store),
 

@@ -168,6 +168,48 @@ pub extern "C" fn start_sensor_manager(
     0
 }
 
+/// Alternative variant of the start_sensor_manager() function using a streams-poc-lib controlled
+/// wifi connection instead of a 'lorawan_send_callback'.
+///
+/// @param wifi_ssid        Name (Service Set Identifier) of the WiFi to login.
+/// @param wifi_pass        Password of the WiFi to login.
+/// @param iota_bridge_url  Same as start_sensor_manager() iota_bridge_url parameter.
+/// @param vfs_fat_path     Optional.
+///                         Same as start_sensor_manager() vfs_fat_path parameter.
+#[no_mangle]
+pub extern "C" fn start_sensor_manager_wifi(
+    wifi_ssid: *const c_char,
+    wifi_pass: *const c_char,
+    iota_bridge_url: *const c_char,
+    vfs_fat_path: *const c_char
+) -> i32 {
+    init_esp_idf_sys_and_logger();
+    info!("[fn start_sensor_manager()] Starting");
+
+    let c_wifi_ssid: &CStr = unsafe { CStr::from_ptr(wifi_ssid) };
+    let c_wifi_pass: &CStr = unsafe { CStr::from_ptr(wifi_pass) };
+    let c_iota_bridge_url: &CStr = unsafe { CStr::from_ptr(iota_bridge_url) };
+    let opt_vfs_fat_path = get_optional_string_from_c_char_ptr(vfs_fat_path, "vfs_fat_path")
+        .expect("Error on converting null terminated C string into utf8 rust String");
+
+    match future::block_on(async {
+        debug!("[fn start_sensor_manager()] Start future::block_on");
+        process_main_esp_rs(
+            c_wifi_ssid.to_str().expect("wifi_ssid contains invalid utf8 code"),
+            c_wifi_pass.to_str().expect("wifi_pass contains invalid utf8 code"),
+            c_iota_bridge_url.to_str().expect("iota_bridge_url contains invalid utf8 code"),
+            opt_vfs_fat_path
+        ).await
+    }){
+        Ok(_) => {},
+        Err(error) => {
+            error!("[fn start_sensor_manager()] An error occurred while calling process_main(): {}", error);
+        }
+    };
+
+    0
+}
+
 /// Indicates if this sensor instance has already been initialized.
 /// A sensor is initialized if it has subscribed to a streams channel and is ready to send
 /// messages via the send_message() function.

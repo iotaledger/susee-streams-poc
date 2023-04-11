@@ -37,6 +37,7 @@ static DEFAULT_FILE_NAME: &str = "channel-seed.txt";
 //
 // #################################################################################################
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PtwPersist {
     pub seed: String,
     pub misc_other_data: String,
@@ -182,5 +183,80 @@ impl SimpleWallet for PlainTextWallet {
 
     fn get_serialization_password(&self) -> &str {
         self.serialization_password.as_str()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::remove_file as fs_remove_file;
+
+    const SERIALIZATION_PASSWD: &'static str = "DO NOT USE THIS IN PRODUCTION";
+
+    fn prepare_persisted_file(file_name: &str, seed: &String, other_data: &str) -> PtwPersist {
+        let persist = PtwPersist {
+            seed: seed.clone(),
+            misc_other_data: other_data.to_string(),
+        };
+        write_persistence_file(file_name, &persist).expect("Error on writing persistence file");
+        persist
+    }
+
+    #[test]
+    fn test_create_seed() {
+        let seed = create_seed();
+        assert_eq!(seed.len(), 81);
+        assert!(seed.chars().all(|c| ALPH9.contains(c)));
+    }
+
+    #[test]
+    fn test_create_seed_from_derivation_phrase() {
+        let seed = create_seed_from_derivation_phrase("A".repeat(81).as_str(), "B".repeat(81).as_str());
+        assert_eq!(seed.len(), 81);
+        assert!(seed.chars().all(|c| ALPH9.contains(c)));
+    }
+    #[test]
+    fn test_write_persistence_file() {
+        let file_name = "test_persistence.ptw";
+        let seed = create_seed();
+        let other_data = "Some other data";
+        let persist = prepare_persisted_file(file_name, &seed, other_data);
+        let read_persist = read_persistence_file(file_name).expect("Error on reading persistence file");
+        assert_eq!(persist, read_persist);
+        fs_remove_file(file_name).expect("Error on removing persistence file");
+    }
+
+    #[test]
+    fn test_create_persistence_file() {
+        let file_name = "test_persistence.ptw";
+        let persist = create_persistence_file(file_name).expect("Error on creating persistence file");
+        let read_persist = read_persistence_file(file_name).expect("Error on reading persistence file");
+        assert_eq!(persist, read_persist);
+        fs_remove_file(file_name).expect("Error on removing persistence file");
+    }
+
+    #[test]
+    fn test_plain_text_wallet_with_derivation_phrase() {
+        let file_name = "test_persistence.ptw";
+        let seed = create_seed();
+        let other_data = "Some other data";
+        let seed_derivation_phrase = "B".repeat(81);
+        prepare_persisted_file(file_name, &seed, other_data);
+        let derived_seed = create_seed_from_derivation_phrase(seed.as_str(), seed_derivation_phrase.as_str());
+        let ptw = PlainTextWallet::new(SERIALIZATION_PASSWD, Some(file_name), Some(seed_derivation_phrase));
+        assert_eq!(derived_seed, ptw.get_seed());
+        fs_remove_file(file_name).expect("Error on removing persistence file");
+    }
+
+    #[test]
+    fn test_simple_wallet() {
+        let file_name = "test_persistence.ptw";
+        let seed = create_seed();
+        let other_data = "Some other data";
+        prepare_persisted_file(file_name, &seed, other_data);
+        let ptw = PlainTextWallet::new(SERIALIZATION_PASSWD, Some(file_name), None);
+        assert_eq!(seed, ptw.get_seed());
+        assert_eq!(SERIALIZATION_PASSWD, ptw.get_serialization_password());
+        fs_remove_file(file_name).expect("Error on removing persistence file");
     }
 }

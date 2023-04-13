@@ -10,6 +10,8 @@ readme = "README.md"
 [dependencies]
 streams-tools = { version = "0.1.2", path = "../streams-tools", features = ["iota_bridge"] }
 susee-tools = { version = "0.1.2", path = "../susee-tools" }
+rusqlite = { version = "0.28.0", features = ["bundled"] }
+
 anyhow = "1.0.40"
 tokio = {version = "1.5"}
 hyper = { version = "0.14", features = ["full"] }

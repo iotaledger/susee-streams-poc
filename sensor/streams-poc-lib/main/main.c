@@ -505,7 +505,7 @@ void app_main(void)
         send_message_via_streams_poc_lib();
     } else {
         ESP_LOGI(TAG, "[fn app_main] Streams channel for this sensor has not been initialized. Calling start_sensor_manager()");
-        start_sensor_manager(
+        start_sensor_manager_wifi(
             STREAMS_POC_LIB_TEST_WIFI_SSID,
             STREAMS_POC_LIB_TEST_WIFI_PASS,
             STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,

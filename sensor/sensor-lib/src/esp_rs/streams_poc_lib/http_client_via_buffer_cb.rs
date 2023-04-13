@@ -124,14 +124,14 @@ extern fn dummy_lorawan_send_callback_for_httpclientoptions_default (
 }
 
 
-pub struct HttpClientOptions {
+pub struct HttpClientViaBufferCallbackOptions {
     pub lorawan_send_callback: send_request_via_lorawan_t,
     pub p_caller_user_data: *mut cty::c_void,
 }
 
-impl Default for HttpClientOptions {
+impl Default for HttpClientViaBufferCallbackOptions {
     fn default() -> Self {
-        HttpClientOptions {
+        HttpClientViaBufferCallbackOptions {
             lorawan_send_callback: dummy_lorawan_send_callback_for_httpclientoptions_default,
             p_caller_user_data: ptr::null_mut::<cty::c_void>()
         }
@@ -139,7 +139,7 @@ impl Default for HttpClientOptions {
 }
 
 #[derive(Clone)]
-pub struct HttpClient {
+pub struct HttpClientViaBufferCallback {
     lorawan_send_callback: send_request_via_lorawan_t,
     request_builder: RequestBuilderStreams,
     tangle_client_options: SendOptions,
@@ -147,11 +147,11 @@ pub struct HttpClient {
     p_caller_user_data: *mut cty::c_void,
 }
 
-impl HttpClient {
-    pub fn new(options: Option<HttpClientOptions>) -> Self {
-        log::debug!("[HttpClient::new()] Unwrapping options");
-        let options = options.unwrap_or_else( || HttpClientOptions::default());
-        log::debug!("[HttpClient::new()] Creating new HttpClient");
+impl HttpClientViaBufferCallback {
+    pub fn new(options: Option<HttpClientViaBufferCallbackOptions>) -> Self {
+        log::debug!("[HttpClientViaBufferCallback::new()] Unwrapping options");
+        let options = options.unwrap_or_else( || HttpClientViaBufferCallbackOptions::default());
+        log::debug!("[HttpClientViaBufferCallback::new()] Creating new HttpClientViaBufferCallback");
         Self {
             lorawan_send_callback: options.lorawan_send_callback,
             p_caller_user_data: options.p_caller_user_data,
@@ -161,7 +161,7 @@ impl HttpClient {
         }
     }
 
-    async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
+    async fn send_message_via_lorawan(&mut self, msg: &TangleMessage) -> Result<()> {
         let req_parts = if self.compressed.get_use_compressed_msg() {
             // Please note the comments in fn recv_message_via_http() below
             // Same principles apply here
@@ -175,8 +175,8 @@ impl HttpClient {
         Ok(())
     }
 
-    async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
-        log::debug!("[HttpClient.recv_message_via_http]");
+    async fn recv_message_via_lorawan(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
+        log::debug!("[HttpClientViaBufferCallback.recv_message_via_http]");
         let req_parts = if self.compressed.get_use_compressed_msg() {
             // We do not set the dev_eui here because it will be communicated by the LoraWAN network
             // and therefore will not be send as lorawan payload.
@@ -202,22 +202,22 @@ impl HttpClient {
 
         let response = self.request(req_parts).await?;
 
-        log::debug!("[HttpClient.recv_message_via_http] check for retrials");
+        log::debug!("[HttpClientViaBufferCallback.recv_message_via_http] check for retrials");
         // TODO: Implement following retrials for bad LoRaWAN connection using EspTimerService if needed.
         // May be we need to introduce StatusCode::CONTINUE in cases where LoRaWAN connection
         // is sometimes too bad and retries are a valid strategy to receive the response
         if response.status_code == StatusCode::CONTINUE {
-            log::warn!("[HttpClient.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
+            log::warn!("[HttpClientViaBufferCallback.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
         }
 
         if response.status_code.is_success() {
-            log::debug!("[HttpClient.recv_message_via_http] StatusCode is successful: {}", response.status_code);
-            log::info!("[HttpClient.recv_message_via_http] Received response with content length of {}", response.body_bytes.len());
+            log::debug!("[HttpClientViaBufferCallback.recv_message_via_http] StatusCode is successful: {}", response.status_code);
+            log::info!("[HttpClientViaBufferCallback.recv_message_via_http] Received response with content length of {}", response.body_bytes.len());
             let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&response.body_bytes.as_slice()).unwrap();
-            log::debug!("[HttpClient.recv_message_via_http] return ret_val");
+            log::debug!("[HttpClientViaBufferCallback.recv_message_via_http] return ret_val");
             Ok(ret_val)
         } else {
-            log::error!("[HttpClient.recv_message_via_http] StatusCode is not OK");
+            log::error!("[HttpClientViaBufferCallback.recv_message_via_http] StatusCode is not OK");
             err!(MapStreamsErrors::from_http_status_codes(
                 response.status_code,
                  Some(link.to_string())
@@ -237,14 +237,14 @@ pub extern "C" fn receive_response(response_data: *const cty::uint8_t, length: c
         match future::block_on(response_scope.sender.send(response_copy)) {
             Ok(_) => StreamsError::STREAMS_OK,
             Err(e) => {
-                log::error!("[HttpClient - fn receive_response] Internal async channel has been closed \
+                log::error!("[HttpClientViaBufferCallback - fn receive_response] Internal async channel has been closed \
         before response could been transmitted.\n Error: {}\n\
         Returning StreamsError::STREAMS_RESPONSE_INTERNAL_CHANNEL_ERR", e);
                 StreamsError::STREAMS_RESPONSE_INTERNAL_CHANNEL_ERR
             }
         }
     } else {
-        log::error!("[HttpClient - fn receive_response] You need to send a request before calling this function.\
+        log::error!("[HttpClientViaBufferCallback - fn receive_response] You need to send a request before calling this function.\
         Returning StreamsError::STREAMS_RESPONSE_RESOLVED_WITHOUT_REQUEST");
         StreamsError::STREAMS_RESPONSE_RESOLVED_WITHOUT_REQUEST
     }
@@ -257,7 +257,7 @@ pub fn get_response_receiver<'a>() -> Result<&'a ResponseCallbackReceiver> {
         if let Some(response_scope) = RESPONSE_CALLBACK_SCOPE.as_ref() {
             Ok(&response_scope.receiver)
         } else {
-            log::error!("[HttpClient - fn receive_response] You need to send a request before calling this function.");
+            log::error!("[HttpClientViaBufferCallback - fn receive_response] You need to send a request before calling this function.");
             bail!("Attempt to response before sending a request or echoed (doubled) response for a previous request.")
         }
     }
@@ -302,24 +302,24 @@ impl<'a> Drop for ResponseCallbackScopeManager<'a> {
     }
 }
 
-impl HttpClient
+impl HttpClientViaBufferCallback
 {
     pub async fn request<'a>(&mut self, req_parts: IotaBridgeRequestParts) -> Result<IotaBridgeResponseParts> {
         let mut buffer: Vec<u8> = vec![0; req_parts.needed_size()];
         req_parts.to_bytes(buffer.as_mut_slice())?;
-        log::debug!("[HttpClient.request] IotaBridgeRequestParts bytes to send: Length: {}\n    {:02X?}", buffer.len(), buffer);
+        log::debug!("[HttpClientViaBufferCallback.request] IotaBridgeRequestParts bytes to send: Length: {}\n    {:02X?}", buffer.len(), buffer);
         let response_parts = self.request_via_lorawan(buffer).await?;
-        log::debug!("[HttpClient::request()] response_parts.status_code is {}", response_parts.status_code);
+        log::debug!("[HttpClientViaBufferCallback::request()] response_parts.status_code is {}", response_parts.status_code);
 
         // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
         // http status which indicates that the iota-bridge has stored all needed
         // data to use compressed massages further on.
         if response_parts.status_code == StatusCode::ALREADY_REPORTED {
-            log::info!("[HttpClient::request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
+            log::info!("[HttpClientViaBufferCallback::request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
             self.compressed.set_use_compressed_msg(true);
         }
 
-        log::info!("[HttpClient::request()] use_compressed_msg = '{}'", self.compressed.get_use_compressed_msg());
+        log::info!("[HttpClientViaBufferCallback::request()] use_compressed_msg = '{}'", self.compressed.get_use_compressed_msg());
         Ok(response_parts)
     }
 
@@ -327,24 +327,24 @@ impl HttpClient
         let _response_callback_scope_manager = ResponseCallbackScopeManager::new();
         match (self.lorawan_send_callback)(buffer.as_ptr(), buffer.len(), receive_response, self.p_caller_user_data) {
             LoRaWanError::LORAWAN_OK => {
-                log::debug!("[HttpClient.request_via_lorawan] Successfully send request via LoRaWAN");
+                log::debug!("[HttpClientViaBufferCallback.request_via_lorawan] Successfully send request via LoRaWAN");
                 let receiver = get_response_receiver()?;
                 match receiver.recv().await {
                     Ok(response) => {
-                        log::debug!("[HttpClient.request_via_lorawan] Received response via LoRaWAN");
+                        log::debug!("[HttpClientViaBufferCallback.request_via_lorawan] Received response via LoRaWAN");
                         if response.len() > 0 {
                             match IotaBridgeResponseParts::try_from_bytes(response.as_slice()) {
                                 Ok(response_parts) => {
-                                    log::debug!("[HttpClient.request_via_lorawan] Successfully deserialized response_parts:\n{}", response_parts);
+                                    log::debug!("[HttpClientViaBufferCallback.request_via_lorawan] Successfully deserialized response_parts:\n{}", response_parts);
                                     if !response_parts.status_code.is_success() {
                                         let err_msg = String::from_utf8(response_parts.body_bytes.clone())
                                             .unwrap_or(String::from("Could not deserialize Error message from response Body"));
-                                        log::debug!("[HttpClient.request] Response status is not successful: Error message is:\n{}", err_msg);
+                                        log::debug!("[HttpClientViaBufferCallback.request] Response status is not successful: Error message is:\n{}", err_msg);
                                     }
                                     Ok(response_parts)
                                 },
                                 Err(e) => {
-                                    log::debug!("[HttpClient.request_via_lorawan] Error on deserializing response_parts: {}", e );
+                                    log::debug!("[HttpClientViaBufferCallback.request_via_lorawan] Error on deserializing response_parts: {}", e );
                                     bail!("Could not deserialize response binary to valid IotaBridgeResponseParts: {}", e)
                                 }
                             }
@@ -360,27 +360,31 @@ impl HttpClient
             LoRaWanError::LORAWAN_NO_CONNECTION => {
                 bail!("lorawan_send_callback returned error LORAWAN_NO_CONNECTION")
             },
+            LoRaWanError::EXIT_SENSOR_MANAGER => {
+                // TODO: Implement clean shutdown of the sensor_manager starting from here
+                bail!("lorawan_send_callback returned error EXIT_SENSOR_MANAGER - clean shutdown of the sensor_manager is missing")
+            }
         }
     }
 }
 
-impl CompressedStateSend for HttpClient {
+impl CompressedStateSend for HttpClientViaBufferCallback {
     fn subscribe_listener(&mut self, listener: Rc<dyn CompressedStateListen>) -> Result<usize> {
         self.compressed.subscribe_listener(listener)
     }
 
     fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
-        log::debug!("[HttpClient::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
+        log::debug!("[HttpClientViaBufferCallback::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
         self.compressed.set_initial_use_compressed_msg_state(use_compressed_msg)
     }
 }
 
 #[async_trait(?Send)]
-impl Transport<TangleAddress, TangleMessage> for HttpClient
+impl Transport<TangleAddress, TangleMessage> for HttpClientViaBufferCallback
 {
     async fn send_message(&mut self, msg: &TangleMessage) -> anyhow::Result<()> {
-        log::info!("[HttpClient.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
-        self.send_message_via_http(msg).await
+        log::info!("[HttpClientViaBufferCallback.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
+        self.send_message_via_lorawan(msg).await
     }
 
     async fn recv_messages(&mut self, _link: &TangleAddress) -> anyhow::Result<Vec<TangleMessage>> {
@@ -388,16 +392,16 @@ impl Transport<TangleAddress, TangleMessage> for HttpClient
     }
 
     async fn recv_message(&mut self, link: &TangleAddress) -> anyhow::Result<TangleMessage> {
-        log::debug!("[HttpClient.recv_message]");
-        let ret_val = self.recv_message_via_http(link).await;
-        log::debug!("[HttpClient.recv_message] ret_val received");
+        log::debug!("[HttpClientViaBufferCallback.recv_message]");
+        let ret_val = self.recv_message_via_lorawan(link).await;
+        log::debug!("[HttpClientViaBufferCallback.recv_message] ret_val received");
         match ret_val.as_ref() {
             Ok(msg) => {
-                log::debug!("[HttpClient.recv_message] ret_val Ok");
-                log::info!("[HttpClient.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string())
+                log::debug!("[HttpClientViaBufferCallback.recv_message] ret_val Ok");
+                log::info!("[HttpClientViaBufferCallback.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string())
             },
             Err(err) => {
-                log::error!("[HttpClient.recv_message] Received streams error: '{}'", err);
+                log::error!("[HttpClientViaBufferCallback.recv_message] Received streams error: '{}'", err);
                 ()
             }
         }
@@ -406,14 +410,14 @@ impl Transport<TangleAddress, TangleMessage> for HttpClient
 }
 
 #[async_trait(?Send)]
-impl TransportDetails<TangleAddress> for HttpClient {
+impl TransportDetails<TangleAddress> for HttpClientViaBufferCallback {
     type Details = Details;
     async fn get_link_details(&mut self, _link: &TangleAddress) -> anyhow::Result<Self::Details> {
         unimplemented!()
     }
 }
 
-impl TransportOptions for HttpClient {
+impl TransportOptions for HttpClientViaBufferCallback {
     type SendOptions = SendOptions;
     fn get_send_options(&self) -> SendOptions {
         self.tangle_client_options.clone()

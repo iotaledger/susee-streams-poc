@@ -10,7 +10,7 @@ use streams_tools::{
     ChannelManager,
     helpers::{
         get_channel_id_from_link,
-        SerializationCallbackRefToClosure
+        SerializationCallbackRefToClosureString
     },
     PlainTextWallet,
     UserDataStore,
@@ -77,7 +77,7 @@ async fn get_channel_manager_for_cli_arg_channel_starts_with<'a>(user_store: &mu
 }
 
 async fn get_channel_manager_for_channel_id<'a>(channel_id: &str, user_store: &mut UserDataStore, cli: &ManagementConsoleCli<'a>) -> Result<ChannelManager<PlainTextWallet>> {
-    let (user_dao, serialize_user_state_callback) = user_store.get_item(channel_id)?;
+    let (user_dao, serialize_user_state_callback) = user_store.get_item(&channel_id.to_string())?;
     let wallet = get_wallet(cli, Some(&user_dao))?;
     get_channel_manager_by_user_dao(
         user_dao,
@@ -87,7 +87,7 @@ async fn get_channel_manager_for_channel_id<'a>(channel_id: &str, user_store: &m
     ).await
 }
 
-async fn get_channel_manager_by_user_dao(user_dao: User, serialize_user_state_callback: Option<SerializationCallbackRefToClosure>, wallet: PlainTextWallet, node: &str) -> Result<ChannelManager<PlainTextWallet>>{
+async fn get_channel_manager_by_user_dao(user_dao: User, serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>, wallet: PlainTextWallet, node: &str) -> Result<ChannelManager<PlainTextWallet>>{
     let mut new_opt = ChannelManagerOptions::default();
     new_opt.user_state = Some(user_dao.streams_user_state.clone());
     new_opt.serialize_user_state_callback = serialize_user_state_callback;

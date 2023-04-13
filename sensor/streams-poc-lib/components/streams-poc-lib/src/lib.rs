@@ -1,6 +1,7 @@
 use log::*;
 use sensor_lib::{
     process_main_esp_rs,
+    process_main_esp_rs_wifi,
     streams_poc_lib,
     streams_poc_lib::{
         api_types::{
@@ -194,7 +195,7 @@ pub extern "C" fn start_sensor_manager_wifi(
 
     match future::block_on(async {
         debug!("[fn start_sensor_manager()] Start future::block_on");
-        process_main_esp_rs(
+        process_main_esp_rs_wifi(
             c_wifi_ssid.to_str().expect("wifi_ssid contains invalid utf8 code"),
             c_wifi_pass.to_str().expect("wifi_pass contains invalid utf8 code"),
             c_iota_bridge_url.to_str().expect("iota_bridge_url contains invalid utf8 code"),

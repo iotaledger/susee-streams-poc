@@ -14,6 +14,7 @@
 typedef enum LoRaWanError {
   LORAWAN_OK = 1,
   LORAWAN_NO_CONNECTION = -1,
+  EXIT_SENSOR_MANAGER = -100,
 } LoRaWanError;
 
 /**
@@ -128,20 +129,45 @@ enum StreamsError send_message(const uint8_t *message_data,
  * (project sensor/main-rust) or the 'management-console' app.
  * For more details about the possible remote commands have a look into the CLI help of those
  * two applications.
+ *
+ * The "sensor_manager" repetitively polls commands from the IOTA-Bridge and executes them. To stop
+ * the sensor_manager command poll loop please return LoRaWanError::EXIT_SENSOR_MANAGER in your
+ * implementation of the lorawan_send_callback.
+ *
+ * @param lorawan_send_callback    Callback function allowing the Streams POC library to send requests via LoRaWAN.
+ *                                 See send_request_via_lorawan_t help above for more details.
+ * @param iota_bridge_url          URL of the iota-bridge instance to connect to.
+ *                                 Example:
+ *                                    start_sensor_manager("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
+ * @param vfs_fat_path             Optional.
+ *                                 Path of the directory where the streams channel user state data and
+ *                                 other files shall be read/written by the Streams POC library.
+ *                                 See function is_streams_channel_initialized() below for further details.
+ * @param p_caller_user_data       Optional.
+ *                                 Pointer to arbitrary data used by the caller of this function
+ *                                 to communicate with the lorawan_send_callback implementation.
+ *                                 See send_request_via_lorawan_t help above for more details.
+ *                                 If no p_caller_user_data is provided set p_caller_user_data = NULL.
+ */
+int32_t start_sensor_manager(send_request_via_lorawan_t lorawan_send_callback,
+                             const char *iota_bridge_url,
+                             const char *vfs_fat_path,
+                             void *p_caller_user_data);
+
+/**
+ * Alternative variant of the start_sensor_manager() function using a streams-poc-lib controlled
+ * wifi connection instead of a 'lorawan_send_callback'.
+ *
  * @param wifi_ssid        Name (Service Set Identifier) of the WiFi to login.
  * @param wifi_pass        Password of the WiFi to login.
- * @param iota_bridge_url  URL of the iota-bridge instance to connect to.
- *                         Example:
- *                            start_sensor_manager("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
+ * @param iota_bridge_url  Same as start_sensor_manager() iota_bridge_url parameter.
  * @param vfs_fat_path     Optional.
- *                         Path of the directory where the streams channel user state data and
- *                         other files shall be read/written by the Streams POC library.
- *                         See function is_streams_channel_initialized() below for further details.
+ *                         Same as start_sensor_manager() vfs_fat_path parameter.
  */
-int32_t start_sensor_manager(const char *wifi_ssid,
-                             const char *wifi_pass,
-                             const char *iota_bridge_url,
-                             const char *vfs_fat_path);
+int32_t start_sensor_manager_wifi(const char *wifi_ssid,
+                                  const char *wifi_pass,
+                                  const char *iota_bridge_url,
+                                  const char *vfs_fat_path);
 
 /**
  * Indicates if this sensor instance has already been initialized.

@@ -30,8 +30,11 @@ use cli::{
 use std::{
     net::SocketAddr,
 };
+use std::rc::Rc;
 use hyper::server::conn::AddrStream;
 use tokio::sync::oneshot;
+use rusqlite::Connection;
+use streams_tools::iota_bridge::PendingRequestDataStore;
 
 async fn handle_request(mut client: IotaBridge<'_>, request: Request<Body>)
                         -> Result<Response<Body>, hyper::http::Error>
@@ -59,8 +62,12 @@ async fn run() {
     let cli = IotaBridgeCli::new(&matches_and_options, &ARG_KEYS) ;
     println!("[IOTA Bridge] Using node '{}' for tangle connection", cli.node);
 
-    let lora_wan_node_store = LoraWanNodeDataStore::new_from_db_file("lora-wan-nodes-iota-bridge.sqlite3");
-    let client = IotaBridge::new(cli.node, lora_wan_node_store);
+    let file_path_and_name = "iota-bridge.sqlite3";
+    let db_connection = Rc::new(Connection::open(file_path_and_name)
+        .expect(format!("Error on open/create SQlite database file '{}'", file_path_and_name).as_str()));
+    let lora_wan_node_store = LoraWanNodeDataStore::new_from_connection(db_connection.clone(), None);
+    let pending_request_store = PendingRequestDataStore::new_from_connection(db_connection, None);
+    let client = IotaBridge::new(cli.node, lora_wan_node_store, pending_request_store);
 
     let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT).into();
     if cli.matches.is_present(cli.arg_keys.listener_ip_address_port) {

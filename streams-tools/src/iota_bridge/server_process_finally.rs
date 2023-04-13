@@ -1,7 +1,10 @@
-use hyper::{Body, http::{
-    Response,
-    Result,
-}, StatusCode};
+use hyper::{
+    Body,
+    http::{
+        Response,
+        Result,
+    }
+};
 
 use crate::{
     ok_or_bail_internal_error_response_500,

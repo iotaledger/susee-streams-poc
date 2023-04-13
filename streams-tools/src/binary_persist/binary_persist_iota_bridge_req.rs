@@ -1,16 +1,12 @@
-use hyper::{
-    Body,
-    body,
-    http::{
-        Result,
-        StatusCode,
-        Response as HyperResponse,
-        request::{
-            Builder,
-            Request,
-        }
+use hyper::{Body, body, http::{
+    Result,
+    StatusCode,
+    Response as HyperResponse,
+    request::{
+        Builder,
+        Request,
     }
-};
+}, Method};
 
 use std::{
     fmt,
@@ -73,13 +69,23 @@ impl From<HeaderFlags> for HttpMethod {
     }
 }
 
+impl From<&Method> for HttpMethod {
+    fn from(method: &Method) -> Self {
+        match method {
+            &Method::POST => Self::POST,
+            &Method::GET => Self::GET,
+            _ => panic!("'{}' is not a valid HttpMethod value", method)
+        }
+    }
+}
+
 pub const HEADER_FLAGS_LEN: usize = 1;
 pub type HeaderFlagsNumericalType = u8;
 
 bitflags! {
     #[derive(Default)]
     pub struct HeaderFlags: HeaderFlagsNumericalType {
-        const NEEDS_REGISTERD_LORAWAN_NODE = 0b00000001;
+        const NEEDS_REGISTERED_LORAWAN_NODE = 0b00000001;
         const IS_METHOD_POST = 0b00000010;
         const IS_METHOD_GET = 0b00000100;
     }
@@ -106,6 +112,16 @@ impl IotaBridgeRequestParts {
     pub fn new(header_flags: HeaderFlags, uri: String, body_bytes: Vec<u8>) -> Self {
         let method = HttpMethod::from(header_flags);
         let uri_bytes = uri.clone().into_bytes();
+        Self {method, uri, body_bytes, uri_bytes, header_flags}
+    }
+
+    pub async fn from_request(request: Request<Body>, needs_registered_lorawan_node: bool) -> Self {
+        let method = HttpMethod::from(request.method());
+        let uri = request.uri().to_string();
+        let body_bytes = body::to_bytes(request.into_body()).await.unwrap().to_vec();
+        let uri_bytes = uri.clone().into_bytes();
+        let mut header_flags = HeaderFlags::from(method.clone());
+        header_flags.set(HeaderFlags::NEEDS_REGISTERED_LORAWAN_NODE, needs_registered_lorawan_node);
         Self {method, uri, body_bytes, uri_bytes, header_flags}
     }
 
@@ -136,7 +152,7 @@ impl IotaBridgeRequestParts {
     }
 
     pub fn needs_registerd_lorawan_node(&self) -> bool {
-        self.header_flags.contains(HeaderFlags::NEEDS_REGISTERD_LORAWAN_NODE)
+        self.header_flags.contains(HeaderFlags::NEEDS_REGISTERED_LORAWAN_NODE)
     }
 }
 

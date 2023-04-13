@@ -1,9 +1,3 @@
-use iota_streams::app::{
-    transport::tangle::{
-        MSGID_SIZE,
-    }
-};
-
 use crate::dao_helpers::{
     DaoManager,
     DbSchemaVersionType,

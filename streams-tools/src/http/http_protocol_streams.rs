@@ -216,7 +216,7 @@ impl RequestBuilderStreams {
     fn get_header_flags(is_compressed: bool, method: HttpMethod) -> HeaderFlags {
         let mut header_flags = HeaderFlags::from(method);
         if is_compressed {
-            header_flags.insert(HeaderFlags::NEEDS_REGISTERD_LORAWAN_NODE);
+            header_flags.insert(HeaderFlags::NEEDS_REGISTERED_LORAWAN_NODE);
         }
         header_flags
     }

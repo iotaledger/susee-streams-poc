@@ -58,21 +58,16 @@ use crate::{
     }
 };
 
-use hyper::{
-    Client as HyperClient,
-    body as hyper_body,
-    Body,
-    client::HttpConnector,
-    http::{
-        StatusCode,
-        Request,
-        Response,
-    },
-};
+use hyper::{Client as HyperClient, body as hyper_body, Body, client::HttpConnector, http::{
+    StatusCode,
+    Request,
+    Response,
+}, body};
 
 use tokio::time;
 
 use anyhow::bail;
+use iota_streams::app::transport::tangle::AppInst;
 
 pub struct HttpClientOptions<'a> {
     pub http_url: &'a str,
@@ -150,19 +145,14 @@ impl HttpClient
         }
     }
 
-    async fn request(&mut self, req_parts: IotaBridgeRequestParts) -> Result<Response<Body>> {
+    async fn request(&mut self, req_parts: IotaBridgeRequestParts, channel_id: AppInst) -> Result<Response<Body>> {
         let request = if self.use_lorawan_rest {
             self.get_lorawan_rest_request(req_parts)?
         } else {
             req_parts.into_request(RequestBuilderTools::get_request_builder())?
         };
 
-        let mut response = self.hyper_client.request(request).await
-            .expect("Error while sending request via hyper_client");
-
-        if self.use_lorawan_rest {
-            response = HttpClient::handle_lorawan_rest_response(response).await?;
-        }
+        let mut response = self.get_request_response(request).await;
 
         // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
         // http status which indicates that the iota-bridge has stored all needed
@@ -170,6 +160,43 @@ impl HttpClient
         if response.status() == StatusCode::ALREADY_REPORTED {
             self.compressed.set_use_compressed_msg(true);
         }
+        if response.status() == StatusCode::UNPROCESSABLE_ENTITY {
+            response = self.handle_request_retransmit(response, channel_id).await?;
+        }
+        Ok(response)
+    }
+
+    async fn get_request_response(&mut self, request: Request<Body>) -> Response<Body> {
+        let mut response = self.hyper_client.request(request).await
+            .expect("Error while sending request via hyper_client");
+
+        if self.use_lorawan_rest {
+            response = HttpClient::handle_lorawan_rest_response(response).await
+                .expect("Error while handling the lorawan_rest_response");
+        }
+        response
+    }
+
+    async fn handle_request_retransmit(&mut self, mut response: Response<Body>, channel_id: AppInst) -> Result<Response<Body>> {
+        let request_key_bytes = body::to_bytes(response.body_mut()).await.expect("Failed to read body bytes for retrieving the request_key");
+        let mut retransmit_request = self.request_builder_streams.retransmit(
+            channel_id,
+            &Vec::<u8>::from(request_key_bytes)
+        )?;
+
+        if self.use_lorawan_rest {
+            let retransmit_request_parts = IotaBridgeRequestParts::from_request(retransmit_request, false).await;
+            retransmit_request = self.get_lorawan_rest_request(retransmit_request_parts)?
+        }
+
+        let response = self.get_request_response(retransmit_request).await;
+
+        if response.status() != StatusCode::ALREADY_REPORTED {
+            log::warn!("[HttpClient.handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response.status());
+            log::warn!("[HttpClient.handle_request_retransmit] Will set use_compressed_msg to false for security reasons");
+            self.compressed.set_use_compressed_msg(false);
+        }
+
         Ok(response)
     }
 
@@ -208,7 +235,7 @@ impl HttpClient
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
         let req_parts = if self.compressed.get_use_compressed_msg() {
             // In contrast to http_client_lorawan::HttpClient we set the dev_eui here because it could be
-            // used in cases where the lorawan-rest API is noz used for compressed messages.
+            // used in cases where the lorawan-rest API is not used for compressed messages.
             // http_client_lorawan::HttpClient never sets the DevEUI because it is communicated by the
             // LoraWAN network automatically (compare comment in function HttpClient::recv_message_via_http()
             // in sensor/sensor-lib/src/esp_rs/streams_poc_lib/http_client_lorawan.rs).
@@ -217,7 +244,8 @@ impl HttpClient
         } else {
             self.request_builder_streams.get_send_message_request_parts(msg, EndpointUris::SEND_MESSAGE, false, None)?
         };
-        self.request(req_parts).await?;
+        let channel_id = msg.link.appinst.clone();
+        self.request(req_parts, channel_id).await?;
         Ok(())
     }
 
@@ -245,7 +273,8 @@ impl HttpClient
 
     async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         let req = self.get_recv_message_request(link)?;
-        let mut response = self.request(req).await?;
+        let channel_id = link.appinst.clone();
+        let mut response = self.request(req, channel_id).await?;
         // TODO: This retrials are most probably not needed because they might be handled by hyper
         //       => Clarify and remove unneeded code
         if response.status() == StatusCode::CONTINUE {
@@ -253,7 +282,8 @@ impl HttpClient
             while response.status() == StatusCode::CONTINUE {
                 interval.tick().await;
                 response = self.request(
-                    self.get_recv_message_request(link)?
+                    self.get_recv_message_request(link)?,
+                    link.appinst
                 ).await?;
             }
         }

@@ -14,6 +14,7 @@ use iota_streams::app::{
 };
 
 use std::{convert::TryInto, ops::Range, fmt};
+use std::fmt::{Debug, Formatter};
 
 use anyhow::{
     Result,
@@ -294,6 +295,12 @@ pub enum StreamsApiFunction {
     ReceiveCompressedMessageFromAddress = 4,
 }
 
+impl fmt::Display for StreamsApiFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl StreamsApiFunction {
     const SELF_LEN: usize = 4;
 
@@ -382,6 +389,15 @@ impl BinaryPersist for StreamsApiRequest {
     }
 }
 
+impl fmt::Display for StreamsApiRequest {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "StreamsApiRequest:
+                     api_function: {}
+                     address: {}
+                     message bytes length: {}
+                ", self.api_function, self.address, self.message.needed_size())
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -38,11 +38,11 @@
 #define STREAMS_POC_LIB_TEST_WIFI_SSID "Susee Demo"
 #define STREAMS_POC_LIB_TEST_WIFI_PASS "susee-rocks"
 // The url of the iota-bridge to connect to. Needed for Sensor initialization.
-#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.0.101:50000")
+#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.0.100:50000")
 
 // IP address and port of the LoRaWAN AppServer Connector Mockup Tool to connect to.
 // Needed for sending messages.
-#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.0.101:50001")
+#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.0.100:50001")
 
 // Setting STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH to NULL will make the streams-poc-lib
 // using its own vfs_fate partition as been described in streams-poc-lib.h

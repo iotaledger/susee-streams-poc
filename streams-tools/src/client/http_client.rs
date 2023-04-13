@@ -7,6 +7,7 @@ use iota_streams::{
             tangle::{
                 TangleAddress,
                 TangleMessage,
+                AppInst,
                 client::{
                     Details,
                     SendOptions,
@@ -67,7 +68,6 @@ use hyper::{Client as HyperClient, body as hyper_body, Body, client::HttpConnect
 use tokio::time;
 
 use anyhow::bail;
-use iota_streams::app::transport::tangle::AppInst;
 
 pub struct HttpClientOptions<'a> {
     pub http_url: &'a str,

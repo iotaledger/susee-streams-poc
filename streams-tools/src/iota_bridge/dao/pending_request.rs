@@ -1,15 +1,19 @@
-use crate::dao_helpers::{
-    DaoManager,
-    DbSchemaVersionType,
-    DaoDataStore,
-    get_item_from_db,
-    update_db_schema_to_current_version,
+use crate::{
+    helpers::SerializationCallbackRefToClosureI64,
+    dao_helpers::{
+        DaoManager,
+        DbSchemaVersionType,
+        DaoDataStore,
+        get_item_from_db,
+        update_db_schema_to_current_version,
+    }
 };
 
 use serde::{
     Deserialize,
     Serialize
 };
+
 use rusqlite::{
     Connection,
     params,
@@ -17,7 +21,6 @@ use rusqlite::{
 
 use anyhow::Result;
 use std::rc::Rc;
-use crate::helpers::{SerializationCallbackRefToClosureI64};
 
 pub type MsgIdTransferType = Vec<u8>;
 

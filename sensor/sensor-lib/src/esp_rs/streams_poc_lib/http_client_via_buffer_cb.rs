@@ -6,7 +6,8 @@ use iota_streams::{
             TransportOptions,
             tangle::{
                 TangleAddress,
-                TangleMessage
+                TangleMessage,
+                AppInst
             },
         },
     },
@@ -171,7 +172,7 @@ impl HttpClientViaBufferCallback {
             self.request_builder.get_send_message_request_parts(msg, EndpointUris::SEND_MESSAGE, false, None)?
         };
 
-        self.request(req_parts).await?;
+        self.request(req_parts, msg.link.appinst).await?;
         Ok(())
     }
 
@@ -200,7 +201,7 @@ impl HttpClientViaBufferCallback {
             )?
         };
 
-        let response = self.request(req_parts).await?;
+        let response = self.request(req_parts, link.appinst).await?;
 
         log::debug!("[HttpClientViaBufferCallback.recv_message_via_http] check for retrials");
         // TODO: Implement following retrials for bad LoRaWAN connection using EspTimerService if needed.
@@ -304,25 +305,53 @@ impl<'a> Drop for ResponseCallbackScopeManager<'a> {
 
 impl HttpClientViaBufferCallback
 {
-    pub async fn request<'a>(&mut self, req_parts: IotaBridgeRequestParts) -> Result<IotaBridgeResponseParts> {
-        let mut buffer: Vec<u8> = vec![0; req_parts.needed_size()];
-        req_parts.to_bytes(buffer.as_mut_slice())?;
+    pub async fn request<'a>(&mut self, req_parts: IotaBridgeRequestParts, channel_id: AppInst) -> Result<IotaBridgeResponseParts> {
+        let buffer = Self::binary_persist_request(req_parts)?;
         log::debug!("[HttpClientViaBufferCallback.request] IotaBridgeRequestParts bytes to send: Length: {}\n    {:02X?}", buffer.len(), buffer);
-        let response_parts = self.request_via_lorawan(buffer).await?;
+        let mut response_parts = self.request_via_lorawan(buffer).await?;
         log::debug!("[HttpClientViaBufferCallback::request()] response_parts.status_code is {}", response_parts.status_code);
 
         // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
         // http status which indicates that the iota-bridge has stored all needed
         // data to use compressed massages further on.
         if response_parts.status_code == StatusCode::ALREADY_REPORTED {
-            log::info!("[HttpClientViaBufferCallback::request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
+            log::info!("[HttpClientViaBufferCallback::request()] Received StatusCode::ALREADY_REPORTED (208)- Set use_compressed_msg = true");
             self.compressed.set_use_compressed_msg(true);
+        }
+        if response_parts.status_code == StatusCode::UNPROCESSABLE_ENTITY {
+            response_parts = self.handle_request_retransmit(response_parts, channel_id).await?;
         }
 
         log::info!("[HttpClientViaBufferCallback::request()] use_compressed_msg = '{}'", self.compressed.get_use_compressed_msg());
         Ok(response_parts)
     }
 
+    fn binary_persist_request(req_parts: IotaBridgeRequestParts) -> Result<Vec<u8>> {
+        let mut buffer: Vec<u8> = vec![0; req_parts.needed_size()];
+        req_parts.to_bytes(buffer.as_mut_slice())?;
+        Ok(buffer)
+    }
+
+    async fn handle_request_retransmit(&mut self, mut response_parts: IotaBridgeResponseParts, channel_id: AppInst) -> Result<IotaBridgeResponseParts> {
+        let mut retransmit_request = self.request_builder.retransmit(
+            channel_id,
+            &response_parts.body_bytes
+        )?;
+        log::info!("[HttpClientViaBufferCallback::handle_request_retransmit()] Received StatusCode::UNPROCESSABLE_ENTITY (422) - Processing {}",
+            retransmit_request.uri());
+
+        let retransmit_req_parts = IotaBridgeRequestParts::from_request(retransmit_request, false).await;
+        let retransmit_req_bytes = Self::binary_persist_request(retransmit_req_parts)?;
+        response_parts = self.request_via_lorawan(retransmit_req_bytes).await?;
+
+        if response_parts.status_code != StatusCode::ALREADY_REPORTED {
+            log::warn!("[HttpClientViaBufferCallback.handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response_parts.status_code);
+            log::warn!("[HttpClientViaBufferCallback.handle_request_retransmit] Will set use_compressed_msg to false for security reasons");
+            self.compressed.set_use_compressed_msg(false);
+        }
+
+        Ok(response_parts)
+    }
     pub async fn request_via_lorawan(&mut self, buffer: Vec<u8>) -> Result<IotaBridgeResponseParts> {
         let _response_callback_scope_manager = ResponseCallbackScopeManager::new();
         match (self.lorawan_send_callback)(buffer.as_ptr(), buffer.len(), receive_response, self.p_caller_user_data) {

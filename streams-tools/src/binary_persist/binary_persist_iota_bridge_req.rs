@@ -1,12 +1,16 @@
-use hyper::{Body, body, http::{
-    Result,
-    StatusCode,
-    Response as HyperResponse,
-    request::{
-        Builder,
-        Request,
-    }
-}, Method};
+use hyper::{
+    Body, body,
+    http::{
+        Result,
+        StatusCode,
+        Response as HyperResponse,
+        request::{
+            Builder,
+            Request,
+        }
+    },
+    Method
+};
 
 use std::{
     fmt,

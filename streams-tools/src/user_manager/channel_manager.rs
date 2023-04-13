@@ -3,15 +3,22 @@ use iota_streams::{
         Address,
         ChannelType,
         Bytes,
+        PublicKey,
     },
     core::Result,
-    app::transport::tangle::client::Client
+    app::{
+        transport::tangle::client::Client,
+        identifier::Identifier,
+    }
 };
 
 use crate::{
     wallet::plain_text_wallet::PlainTextWallet,
     SimpleWallet,
-    helpers::SerializationCallbackRefToClosureString,
+    helpers::{
+        get_channel_id_from_link,
+        SerializationCallbackRefToClosureString
+    },
 };
 
 use std::{
@@ -23,10 +30,7 @@ use std::{
 };
 
 use futures::executor::block_on;
-use iota_streams::app_channels::api::tangle::PublicKey;
-use iota_streams::app::identifier::Identifier;
 use log;
-use crate::helpers::{get_channel_id_from_link};
 
 pub type Author = iota_streams::app_channels::api::tangle::Author<Client>;
 

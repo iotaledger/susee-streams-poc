@@ -3,6 +3,7 @@ use iota_streams::app::{
         TangleMessage,
         TangleAddress,
         MsgId,
+        AppInst,
         APPINST_SIZE,
         MSGID_SIZE,
     },
@@ -13,8 +14,16 @@ use iota_streams::app::{
     }
 };
 
-use std::{convert::TryInto, ops::Range, fmt};
-use std::fmt::{Debug, Formatter};
+use std::{
+    convert::TryInto,
+    ops::Range,
+    str::FromStr,
+    fmt,
+    fmt::{
+        Debug,
+        Formatter
+    }
+};
 
 use anyhow::{
     Result,
@@ -29,8 +38,6 @@ use crate::binary_persist::{
     serialize_string,
     deserialize_string,
 };
-use iota_streams::app::transport::tangle::AppInst;
-use std::str::FromStr;
 
 pub static TANGLE_ADDRESS_BYTE_LEN: usize = APPINST_SIZE + MSGID_SIZE;
 

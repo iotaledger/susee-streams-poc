@@ -1,17 +1,22 @@
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    rc::Rc,
+};
+
 use rusqlite::{
     Connection,
     Rows,
 };
+
 use serde_rusqlite::from_rows_ref;
+use serde::de::DeserializeOwned;
 
 use anyhow::{
     Result,
     bail,
 };
+
 use fallible_streaming_iterator::FallibleStreamingIterator;
-use serde::de::DeserializeOwned;
-use std::rc::Rc;
 
 pub type DbSchemaVersionType = i32;
 

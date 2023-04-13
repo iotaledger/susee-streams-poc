@@ -1,6 +1,8 @@
 use crate::{
+    helpers::SerializationCallbackRefToClosureString,
     dao_helpers::{
         DaoManager,
+        DaoDataStore,
         DbSchemaVersionType,
         get_item_from_db,
         update_db_schema_to_current_version,
@@ -13,11 +15,11 @@ use serde::{
     Deserialize,
     Serialize
 };
-use rusqlite::{Connection};
+
+use rusqlite::Connection;
 use serde_rusqlite::to_params_named;
 use std::rc::Rc;
-use crate::helpers::SerializationCallbackRefToClosureString;
-use crate::dao_helpers::DaoDataStore;
+
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default, Clone)]
 pub struct User {

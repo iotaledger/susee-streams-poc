@@ -1,9 +1,12 @@
-use crate::dao_helpers::{
-    DaoManager,
-    DbSchemaVersionType,
-    DaoDataStore,
-    get_item_from_db,
-    update_db_schema_to_current_version,
+use crate::{
+    helpers::SerializationCallbackRefToClosureString,
+    dao_helpers::{
+        DaoManager,
+        DbSchemaVersionType,
+        DaoDataStore,
+        get_item_from_db,
+        update_db_schema_to_current_version,
+    }
 };
 
 use serde::{
@@ -15,7 +18,6 @@ use serde_rusqlite::to_params_named;
 
 use anyhow::Result;
 use std::rc::Rc;
-use crate::helpers::SerializationCallbackRefToClosureString;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default, Clone)]
 pub struct LoraWanNode {

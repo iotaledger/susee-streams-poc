@@ -165,7 +165,7 @@ been send. The *IOTA Bridge* then learns which Streams Channel ID is used
 by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI.
 
 The mapping of LoraWAN DevEUI to Streams Channel meta data is stored in a local SQLite3 database.
-The database file "lora-wan-nodes-iota-bridge.sqlite3" is stored in the directory where the
+The database file "iota-bridge.sqlite3" is stored in the directory where the
 *IOTA-Bridge* is started.
 
 To review the data stored in the local SQLite3 database we recommend the

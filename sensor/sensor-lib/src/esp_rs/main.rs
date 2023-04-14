@@ -8,7 +8,7 @@ use super::{
         SubscriberManagerPlainTextWalletHttpClientEspRs,
     },
     http_client_smol_esp_rs::{
-        HttpClient,
+        HttpClientEspRs,
         HttpClientOptions,
     },
 };
@@ -70,7 +70,7 @@ use hyper::{
     }
 };
 
-type ClientType = HttpClient;
+type ClientType = HttpClientEspRs;
 
 fn print_heap_info() {
     unsafe {
@@ -283,9 +283,9 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
     }
 
     async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
-        let client = HttpClient::new(Some(HttpClientOptions{ http_url: self.iota_bridge_url.as_str() }));
+        let client = HttpClientEspRs::new(Some(HttpClientOptions{ http_url: self.iota_bridge_url.as_str() }));
         let (mut subscriber, mut vfs_fat_handle) =
-            create_subscriber::<HttpClient, PlainTextWallet>(client, self.vfs_fat_path.clone()).await?;
+            create_subscriber::<HttpClientEspRs, PlainTextWallet>(client, self.vfs_fat_path.clone()).await?;
 
         print_heap_info();
 

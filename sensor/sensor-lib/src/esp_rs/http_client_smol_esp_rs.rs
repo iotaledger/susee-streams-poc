@@ -92,18 +92,18 @@ impl fmt::Display for HttpClientOptions<'_> {
 }
 
 #[derive(Clone)]
-pub struct HttpClient {
+pub struct HttpClientEspRs {
     request_builder: RequestBuilderStreams,
     tangle_client_options: SendOptions,
     esp_http_client_opt: HttpConfiguration,
     compressed: CompressedStateManager,
 }
 
-impl HttpClient
+impl HttpClientEspRs
 {
     pub fn new(options: Option<HttpClientOptions>) -> Self {
         let options = options.unwrap_or_default();
-        log::debug!("[HttpClient::new()] Creating new HttpClient using options: {}", options);
+        log::debug!("[HttpClientEspRs::new()] Creating new HttpClient using options: {}", options);
         let mut esp_http_client_opt = HttpConfiguration::default();
         esp_http_client_opt.timeout = Some(Duration::from_secs(60));
         Self {
@@ -121,7 +121,7 @@ impl HttpClient
         // http status which indicates that the iota-bridge has stored all needed
         // data to use compressed massages further on.
         if response.status == StatusCode::ALREADY_REPORTED {
-            log::debug!("[HttpClient::request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
+            log::debug!("[HttpClientEspRs::request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
             self.compressed.set_use_compressed_msg(true);
         }
         Ok(response)
@@ -141,8 +141,8 @@ impl HttpClient
     }
 
     async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
-        log::debug!("[HttpClient.recv_message_via_http]");
-        log::debug!("[HttpClient.recv_message_via_http] EspHttpClient created");
+        log::debug!("[HttpClientEspRs.recv_message_via_http]");
+        log::debug!("[HttpClientEspRs.recv_message_via_http] EspHttpClient created");
         let req = if self.compressed.get_use_compressed_msg() {
             let cmpr_link = TangleAddressCompressed::from_tangle_address(link);
             self.request_builder.receive_compressed_message_from_address(&cmpr_link, None)?
@@ -155,11 +155,11 @@ impl HttpClient
     }
 
     async fn handle_recv_message_response<'a>(&mut self, response: SimpleHttpResponse, link: &TangleAddress) -> Result<TangleMessage> {
-        log::debug!("[HttpClient.recv_message_via_http] check for retrials");
+        log::debug!("[HttpClientEspRs.recv_message_via_http] check for retrials");
         // TODO: Implement following retrials using EspTimerService if needed.
         // May be StatusCode::CONTINUE is handled by the EspHttpClient
         if response.status == StatusCode::CONTINUE {
-            log::warn!("[HttpClient.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
+            log::warn!("[HttpClientEspRs.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
             // let periodic = getPeriodicTimer(Duration::from_millis(500), move || {
             //     response = send_hyper_request_via_esp_http(
             //             self.request_builder.receive_message_from_address(link)?
@@ -176,16 +176,16 @@ impl HttpClient
         }
 
         if is_http_status_success(response.status.as_u16()) {
-            log::debug!("[HttpClient.recv_message_via_http] StatusCode is successful: {}", response.status);
-            log::info!("[HttpClient.recv_message_via_http] create TangleMessage ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}",
+            log::debug!("[HttpClientEspRs.recv_message_via_http] StatusCode is successful: {}", response.status);
+            log::info!("[HttpClientEspRs.recv_message_via_http] create TangleMessage ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}",
                        response.body.len(),
                        response.body.as_slice()
             );
             let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&response.body).unwrap();
-            log::debug!("[HttpClient.recv_message_via_http] return ret_val");
+            log::debug!("[HttpClientEspRs.recv_message_via_http] return ret_val");
             Ok(ret_val)
         } else {
-            log::error!("[HttpClient.recv_message_via_http] StatusCode is not OK");
+            log::error!("[HttpClientEspRs.recv_message_via_http] StatusCode is not OK");
             err!(MapStreamsErrors::from_http_status_codes(
                 response.status,
                 Some(link.to_string())
@@ -194,22 +194,22 @@ impl HttpClient
     }
 }
 
-impl CompressedStateSend for HttpClient {
+impl CompressedStateSend for HttpClientEspRs {
     fn subscribe_listener(&mut self, listener: Rc<dyn CompressedStateListen>) -> Result<usize> {
         self.compressed.subscribe_listener(listener)
     }
 
     fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
-        log::debug!("[HttpClient::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
+        log::debug!("[HttpClientEspRs::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
         self.compressed.set_initial_use_compressed_msg_state(use_compressed_msg)
     }
 }
 
 #[async_trait(?Send)]
-impl Transport<TangleAddress, TangleMessage> for HttpClient
+impl Transport<TangleAddress, TangleMessage> for HttpClientEspRs
 {
     async fn send_message(&mut self, msg: &TangleMessage) -> anyhow::Result<()> {
-        log::info!("[HttpClient.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
+        log::info!("[HttpClientEspRs.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
         self.send_message_via_http(msg).await
     }
 
@@ -218,16 +218,16 @@ impl Transport<TangleAddress, TangleMessage> for HttpClient
     }
 
     async fn recv_message(&mut self, link: &TangleAddress) -> anyhow::Result<TangleMessage> {
-        log::debug!("[HttpClient.recv_message]");
+        log::debug!("[HttpClientEspRs.recv_message]");
         let ret_val = self.recv_message_via_http(link).await;
-        log::debug!("[HttpClient.recv_message] ret_val received");
+        log::debug!("[HttpClientEspRs.recv_message] ret_val received");
         match ret_val.as_ref() {
             Ok(msg) => {
-                log::debug!("[HttpClient.recv_message] ret_val Ok");
-                log::info!("[HttpClient.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string())
+                log::debug!("[HttpClientEspRs.recv_message] ret_val Ok");
+                log::info!("[HttpClientEspRs.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string())
             },
             Err(err) => {
-                log::error!("[HttpClient.recv_message] Received streams error: '{}'", err);
+                log::error!("[HttpClientEspRs.recv_message] Received streams error: '{}'", err);
                 ()
             }
         }
@@ -236,14 +236,14 @@ impl Transport<TangleAddress, TangleMessage> for HttpClient
 }
 
 #[async_trait(?Send)]
-impl TransportDetails<TangleAddress> for HttpClient {
+impl TransportDetails<TangleAddress> for HttpClientEspRs {
     type Details = Details;
     async fn get_link_details(&mut self, _link: &TangleAddress) -> anyhow::Result<Self::Details> {
         unimplemented!()
     }
 }
 
-impl TransportOptions for HttpClient {
+impl TransportOptions for HttpClientEspRs {
     type SendOptions = SendOptions;
     fn get_send_options(&self) -> SendOptions {
         self.tangle_client_options.clone()

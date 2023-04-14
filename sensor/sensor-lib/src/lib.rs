@@ -15,7 +15,7 @@ pub use self::esp_rs::{
     },
     streams_poc_lib,
     http_client_smol_esp_rs::{
-        HttpClient,
+        HttpClientEspRs,
         HttpClientOptions,
     },
 };

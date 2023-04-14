@@ -3,7 +3,7 @@ use anyhow::{
 };
 use super::{
     http_client_smol_esp_rs::{
-        HttpClient as HttpClientEspRs,
+        HttpClientEspRs as HttpClientEspRs,
     }
 };
 

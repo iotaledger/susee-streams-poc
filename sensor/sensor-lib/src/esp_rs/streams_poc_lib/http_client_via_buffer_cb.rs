@@ -459,3 +459,37 @@ impl TransportOptions for HttpClientViaBufferCallback {
     fn get_recv_options(&self) {}
     fn set_recv_options(&mut self, _opt: ()) {}
 }
+
+/* Ccurrently, this can not be compiled because of the esp-idf-sys dependency
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_response_callback_scope_manager() {
+        const DATA_TO_SEND: ResponseCallbackBuffer = vec![0, 1, 2, 3, 4, 5, 6, 7];
+        let mut received_data: Some<ResponseCallbackBuffer> = None;
+
+        {
+            let _response_callback_scope_manager = ResponseCallbackScopeManager::new();
+            let response_receiver = get_response_receiver().unwrap();
+            match receiver.recv().await {
+                Ok(response) => {
+                    received_data = Some(DATA_TO_SEND.clone());
+                    assert_eq!(response, DATA_TO_SEND)
+                },
+                Err(e) => {
+                    assert_eq!("Response receiver.recv() failed: {}", response)
+                }
+            }
+            if let Some(response_scope) = unsafe { RESPONSE_CALLBACK_SCOPE.as_ref() } {
+                assert_eq!(response_scope.sender.send(DATA_TO_SEND).await, Ok(()));
+            }
+        }
+
+        assert_eq!(received_data, DATA_TO_SEND);
+        assert_eq!(unsafe {RESPONSE_CALLBACK_SCOPE.is_none() }, true);
+    }
+}
+*/

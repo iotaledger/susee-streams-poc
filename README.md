@@ -169,7 +169,7 @@ as these applications do not need a wallet:
   This way the user state is secured against power outages of the ESP32.
   
 * The *IOTA Bridge* stores a map of LoraWAN DevEUIs and *Streams* channel IDs in a local SQLite3
-  database "lora-wan-nodes-iota-bridge.sqlite3". More details can be found in the 
+  database "iota-bridge.sqlite3". More details can be found in the 
   [Compressed Streams Messages](sensor/README.md#deveuis-and-compressed-streams-messages)
   section.
 

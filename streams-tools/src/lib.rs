@@ -36,11 +36,3 @@ pub use {
 pub use {
     iota_bridge::IotaBridge,
 };
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}

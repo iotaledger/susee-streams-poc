@@ -186,6 +186,10 @@ impl SimpleWallet for PlainTextWallet {
     }
 }
 
+
+// These tests need to be started as follows:
+//      > cargo test --package streams-tools --lib wallet::plain_text_wallet::tests  -- --test-threads=1
+//
 #[cfg(test)]
 mod tests {
     use super::*;

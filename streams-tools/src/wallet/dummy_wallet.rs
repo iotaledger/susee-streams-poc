@@ -23,6 +23,11 @@ impl SimpleWallet for DummyWallet {
     }
 }
 
+
+
+// These tests need to be started as follows:
+//      > cargo test --package streams-tools --lib wallet::dummy_wallet::tests
+//
 #[cfg(test)]
 mod tests {
     use super::*;

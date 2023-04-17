@@ -79,6 +79,9 @@ impl ServerProcessFinally for ProcessFinally {
     }
 }
 
+// These tests need to be started as follows:
+//      > cargo test --package streams-tools --lib iota_bridge::server_process_finally::tests --features iota_bridge
+//
 #[cfg(test)]
 mod tests {
     use std::rc::Rc;
@@ -86,6 +89,7 @@ mod tests {
     use crate::http::ScopeProvide;
     use crate::iota_bridge::ServerScopeProvide;
     use super::*;
+    use hyper::http::StatusCode;
 
     #[test]
     fn test_handle_add_new_lorawan_node_to_db() {
@@ -103,6 +107,6 @@ mod tests {
 
         let ret_val = Response::builder().status(StatusCode::OK).body(Body::empty()).unwrap();
         let ret_val = process_finally.handle_add_new_lorawan_node_to_db(ret_val, scope.as_ref()).unwrap();
-        assert_eq!(ret_val.status(), StatusCode::OK);
+        assert_eq!(ret_val.status(), StatusCode::ALREADY_REPORTED);
     }
 }

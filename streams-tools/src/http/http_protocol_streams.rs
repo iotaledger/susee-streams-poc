@@ -395,6 +395,9 @@ fn get_query_param_retransmit(req_parts: &DispatchedRequestParts) -> StreamsTool
     Ok(String::from(&*request_key_val[0].1))
 }
 
+// These tests need to be started as follows:
+//      > cargo test --package streams-tools --lib http::http_protocol_streams::tests -- --nocapture
+//
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;

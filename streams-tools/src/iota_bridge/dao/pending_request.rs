@@ -155,13 +155,17 @@ impl DaoManager for PendingRequestDaoManager {
 
 pub type PendingRequestDataStore = DaoDataStore<PendingRequestDaoManager>;
 
+// These tests need to be started as follows:
+//      > cargo test --package streams-tools --lib iota_bridge::dao::pending_request::tests  --features iota_bridge
+//
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::helpers::SerializationCallbackRefToClosureI64;
+    use iota_streams::app::transport::tangle::MSGID_SIZE;
 
     const DEV_EUI: &str = "12345678";
-    const MSG_ID: [u8;MSGID_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const MSG_ID: [u8; MSGID_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
     #[test]
     fn test_pending_request_dao_manager() {

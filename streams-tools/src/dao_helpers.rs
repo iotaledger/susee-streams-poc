@@ -237,6 +237,9 @@ impl<DaoManagerT: DaoManager + Clone> DaoDataStore<DaoManagerT> {
 
 }
 
+// These tests need to be started as follows:
+//      > cargo test --package streams-tools --features dao --lib dao_helpers::tests
+//
 #[cfg(test)]
 mod tests {
     use rusqlite::params;

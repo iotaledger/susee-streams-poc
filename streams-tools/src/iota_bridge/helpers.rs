@@ -69,6 +69,9 @@ pub fn log_err_and_respond_500(err: anyhow::Error, fn_name: &str) -> Result<Resp
     builder.body(Default::default())
 }
 
+// These tests need to be started as follows:
+//      > cargo test --package streams-tools --lib iota_bridge::helpers::tests --features iota_bridge
+//
 #[cfg(test)]
 mod tests {
     use super::*;

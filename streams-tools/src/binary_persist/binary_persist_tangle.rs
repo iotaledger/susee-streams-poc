@@ -406,6 +406,9 @@ impl fmt::Display for StreamsApiRequest {
     }
 }
 
+// These tests need to be started as follows:
+//      > cargo test --package streams-tools --lib binary_persist::binary_persist_tangle::tests
+//
 #[cfg(test)]
 mod tests {
     use super::*;

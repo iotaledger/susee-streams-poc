@@ -32,8 +32,6 @@ use log;
 
 use streams_tools::{
     binary_persist::{
-        BinaryPersist,
-        EnumeratedPersistable,
         Command,
     },
     http::{

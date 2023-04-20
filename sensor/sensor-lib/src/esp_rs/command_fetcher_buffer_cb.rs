@@ -6,21 +6,6 @@ use hyper::{
     }
 };
 
-use embedded_svc::{
-    io::Read,
-    http::{
-        Status,
-        Headers,
-        client::{
-            Client as HttpClient,
-        }
-    }
-};
-
-use esp_idf_svc::http::client::{
-    EspHttpConnection,
-};
-
 use anyhow::{
     Result,
     bail,
@@ -33,25 +18,18 @@ use log;
 use streams_tools::{
     binary_persist::{
         BinaryPersist,
-        EnumeratedPersistable,
         Command,
         HeaderFlags,
     },
     http::{
         http_protocol_command::EndpointUris as EndpointUrisCommand,
     },
-    STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
 };
 
 use crate::{
     command_fetcher::{
         CommandFetcher,
         deserialize_command,
-    },
-    esp_rs::hyper_esp_rs_tools::{
-        HyperEsp32Client,
-        EspHttpResponse,
-        UserAgentName,
     },
     request_via_buffer_cb::{
         RequestViaBufferCallbackOptions,
@@ -60,7 +38,6 @@ use crate::{
 };
 
 use streams_tools::binary_persist::binary_persist_iota_bridge_req::{IotaBridgeResponseParts, IotaBridgeRequestParts, HttpMethod};
-use streams_tools::http::RequestBuilderStreams;
 use iota_streams::core::async_trait;
 
 #[derive(Clone)]
@@ -92,11 +69,9 @@ pub struct CommandFetcherBufferCb {
 
 impl CommandFetcherBufferCb {
 
-    fn deserialize_command(& self, mut response: IotaBridgeResponseParts) -> Result<(Command, Vec<u8>)> {
-        let mut ret_val = (Command::NO_COMMAND, Vec::<u8>::default());
+    fn deserialize_command(& self, response: IotaBridgeResponseParts) -> Result<(Command, Vec<u8>)> {
         log::debug!("[CommandFetcherBufferCb.deserialize_command] response.body_bytes.len() = {}", response.body_bytes.len());
-        ret_val = deserialize_command(response.body_bytes)?;
-        Ok(ret_val)
+        deserialize_command(response.body_bytes)
     }
 }
 

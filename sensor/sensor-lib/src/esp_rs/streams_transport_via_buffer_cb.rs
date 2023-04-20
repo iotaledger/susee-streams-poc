@@ -59,35 +59,10 @@ use iota_client_types::{
     SendOptions
 };
 
-
-use smol::channel::{
-    bounded,
-    Sender,
-    Receiver,
+use crate::request_via_buffer_cb::{
+    RequestViaBufferCallback,
+    RequestViaBufferCallbackOptions
 };
-
-use crate::request_via_buffer_cb::{RequestViaBufferCallback, RequestViaBufferCallbackOptions};
-use std::convert::TryInto;
-
-pub type ResponseCallbackBuffer = Vec<u8>;
-pub type ResponseCallbackSender = Sender<ResponseCallbackBuffer>;
-pub type ResponseCallbackReceiver = Receiver<ResponseCallbackBuffer>;
-
-pub struct ResponseCallbackScope {
-    pub sender: ResponseCallbackSender,
-    pub receiver: ResponseCallbackReceiver,
-}
-
-impl ResponseCallbackScope {
-    pub fn new() -> Self {
-        let (sender, receiver) = bounded::<ResponseCallbackBuffer>(1);
-        Self{
-            sender,
-            receiver,
-        }
-    }
-}
-
 
 #[derive(Clone)]
 pub struct StreamsTransportViaBufferCallback {
@@ -122,7 +97,7 @@ impl StreamsTransportViaBufferCallback {
     }
 
     async fn recv_message_via_lorawan(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
-        log::debug!("[HttpClientViaBufferCallback.recv_message_via_http]");
+        log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http]");
         let req_parts = if self.compressed.get_use_compressed_msg() {
             // We do not set the dev_eui here because it will be communicated by the LoraWAN network
             // and therefore will not be send as lorawan payload.
@@ -148,22 +123,22 @@ impl StreamsTransportViaBufferCallback {
 
         let response = self.request(req_parts, link.appinst).await?;
 
-        log::debug!("[HttpClientViaBufferCallback.recv_message_via_http] check for retrials");
+        log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] check for retrials");
         // TODO: Implement following retrials for bad LoRaWAN connection using EspTimerService if needed.
         // May be we need to introduce StatusCode::CONTINUE in cases where LoRaWAN connection
         // is sometimes too bad and retries are a valid strategy to receive the response
         if response.status_code == StatusCode::CONTINUE {
-            log::warn!("[HttpClientViaBufferCallback.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
+            log::warn!("[StreamsTransportViaBufferCallback.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
         }
 
         if response.status_code.is_success() {
-            log::debug!("[HttpClientViaBufferCallback.recv_message_via_http] StatusCode is successful: {}", response.status_code);
-            log::info!("[HttpClientViaBufferCallback.recv_message_via_http] Received response with content length of {}", response.body_bytes.len());
+            log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] StatusCode is successful: {}", response.status_code);
+            log::info!("[StreamsTransportViaBufferCallback.recv_message_via_http] Received response with content length of {}", response.body_bytes.len());
             let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&response.body_bytes.as_slice()).unwrap();
-            log::debug!("[HttpClientViaBufferCallback.recv_message_via_http] return ret_val");
+            log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] return ret_val");
             Ok(ret_val)
         } else {
-            log::error!("[HttpClientViaBufferCallback.recv_message_via_http] StatusCode is not OK");
+            log::error!("[StreamsTransportViaBufferCallback.recv_message_via_http] StatusCode is not OK");
             err!(MapStreamsErrors::from_http_status_codes(
                 response.status_code,
                  Some(link.to_string())
@@ -176,31 +151,31 @@ impl StreamsTransportViaBufferCallback
 {
     pub async fn request<'a>(&mut self, req_parts: IotaBridgeRequestParts, channel_id: AppInst) -> Result<IotaBridgeResponseParts> {
         let buffer: Vec<u8> = req_parts.as_vecu8()?;
-        log::debug!("[HttpClientViaBufferCallback.request] IotaBridgeRequestParts bytes to send: Length: {}\n    {:02X?}", buffer.len(), buffer);
+        log::debug!("[StreamsTransportViaBufferCallback.request] IotaBridgeRequestParts bytes to send: Length: {}\n    {:02X?}", buffer.len(), buffer);
         let mut response_parts = self.request_via_cb.request_via_buffer_callback(buffer).await?;
-        log::debug!("[HttpClientViaBufferCallback::request()] response_parts.status_code is {}", response_parts.status_code);
+        log::debug!("[StreamsTransportViaBufferCallback::request()] response_parts.status_code is {}", response_parts.status_code);
 
         // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
         // http status which indicates that the iota-bridge has stored all needed
         // data to use compressed massages further on.
         if response_parts.status_code == StatusCode::ALREADY_REPORTED {
-            log::info!("[HttpClientViaBufferCallback::request()] Received StatusCode::ALREADY_REPORTED (208)- Set use_compressed_msg = true");
+            log::info!("[StreamsTransportViaBufferCallback::request()] Received StatusCode::ALREADY_REPORTED (208)- Set use_compressed_msg = true");
             self.compressed.set_use_compressed_msg(true);
         }
         if response_parts.status_code == StatusCode::UNPROCESSABLE_ENTITY {
             response_parts = self.handle_request_retransmit(response_parts, channel_id).await?;
         }
 
-        log::info!("[HttpClientViaBufferCallback::request()] use_compressed_msg = '{}'", self.compressed.get_use_compressed_msg());
+        log::info!("[StreamsTransportViaBufferCallback::request()] use_compressed_msg = '{}'", self.compressed.get_use_compressed_msg());
         Ok(response_parts)
     }
 
     async fn handle_request_retransmit(&mut self, mut response_parts: IotaBridgeResponseParts, channel_id: AppInst) -> Result<IotaBridgeResponseParts> {
-        let mut retransmit_request = self.request_builder.retransmit(
+        let retransmit_request = self.request_builder.retransmit(
             channel_id,
             &response_parts.body_bytes
         )?;
-        log::info!("[HttpClientViaBufferCallback::handle_request_retransmit()] Received StatusCode::UNPROCESSABLE_ENTITY (422) - Processing {}",
+        log::info!("[StreamsTransportViaBufferCallback::handle_request_retransmit()] Received StatusCode::UNPROCESSABLE_ENTITY (422) - Processing {}",
             retransmit_request.uri());
 
         let retransmit_req_parts = IotaBridgeRequestParts::from_request(retransmit_request, false).await;
@@ -208,8 +183,8 @@ impl StreamsTransportViaBufferCallback
         response_parts = self.request_via_cb.request_via_buffer_callback(retransmit_req_bytes).await?;
 
         if response_parts.status_code != StatusCode::ALREADY_REPORTED {
-            log::warn!("[HttpClientViaBufferCallback.handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response_parts.status_code);
-            log::warn!("[HttpClientViaBufferCallback.handle_request_retransmit] Will set use_compressed_msg to false for security reasons");
+            log::warn!("[StreamsTransportViaBufferCallback.handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response_parts.status_code);
+            log::warn!("[StreamsTransportViaBufferCallback.handle_request_retransmit] Will set use_compressed_msg to false for security reasons");
             self.compressed.set_use_compressed_msg(false);
         }
 
@@ -223,7 +198,7 @@ impl CompressedStateSend for StreamsTransportViaBufferCallback {
     }
 
     fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
-        log::debug!("[HttpClientViaBufferCallback::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
+        log::debug!("[StreamsTransportViaBufferCallback::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
         self.compressed.set_initial_use_compressed_msg_state(use_compressed_msg)
     }
 }
@@ -232,7 +207,7 @@ impl CompressedStateSend for StreamsTransportViaBufferCallback {
 impl Transport<TangleAddress, TangleMessage> for StreamsTransportViaBufferCallback
 {
     async fn send_message(&mut self, msg: &TangleMessage) -> anyhow::Result<()> {
-        log::info!("[HttpClientViaBufferCallback.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
+        log::info!("[StreamsTransportViaBufferCallback.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
         self.send_message_via_lorawan(msg).await
     }
 
@@ -241,16 +216,16 @@ impl Transport<TangleAddress, TangleMessage> for StreamsTransportViaBufferCallba
     }
 
     async fn recv_message(&mut self, link: &TangleAddress) -> anyhow::Result<TangleMessage> {
-        log::debug!("[HttpClientViaBufferCallback.recv_message]");
+        log::debug!("[StreamsTransportViaBufferCallback.recv_message]");
         let ret_val = self.recv_message_via_lorawan(link).await;
-        log::debug!("[HttpClientViaBufferCallback.recv_message] ret_val received");
+        log::debug!("[StreamsTransportViaBufferCallback.recv_message] ret_val received");
         match ret_val.as_ref() {
             Ok(msg) => {
-                log::debug!("[HttpClientViaBufferCallback.recv_message] ret_val Ok");
-                log::info!("[HttpClientViaBufferCallback.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string())
+                log::debug!("[StreamsTransportViaBufferCallback.recv_message] ret_val Ok");
+                log::info!("[StreamsTransportViaBufferCallback.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string())
             },
             Err(err) => {
-                log::error!("[HttpClientViaBufferCallback.recv_message] Received streams error: '{}'", err);
+                log::error!("[StreamsTransportViaBufferCallback.recv_message] Received streams error: '{}'", err);
                 ()
             }
         }

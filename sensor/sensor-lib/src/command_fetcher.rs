@@ -1,16 +1,14 @@
-use streams_tools::binary_persist::{Command, EnumeratedPersistable, BinaryPersist};
-use std::io::Read;
-
+use streams_tools::binary_persist::{
+    Command,
+    EnumeratedPersistable,
+    BinaryPersist
+};
 
 use iota_streams::core::async_trait;
+
 use hyper::{
     Body as HyperBody,
     http::Request as HyperRequest,
-};
-use streams_tools::binary_persist::binary_persist_iota_bridge_req::IotaBridgeResponseParts;
-
-use anyhow::{
-    Result,
 };
 
 #[async_trait(?Send)]
@@ -23,7 +21,8 @@ pub trait CommandFetcher {
     async fn send_confirmation(&self, confirmation_request: HyperRequest<HyperBody>) -> anyhow::Result<()>;
 }
 
-pub (crate) fn deserialize_command(mut buffer: Vec<u8>) -> anyhow::Result<(Command, Vec<u8>)> {
+#[cfg_attr(feature = "std", allow(dead_code))]
+pub (crate) fn deserialize_command(buffer: Vec<u8>) -> anyhow::Result<(Command, Vec<u8>)> {
     let mut ret_val = (Command::NO_COMMAND, Vec::<u8>::default());
     let content_len: usize = buffer.len();
     if content_len >= Command::LENGTH_BYTES {

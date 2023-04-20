@@ -36,14 +36,12 @@ use streams_tools::{
         SubscriberStatus,
         Command,
     },
-    PlainTextWallet,
     http::http_protocol_confirm::RequestBuilderConfirm,
     remote::command_processor::{
         CommandProcessor,
         SensorFunctions,
         CommandFetchLoopOptions,
         run_command_fetch_loop,
-        process_sensor_commands,
     }
 };
 
@@ -61,7 +59,6 @@ use iota_streams::{
 use core::str::FromStr;
 
 use anyhow::{
-    anyhow,
     Result,
 };
 

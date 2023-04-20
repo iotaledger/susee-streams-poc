@@ -4,7 +4,6 @@ use streams_tools::{
     binary_persist::{
         BinaryPersist,
         binary_persist_iota_bridge_req::{
-            IotaBridgeRequestParts,
             IotaBridgeResponseParts,
         },
     }

@@ -42,7 +42,7 @@ use crate::{
             QueryParameters
         }
     },
-    client_base::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
+    streams_transport::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
     binary_persist::{
         BinaryPersist,
         TangleMessageCompressed,
@@ -59,23 +59,29 @@ use crate::{
     }
 };
 
-use hyper::{Client as HyperClient, body as hyper_body, Body, client::HttpConnector, http::{
-    StatusCode,
-    Request,
-    Response,
-}, body};
+use hyper::{
+    Client as HyperClient,
+    body as hyper_body,
+    Body,
+    client::HttpConnector, http::{
+        StatusCode,
+        Request,
+        Response,
+    },
+    body
+};
 
 use tokio::time;
 
 use anyhow::bail;
 
-pub struct HttpClientOptions<'a> {
+pub struct StreamsTransportSocketOptions<'a> {
     pub http_url: &'a str,
     pub dev_eui: Option<String>,
     pub use_lorawan_rest: bool,
 }
 
-impl<'a> HttpClientOptions<'a> {
+impl<'a> StreamsTransportSocketOptions<'a> {
     pub fn new(http_url: &'a str) -> Self {
         let mut ret_val = Self::default();
         ret_val.http_url = http_url;
@@ -83,7 +89,7 @@ impl<'a> HttpClientOptions<'a> {
     }
 }
 
-impl Default for HttpClientOptions<'_> {
+impl Default for StreamsTransportSocketOptions<'_> {
     fn default() -> Self {
         Self {
             http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
@@ -93,9 +99,9 @@ impl Default for HttpClientOptions<'_> {
     }
 }
 
-impl fmt::Display for HttpClientOptions<'_> {
+impl fmt::Display for StreamsTransportSocketOptions<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "HttpClientOptions:\n     http_url: {},\n     dev_eui:  {},\n     use_lorawan_rest:  {}",
+        write!(f, "StreamsTransportSocketOptions:\n     http_url: {},\n     dev_eui:  {},\n     use_lorawan_rest:  {}",
             self.http_url,
             if let Some(eui) = &self.dev_eui {eui.as_str()} else {""},
             self.use_lorawan_rest
@@ -104,7 +110,7 @@ impl fmt::Display for HttpClientOptions<'_> {
 }
 
 #[derive(Clone)]
-pub struct HttpClient {
+pub struct StreamsTransportSocket {
     tangle_client_options: SendOptions,
     hyper_client: HyperClient<HttpConnector, Body>,
     request_builder_streams: RequestBuilderStreams,
@@ -114,11 +120,11 @@ pub struct HttpClient {
     use_lorawan_rest: bool,
 }
 
-impl HttpClient
+impl StreamsTransportSocket
 {
-    pub fn new(options: Option<HttpClientOptions>) -> Self {
+    pub fn new(options: Option<StreamsTransportSocketOptions>) -> Self {
         let options = options.unwrap_or_default();
-        println!("[HttpClient.new_from_url()] Initializing instance with options:\n{}\n", options);
+        println!("[StreamsTransportSocket.new_from_url()] Initializing instance with options:\n{}\n", options);
         Self {
             tangle_client_options: SendOptions::default(),
             hyper_client: HyperClient::new(),
@@ -131,7 +137,7 @@ impl HttpClient
     }
 }
 
-impl HttpClient
+impl StreamsTransportSocket
 {
     fn get_lorawan_rest_request(&self, req_parts: IotaBridgeRequestParts) -> Result<Request<Body>>{
         let mut buffer: Vec<u8> = vec![0; req_parts.needed_size()];
@@ -141,7 +147,7 @@ impl HttpClient
                 .expect("Error on creating hyper request for lorawan-rest/post_binary_request call")
             )
         } else {
-            bail!("You need to specify a dev_eui in the HttpClientOptions to use the lorawan-rest API with this HttpClient" )
+            bail!("You need to specify a dev_eui in the StreamsTransportSocketOptions to use the lorawan-rest API with this StreamsTransportSocket" )
         }
     }
 
@@ -171,7 +177,7 @@ impl HttpClient
             .expect("Error while sending request via hyper_client");
 
         if self.use_lorawan_rest {
-            response = HttpClient::handle_lorawan_rest_response(response).await
+            response = StreamsTransportSocket::handle_lorawan_rest_response(response).await
                 .expect("Error while handling the lorawan_rest_response");
         }
         response
@@ -192,8 +198,8 @@ impl HttpClient
         let response = self.get_request_response(retransmit_request).await;
 
         if response.status() != StatusCode::ALREADY_REPORTED {
-            log::warn!("[HttpClient.handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response.status());
-            log::warn!("[HttpClient.handle_request_retransmit] Will set use_compressed_msg to false for security reasons");
+            log::warn!("[StreamsTransportSocket.handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response.status());
+            log::warn!("[StreamsTransportSocket.handle_request_retransmit] Will set use_compressed_msg to false for security reasons");
             self.compressed.set_use_compressed_msg(false);
         }
 
@@ -207,18 +213,18 @@ impl HttpClient
             if bytes.len() > 0 {
                 match IotaBridgeResponseParts::try_from_bytes(bytes.to_vec().as_slice()) {
                     Ok(response_parts) => {
-                        log::debug!("[HttpClient.request] Successfully deserialized response_parts:\n{}", response_parts);
+                        log::debug!("[StreamsTransportSocket.request] Successfully deserialized response_parts:\n{}", response_parts);
                         if !response_parts.status_code.is_success() {
                             let err_msg = String::from_utf8(response_parts.body_bytes.clone())
                                 .unwrap_or(String::from("Could not deserialize Error message from response Body"));
-                            log::debug!("[HttpClient.request] Response status is not successful: Error message is:\n{}", err_msg);
+                            log::debug!("[StreamsTransportSocket.request] Response status is not successful: Error message is:\n{}", err_msg);
                         }
                         ret_val = Response::builder()
                             .status(response_parts.status_code)
                             .body(Body::from(response_parts.body_bytes))?;
                     },
                     Err(e) => {
-                        log::debug!("[HttpClient.request] Error on deserializing response_parts: {}", e);
+                        log::debug!("[StreamsTransportSocket.request] Error on deserializing response_parts: {}", e);
                         bail!("Could not deserialize response binary to valid IotaBridgeResponseParts: {}", e)
                     }
                 }
@@ -226,19 +232,18 @@ impl HttpClient
                 bail!("Received 0 bytes response from server.")
             }
         } else {
-            log::error!("[HttpClient.request] Received HTTP Error from Iota-Bridge. Status: {}", ret_val.status());
-            log::error!("[HttpClient.request] Returning original lorawan-rest response");
+            log::error!("[StreamsTransportSocket.request] Received HTTP Error from Iota-Bridge. Status: {}", ret_val.status());
+            log::error!("[StreamsTransportSocket.request] Returning original lorawan-rest response");
         }
         Ok(ret_val)
     }
 
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
         let req_parts = if self.compressed.get_use_compressed_msg() {
-            // In contrast to http_client_lorawan::HttpClient we set the dev_eui here because it could be
+            // In contrast to StreamsTransportViaBufferCallback we set the dev_eui here because it could be
             // used in cases where the lorawan-rest API is not used for compressed messages.
-            // http_client_lorawan::HttpClient never sets the DevEUI because it is communicated by the
-            // LoraWAN network automatically (compare comment in function HttpClient::recv_message_via_http()
-            // in sensor/sensor-lib/src/esp_rs/streams_poc_lib/http_client_lorawan.rs).
+            // StreamsTransportViaBufferCallback never sets the DevEUI because it is communicated by the
+            // LoraWAN network automatically (compare comment in function StreamsTransportViaBufferCallback::recv_message_via_http()
             let cmpr_message = TangleMessageCompressed::from_tangle_message(msg);
             self.request_builder_streams.get_send_message_request_parts(&cmpr_message, EndpointUris::SEND_COMPRESSED_MESSAGE, true, self.dev_eui.clone())?
         } else {
@@ -297,7 +302,7 @@ impl HttpClient
     }
 }
 
-impl CompressedStateSend for HttpClient {
+impl CompressedStateSend for StreamsTransportSocket {
     fn subscribe_listener(&mut self, listener: Rc<dyn CompressedStateListen>) -> Result<usize> {
         self.compressed.subscribe_listener(listener)
     }
@@ -308,10 +313,10 @@ impl CompressedStateSend for HttpClient {
 }
 
 #[async_trait(?Send)]
-impl Transport<TangleAddress, TangleMessage> for HttpClient
+impl Transport<TangleAddress, TangleMessage> for StreamsTransportSocket
 {
     async fn send_message(&mut self, msg: &TangleMessage) -> Result<()> {
-        println!("[HttpClient.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n",
+        println!("[StreamsTransportSocket.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n",
                  msg.body.as_bytes().len() as u32, msg.body.to_string());
         self.send_message_via_http(msg).await
     }
@@ -323,7 +328,7 @@ impl Transport<TangleAddress, TangleMessage> for HttpClient
     async fn recv_message(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         let ret_val = self.recv_message_via_http(link).await;
         match ret_val.as_ref() {
-            Ok(msg) => println!("[HttpClient.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n",
+            Ok(msg) => println!("[StreamsTransportSocket.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n",
                                 msg.body.as_bytes().len() as u32, msg.body.to_string()),
             _ => ()
         }
@@ -332,14 +337,14 @@ impl Transport<TangleAddress, TangleMessage> for HttpClient
 }
 
 #[async_trait(?Send)]
-impl TransportDetails<TangleAddress> for HttpClient {
+impl TransportDetails<TangleAddress> for StreamsTransportSocket {
     type Details = Details;
     async fn get_link_details(&mut self, _link: &TangleAddress) -> Result<Self::Details> {
         unimplemented!()
     }
 }
 
-impl TransportOptions for HttpClient {
+impl TransportOptions for StreamsTransportSocket {
     type SendOptions = SendOptions;
     fn get_send_options(&self) -> SendOptions {
         self.tangle_client_options.clone()

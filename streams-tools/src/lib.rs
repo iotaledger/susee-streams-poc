@@ -3,7 +3,7 @@
 
 pub mod wallet;
 pub mod user_manager;
-pub mod client;
+pub mod streams_transport;
 pub mod http;
 pub mod binary_persist;
 pub mod remote;
@@ -22,7 +22,7 @@ pub use {
         dummy_wallet::DummyWallet,
         simple_wallet::SimpleWallet,
     },
-    client::*,
+    streams_transport::*,
     user_manager::*,
 };
 

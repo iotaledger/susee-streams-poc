@@ -7,7 +7,7 @@ use iota_streams::{
             tangle::{
                 TangleAddress,
                 TangleMessage,
-                client::{
+                streams_transport::{
                     Client,
                     Details,
                     SendOptions,
@@ -79,7 +79,7 @@ fn get_folder_from_client_role(client_role: ClientRole) -> InputOutputFolders {
 }
 
 #[derive(Clone)]
-pub struct FileStreamClient<F> {
+pub struct StreamsTransportFile<F> {
     phantom: PhantomData<F>,
     client: Client,
     number_of_written_files: u32,
@@ -88,7 +88,7 @@ pub struct FileStreamClient<F> {
     pub output_folder_path: String,
 }
 
-impl<F> WrappedClient for FileStreamClient<F>
+impl<F> WrappedClient for StreamsTransportFile<F>
     where
         F: 'static + core::marker::Send + core::marker::Sync,
 {
@@ -107,7 +107,7 @@ impl<F> WrappedClient for FileStreamClient<F>
     }
 }
 
-impl<F> FileStreamClient<F>
+impl<F> StreamsTransportFile<F>
     where
         F: 'static + core::marker::Send + core::marker::Sync,
 {
@@ -117,7 +117,7 @@ impl<F> FileStreamClient<F>
             create_dir_all(self.output_folder_path.as_str())?;
         }
         if !path_out_dir.is_dir() {
-            panic!("[FileStreamClient.create_output_file] Output loder path '{}' is not a directory.", self.output_folder_path);
+            panic!("[StreamsTransportFile.create_output_file] Output loder path '{}' is not a directory.", self.output_folder_path);
         }
         let file_path_and_name = String::from(format!("{}/msg_{:04}-{}",
                                                       self.output_folder_path,
@@ -151,10 +151,10 @@ impl<F> FileStreamClient<F>
                     return Ok(file_result);
                 }
             } else {
-                println!("[FileStreamClient.send_message] Could not find file name");
+                println!("[StreamsTransportFile.send_message] Could not find file name");
             }
         }
-        panic!("[FileStreamClient.send_message] Could not find message file for address {}", link.to_string());
+        panic!("[StreamsTransportFile.send_message] Could not find message file for address {}", link.to_string());
     }
 
     fn read_message_from_file(&mut self, link: &TangleAddress) -> Result<TangleMessage<F>> {
@@ -183,12 +183,12 @@ impl<F> FileStreamClient<F>
 }
 
 #[async_trait(?Send)]
-impl<F> Transport<TangleAddress, TangleMessage<F>> for FileStreamClient<F>
+impl<F> Transport<TangleAddress, TangleMessage<F>> for StreamsTransportFile<F>
     where
         F: 'static + core::marker::Send + core::marker::Sync,
 {
     async fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
-        println!("[FileStreamClient.send_message] Sending message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string());
+        println!("[StreamsTransportFile.send_message] Sending message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string());
         self.write_message_to_file(msg)
     }
 
@@ -197,7 +197,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for FileStreamClient<F>
         match ret_val.as_ref() {
             Ok(msg_vec) => {
                 for (idx, msg) in msg_vec.iter().enumerate() {
-                    println!("[FileStreamClient.recv_messages] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, msg.binary.body.bytes.len(), msg.binary.to_string())
+                    println!("[StreamsTransportFile.recv_messages] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, msg.binary.body.bytes.len(), msg.binary.to_string())
                 }
             },
             _ => ()
@@ -208,7 +208,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for FileStreamClient<F>
     async fn recv_message(&mut self, link: &TangleAddress) -> Result<TangleMessage<F>> {
         let ret_val = self.read_message_from_file(link);
         match ret_val.as_ref() {
-            Ok(msg) => println!("[FileStreamClient.recv_message] Receiving message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string()),
+            Ok(msg) => println!("[StreamsTransportFile.recv_message] Receiving message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string()),
             _ => ()
         }
         ret_val
@@ -216,14 +216,14 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for FileStreamClient<F>
 }
 
 #[async_trait(?Send)]
-impl<F> TransportDetails<TangleAddress> for FileStreamClient<F> {
+impl<F> TransportDetails<TangleAddress> for StreamsTransportFile<F> {
     type Details = Details;
     async fn get_link_details(&mut self, link: &TangleAddress) -> Result<Self::Details> {
         self.client.get_link_details(link).await
     }
 }
 
-impl<F> TransportOptions for FileStreamClient<F> {
+impl<F> TransportOptions for StreamsTransportFile<F> {
     type SendOptions = SendOptions;
     fn get_send_options(&self) -> SendOptions {
         self.client.get_send_options()

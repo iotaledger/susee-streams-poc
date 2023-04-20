@@ -1,9 +1,9 @@
 use streams_tools::{
-    HttpClient,
+    StreamsTransportSocket,
     SubscriberManagerPlainTextWallet
 };
 
-pub type ClientType = HttpClient; // CaptureClient; //
+pub type ClientType = StreamsTransportSocket; // CaptureClient; //
 type SubscriberManagerPlainTextWalletHttpClient = SubscriberManagerPlainTextWallet<ClientType>;
 
 

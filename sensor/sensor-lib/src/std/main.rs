@@ -23,7 +23,7 @@ use crate::{
 
 use streams_tools::{
     PlainTextWallet,
-    http_client::HttpClientOptions,
+    streams_transport_socket::StreamsTransportSocketOptions,
     http::http_protocol_confirm::RequestBuilderConfirm,
     binary_persist::Command,
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
@@ -82,7 +82,7 @@ pub fn manage_mocked_lorawan_dev_eui(wallet: &mut PlainTextWallet) {
 
 pub async fn create_subscriber_manager<'a>(cli: &SensorCli<'a>) -> Result<SubscriberManagerPlainTextWalletHttpClient> {
     let mut wallet = get_wallet(&cli)?;
-    let mut http_client_options: HttpClientOptions = HttpClientOptions::default();
+    let mut http_client_options: StreamsTransportSocketOptions = StreamsTransportSocketOptions::default();
     if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
         http_client_options.http_url = iota_bridge_url;
     }

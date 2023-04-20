@@ -1,12 +1,12 @@
-pub mod client_base;
+pub mod streams_transport;
 
 #[cfg(feature = "std")]
-pub mod capture_client;
+pub mod streams_transport_capture;
 #[cfg(feature = "std")]
-pub mod http_client;
+pub mod streams_transport_socket;
 
 pub use {
-    client_base::{
+    streams_transport::{
         STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT,
         STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
         STREAMS_TOOLS_CONST_DEFAULT_TCP_LISTENER_ADDRESS,
@@ -16,6 +16,6 @@ pub use {
 
 #[cfg(feature = "std")]
 pub use {
-    capture_client::CaptureClient,
-    http_client::HttpClient,
+    streams_transport_capture::StreamsTransportCapture,
+    streams_transport_socket::StreamsTransportSocket,
 };

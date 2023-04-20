@@ -41,6 +41,13 @@ esp_idf = [
     "susee-tools/esp_idf",
 ]
 
+tokio_test = [
+    "tokio/macros",
+    "tokio/rt",
+    "tokio/time",
+    "cty",
+]
+
 [dependencies]
 # bindgen = "0.58"
 # cbindgen = "0.19"

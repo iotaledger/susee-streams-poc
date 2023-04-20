@@ -234,6 +234,7 @@ impl BinaryPersist for IotaBridgeRequestParts {
 }
 
 
+#[derive(Debug, PartialEq)]
 pub struct IotaBridgeResponseParts {
     pub body_bytes: Vec<u8>,
     pub status_code: StatusCode,

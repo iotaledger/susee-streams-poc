@@ -24,6 +24,7 @@ mod ffi {
 /// The contained values are just for example purposes.
 /// The final list will differ a lot.
 #[allow(non_camel_case_types)]
+#[derive(PartialEq, Debug)]
 pub enum StreamsError {
     STREAMS_OK = 1,
     STREAMS_UNKNOWN_ERROR = -1,

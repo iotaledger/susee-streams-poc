@@ -1,19 +1,22 @@
 use super::{
-    command_fetcher::{
-        CommandFetcher,
-        CommandFetcherOptions,
+    command_fetcher_socket::{
+        CommandFetcherSocket,
+        CommandFetcherSocketOptions,
     },
     esp32_subscriber_tools::{
         create_subscriber,
-        SubscriberManagerPlainTextWalletHttpClientEspRs,
+        SubscriberManagerPlainTextWalletTransportSocketEspRs,
     },
-    http_client_smol_esp_rs::{
-        HttpClientEspRs,
-        HttpClientOptions,
+    streams_transport_socket_esprs::{
+        StreamsTransportSocketEspRs,
+        StreamsTransportSocketEspRsOptions,
     },
 };
 
-use crate::esp_rs::streams_poc_lib::api_types::send_request_via_lorawan_t;
+use crate::{
+    command_fetcher::CommandFetcher,
+    streams_poc_lib_api_types::send_request_via_lorawan_t
+};
 
 use payloads::{
     Message,
@@ -69,8 +72,10 @@ use hyper::{
         status,
     }
 };
+use crate::esp_rs::command_fetcher_buffer_cb::{CommandFetcherBufferCb, CommandFetcherBufferCbOptions};
+use crate::request_via_buffer_cb::RequestViaBufferCallbackOptions;
 
-type ClientType = HttpClientEspRs;
+type ClientType = StreamsTransportSocketEspRs;
 
 fn print_heap_info() {
     unsafe {
@@ -98,7 +103,7 @@ fn println_subscription_details(subscriber: &Subscriber<ClientType>, subscriptio
 }
 
 fn println_subscriber_status<'a> (
-    subscriber_manager: &SubscriberManagerPlainTextWalletHttpClientEspRs,
+    subscriber_manager: &SubscriberManagerPlainTextWalletTransportSocketEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -149,7 +154,7 @@ fn println_subscriber_status<'a> (
 }
 
 async fn clear_client_state<'a> (
-    subscriber_manager: &mut SubscriberManagerPlainTextWalletHttpClientEspRs,
+    subscriber_manager: &mut SubscriberManagerPlainTextWalletTransportSocketEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -159,7 +164,7 @@ async fn clear_client_state<'a> (
 
 pub async fn send_content_as_msg(
     message_key: String,
-    subscriber: &mut SubscriberManagerPlainTextWalletHttpClientEspRs,
+    subscriber: &mut SubscriberManagerPlainTextWalletTransportSocketEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -172,7 +177,7 @@ pub async fn send_content_as_msg(
 
 async fn subscribe_to_channel(
     announcement_link_str: &str,
-    subscriber_mngr: &mut SubscriberManagerPlainTextWalletHttpClientEspRs,
+    subscriber_mngr: &mut SubscriberManagerPlainTextWalletTransportSocketEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -193,7 +198,7 @@ async fn subscribe_to_channel(
 
 async fn register_keyload_msg(
     keyload_msg_link_str: &str,
-    subscriber_mngr: &mut SubscriberManagerPlainTextWalletHttpClientEspRs,
+    subscriber_mngr: &mut SubscriberManagerPlainTextWalletTransportSocketEspRs,
     confirm_req_builder: &RequestBuilderConfirm
 ) -> hyper::http::Result<Request<Body>>
 {
@@ -210,18 +215,16 @@ async fn register_keyload_msg(
     confirm_req_builder.keyload_registration()
 }
 
-struct CmdProcessor<'a> {
-    command_fetcher: CommandFetcher<'a>,
-    iota_bridge_url: String,
+struct CmdProcessor<CmdFetch: CommandFetcher> {
+    command_fetcher: CmdFetch,
     vfs_fat_path: Option<String>,
 }
 
-impl<'a> CmdProcessor<'a> {
-    pub fn new(iota_bridge_url: &'a str, vfs_fat_path: Option<String>) -> CmdProcessor<'a> {
+impl<CmdFetch: CommandFetcher> CmdProcessor<CmdFetch> {
+    pub fn new<>(vfs_fat_path: Option<String>, command_fetch_options: CmdFetch::Options) -> CmdProcessor<CmdFetch> {
         CmdProcessor {
-            iota_bridge_url: String::from(iota_bridge_url),
-            command_fetcher: CommandFetcher::new(
-                Some(CommandFetcherOptions{ http_url: iota_bridge_url })
+            command_fetcher: CmdFetch::new(
+                Some(command_fetch_options)
             ),
             vfs_fat_path,
         }
@@ -229,11 +232,15 @@ impl<'a> CmdProcessor<'a> {
 }
 
 #[async_trait(?Send)]
-impl<'a> SensorFunctions for CmdProcessor<'a> {
-    type SubscriberManager = SubscriberManagerPlainTextWalletHttpClientEspRs;
+impl<CmdFetch: CommandFetcher> SensorFunctions for CmdProcessor<CmdFetch> {
+    type SubscriberManager = SubscriberManagerPlainTextWalletTransportSocketEspRs;
 
-    fn get_iota_bridge_url(&self) -> &str {
-        self.iota_bridge_url.as_str()
+    fn get_iota_bridge_url(&self) -> String {
+        if let Some(url) = self.command_fetcher.get_iota_bridge_url() {
+            url.clone()
+        } else {
+            "".to_string()
+        }
     }
 
     async fn subscribe_to_channel(
@@ -273,9 +280,9 @@ impl<'a> SensorFunctions for CmdProcessor<'a> {
 }
 
 #[async_trait(?Send)]
-impl<'a> CommandProcessor for CmdProcessor<'a> {
+impl<CmdFetch: CommandFetcher> CommandProcessor for CmdProcessor<CmdFetch> {
     async fn fetch_next_command(&self) -> Result<(Command, Vec<u8>)> {
-        self.command_fetcher.fetch_next_command()
+        self.command_fetcher.fetch_next_command().await
     }
 
     async fn send_confirmation(&self, confirmation_request: Request<Body>) -> Result<()> {
@@ -283,6 +290,8 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
     }
 
     async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
+        unimplemented!()
+        /*
         let client = HttpClientEspRs::new(Some(HttpClientOptions{ http_url: self.iota_bridge_url.as_str() }));
         let (mut subscriber, mut vfs_fat_handle) =
             create_subscriber::<HttpClientEspRs, PlainTextWallet>(client, self.vfs_fat_path.clone()).await?;
@@ -299,16 +308,24 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
         vfs_fat_handle.drop_filesystem()?;
 
         confirmation_request.ok_or(anyhow!("No confirmation_request received"))
+
+         */
     }
 }
 
-pub async fn process_main_esp_rs(lorawan_send_callback: send_request_via_lorawan_t, iota_bridge_url: &str, vfs_fat_path: Option<String>) -> Result<()> {
+pub async fn process_main_esp_rs(lorawan_send_callback: send_request_via_lorawan_t, p_caller_user_data: *mut cty::c_void, vfs_fat_path: Option<String>) -> Result<()> {
     log::debug!("[fn process_main_esp_rs] process_main() entry");
 
     print_heap_info();
 
-    log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", iota_bridge_url);
-    let command_processor = CmdProcessor::new(iota_bridge_url, vfs_fat_path);
+    log::info!("[fn process_main_esp_rs] Using callback functions to send and receive binary packages");
+    let command_processor = CmdProcessor::<CommandFetcherBufferCb>::new(
+        vfs_fat_path,
+        CommandFetcherBufferCbOptions{ buffer_cb: RequestViaBufferCallbackOptions{
+            send_callback: lorawan_send_callback,
+            p_caller_user_data: p_caller_user_data,
+        }},
+    );
     run_command_fetch_loop(
         command_processor,
         Some(
@@ -328,7 +345,12 @@ pub async fn process_main_esp_rs_wifi(wifi_ssid: &str, wifi_pass: &str, iota_bri
     let _wifi_hdl = init_wifi(wifi_ssid, wifi_pass)?;
 
     log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", iota_bridge_url);
-    let command_processor = CmdProcessor::new(iota_bridge_url, vfs_fat_path);
+    let command_processor = CmdProcessor::<CommandFetcherSocket>::new(
+        vfs_fat_path,
+        CommandFetcherSocketOptions{
+            http_url: iota_bridge_url
+        }
+    );
     run_command_fetch_loop(
         command_processor,
         Some(

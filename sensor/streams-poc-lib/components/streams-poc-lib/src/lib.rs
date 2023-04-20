@@ -3,11 +3,9 @@ use sensor_lib::{
     process_main_esp_rs,
     process_main_esp_rs_wifi,
     streams_poc_lib,
-    streams_poc_lib::{
-        api_types::{
-            StreamsError,
-            send_request_via_lorawan_t,
-        }
+    streams_poc_lib_api_types::{
+        StreamsError,
+        send_request_via_lorawan_t,
     }
     // HttpClient,
     // HttpClientOptions,
@@ -126,9 +124,6 @@ pub extern "C" fn send_message(
 ///
 /// @param lorawan_send_callback    Callback function allowing the Streams POC library to send requests via LoRaWAN.
 ///                                 See send_request_via_lorawan_t help above for more details.
-/// @param iota_bridge_url          URL of the iota-bridge instance to connect to.
-///                                 Example:
-///                                    start_sensor_manager("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
 /// @param vfs_fat_path             Optional.
 ///                                 Path of the directory where the streams channel user state data and
 ///                                 other files shall be read/written by the Streams POC library.
@@ -141,14 +136,12 @@ pub extern "C" fn send_message(
 #[no_mangle]
 pub extern "C" fn start_sensor_manager(
     lorawan_send_callback: send_request_via_lorawan_t,
-    iota_bridge_url: *const c_char,
     vfs_fat_path: *const c_char,
     p_caller_user_data: *mut cty::c_void
 ) -> i32 {
     init_esp_idf_sys_and_logger();
     info!("[fn start_sensor_manager()] Starting");
 
-    let c_iota_bridge_url: &CStr = unsafe { CStr::from_ptr(iota_bridge_url) };
     let opt_vfs_fat_path = get_optional_string_from_c_char_ptr(vfs_fat_path, "vfs_fat_path")
         .expect("Error on converting null terminated C string into utf8 rust String");
 
@@ -156,7 +149,7 @@ pub extern "C" fn start_sensor_manager(
         debug!("[fn start_sensor_manager()] Start future::block_on");
         process_main_esp_rs(
             lorawan_send_callback,
-            c_iota_bridge_url.to_str().expect("iota_bridge_url contains invalid utf8 code"),
+            p_caller_user_data,
             opt_vfs_fat_path
         ).await
     }){

@@ -90,7 +90,7 @@ pub async fn run_command_fetch_loop(command_processor: impl CommandProcessor, op
 pub trait SensorFunctions {
     type SubscriberManager;
 
-    fn get_iota_bridge_url(&self) -> &str;
+    fn get_iota_bridge_url(&self) -> String;
 
     async fn subscribe_to_channel(
         &self,
@@ -130,7 +130,7 @@ pub async fn process_sensor_commands<SensorT: SensorFunctions>(
     sensor: &SensorT, subscriber: &mut SensorT::SubscriberManager, command: Command, buffer: Vec<u8>
 ) -> Result<Option<Request<Body>>>
 {
-    let confirm_req_builder = RequestBuilderConfirm::new(sensor.get_iota_bridge_url());
+    let confirm_req_builder = RequestBuilderConfirm::new(sensor.get_iota_bridge_url().as_str());
     let mut confirmation_request: Option<Request<Body>> = None;
 
     if command == Command::SUBSCRIBE_TO_ANNOUNCEMENT_LINK {

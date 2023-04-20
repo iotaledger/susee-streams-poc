@@ -216,8 +216,8 @@ impl<'a> CmdProcessor<'a> {
 impl<'a> SensorFunctions for CmdProcessor<'a> {
     type SubscriberManager = SubscriberManagerPlainTextWalletHttpClient;
 
-    fn get_iota_bridge_url(&self) -> &str {
-        self.iota_bridge_url.as_str()
+    fn get_iota_bridge_url(&self) -> String {
+        self.iota_bridge_url.clone()
     }
 
     async fn subscribe_to_channel(

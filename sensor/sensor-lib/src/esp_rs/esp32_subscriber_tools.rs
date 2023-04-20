@@ -2,8 +2,8 @@ use anyhow::{
     Result
 };
 use super::{
-    http_client_smol_esp_rs::{
-        HttpClientEspRs as HttpClientEspRs,
+    streams_transport_socket_esprs::{
+        StreamsTransportSocketEspRs,
     }
 };
 
@@ -28,7 +28,7 @@ use streams_tools::subscriber_manager::ClientTTrait;
 pub static BASE_PATH: &str = "/spiflash";
 pub static SENSOR_STREAMS_USER_STATE_FILE_NAME: &str = "user-state-sensor.bin";
 
-pub type SubscriberManagerPlainTextWalletHttpClientEspRs = SubscriberManager<HttpClientEspRs, PlainTextWallet>;
+pub type SubscriberManagerPlainTextWalletTransportSocketEspRs = SubscriberManager<StreamsTransportSocketEspRs, PlainTextWallet>;
 
 pub struct VfsFatHandle {
     pub is_vfs_managed_by_others: bool,

@@ -9,6 +9,7 @@ pub use {
     binary_persist_command::*,
     binary_persist_confirmation::*,
     binary_persist_tangle::*,
+    binary_persist_iota_bridge_req::HeaderFlags,
 };
 
 

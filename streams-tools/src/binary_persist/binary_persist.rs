@@ -6,7 +6,8 @@ use std::{
 
 use anyhow::{
     Result,
-    bail
+    bail,
+    Error,
 };
 use std::ops::Deref;
 
@@ -38,8 +39,13 @@ pub trait BinaryPersist {
 
     // static
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized;
-}
 
+    fn as_vecu8(&self) -> Result<Vec<u8>, Error> {
+        let mut buffer: Vec<u8> = vec![0; self.needed_size()];
+        self.to_bytes(buffer.as_mut_slice())?;
+        Ok(buffer)
+    }
+}
 
 impl BinaryPersist for u64 {
     fn needed_size(&self) -> usize {

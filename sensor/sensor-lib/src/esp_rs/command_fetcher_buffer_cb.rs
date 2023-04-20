@@ -1,0 +1,160 @@
+use hyper::{
+    Body as HyperBody,
+    http::{
+        StatusCode as HyperStatusCode,
+        Request as HyperRequest,
+    }
+};
+
+use embedded_svc::{
+    io::Read,
+    http::{
+        Status,
+        Headers,
+        client::{
+            Client as HttpClient,
+        }
+    }
+};
+
+use esp_idf_svc::http::client::{
+    EspHttpConnection,
+};
+
+use anyhow::{
+    Result,
+    bail,
+};
+
+use std::fmt;
+
+use log;
+
+use streams_tools::{
+    binary_persist::{
+        BinaryPersist,
+        EnumeratedPersistable,
+        Command,
+        HeaderFlags,
+    },
+    http::{
+        http_protocol_command::EndpointUris as EndpointUrisCommand,
+    },
+    STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
+};
+
+use crate::{
+    command_fetcher::{
+        CommandFetcher,
+        deserialize_command,
+    },
+    esp_rs::hyper_esp_rs_tools::{
+        HyperEsp32Client,
+        EspHttpResponse,
+        UserAgentName,
+    },
+    request_via_buffer_cb::{
+        RequestViaBufferCallbackOptions,
+        RequestViaBufferCallback
+    }
+};
+
+use streams_tools::binary_persist::binary_persist_iota_bridge_req::{IotaBridgeResponseParts, IotaBridgeRequestParts, HttpMethod};
+use streams_tools::http::RequestBuilderStreams;
+use iota_streams::core::async_trait;
+
+#[derive(Clone)]
+pub struct CommandFetcherBufferCbOptions {
+    pub(crate) buffer_cb: RequestViaBufferCallbackOptions,
+}
+
+impl Default for CommandFetcherBufferCbOptions {
+    fn default() -> Self {
+        Self {
+            buffer_cb: RequestViaBufferCallbackOptions::default()
+        }
+    }
+}
+
+impl fmt::Display for CommandFetcherBufferCbOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CommandFetcherOptions:
+                buffer_cb: {}
+                ",
+            self.buffer_cb
+        )
+    }
+}
+
+pub struct CommandFetcherBufferCb {
+    options: CommandFetcherBufferCbOptions,
+}
+
+impl CommandFetcherBufferCb {
+
+    fn deserialize_command(& self, mut response: IotaBridgeResponseParts) -> Result<(Command, Vec<u8>)> {
+        let mut ret_val = (Command::NO_COMMAND, Vec::<u8>::default());
+        log::debug!("[CommandFetcherBufferCb.deserialize_command] response.body_bytes.len() = {}", response.body_bytes.len());
+        ret_val = deserialize_command(response.body_bytes)?;
+        Ok(ret_val)
+    }
+}
+
+#[async_trait(?Send)]
+impl CommandFetcher for CommandFetcherBufferCb {
+    type Options = CommandFetcherBufferCbOptions;
+
+    fn new(options: Option<CommandFetcherBufferCbOptions>) -> Self {
+        let options = options.unwrap_or_default();
+        log::debug!("[CommandFetcherBufferCb::new()] Creating new CommandFetcher using options: {}", options);
+        Self {
+            options,
+        }
+    }
+
+    fn get_iota_bridge_url(&self) -> Option<String> {
+        None
+    }
+
+    async fn fetch_next_command(& self) -> Result<(Command, Vec<u8>)> {
+        let mut request_buffer_cb = RequestViaBufferCallback::new(Some(self.options.buffer_cb.clone()));
+        let url = format!("{}", EndpointUrisCommand::FETCH_NEXT_COMMAND); // May be "http://foor.bar/{}" is needed
+        let header_flags = HeaderFlags::from(HttpMethod::GET);
+        let request = IotaBridgeRequestParts::new(
+            header_flags,
+            url,
+            Vec::<u8>::default(),
+        );
+
+        let request_bytes: Vec<u8> = request.as_vecu8()?;
+        match request_buffer_cb.request_via_buffer_callback(request_bytes).await {
+            Ok(response) => {
+                log::debug!("[CommandFetcherBufferCb.fetch_next_command] Received Response");
+                if response.status_code == HyperStatusCode::OK {
+                    log::debug!("[CommandFetcher.fetch_next_command] StatusCode::OK - deserializing command");
+                    self.deserialize_command(response)
+                } else {
+                    log::error!("[CommandFetcherBufferCb.fetch_next_command] HTTP Error. Status: {}", response.status_code);
+                    Ok((Command::NO_COMMAND, Vec::<u8>::default()))
+                }
+            },
+            Err(e) => {
+                bail!("[CommandFetcherBufferCb.fetch_next_command] esp_http_req.submit failed: {}", e)
+            }
+        }
+    }
+
+    async fn send_confirmation(&self, confirmation_request: HyperRequest<HyperBody>) -> Result<()> {
+        let mut request_buffer_cb = RequestViaBufferCallback::new(Some(self.options.buffer_cb.clone()));
+        let request = IotaBridgeRequestParts::from_request(confirmation_request, false).await;
+        let request_bytes = request.as_vecu8()?;
+        let response = request_buffer_cb.request_via_buffer_callback(request_bytes).await?;
+        log::debug!("[CommandFetcherBufferCb.send_confirmation] Received response");
+        if response.status_code == HyperStatusCode::OK {
+            log::debug!("[CommandFetcherBufferCb.send_confirmation] StatusCode::OK");
+            Ok(())
+        } else {
+            bail!("[CommandFetcherBufferCb.send_confirmation] Received HTTP Error as response for confirmation transmission. Status: {}", response.status_code)
+        }
+    }
+}

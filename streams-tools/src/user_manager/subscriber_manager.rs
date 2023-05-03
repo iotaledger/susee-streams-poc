@@ -1,21 +1,19 @@
 use iota_streams::{
     app_channels::api::tangle::{
         Address,
-        Message,
         Bytes,
     },
-    core::Result,
-    app::transport::{
-        Transport,
-        TransportDetails,
-        TransportOptions,
-    }
+    core::{
+        Result,
+        Errors as StreamsErrors,
+    },
 };
 
 use std::{
     path::Path,
     ops::Range,
     rc::Rc,
+    option::Option::Some,
     fs::{
         write,
         read,
@@ -31,15 +29,17 @@ use crate::{
     binary_persist::{
         BinaryPersist,
         RangeIterator,
+        serialize_bool,
+        deserialize_bool,
         binary_persist_tangle::{
             TANGLE_ADDRESS_BYTE_LEN,
         }
     },
     compressed_state::{
-        CompressedStateSend,
         CompressedStateListen,
         CompressedStateManager
     },
+    StreamsTransport
 };
 
 #[cfg(feature = "std")]
@@ -59,50 +59,29 @@ use smol::block_on;
 
 type Subscriber<ClientT> = iota_streams::app_channels::api::tangle::Subscriber<ClientT>;
 
-
-pub trait ClientTTrait: Clone + TransportOptions + Transport<Address, Message> + TransportDetails<Address> + CompressedStateSend {}
-impl<T> ClientTTrait for T where T: Clone + TransportOptions + Transport<Address, Message> + TransportDetails<Address> + CompressedStateSend {}
-
-pub struct SubscriberManager<ClientT: ClientTTrait, WalletT: SimpleWallet>
+pub struct SubscriberManager<TransportT: StreamsTransport, WalletT: SimpleWallet>
 {
-    client: ClientT,
+    transport: TransportT,
     wallet: WalletT,
     serialization_file: Option<String>,
     compressed: Rc<CompressedStateManager>,
-    pub subscriber: Option<Subscriber<ClientT>>,
+    is_synced: bool,
+    pub subscriber: Option<Subscriber<TransportT>>,
     pub announcement_link: Option<Address>,
     pub subscription_link: Option<Address>,
     pub prev_msg_link:  Option<Address>,
 }
 
-pub fn get_public_key_str<ClientT: ClientTTrait>(subscriber: &Subscriber<ClientT>) -> String {
-    let own_public_key = subscriber.get_public_key();
-    let own_public_key_str = hex::encode(own_public_key.to_bytes().as_slice());
-    own_public_key_str
-}
-
-impl<ClientT: ClientTTrait, WalletT: SimpleWallet> CompressedStateListen for SubscriberManager<ClientT, WalletT>
+impl<ClientT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<ClientT, WalletT>
     where
-        ClientT: ClientTTrait
-{
-    fn set_use_compressed_msg(&self, use_compressed_msg: bool) {
-        self.compressed.set_use_compressed_msg(use_compressed_msg);
-    }
-
-    fn get_use_compressed_msg(&self) -> bool {
-        self.compressed.get_use_compressed_msg()
-    }
-}
-
-impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, WalletT>
-    where
-        ClientT: ClientTTrait
+        ClientT: StreamsTransport
 {
     pub async fn new(client: ClientT, wallet: WalletT, serialization_file: Option<String>) -> Self {
         let mut ret_val = Self {
             wallet,
+            is_synced: false,
             serialization_file: serialization_file.clone(),
-            client,
+            transport: client,
             subscriber: None,
             announcement_link: None,
             subscription_link: None,
@@ -131,7 +110,7 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
             .expect("Error while doing CompressedStatePublish::subscribe on self.client");
         Subscriber::new(
             self.wallet.get_seed(),
-            self.client.clone(),
+            self.transport.clone(),
         )
     }
 
@@ -180,25 +159,71 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
         Ok(())
     }
 
+
+
     pub async fn send_signed_packet(&mut self, input: &Bytes) -> Result<Address> {
+        log::debug!("[fn send_signed_packet] - START");
         if self.subscriber.is_none(){
             panic!("[SubscriberManager.subscribe()] - Before sending messages you need to subscribe to a channel. Use subscribe() and register_keyload_msg() before using this function.")
         }
         if self.prev_msg_link.is_none(){
             panic!("[SubscriberManager.subscribe()] - Before sending messages you need to register a keyload message. Use register_keyload_msg() before using this function.")
         }
+        log::debug!("[fn send_signed_packet] - sync_subscriber_state");
+        self.sync_subscriber_state().await?;
+        log::debug!("[fn send_signed_packet] - call_subscriber_send_signed_packet");
+        let msg_link = self.call_subscriber_send_signed_packet(input).await?;
+        log::debug!("[fn send_signed_packet] - set new prev_msg_link");
+        self.prev_msg_link = Some(msg_link);
+        Ok(msg_link)
+    }
+
+    async fn sync_subscriber_state(&mut self) -> Result<()>{
         let subscriber = self.subscriber.as_mut().unwrap() ;
-
-        if !self.compressed.get_use_compressed_msg() {
+        if !self.compressed.get_use_compressed_msg() || !self.is_synced {
+            log::debug!("[fn sync_subscriber_state] - syncing client state");
             subscriber.sync_state().await?;
+            self.is_synced = true;
         }
+        Ok(())
+    }
 
-        let (msg_link, _seq_link) = subscriber.send_signed_packet(
-            &self.prev_msg_link.as_ref().unwrap(),
+    async fn call_subscriber_send_signed_packet(&mut self, input: &Bytes) -> Result<TangleAddress> {
+        let subscriber = self.subscriber.as_mut().unwrap() ;
+        log::debug!("[fn call_subscriber_send_signed_packet] - prev_msg_link");
+        let prev_msg_link = self.prev_msg_link.as_ref().unwrap();
+        log::debug!("[fn call_subscriber_send_signed_packet] - subscriber.send_signed_packet()");
+        let (msg_link, _seq_link) = match subscriber.send_signed_packet(
+            prev_msg_link,
             &Bytes::default(),
             input,
-        ).await?;
-        self.prev_msg_link = Some(msg_link);
+        ).await
+        {
+            Ok(msg_link_and_sq_link) => msg_link_and_sq_link,
+            Err(err) => match err.downcast_ref() {
+                Some(streams_err) => {
+                    match streams_err {
+                        StreamsErrors::MessageLinkNotFoundInStore(address) => {
+                            log::debug!("[fn send_signed_packet] - Got MessageLinkNotFoundInStore error for {} - syncing client state", address);
+                            subscriber.sync_state().await?;
+                            self.is_synced = true;
+                            log::debug!("[fn send_signed_packet] - subscriber.send_signed_packet() after MessageLinkNotFoundInStore error");
+                            subscriber.send_signed_packet(
+                                prev_msg_link,
+                                &Bytes::default(),
+                                input,
+                            ).await?
+                        },
+                        _ => {
+                            return Err(err);
+                        }
+                    }
+                },
+                None => {
+                    return Err(err);
+                }
+            }
+        };
         Ok(msg_link)
     }
 
@@ -225,7 +250,7 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
             self.prev_msg_link = None;
             self.subscription_link = None;
             self.subscriber = None;
-            self.client.set_initial_use_compressed_msg_state(false);
+            self.transport.set_initial_use_compressed_msg_state(false);
             if let Some(subscriber) = self.subscriber.as_ref() {
                 subscriber.get_transport().set_initial_use_compressed_msg_state(false);
             }
@@ -239,7 +264,7 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
 
     fn subscribe_compressed_message_state(&mut self) -> Result<()>{
         if self.subscriber.is_none() {
-            self.client.subscribe_listener(self.compressed.clone())?;
+            self.transport.subscribe_listener(self.compressed.clone())?;
             Ok(())
         } else {
             bail!("You need to subscribe to self.client before self.subscriber is created.\
@@ -261,7 +286,8 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
             let static_sized_buffer_front_length =
                   TANGLE_ADDRESS_BYTE_LEN               // PREV_MSG_LINK
                 + TANGLE_ADDRESS_BYTE_LEN               // SUBSCRIPTION_LINK
-                + 1                                     // use_compressed_msg
+                + 1                                     // USE_COMPRESSED_MSG
+                + 1                                     // IS_SYNCED
             ;
             let mut buffer: Vec<u8> = vec![0; static_sized_buffer_front_length];
             log::debug!("[fn export_to_serialization_file] - buffer.len: {}", buffer.len());
@@ -276,11 +302,23 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
             log::debug!("[fn export_to_serialization_file] - persist SUBSCRIPTION_LINK");
             self.persist_optional_tangle_address(&mut buffer, &mut range, self.subscription_link);
 
-            // use_compressed_msg
-            range.increment(1);
-            let use_compressed_msg:u8 = if self.compressed.get_use_compressed_msg() {1} else {0};
-            log::debug!("[fn export_to_serialization_file] - persist use_compressed_msg. Value: {}", use_compressed_msg);
-            use_compressed_msg.to_bytes(&mut buffer[range.clone()])?;
+            // USE_COMPRESSED_MSG
+            serialize_bool(
+                "fn export_to_serialization_file",
+                "use_compressed_msg",
+                self.compressed.get_use_compressed_msg(),
+                &mut buffer,
+                &mut range
+            );
+
+            // IS_SYNCED
+            serialize_bool(
+                "fn export_to_serialization_file",
+                "is_synced",
+                self.is_synced,
+                &mut buffer,
+                &mut range
+            );
 
             // SUBSCRIBER
             log::debug!("[fn export_to_serialization_file] - persist SUBSCRIBER");
@@ -303,7 +341,7 @@ impl<ClientT: ClientTTrait, WalletT: SimpleWallet> SubscriberManager<ClientT, Wa
     }
 }
 
-async fn import_from_serialization_file<ClientT: ClientTTrait, WalletT: SimpleWallet>(
+async fn import_from_serialization_file<ClientT: StreamsTransport, WalletT: SimpleWallet>(
     file_name: &str,
     ret_val: &mut SubscriberManager<ClientT, WalletT>
 ) -> Result<()>{
@@ -319,12 +357,23 @@ async fn import_from_serialization_file<ClientT: ClientTTrait, WalletT: SimpleWa
     range.increment(TANGLE_ADDRESS_BYTE_LEN);
     ret_val.subscription_link = read_optional_tangle_address_from_bytes(&buffer, &range);
 
-    // use_compressed_msg
-    range.increment(1);
-    let use_compressed_msg = u8::try_from_bytes(&buffer[range.clone()])? != 0;
-    log::debug!("[fn import_from_serialization_file] - read use_compressed_msg. Value: {}", use_compressed_msg);
-    ret_val.client.set_initial_use_compressed_msg_state(use_compressed_msg);
+    // USE_COMPRESSED_MSG
+    let use_compressed_msg = deserialize_bool(
+        "fn import_from_serialization_file",
+        "use_compressed_msg",
+        buffer.as_slice(),
+        &mut range
+    )?;
+    ret_val.transport.set_initial_use_compressed_msg_state(use_compressed_msg);
     ret_val.subscribe_compressed_message_state()?;
+
+    // IS_SYNCED
+    ret_val.is_synced = deserialize_bool(
+        "fn import_from_serialization_file",
+        "is_synced",
+        buffer.as_slice(),
+        &mut range
+    )?;
 
     // SUBSCRIBER
     let subscriber_export_len = buffer.len() - range.end;
@@ -332,7 +381,7 @@ async fn import_from_serialization_file<ClientT: ClientTTrait, WalletT: SimpleWa
     let subscriber = Subscriber::import(
         &buffer[range],
         ret_val.wallet.get_serialization_password(),
-        ret_val.client.clone()
+        ret_val.transport.clone()
     ).await?;
     if let Some(link) = subscriber.announcement_link() {
         ret_val.announcement_link = Some(link.clone());
@@ -372,8 +421,27 @@ fn read_optional_tangle_address_from_bytes(
     }
 }
 
+pub fn get_public_key_str<ClientT: StreamsTransport>(subscriber: &Subscriber<ClientT>) -> String {
+    let own_public_key = subscriber.get_public_key();
+    let own_public_key_str = hex::encode(own_public_key.to_bytes().as_slice());
+    own_public_key_str
+}
+
+impl<ClientT: StreamsTransport, WalletT: SimpleWallet> CompressedStateListen for SubscriberManager<ClientT, WalletT>
+    where
+        ClientT: StreamsTransport
+{
+    fn set_use_compressed_msg(&self, use_compressed_msg: bool) {
+        self.compressed.set_use_compressed_msg(use_compressed_msg);
+    }
+
+    fn get_use_compressed_msg(&self) -> bool {
+        self.compressed.get_use_compressed_msg()
+    }
+}
+
 #[cfg(feature = "std")]
-impl<ClientT: ClientTTrait, WalletT: SimpleWallet> Drop for SubscriberManager<ClientT, WalletT>{
+impl<ClientT: StreamsTransport, WalletT: SimpleWallet> Drop for SubscriberManager<ClientT, WalletT>{
     fn drop(&mut self) {
         self.save_user_state();
     }

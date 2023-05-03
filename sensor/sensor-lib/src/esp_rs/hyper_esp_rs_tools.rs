@@ -37,6 +37,10 @@ use anyhow::{
     Result,
     bail,
 };
+use std::{
+    fmt,
+    fmt::Formatter,
+};
 
 pub type EspHttpResponse<'a> = Response<&'a mut EspHttpConnection>;
 
@@ -96,16 +100,19 @@ pub fn read_stream_into_buffer<R: Read>(r: &mut R, buf: &mut Vec<u8>) -> Result<
 pub enum UserAgentName {
     Main,
     CommandFetcher,
+    LoraWanRestClient
 }
 
 impl UserAgentName {
     pub const COMMAND_FETCHER: &'static str = "sensor/command-fetcher";
     pub const MAIN: &'static str = "sensor/main";
+    pub const LORAWAN_REST_CLIENT: &'static str = "sensor/lorawan-rest-client";
 
     pub fn value(&self) -> &'static str {
         match self {
             UserAgentName::Main => UserAgentName::MAIN,
             UserAgentName::CommandFetcher => UserAgentName::COMMAND_FETCHER,
+            UserAgentName::LoraWanRestClient => UserAgentName::LORAWAN_REST_CLIENT,
         }
     }
 }
@@ -143,8 +150,14 @@ pub struct HyperEsp32Client {
 }
 
 pub struct SimpleHttpResponse {
-    pub(crate) status: StatusCode,
-    pub(crate) body: Vec<u8>,
+    pub status: StatusCode,
+    pub body: Vec<u8>,
+}
+
+impl fmt::Display for SimpleHttpResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Http Response: status: {}. Body length: {}", self.status, self.body.len())
+    }
 }
 
 impl HyperEsp32Client {
@@ -216,7 +229,7 @@ impl HyperEsp32Client {
                 esp_http_req.write_all(&bytes)?;
                 log::debug!("[HyperEsp32Client.send] Sending bytes was successful");
                 esp_http_req.flush()?;
-                log::debug!("[HyperEsp32Client.send] Flushling esp_http_req was successful");
+                log::debug!("[HyperEsp32Client.send] Flushing esp_http_req was successful");
             },
             Method::Get => {},
             _ => {

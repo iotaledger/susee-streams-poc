@@ -20,7 +20,7 @@ mod ffi {
 // }
 
 #[repr(C)]
-/// Possible errors of the Streams communication stack.
+/// Possible errors while communicating with the IOTA-Tangle via Streams protocol.
 /// The contained values are just for example purposes.
 /// The final list will differ a lot.
 #[allow(non_camel_case_types)]
@@ -58,26 +58,29 @@ impl fmt::Display for StreamsError {
 pub enum LoRaWanError {
     LORAWAN_OK = 1,
     LORAWAN_NO_CONNECTION = -1,
-    EXIT_SENSOR_MANAGER = -100,
+    LORAWAN_IOTA_BRIDGE_CONNECTOR_ERROR = -2,
+    LORAWAN_EXIT_SENSOR_MANAGER = -100,
 }
 
 /// Signature of the callback function allowing the Streams POC library to receive the response for a
 /// request that has been send using a send_request_via_lorawan_t function instance.
 /// The resolve_request_response_t function will be implemented by the Streams POC library and will be provided to
-/// the LoRaWAN communication stack via the response_callback parameter of the send_request_via_lorawan_t function.
+/// the Sensor application via the response_callback parameter of the send_request_via_lorawan_t function.
 /// @param response_data             Binary response data buffer to be returned to the Streams POC library.
-///                                  Will be owned by the LoRaWAN communication stack that calls this function.
+///                                  Will be owned by the Sensor application that calls this function.
 /// @param length                    Length of response_data
 #[allow(non_camel_case_types)]
 pub type resolve_request_response_t = extern fn(response_data: *const cty::uint8_t, length: cty::size_t) -> StreamsError;
 
-/// Signature of the callback function allowing the Streams POC library to send requests via LoRaWAN.
-/// This function will be implemented by the LoRaWAN communication stack and will be provided to the Streams POC library
-/// via the lorawan_send_callback parameter of the send_message() function.
+/// Signature of the callback function allowing the Streams POC library to send requests via LoRaWAN,
+/// serial wired connections or other connection types that are managed by the Sensor application.
+///
+/// This function will be implemented by the Sensor application and will be provided to the Streams POC library
+/// via the lorawan_send_callback parameter of the send_message() or start_sensor_manager() functions.
 /// @param request_data              Binary request data buffer to be send via LoRaWAN.
 ///                                  Will be owned by the Streams POC library code calling this function.
 /// @param length                    Length of request_data
-/// @param response_callback         Callback function allowing the LoRaWAN communication stack to return response
+/// @param response_callback         Callback function allowing the Sensor application to return response
 ///                                  data to the Streams POC library.
 ///                                  These data  have been received via LoRaWAN as a response for the request.
 ///                                  See resolve_request_response_t help above for more details.
@@ -123,3 +126,19 @@ pub type send_request_via_lorawan_t = extern fn(
     response_callback: resolve_request_response_t,
     p_caller_user_data: *mut cty::c_void
 ) -> LoRaWanError;
+
+pub use streams_tools::binary_persist::binary_persist_iota_bridge_req::streams_poc_lib_ffi::iota_bridge_tcpip_proxy_options_t;
+
+/// Signature of the callback function used to receive an HTTP-Response.
+/// See function post_binary_request_to_iota_bridge() for more details.
+/// @param status           HTTP response status.
+/// @param body_bytes       Binary data of the response body.
+///                         The data sre owned by the streams_poc_library.
+/// @param body_length      Length of the body_bytes
+#[allow(non_camel_case_types)]
+pub type http_response_call_back_t = extern fn(
+    status: u16,
+    body_bytes: *const cty::uint8_t,
+    body_length: cty::size_t,
+    p_caller_user_data: *mut cty::c_void
+);

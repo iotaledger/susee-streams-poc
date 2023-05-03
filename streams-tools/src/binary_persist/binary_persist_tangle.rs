@@ -165,7 +165,7 @@ impl TangleAddressCompressed {
 impl Default for TangleAddressCompressed {
     fn default() -> Self {
         TangleAddressCompressed {
-            msgid: MsgId::from_str("").expect("Error on deserializing MsgId from empty string")
+            msgid: MsgId::from_str("000000000000000000000000").expect("Error on deserializing MsgId from empty string")
         }
     }
 }

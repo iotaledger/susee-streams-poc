@@ -1,30 +1,26 @@
 use super::{
-    command_fetcher_socket::{
-        CommandFetcherSocket,
-        CommandFetcherSocketOptions,
-    },
+    CommandFetcherSocket,
+    CommandFetcherSocketOptions,
+    CommandFetcherBufferCb,
+    CommandFetcherBufferCbOptions,
+    StreamsTransportSocketEspRs,
+    StreamsTransportSocketEspRsOptions,
+    streams_transport_via_buffer_cb::StreamsTransportViaBufferCallback,
     esp32_subscriber_tools::{
         create_subscriber,
-        SubscriberManagerPlainTextWalletTransportSocketEspRs,
     },
-    streams_transport_socket_esprs::{
-        StreamsTransportSocketEspRs,
-        StreamsTransportSocketEspRsOptions,
-    },
+    wifi_utils::init_wifi,
 };
 
 use crate::{
     command_fetcher::CommandFetcher,
-    streams_poc_lib_api_types::send_request_via_lorawan_t
+    streams_poc_lib_api_types::send_request_via_lorawan_t,
+    request_via_buffer_cb::RequestViaBufferCallbackOptions,
 };
 
 use payloads::{
     Message,
     get_message_bytes,
-};
-
-use super::{
-    wifi_utils::init_wifi,
 };
 
 use susee_tools::SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC;
@@ -42,7 +38,11 @@ use streams_tools::{
         SensorFunctions,
         CommandFetchLoopOptions,
         run_command_fetch_loop,
-    }
+        process_sensor_commands,
+    },
+    PlainTextWallet,
+    StreamsTransport,
+    SubscriberManager
 };
 
 use iota_streams::{
@@ -59,6 +59,7 @@ use iota_streams::{
 use core::str::FromStr;
 
 use anyhow::{
+    anyhow,
     Result,
 };
 
@@ -69,10 +70,6 @@ use hyper::{
         status,
     }
 };
-use crate::esp_rs::command_fetcher_buffer_cb::{CommandFetcherBufferCb, CommandFetcherBufferCbOptions};
-use crate::request_via_buffer_cb::RequestViaBufferCallbackOptions;
-
-type ClientType = StreamsTransportSocketEspRs;
 
 fn print_heap_info() {
     unsafe {
@@ -84,153 +81,177 @@ fn print_heap_info() {
     }
 }
 
-fn println_subscription_details(subscriber: &Subscriber<ClientType>, subscription_link: &Address, comment: &str, key_name: &str) {
-    let public_key = get_public_key_str(subscriber);
-    println!(
-        "[Sensor] {}:
-         {} Link:     {}
-              Tangle Index:     {:#}
-         Subscriber public key: {}\n",
-        comment,
-        key_name,
-        subscription_link.to_string(),
-        subscription_link.to_msg_index(),
-        public_key,
-    );
-}
-
-fn println_subscriber_status<'a> (
-    subscriber_manager: &SubscriberManagerPlainTextWalletTransportSocketEspRs,
-    confirm_req_builder: &RequestBuilderConfirm
-) -> hyper::http::Result<Request<Body>>
+struct CmdProcessor<CmdFetchT, StreamsTransportT>
+where
+    CmdFetchT: CommandFetcher,
+    StreamsTransportT: StreamsTransport,
+    StreamsTransportT::Options: Clone,
 {
-    let mut ret_val: Option<Request<Body>> = None;
-    if let Some(subscriber) = &subscriber_manager.subscriber {
-        if let Some(subscription_link) = subscriber_manager.subscription_link {
-            println_subscription_details(&subscriber, &subscription_link, "A subscription with the following details has already been created", "Subscription");
-
-            let mut previous_message_link= String::from("");
-            if let Some(prev_msg_link) = subscriber_manager.prev_msg_link {
-                previous_message_link = prev_msg_link.to_string();
-            }
-
-            ret_val = Some(
-                confirm_req_builder.subscriber_status(
-                    previous_message_link,
-                    Subscription {
-                        subscription_link: subscription_link.to_string(),
-                        pup_key: get_public_key_str(subscriber),
-                    })?
-            );
-        }
-    }
-    if ret_val.is_none() {
-        println!("[Sensor] No subscription found.");
-        let to_send = SubscriberStatus::default();
-        ret_val = Some( confirm_req_builder.subscriber_status(to_send.previous_message_link, to_send.subscription)?);
-    }
-
-    if let Some(prev_msg_link) = subscriber_manager.prev_msg_link {
-        println!(
-            "[Sensor] Previous message:
-         Prev msg link:     {}
-             Tangle Index:     {:#}",
-            prev_msg_link.to_string(),
-            prev_msg_link.to_msg_index()
-        );
-    }
-
-    // hyper::http::Error::from(InvalidStatusCode::from(404).unwrap())
-    ret_val.ok_or_else(|| {
-        if let Err(e) = status::StatusCode::from_u16(404) {
-            e.into()
-        } else {
-            panic!("Should never happen");
-        }
-    })
-}
-
-async fn clear_client_state<'a> (
-    subscriber_manager: &mut SubscriberManagerPlainTextWalletTransportSocketEspRs,
-    confirm_req_builder: &RequestBuilderConfirm
-) -> hyper::http::Result<Request<Body>>
-{
-    subscriber_manager.clear_client_state().await.expect("subscriber_manager.clear_client_state() returned error");
-    confirm_req_builder.clear_client_state()
-}
-
-pub async fn send_content_as_msg(
-    message_key: String,
-    subscriber: &mut SubscriberManagerPlainTextWalletTransportSocketEspRs,
-    confirm_req_builder: &RequestBuilderConfirm
-) -> hyper::http::Result<Request<Body>>
-{
-    let message_bytes = get_message_bytes(Message::from(message_key.as_str()));
-    log::info!("[fn send_content_as_msg] Sending {} bytes payload\n", message_bytes.len());
-    log::debug!("[fn send_content_as_msg] - send_content_as_msg()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
-    let prev_message = subscriber.send_signed_packet(&Bytes(message_bytes.to_vec())).await.expect("subscriber.send_signed_packet() returned error");
-    confirm_req_builder.send_message(prev_message.to_string())
-}
-
-async fn subscribe_to_channel(
-    announcement_link_str: &str,
-    subscriber_mngr: &mut SubscriberManagerPlainTextWalletTransportSocketEspRs,
-    confirm_req_builder: &RequestBuilderConfirm
-) -> hyper::http::Result<Request<Body>>
-{
-    let ann_address = Address::from_str(&announcement_link_str).expect("Address::from_str() returned error");
-    let sub_msg_link = subscriber_mngr.subscribe(&ann_address).await.expect("subscriber_mngr::subscribe() returned error");
-
-    let subscriber = subscriber_mngr.subscriber.as_ref().unwrap();
-
-    println_subscription_details(
-        &subscriber,
-        &sub_msg_link,
-        "New subscription",
-        "Subscription",
-    );
-
-    confirm_req_builder.subscription(sub_msg_link.to_string(), get_public_key_str(subscriber))
-}
-
-async fn register_keyload_msg(
-    keyload_msg_link_str: &str,
-    subscriber_mngr: &mut SubscriberManagerPlainTextWalletTransportSocketEspRs,
-    confirm_req_builder: &RequestBuilderConfirm
-) -> hyper::http::Result<Request<Body>>
-{
-    let keyload_msg_link = Address::from_str(&keyload_msg_link_str).expect("Address::from_str() returned error");
-    subscriber_mngr.register_keyload_msg(&keyload_msg_link).expect("[fn register_keyload_msg] register_keyload_msg err");
-
-    println_subscription_details(
-        &subscriber_mngr.subscriber.as_ref().unwrap(),
-        &keyload_msg_link,
-        "Keyload Message",
-        "Keyload  msg",
-    );
-
-    confirm_req_builder.keyload_registration()
-}
-
-struct CmdProcessor<CmdFetch: CommandFetcher> {
-    command_fetcher: CmdFetch,
+    command_fetcher: CmdFetchT,
+    streams_transport_opt: StreamsTransportT::Options,
     vfs_fat_path: Option<String>,
 }
 
-impl<CmdFetch: CommandFetcher> CmdProcessor<CmdFetch> {
-    pub fn new<>(vfs_fat_path: Option<String>, command_fetch_options: CmdFetch::Options) -> CmdProcessor<CmdFetch> {
+impl<CmdFetchT, StreamsTransportT> CmdProcessor<CmdFetchT, StreamsTransportT>
+    where
+        CmdFetchT: CommandFetcher,
+        StreamsTransportT: StreamsTransport,
+        StreamsTransportT::Options: Clone,
+{
+    fn println_subscription_details(subscriber: &Subscriber<StreamsTransportT>, subscription_link: &Address, comment: &str, key_name: &str) {
+        let public_key = get_public_key_str(subscriber);
+        println!(
+            "[Sensor] {}:
+         {} Link:     {}
+              Tangle Index:     {:#}
+         Subscriber public key: {}\n",
+            comment,
+            key_name,
+            subscription_link.to_string(),
+            subscription_link.to_msg_index(),
+            public_key,
+        );
+    }
+
+    fn println_subscriber_status<'a> (
+        subscriber_manager: &<Self as SensorFunctions>::SubscriberManager,
+        confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        let mut ret_val: Option<Request<Body>> = None;
+        if let Some(subscriber) = &subscriber_manager.subscriber {
+            if let Some(subscription_link) = subscriber_manager.subscription_link {
+                Self::println_subscription_details(&subscriber, &subscription_link, "A subscription with the following details has already been created", "Subscription");
+
+                let mut previous_message_link= String::from("");
+                if let Some(prev_msg_link) = subscriber_manager.prev_msg_link {
+                    previous_message_link = prev_msg_link.to_string();
+                }
+
+                ret_val = Some(
+                    confirm_req_builder.subscriber_status(
+                        previous_message_link,
+                        Subscription {
+                            subscription_link: subscription_link.to_string(),
+                            pup_key: get_public_key_str(subscriber),
+                        })?
+                );
+            }
+        }
+        if ret_val.is_none() {
+            println!("[Sensor] No subscription found.");
+            let to_send = SubscriberStatus::default();
+            ret_val = Some( confirm_req_builder.subscriber_status(to_send.previous_message_link, to_send.subscription)?);
+        }
+
+        if let Some(prev_msg_link) = subscriber_manager.prev_msg_link {
+            println!(
+                "[Sensor] Previous message:
+         Prev msg link:     {}
+             Tangle Index:     {:#}",
+                prev_msg_link.to_string(),
+                prev_msg_link.to_msg_index()
+            );
+        }
+
+        // hyper::http::Error::from(InvalidStatusCode::from(404).unwrap())
+        ret_val.ok_or_else(|| {
+            if let Err(e) = status::StatusCode::from_u16(404) {
+                e.into()
+            } else {
+                panic!("Should never happen");
+            }
+        })
+    }
+
+    async fn clear_client_state<'a> (
+        subscriber_manager: &mut <Self as SensorFunctions>::SubscriberManager,
+        confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        subscriber_manager.clear_client_state().await.expect("subscriber_manager.clear_client_state() returned error");
+        confirm_req_builder.clear_client_state()
+    }
+
+    pub async fn send_content_as_msg(
+        message_key: String,
+        subscriber: &mut <Self as SensorFunctions>::SubscriberManager,
+        confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        let message_bytes = get_message_bytes(Message::from(message_key.as_str()));
+        log::info!("[fn send_content_as_msg] Sending {} bytes payload\n", message_bytes.len());
+        log::debug!("[fn send_content_as_msg] - send_content_as_msg()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
+        let prev_message = subscriber.send_signed_packet(&Bytes(message_bytes.to_vec())).await.expect("subscriber.send_signed_packet() returned error");
+        confirm_req_builder.send_message(prev_message.to_string())
+    }
+
+    async fn subscribe_to_channel(
+        announcement_link_str: &str,
+        subscriber_mngr: &mut <Self as SensorFunctions>::SubscriberManager,
+        confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        let ann_address = Address::from_str(&announcement_link_str).expect("Address::from_str() returned error");
+        let sub_msg_link = subscriber_mngr.subscribe(&ann_address).await.expect("subscriber_mngr::subscribe() returned error");
+
+        let subscriber = subscriber_mngr.subscriber.as_ref().unwrap();
+
+        Self::println_subscription_details(
+            &subscriber,
+            &sub_msg_link,
+            "New subscription",
+            "Subscription",
+        );
+
+        confirm_req_builder.subscription(sub_msg_link.to_string(), get_public_key_str(subscriber))
+    }
+
+    async fn register_keyload_msg(
+        keyload_msg_link_str: &str,
+        subscriber_mngr: &mut <Self as SensorFunctions>::SubscriberManager,
+        confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>
+    {
+        let keyload_msg_link = Address::from_str(&keyload_msg_link_str).expect("Address::from_str() returned error");
+        subscriber_mngr.register_keyload_msg(&keyload_msg_link).expect("[fn register_keyload_msg] register_keyload_msg err");
+
+        Self::println_subscription_details(
+            &subscriber_mngr.subscriber.as_ref().unwrap(),
+            &keyload_msg_link,
+            "Keyload Message",
+            "Keyload  msg",
+        );
+
+        confirm_req_builder.keyload_registration()
+    }
+}
+
+impl<CmdFetchT, StreamsTransportT> CmdProcessor<CmdFetchT, StreamsTransportT>
+    where
+        CmdFetchT: CommandFetcher,
+        StreamsTransportT: StreamsTransport,
+        StreamsTransportT::Options: Clone,
+{
+    pub fn new<>(vfs_fat_path: Option<String>, command_fetch_opt: CmdFetchT::Options, streams_transport_opt: StreamsTransportT::Options) -> CmdProcessor<CmdFetchT, StreamsTransportT> {
         CmdProcessor {
-            command_fetcher: CmdFetch::new(
-                Some(command_fetch_options)
+            command_fetcher: CmdFetchT::new(
+                Some(command_fetch_opt)
             ),
+            streams_transport_opt,
             vfs_fat_path,
         }
     }
 }
 
 #[async_trait(?Send)]
-impl<CmdFetch: CommandFetcher> SensorFunctions for CmdProcessor<CmdFetch> {
-    type SubscriberManager = SubscriberManagerPlainTextWalletTransportSocketEspRs;
+impl<CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, StreamsTransportT>
+    where
+        CmdFetchT: CommandFetcher,
+        StreamsTransportT: StreamsTransport,
+        StreamsTransportT::Options: Clone,
+{
+    type SubscriberManager = SubscriberManager<StreamsTransportT, PlainTextWallet>;
 
     fn get_iota_bridge_url(&self) -> String {
         if let Some(url) = self.command_fetcher.get_iota_bridge_url() {
@@ -244,40 +265,44 @@ impl<CmdFetch: CommandFetcher> SensorFunctions for CmdProcessor<CmdFetch> {
         &self, announcement_link_str: &str, subscriber_mngr: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
     ) -> hyper::http::Result<Request<Body>>
     {
-        subscribe_to_channel(announcement_link_str, subscriber_mngr, confirm_req_builder).await
+        Self::subscribe_to_channel(announcement_link_str, subscriber_mngr, confirm_req_builder).await
     }
 
     async fn send_content_as_msg(
         &self, message_key: String, subscriber: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
     ) -> hyper::http::Result<Request<Body>>
     {
-        send_content_as_msg(message_key, subscriber, confirm_req_builder).await
+        Self::send_content_as_msg(message_key, subscriber, confirm_req_builder).await
     }
 
     async fn register_keyload_msg(
         &self, keyload_msg_link_str: &str, subscriber_mngr: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
     ) -> hyper::http::Result<Request<Body>>
     {
-        register_keyload_msg(keyload_msg_link_str, subscriber_mngr, confirm_req_builder).await
+        Self::register_keyload_msg(keyload_msg_link_str, subscriber_mngr, confirm_req_builder).await
     }
 
     fn println_subscriber_status<'b>(
         &self, subscriber_manager: &Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
     ) -> hyper::http::Result<Request<Body>>
     {
-        println_subscriber_status(subscriber_manager, confirm_req_builder)
+        Self::println_subscriber_status(subscriber_manager, confirm_req_builder)
     }
 
     async fn clear_client_state<'b>(
         &self, subscriber_manager: &mut Self::SubscriberManager, confirm_req_builder: &RequestBuilderConfirm
     ) -> hyper::http::Result<Request<Body>>
     {
-        clear_client_state(subscriber_manager, confirm_req_builder).await
+        Self::clear_client_state(subscriber_manager, confirm_req_builder).await
     }
 }
 
 #[async_trait(?Send)]
-impl<CmdFetch: CommandFetcher> CommandProcessor for CmdProcessor<CmdFetch> {
+impl<CmdFetchT, StreamsTransportT> CommandProcessor for CmdProcessor<CmdFetchT, StreamsTransportT>where
+    CmdFetchT: CommandFetcher,
+    StreamsTransportT: StreamsTransport,
+    StreamsTransportT::Options: Clone,
+{
     async fn fetch_next_command(&self) -> Result<(Command, Vec<u8>)> {
         self.command_fetcher.fetch_next_command().await
     }
@@ -287,11 +312,12 @@ impl<CmdFetch: CommandFetcher> CommandProcessor for CmdProcessor<CmdFetch> {
     }
 
     async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
-        unimplemented!()
-        /*
-        let client = HttpClientEspRs::new(Some(HttpClientOptions{ http_url: self.iota_bridge_url.as_str() }));
+        let transport = StreamsTransportT::new(
+            Some(self.streams_transport_opt.clone())
+        );
+
         let (mut subscriber, mut vfs_fat_handle) =
-            create_subscriber::<HttpClientEspRs, PlainTextWallet>(client, self.vfs_fat_path.clone()).await?;
+            create_subscriber::<StreamsTransportT, PlainTextWallet>(transport, self.vfs_fat_path.clone()).await?;
 
         print_heap_info();
 
@@ -305,23 +331,29 @@ impl<CmdFetch: CommandFetcher> CommandProcessor for CmdProcessor<CmdFetch> {
         vfs_fat_handle.drop_filesystem()?;
 
         confirmation_request.ok_or(anyhow!("No confirmation_request received"))
-
-         */
     }
 }
 
-pub async fn process_main_esp_rs(lorawan_send_callback: send_request_via_lorawan_t, p_caller_user_data: *mut cty::c_void, vfs_fat_path: Option<String>) -> Result<()> {
+pub async fn process_main_esp_rs(
+    lorawan_send_callback: send_request_via_lorawan_t,
+    vfs_fat_path: Option<String>,
+    p_caller_user_data: *mut cty::c_void,
+) -> Result<()>
+{
     log::debug!("[fn process_main_esp_rs] process_main() entry");
 
     print_heap_info();
 
     log::info!("[fn process_main_esp_rs] Using callback functions to send and receive binary packages");
-    let command_processor = CmdProcessor::<CommandFetcherBufferCb>::new(
-        vfs_fat_path,
-        CommandFetcherBufferCbOptions{ buffer_cb: RequestViaBufferCallbackOptions{
-            send_callback: lorawan_send_callback,
-            p_caller_user_data: p_caller_user_data,
-        }},
+    let request_via_callback_opt = RequestViaBufferCallbackOptions{
+        send_callback: lorawan_send_callback,
+        p_caller_user_data: p_caller_user_data,
+    };
+    let command_processor =
+        CmdProcessor::<CommandFetcherBufferCb, StreamsTransportViaBufferCallback>::new(
+            vfs_fat_path,
+            CommandFetcherBufferCbOptions{ buffer_cb: request_via_callback_opt.clone()},
+            request_via_callback_opt
     );
     run_command_fetch_loop(
         command_processor,
@@ -332,7 +364,6 @@ pub async fn process_main_esp_rs(lorawan_send_callback: send_request_via_lorawan
     ).await
 }
 
-
 pub async fn process_main_esp_rs_wifi(wifi_ssid: &str, wifi_pass: &str, iota_bridge_url: &str, vfs_fat_path: Option<String>) -> Result<()> {
     log::debug!("[fn process_main_esp_rs] process_main() entry");
 
@@ -342,11 +373,16 @@ pub async fn process_main_esp_rs_wifi(wifi_ssid: &str, wifi_pass: &str, iota_bri
     let _wifi_hdl = init_wifi(wifi_ssid, wifi_pass)?;
 
     log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", iota_bridge_url);
-    let command_processor = CmdProcessor::<CommandFetcherSocket>::new(
-        vfs_fat_path,
-        CommandFetcherSocketOptions{
-            http_url: iota_bridge_url
-        }
+
+    let command_processor =
+        CmdProcessor::<CommandFetcherSocket, StreamsTransportSocketEspRs>::new(
+            vfs_fat_path,
+            CommandFetcherSocketOptions{
+                http_url: iota_bridge_url
+            },
+            StreamsTransportSocketEspRsOptions{
+                http_url: iota_bridge_url.to_string()
+            }
     );
     run_command_fetch_loop(
         command_processor,

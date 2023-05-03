@@ -4,7 +4,10 @@ mod cli;
 
 use streams_tools::{
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT,
-    iota_bridge::LoraWanNodeDataStore,
+    iota_bridge::{
+        LoraWanNodeDataStore,
+        PendingRequestDataStore,
+    },
     IotaBridge,
 };
 
@@ -34,7 +37,6 @@ use std::rc::Rc;
 use hyper::server::conn::AddrStream;
 use tokio::sync::oneshot;
 use rusqlite::Connection;
-use streams_tools::iota_bridge::PendingRequestDataStore;
 
 async fn handle_request(mut client: IotaBridge<'_>, request: Request<Body>)
                         -> Result<Response<Body>, hyper::http::Error>
@@ -45,7 +47,6 @@ async fn handle_request(mut client: IotaBridge<'_>, request: Request<Body>)
 }
 
 fn main() {
-
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -72,7 +73,13 @@ async fn run() {
     let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT).into();
     if cli.matches.is_present(cli.arg_keys.listener_ip_address_port) {
         let addr_str = cli.matches.value_of(cli.arg_keys.listener_ip_address_port).unwrap().trim();
-        addr = addr_str.parse().unwrap();
+        match addr_str.parse() {
+            Ok(addr_from_cli) => addr = addr_from_cli,
+            Err(e) => {
+                println!("[IOTA Bridge] Could not parse listener_ip_address_port. Error: {}", e);
+                return;
+            }
+        };
     }
 
     // Template from https://docs.rs/hyper/0.14.15/hyper/server/index.html

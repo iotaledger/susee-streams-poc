@@ -14,11 +14,12 @@
 typedef enum LoRaWanError {
   LORAWAN_OK = 1,
   LORAWAN_NO_CONNECTION = -1,
-  EXIT_SENSOR_MANAGER = -100,
+  LORAWAN_IOTA_BRIDGE_CONNECTOR_ERROR = -2,
+  LORAWAN_EXIT_SENSOR_MANAGER = -100,
 } LoRaWanError;
 
 /**
- * Possible errors of the Streams communication stack.
+ * Possible errors while communicating with the IOTA-Tangle via Streams protocol.
  * The contained values are just for example purposes.
  * The final list will differ a lot.
  */
@@ -36,21 +37,23 @@ typedef enum StreamsError {
  * Signature of the callback function allowing the Streams POC library to receive the response for a
  * request that has been send using a send_request_via_lorawan_t function instance.
  * The resolve_request_response_t function will be implemented by the Streams POC library and will be provided to
- * the LoRaWAN communication stack via the response_callback parameter of the send_request_via_lorawan_t function.
+ * the Sensor application via the response_callback parameter of the send_request_via_lorawan_t function.
  * @param response_data             Binary response data buffer to be returned to the Streams POC library.
- *                                  Will be owned by the LoRaWAN communication stack that calls this function.
+ *                                  Will be owned by the Sensor application that calls this function.
  * @param length                    Length of response_data
  */
 typedef enum StreamsError (*resolve_request_response_t)(const uint8_t *response_data, size_t length);
 
 /**
- * Signature of the callback function allowing the Streams POC library to send requests via LoRaWAN.
- * This function will be implemented by the LoRaWAN communication stack and will be provided to the Streams POC library
- * via the lorawan_send_callback parameter of the send_message() function.
+ * Signature of the callback function allowing the Streams POC library to send requests via LoRaWAN,
+ * serial wired connections or other connection types that are managed by the Sensor application.
+ *
+ * This function will be implemented by the Sensor application and will be provided to the Streams POC library
+ * via the lorawan_send_callback parameter of the send_message() or start_sensor_manager() functions.
  * @param request_data              Binary request data buffer to be send via LoRaWAN.
  *                                  Will be owned by the Streams POC library code calling this function.
  * @param length                    Length of request_data
- * @param response_callback         Callback function allowing the LoRaWAN communication stack to return response
+ * @param response_callback         Callback function allowing the Sensor application to return response
  *                                  data to the Streams POC library.
  *                                  These data  have been received via LoRaWAN as a response for the request.
  *                                  See resolve_request_response_t help above for more details.
@@ -92,6 +95,27 @@ typedef enum StreamsError (*resolve_request_response_t)(const uint8_t *response_
 typedef enum LoRaWanError (*send_request_via_lorawan_t)(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void *p_caller_user_data);
 
 /**
+ * Used with post_binary_request_to_iota_bridge() function
+ * @param dev_eui              DevEUI of the sensor used by the IOTA-Bridge to identify the sensor.
+ * @param iota_bridge_url      URL of the iota-bridge instance to connect to.
+ *                                 Example: "http://192.168.0.100:50000"
+ */
+typedef struct iota_bridge_tcpip_proxy_options_t {
+  uint64_t dev_eui;
+  const char *iota_bridge_url;
+} iota_bridge_tcpip_proxy_options_t;
+
+/**
+ * Signature of the callback function used to receive an HTTP-Response.
+ * See function post_binary_request_to_iota_bridge() for more details.
+ * @param status           HTTP response status.
+ * @param body_bytes       Binary data of the response body.
+ *                         The data sre owned by the streams_poc_library.
+ * @param body_length      Length of the body_bytes
+ */
+typedef void (*http_response_call_back_t)(uint16_t status, const uint8_t *body_bytes, size_t body_length, void *p_caller_user_data);
+
+/**
  * Convert a StreamsError value into a static C string
  */
 const char *streams_error_to_string(enum StreamsError error);
@@ -130,15 +154,27 @@ enum StreamsError send_message(const uint8_t *message_data,
  * For more details about the possible remote commands have a look into the CLI help of those
  * two applications.
  *
- * The "sensor_manager" repetitively polls commands from the IOTA-Bridge and executes them. To stop
+ * The "sensor_manager" repetitively polls commands from the iota-bridge and executes them. To stop
  * the sensor_manager command poll loop please return LoRaWanError::EXIT_SENSOR_MANAGER in your
  * implementation of the lorawan_send_callback.
  *
- * @param lorawan_send_callback    Callback function allowing the Streams POC library to send requests via LoRaWAN.
+ * In general the connection from the Sensor application to the iota-bridge can be realized in one
+ * of the following ways:
+ *
+ * * Via LoRaWAN, Bluetooth, a serial wired connection or similar connections that are managed by
+ *   the Sensor application and using a proxy that transmits the binary packages to the
+ *   iota-bridge (e.g. an 'Application Server Connector').
+ *   Here the used iota-bridge is configured in the settings of the proxy.
+ *   To implement the proxy application the function post_binary_request_to_iota_bridge() can be
+ *   used to send the payloads to/from the iota-bridge via the "/lorawan-rest/binary_request"
+ *   REST API endpoint.
+ * * Via WiFi, managed by the streams-poc-lib or via an other esp-lwIP based connection.
+ *   Use function start_sensor_manager_lwip() instead.
+ *
+ * @param send_callback            Callback function allowing the Streams POC library to send
+ *                                 requests via LoRaWAN, serial wired connections or other
+ *                                 connection types that are managed by the application.
  *                                 See send_request_via_lorawan_t help above for more details.
- * @param iota_bridge_url          URL of the iota-bridge instance to connect to.
- *                                 Example:
- *                                    start_sensor_manager("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
  * @param vfs_fat_path             Optional.
  *                                 Path of the directory where the streams channel user state data and
  *                                 other files shall be read/written by the Streams POC library.
@@ -149,22 +185,32 @@ enum StreamsError send_message(const uint8_t *message_data,
  *                                 See send_request_via_lorawan_t help above for more details.
  *                                 If no p_caller_user_data is provided set p_caller_user_data = NULL.
  */
-int32_t start_sensor_manager(send_request_via_lorawan_t lorawan_send_callback,
-                             const char *iota_bridge_url,
+int32_t start_sensor_manager(send_request_via_lorawan_t send_callback,
                              const char *vfs_fat_path,
                              void *p_caller_user_data);
 
 /**
  * Alternative variant of the start_sensor_manager() function using a streams-poc-lib controlled
- * wifi connection instead of a 'lorawan_send_callback'.
+ * wifi connection or an other esp-lwIP based connection instead of a 'lorawan_send_callback'.
+ * More details regarding esp-lwIP:
+ * * https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-guides/lwip.html
+ * * Function example_connect()
+ *   https://github.com/espressif/esp-idf/blob/master/examples/common_components/protocol_examples_common/include/protocol_examples_common.h
  *
- * @param wifi_ssid        Name (Service Set Identifier) of the WiFi to login.
- * @param wifi_pass        Password of the WiFi to login.
- * @param iota_bridge_url  Same as start_sensor_manager() iota_bridge_url parameter.
+ * @param wifi_ssid        Optional.
+ *                         Name (Service Set Identifier) of the WiFi to login.
+ *                         If wifi_ssid == NULL, the caller of this function has to provide a
+ *                         suitable tcp/ip network connection via esp-lwIP.
+ * @param wifi_pass        Optional.
+ *                         Password of the WiFi to login.
+ *                         Needed if wifi_ssid != NULL otherwise set wifi_pass to NULL.
+ * @param iota_bridge_url  URL of the iota-bridge instance to connect to.
+ *                                 Example:
+ *                                    start_sensor_manager_wifi("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
  * @param vfs_fat_path     Optional.
  *                         Same as start_sensor_manager() vfs_fat_path parameter.
  */
-int32_t start_sensor_manager_wifi(const char *wifi_ssid,
+int32_t start_sensor_manager_lwip(const char *wifi_ssid,
                                   const char *wifi_pass,
                                   const char *iota_bridge_url,
                                   const char *vfs_fat_path);
@@ -221,5 +267,31 @@ int32_t start_sensor_manager_wifi(const char *wifi_ssid,
  *                            is_streams_channel_initialized("/other-flash-partition/streams-folder")
  */
 bool is_streams_channel_initialized(const char *vfs_fat_path);
+
+/**
+ * Send a data package to the iota-bridge using the "/lorawan-rest/binary_request" REST API endpoint.
+ * This function is NOT used in the Sensor application.
+ * This function can be used in a proxy like application (e.g. Application-Server-Connector) that
+ * is used to transmit payloads and responses to/from the iota-bridge.
+ *
+ * @param request_data             Binary request data to be send to the iota-bridge.
+ *                                 These data have been received by the Sensor application
+ *                                 via the send_callback (parameter of the start_sensor_manager()
+ *                                 or send_message() function).
+ *                                 The request data are owned by the proxy application.
+ * @param request_length           Length of the request_data
+ * @param iota_bridge_proxy_opt    Defines the url of the iota-bridge and the dev_eui of the sensor.
+ * @param response_call_back       Used to receive the response data coming from the iota-bridge.
+ * @param p_caller_user_data       Optional.
+ *                                 Pointer to arbitrary data used by the caller of this function
+ *                                 to communicate with the callers own functions.
+ *                                 See send_request_via_lorawan_t help above for more details.
+ *                                 If no p_caller_user_data is provided set p_caller_user_data = NULL.
+ */
+void post_binary_request_to_iota_bridge(const uint8_t *request_data,
+                                        size_t request_length,
+                                        const struct iota_bridge_tcpip_proxy_options_t *iota_bridge_proxy_opt,
+                                        http_response_call_back_t response_call_back,
+                                        void *p_caller_user_data);
 
 #endif /* streams_poc_lib_h */

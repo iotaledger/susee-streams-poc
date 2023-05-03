@@ -17,6 +17,8 @@ use std::{
     fmt::Formatter,
     ops::Range,
     str::FromStr,
+    ptr,
+    ffi::CStr,
 };
 
 use crate::binary_persist::{
@@ -25,7 +27,8 @@ use crate::binary_persist::{
     RangeIterator,
     deserialize_string,
     serialize_vec_u8,
-    deserialize_vec_u8
+    deserialize_vec_u8,
+    serialize_string
 };
 
 use anyhow::bail;
@@ -320,3 +323,78 @@ impl fmt::Display for IotaBridgeResponseParts {
     }
 }
 
+pub mod streams_poc_lib_ffi {
+    use std::os::raw::c_char;
+
+    /// Used with post_binary_request_to_iota_bridge() function
+    /// @param dev_eui              DevEUI of the sensor used by the IOTA-Bridge to identify the sensor.
+    /// @param iota_bridge_url      URL of the iota-bridge instance to connect to.
+    ///                                 Example: "http://192.168.0.100:50000"
+    #[allow(non_camel_case_types)]
+    #[repr(C)]
+    pub struct iota_bridge_tcpip_proxy_options_t {
+        pub dev_eui: u64,
+        pub iota_bridge_url: *const c_char,
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IotaBridgeTcpIpProxySettings {
+    pub dev_eui: u64,
+    pub iota_bridge_url: String,
+}
+
+impl IotaBridgeTcpIpProxySettings {
+    pub fn new_from_iota_bridge_proxy_opt(iota_bridge_proxy_opt: *const streams_poc_lib_ffi::iota_bridge_tcpip_proxy_options_t) -> Option<Self> {
+        if iota_bridge_proxy_opt == ptr::null() {
+            return None
+        }
+
+        let dev_eui: u64 = unsafe{ (*iota_bridge_proxy_opt).dev_eui };
+        let iota_bridge_url = if unsafe{ (*iota_bridge_proxy_opt).iota_bridge_url } != ptr::null() {
+            let cstr_in: &CStr = unsafe { CStr::from_ptr((*iota_bridge_proxy_opt).iota_bridge_url) };
+            match cstr_in.to_str() {
+                Ok(utf8_str_in) => {
+                    String::from(utf8_str_in)
+                }
+                Err(e) => format!("Utf8Error: {}", e)
+            }
+        } else {
+            "".to_string()
+        };
+
+        Some(Self { dev_eui, iota_bridge_url })
+    }
+}
+
+impl BinaryPersist for IotaBridgeTcpIpProxySettings {
+    fn needed_size(&self) -> usize {
+        // dev_eui: u64 -> 8 byte
+        // iota_bridge_url: USIZE_LEN + string_data
+        8 + USIZE_LEN + self.iota_bridge_url.len()
+    }
+
+    fn to_bytes(&self, buffer: &mut [u8]) -> anyhow::Result<usize> {
+        if buffer.len() < self.needed_size() {
+            panic!("[BinaryPersist for IotaBridgeTcpIpProxySettings - to_bytes()] This struct needs {} bytes but \
+                    the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
+        }
+        // dev_eui
+        let mut range: Range<usize> = RangeIterator::new(8);
+        self.dev_eui.to_bytes(&mut buffer[range.clone()])?;
+        // iota_bridge_url
+        serialize_string(&self.iota_bridge_url, buffer, &mut range)?;
+
+        Ok(range.end)
+    }
+
+    fn try_from_bytes(buffer: &[u8]) -> anyhow::Result<Self> where Self: Sized {
+        let mut range: Range<usize> = RangeIterator::new(8);
+        // dev_eui
+        let dev_eui = u64::try_from_bytes(&buffer[range.clone()])?;
+        // iota_bridge_url
+        let iota_bridge_url = deserialize_string(&buffer, &mut range)?;
+
+        Ok(Self {dev_eui, iota_bridge_url})
+    }
+}

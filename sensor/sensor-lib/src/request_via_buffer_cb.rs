@@ -231,7 +231,10 @@ impl RequestViaBufferCallback
             LoRaWanError::LORAWAN_NO_CONNECTION => {
                 bail!("lorawan_send_callback returned error LORAWAN_NO_CONNECTION")
             },
-            LoRaWanError::EXIT_SENSOR_MANAGER => {
+            LoRaWanError::LORAWAN_IOTA_BRIDGE_CONNECTOR_ERROR => {
+                bail!("lorawan_send_callback returned error LORAWAN_IOTA_BRIDGE_CONNECTOR_ERROR")
+            },
+            LoRaWanError::LORAWAN_EXIT_SENSOR_MANAGER => {
                 // TODO: Implement clean shutdown of the sensor_manager starting from here
                 bail!("lorawan_send_callback returned error EXIT_SENSOR_MANAGER - clean shutdown of the sensor_manager is missing")
             }

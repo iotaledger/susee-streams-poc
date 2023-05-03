@@ -11,6 +11,7 @@ pub use {
         STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
         STREAMS_TOOLS_CONST_DEFAULT_TCP_LISTENER_ADDRESS,
         WrappedClient,
+        StreamsTransport,
     },
 };
 

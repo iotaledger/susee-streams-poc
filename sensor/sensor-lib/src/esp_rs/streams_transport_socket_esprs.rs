@@ -53,7 +53,8 @@ use streams_tools::{
         TangleMessageCompressed,
         TangleAddressCompressed
     },
-    STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL
+    STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
+    StreamsTransport
 };
 
 use iota_client_types::{
@@ -65,27 +66,28 @@ use crate::{
     esp_rs::hyper_esp_rs_tools::{
         HyperEsp32Client,
         UserAgentName,
+        SimpleHttpResponse,
     }
 };
-use crate::esp_rs::hyper_esp_rs_tools::SimpleHttpResponse;
 
 fn is_http_status_success(status: u16) -> bool {
     300 > status && status >= 200
 }
 
-pub struct StreamsTransportSocketEspRsOptions<'a> {
-    pub(crate) http_url: &'a str,
+#[derive(Clone)]
+pub struct StreamsTransportSocketEspRsOptions {
+    pub http_url: String,
 }
 
-impl Default for StreamsTransportSocketEspRsOptions<'_> {
+impl Default for StreamsTransportSocketEspRsOptions {
     fn default() -> Self {
         Self {
-            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL
+            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL.to_string()
         }
     }
 }
 
-impl fmt::Display for StreamsTransportSocketEspRsOptions<'_> {
+impl fmt::Display for StreamsTransportSocketEspRsOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "HttpClientOptions: http_url: {}", self.http_url)
     }
@@ -99,21 +101,25 @@ pub struct StreamsTransportSocketEspRs {
     compressed: CompressedStateManager,
 }
 
-impl StreamsTransportSocketEspRs
-{
-    pub fn new(options: Option<StreamsTransportSocketEspRsOptions>) -> Self {
+impl StreamsTransport for StreamsTransportSocketEspRs {
+    type Options = StreamsTransportSocketEspRsOptions;
+
+    fn new(options: Option<StreamsTransportSocketEspRsOptions>) -> Self {
         let options = options.unwrap_or_default();
         log::debug!("[StreamsTransportSocketEspRs::new()] Creating new HttpClient using options: {}", options);
         let mut esp_http_client_opt = HttpConfiguration::default();
         esp_http_client_opt.timeout = Some(Duration::from_secs(60));
         Self {
-            request_builder: RequestBuilderStreams::new(options.http_url),
+            request_builder: RequestBuilderStreams::new(options.http_url.as_str()),
             tangle_client_options: SendOptions::default(),
             esp_http_client_opt,
             compressed: CompressedStateManager::new(),
         }
     }
+}
 
+impl StreamsTransportSocketEspRs
+{
     async fn request<'a>(&mut self, request: Request<Body>, http_client: &'a mut HyperEsp32Client) -> Result<SimpleHttpResponse> {
         let response = http_client.send(request).await?;
 

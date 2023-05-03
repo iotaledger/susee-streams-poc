@@ -24,7 +24,10 @@ use crate::{
     request_via_buffer_cb::RequestViaBufferCallbackOptions,
 };
 
-use streams_tools::PlainTextWallet;
+use streams_tools::{
+    PlainTextWallet,
+    StreamsTransport
+};
 
 pub async fn send_message(
     message_bytes: &[u8],
@@ -33,17 +36,21 @@ pub async fn send_message(
     p_caller_user_data: *mut cty::c_void
 ) -> Result<()>{
 
-    let client = StreamsTransportViaBufferCallback::new(
+    let streams_transport = StreamsTransportViaBufferCallback::new(
         Some(RequestViaBufferCallbackOptions { send_callback: lorawan_send_callback, p_caller_user_data})
     );
     let (mut subscriber, mut vfs_fat_handle) =
-        create_subscriber::<StreamsTransportViaBufferCallback, PlainTextWallet>(client, vfs_fat_path).await?;
+        create_subscriber::<StreamsTransportViaBufferCallback, PlainTextWallet>(streams_transport, vfs_fat_path).await?;
 
     log::info!("[fn - send_message()] Sending {} bytes payload\n", message_bytes.len());
     log::debug!("[fn - send_message()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
-    let msg_link_result = subscriber.send_signed_packet(&Bytes(message_bytes.to_vec())).await;
-    if let Ok(msg_link) = msg_link_result {
-        log::debug!("[fn - send_message()] Message sent: {}, tangle index: {:#}\n", msg_link, msg_link.to_msg_index());
+    match subscriber.send_signed_packet(&Bytes(message_bytes.to_vec())).await {
+        Ok(msg_link) => {
+            log::debug!("[fn - send_message()] Message sent: {}, tangle index: {:#}\n", msg_link, msg_link.to_msg_index());
+        },
+        Err(e) => {
+            log::error!("[fn - send_message()] Error while sending Message: {}", e);
+        }
     }
     log::debug!("[fn - send_message()] Safe subscriber client_status to disk");
     subscriber.safe_client_status_to_disk().await?;

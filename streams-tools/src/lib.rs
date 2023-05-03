@@ -2,11 +2,13 @@
 #![feature(hasher_prefixfree_extras)]
 
 pub mod wallet;
+/// cbindgen:ignore
 pub mod user_manager;
 pub mod streams_transport;
 pub mod http;
 pub mod binary_persist;
 pub mod remote;
+pub mod lorawan_rest_helpers;
 
 #[cfg(feature = "std")]
 pub mod helpers;
@@ -21,15 +23,13 @@ pub use {
     wallet::{
         dummy_wallet::DummyWallet,
         simple_wallet::SimpleWallet,
+        plain_text_wallet::{
+            PlainTextWallet,
+        },
     },
     streams_transport::*,
     user_manager::*,
-};
-
-pub use {
-    wallet::plain_text_wallet::{
-        PlainTextWallet,
-    },
+    lorawan_rest_helpers::*,
 };
 
 #[cfg(feature = "iota_bridge")]

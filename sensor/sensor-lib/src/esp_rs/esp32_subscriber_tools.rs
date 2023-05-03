@@ -1,11 +1,6 @@
 use anyhow::{
     Result
 };
-use super::{
-    streams_transport_socket_esprs::{
-        StreamsTransportSocketEspRs,
-    }
-};
 
 use esp_idf_sys::{
     esp_vfs_fat_spiflash_mount,
@@ -16,19 +11,20 @@ use esp_idf_sys::{
     esp,
 };
 
-use streams_tools::{PlainTextWallet, SubscriberManager, SimpleWallet};
+use streams_tools::{
+    SubscriberManager,
+    StreamsTransport,
+    SimpleWallet
+};
 
 pub use esp_idf_sys::wl_handle_t;
 
 use std::ffi::{
     CString
 };
-use streams_tools::subscriber_manager::ClientTTrait;
 
 pub static BASE_PATH: &str = "/spiflash";
 pub static SENSOR_STREAMS_USER_STATE_FILE_NAME: &str = "user-state-sensor.bin";
-
-pub type SubscriberManagerPlainTextWalletTransportSocketEspRs = SubscriberManager<StreamsTransportSocketEspRs, PlainTextWallet>;
 
 pub struct VfsFatHandle {
     pub is_vfs_managed_by_others: bool,
@@ -94,9 +90,9 @@ impl VfsFatHandle {
     }
 }
 
-pub async fn create_subscriber<ClientT, WalletT>(client: ClientT, opt_vfs_fat_path: Option<String>) -> Result<(SubscriberManager<ClientT, WalletT>, VfsFatHandle)>
+pub async fn create_subscriber<TransportT, WalletT>(transport: TransportT, opt_vfs_fat_path: Option<String>) -> Result<(SubscriberManager<TransportT, WalletT>, VfsFatHandle)>
 where
-    ClientT: ClientTTrait,
+    TransportT: StreamsTransport,
     WalletT: SimpleWallet
 {
     log::debug!("[fn - create_subscriber()] setup_filesystem");
@@ -104,13 +100,13 @@ where
     vfs_fat_handle.setup_filesystem()?;
 
     log::debug!("[fn - create_subscriber()] Creating Wallet");
-    let wallet_path = vfs_fat_handle.base_path.clone() + "/wallet_sensor.txt";
+    let wallet_path = vfs_fat_handle.base_path.clone() + "/wallet_sensor.t\txt";
     let wallet = WalletT::new(wallet_path.as_str());
 
     log::debug!("[fn - create_subscriber()] Creating HttpClient");
     log::debug!("[fn - create_subscriber()] Creating subscriber");
-    let subscriber= SubscriberManager::<ClientT, WalletT>::new(
-        client,
+    let subscriber= SubscriberManager::<TransportT, WalletT>::new(
+        transport,
         wallet,
         Some(vfs_fat_handle.base_path.clone() + "/" + SENSOR_STREAMS_USER_STATE_FILE_NAME),
     ).await;

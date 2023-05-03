@@ -56,7 +56,8 @@ use crate::{
         CompressedStateSend,
         CompressedStateListen,
         CompressedStateManager
-    }
+    },
+    StreamsTransport
 };
 
 use hyper::{
@@ -75,31 +76,31 @@ use tokio::time;
 
 use anyhow::bail;
 
-pub struct StreamsTransportSocketOptions<'a> {
-    pub http_url: &'a str,
+pub struct StreamsTransportSocketOptions {
+    pub http_url: String,
     pub dev_eui: Option<String>,
     pub use_lorawan_rest: bool,
 }
 
-impl<'a> StreamsTransportSocketOptions<'a> {
-    pub fn new(http_url: &'a str) -> Self {
+impl StreamsTransportSocketOptions {
+    pub fn new(http_url: String) -> Self {
         let mut ret_val = Self::default();
         ret_val.http_url = http_url;
         ret_val
     }
 }
 
-impl Default for StreamsTransportSocketOptions<'_> {
+impl Default for StreamsTransportSocketOptions {
     fn default() -> Self {
         Self {
-            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
+            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL.to_string(),
             dev_eui: None,
             use_lorawan_rest: false,
         }
     }
 }
 
-impl fmt::Display for StreamsTransportSocketOptions<'_> {
+impl fmt::Display for StreamsTransportSocketOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "StreamsTransportSocketOptions:\n     http_url: {},\n     dev_eui:  {},\n     use_lorawan_rest:  {}",
             self.http_url,
@@ -120,16 +121,17 @@ pub struct StreamsTransportSocket {
     use_lorawan_rest: bool,
 }
 
-impl StreamsTransportSocket
-{
-    pub fn new(options: Option<StreamsTransportSocketOptions>) -> Self {
+impl StreamsTransport for StreamsTransportSocket {
+    type Options = StreamsTransportSocketOptions;
+
+    fn new(options: Option<StreamsTransportSocketOptions>) -> Self {
         let options = options.unwrap_or_default();
         println!("[StreamsTransportSocket.new_from_url()] Initializing instance with options:\n{}\n", options);
         Self {
             tangle_client_options: SendOptions::default(),
             hyper_client: HyperClient::new(),
-            request_builder_streams: RequestBuilderStreams::new(options.http_url),
-            request_builder_lorawan_rest: RequestBuilderLorawanRest::new(options.http_url),
+            request_builder_streams: RequestBuilderStreams::new(options.http_url.as_str()),
+            request_builder_lorawan_rest: RequestBuilderLorawanRest::new(options.http_url.as_str()),
             compressed: CompressedStateManager::new(),
             dev_eui: options.dev_eui,
             use_lorawan_rest: options.use_lorawan_rest

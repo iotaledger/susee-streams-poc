@@ -13,6 +13,7 @@ use hyper::{
         }
     }
 };
+
 use crate::binary_persist::{
     BinaryPersist,
     EnumeratedPersistable,

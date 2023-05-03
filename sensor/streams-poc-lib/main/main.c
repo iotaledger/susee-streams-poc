@@ -34,15 +34,17 @@
    ############################ Test CONFIG ###############################################
    ######################################################################################## */
 
+#define USE_START_SENSOR_MANAGER_LWIP false
+
 // Please edit your Wifi credentials here. Needed for Sensor initialization.
 #define STREAMS_POC_LIB_TEST_WIFI_SSID "Susee Demo"
 #define STREAMS_POC_LIB_TEST_WIFI_PASS "susee-rocks"
 // The url of the iota-bridge to connect to. Needed for Sensor initialization.
-#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.0.100:50000")
+#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.0.101:50000")
 
 // IP address and port of the LoRaWAN AppServer Connector Mockup Tool to connect to.
 // Needed for sending messages.
-#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.0.100:50001")
+#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.0.101:50001")
 
 // Setting STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH to NULL will make the streams-poc-lib
 // using its own vfs_fate partition as been described in streams-poc-lib.h
@@ -83,46 +85,49 @@ static EventGroupHandle_t s_wifi_event_group;
  * - we are connected to the AP with an IP
  * - we failed to connect after the maximum amount of retries */
 #define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT      BIT1
+#define WIFI_FAIL_BIT BIT1
 
 static int s_retry_num = 0;
 
 static int s_socket_handle;
 
+static uint64_t s_mac_id = 0;
+
+
 // This is the binary representation of the content of the file /test/meter_reading_1.json
 #define MESSAGE_DATA_LENGTH 80 // 213
-const uint8_t message_data[MESSAGE_DATA_LENGTH] = {
-        0x7b, 0x0a, 0x20, 0x20, 0x22, 0x74, 0x79, 0x70,
-        0x65, 0x22, 0x3a, 0x20, 0x22, 0x6d, 0x65, 0x74,
-        0x65, 0x72, 0x5f, 0x72, 0x65, 0x61, 0x64, 0x69,
-        0x6e, 0x67, 0x22, 0x2c, 0x0a, 0x20, 0x20, 0x22,
-        0x72, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72,
-        0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x3a,
-        0x20, 0x32, 0x32, 0x30, 0x31, 0x2e, 0x30, 0x32,
-        0x2c, 0x0a, 0x20, 0x20, 0x22, 0x71, 0x75, 0x61,
-        0x6c, 0x69, 0x66, 0x69, 0x65, 0x72, 0x22, 0x3a,
-        0x20, 0x22, 0x61, 0x2d, 0x70, 0x6c, 0x75, 0x73,
-//        0x22, 0x2c, 0x0a, 0x20, 0x20, 0x22, 0x6f, 0x62,
-//        0x69, 0x73, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65,
-//        0x22, 0x3a, 0x20, 0x32, 0x32, 0x30, 0x31, 0x2e,
-//        0x30, 0x32, 0x2c, 0x0a, 0x20, 0x20, 0x22, 0x6d,
-//        0x65, 0x74, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x22,
-//        0x3a, 0x20, 0x20, 0x20, 0x36, 0x30, 0x32, 0x35,
-//        0x31, 0x35, 0x30, 0x34, 0x2c, 0x0a, 0x20, 0x20,
-//        0x22, 0x6d, 0x65, 0x64, 0x69, 0x75, 0x6d, 0x22,
-//        0x3a, 0x20, 0x22, 0x65, 0x6c, 0x65, 0x63, 0x74,
-//        0x72, 0x69, 0x63, 0x69, 0x74, 0x79, 0x5f, 0x6b,
-//        0x77, 0x68, 0x22, 0x2c, 0x0a, 0x20, 0x20, 0x22,
-//        0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x5f, 0x76,
-//        0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x22, 0x3a,
-//        0x20, 0x31, 0x2c, 0x0a, 0x20, 0x20, 0x22, 0x31,
-//        0x2d, 0x30, 0x3a, 0x31, 0x2e, 0x38, 0x2e, 0x30,
-//        0x22, 0x3a, 0x20, 0x20, 0x32, 0x32, 0x30, 0x31,
-//        0x2e, 0x30, 0x32, 0x0a, 0x7d
+const uint8_t MESSAGE_DATA[MESSAGE_DATA_LENGTH] = {
+    0x7b, 0x0a, 0x20, 0x20, 0x22, 0x74, 0x79, 0x70,
+    0x65, 0x22, 0x3a, 0x20, 0x22, 0x6d, 0x65, 0x74,
+    0x65, 0x72, 0x5f, 0x72, 0x65, 0x61, 0x64, 0x69,
+    0x6e, 0x67, 0x22, 0x2c, 0x0a, 0x20, 0x20, 0x22,
+    0x72, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72,
+    0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x3a,
+    0x20, 0x32, 0x32, 0x30, 0x31, 0x2e, 0x30, 0x32,
+    0x2c, 0x0a, 0x20, 0x20, 0x22, 0x71, 0x75, 0x61,
+    0x6c, 0x69, 0x66, 0x69, 0x65, 0x72, 0x22, 0x3a,
+    0x20, 0x22, 0x61, 0x2d, 0x70, 0x6c, 0x75, 0x73,
+    //        0x22, 0x2c, 0x0a, 0x20, 0x20, 0x22, 0x6f, 0x62,
+    //        0x69, 0x73, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65,
+    //        0x22, 0x3a, 0x20, 0x32, 0x32, 0x30, 0x31, 0x2e,
+    //        0x30, 0x32, 0x2c, 0x0a, 0x20, 0x20, 0x22, 0x6d,
+    //        0x65, 0x74, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x22,
+    //        0x3a, 0x20, 0x20, 0x20, 0x36, 0x30, 0x32, 0x35,
+    //        0x31, 0x35, 0x30, 0x34, 0x2c, 0x0a, 0x20, 0x20,
+    //        0x22, 0x6d, 0x65, 0x64, 0x69, 0x75, 0x6d, 0x22,
+    //        0x3a, 0x20, 0x22, 0x65, 0x6c, 0x65, 0x63, 0x74,
+    //        0x72, 0x69, 0x63, 0x69, 0x74, 0x79, 0x5f, 0x6b,
+    //        0x77, 0x68, 0x22, 0x2c, 0x0a, 0x20, 0x20, 0x22,
+    //        0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x5f, 0x76,
+    //        0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x22, 0x3a,
+    //        0x20, 0x31, 0x2c, 0x0a, 0x20, 0x20, 0x22, 0x31,
+    //        0x2d, 0x30, 0x3a, 0x31, 0x2e, 0x38, 0x2e, 0x30,
+    //        0x22, 0x3a, 0x20, 0x20, 0x32, 0x32, 0x30, 0x31,
+    //        0x2e, 0x30, 0x32, 0x0a, 0x7d
 };
 
-// Function that will be called in send_request_via_socket() to test p_caller_user_data
-void test_p_caller_user_data(const char* function_name) {
+// Function that will be called in cb_fun_send_request_via_socket() to test p_caller_user_data
+void test_p_caller_user_data(const char *function_name) {
     ESP_LOGI(TAG, "[fn test_p_caller_user_data] This function has successfully been called from within the %s() function", function_name);
 }
 
@@ -137,56 +142,54 @@ void test_p_caller_user_data(const char* function_name) {
 //
 // Therefore we use a wrapper struct called test_p_caller_user_data_wrapper
 
-typedef void (*test_p_caller_user_data_t)(const char*);
+typedef void (*test_p_caller_user_data_t)(const char *);
 
-typedef struct test_p_caller_user_data_wrapper {
+typedef struct test_p_caller_user_data_wrapper{
     test_p_caller_user_data_t fun_ptr;
 } test_p_caller_user_data_wrapper_t;
 
-
-static void wifi_init_event_handler(void* arg, esp_event_base_t event_base,
-                                int32_t event_id, void* event_data)
-{
+static void wifi_init_event_handler(void *arg, esp_event_base_t event_base,
+                                    int32_t event_id, void *event_data) {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+    }
+    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         if (s_retry_num < STREAMS_POC_LIB_TEST_MAXIMUM_RETRY) {
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "[fn wifi_init_event_handler] Retry to connect to the AP");
-        } else {
+        }
+        else {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
-        ESP_LOGI(TAG,"[fn wifi_init_event_handler] Connect to the AP fail");
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(TAG, "[fn wifi_init_event_handler] Connect to the AP fail");
+    }
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "[fn wifi_init_event_handler] Got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
 
-static bool mount_fatfs(wl_handle_t* p_wl_handle)
+static bool mount_fatfs(wl_handle_t *p_wl_handle)
 {
     ESP_LOGI(TAG, "[fn mount_fatfs] Mounting FAT filesystem with base_path '%s'", STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH);
     const esp_vfs_fat_mount_config_t mount_config = {
-            .max_files = 4,
-            .format_if_mount_failed = true,
-            .allocation_unit_size = CONFIG_WL_SECTOR_SIZE
-    };
+        .max_files = 4,
+        .format_if_mount_failed = true,
+        .allocation_unit_size = CONFIG_WL_SECTOR_SIZE};
     esp_err_t err = esp_vfs_fat_spiflash_mount(
         STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
         "storage",
         &mount_config,
-        p_wl_handle
-    );
+        p_wl_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "[fn mount_fatfs] Failed to mount FATFS (%s)", esp_err_to_name(err));
         return false;
     }
     return true;
 }
-
 
 void wifi_init_sta(void)
 {
@@ -220,35 +223,37 @@ void wifi_init_sta(void)
             /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
              * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
              * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
-	     * WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK standards.
+             * WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK standards.
              */
             .threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD,
             .sae_pwe_h2e = WPA3_SAE_PWE_BOTH,
         },
     };
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
-    ESP_ERROR_CHECK(esp_wifi_start() );
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "[fn wifi_init_sta] wifi_init_sta finished.");
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by wifi_init_event_handler() (see above) */
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-            pdFALSE,
-            pdFALSE,
-            portMAX_DELAY);
+                                           WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+                                           pdFALSE,
+                                           pdFALSE,
+                                           portMAX_DELAY);
 
     /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
      * happened. */
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "[fn wifi_init_sta] connected to wifi SSID:%s password:%s",
                  STREAMS_POC_LIB_TEST_WIFI_SSID, STREAMS_POC_LIB_TEST_WIFI_PASS);
-    } else if (bits & WIFI_FAIL_BIT) {
+    }
+    else if (bits & WIFI_FAIL_BIT) {
         ESP_LOGI(TAG, "[fn wifi_init_sta] Failed to connect to SSID:%s, password:%s",
                  STREAMS_POC_LIB_TEST_WIFI_SSID, STREAMS_POC_LIB_TEST_WIFI_PASS);
-    } else {
+    }
+    else {
         ESP_LOGE(TAG, "[fn wifi_init_sta] UNEXPECTED EVENT");
     }
 }
@@ -257,22 +262,26 @@ void log_binary_data(const uint8_t *data, size_t length) {
     int i;
     for (i = 0; i < length; i++)
     {
-        if (i > 0) printf(":");
+        if (i > 0)
+            printf(":");
         printf("%02X", data[i]);
     }
     printf("\n");
 }
 
-
 uint64_t get_base_mac_48_as_mocked_u64_dev_eui() {
-    uint64_t mac_id;
-    ESP_ERROR_CHECK(esp_efuse_mac_get_default((uint8_t*)&mac_id));
-    ESP_LOGD(TAG, "[fn get_mac_id_as_u64_dev_eui_mock] mac_id as u64 is %" PRIu64 "\n", mac_id);
-    return mac_id;
+    if (s_mac_id == 0) {
+        ESP_ERROR_CHECK(esp_efuse_mac_get_default((uint8_t *)&s_mac_id));
+        ESP_LOGD(TAG, "[fn get_base_mac_48_as_mocked_u64_dev_eui] s_mac_id as u64 is set to %" PRIu64 "\n", s_mac_id);
+    } else {
+        ESP_LOGD(TAG, "[fn get_base_mac_48_as_mocked_u64_dev_eui] returning initial s_mac_id %" PRIu64 "\n", s_mac_id);
+    }
+
+    return s_mac_id;
 }
 
-LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void* p_caller_user_data) {
-    ESP_LOGI(TAG, "[fn send_request_via_socket] is called with %d bytes of request_data", length);
+LoRaWanError cb_fun_send_request_via_socket(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void *p_caller_user_data) {
+    ESP_LOGI(TAG, "[fn cb_fun_send_request_via_socket] is called with %d bytes of request_data", length);
 
     log_binary_data(request_data, length);
 
@@ -296,7 +305,7 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
 
     int err = send(s_socket_handle, send_buffer, send_buffer_len, 0);
     if (err < 0) {
-        ESP_LOGE(TAG, "[fn send_request_via_socket] Error occurred during sending: errno %d", errno);
+        ESP_LOGE(TAG, "[fn cb_fun_send_request_via_socket] Error occurred during sending: errno %d", errno);
         return LORAWAN_NO_CONNECTION;
     }
 
@@ -304,36 +313,37 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
     int rx_len = recv(s_socket_handle, rx_buffer, sizeof(rx_buffer), 0);
     // Error occurred during receiving
     if (rx_len < 0) {
-        ESP_LOGE(TAG, "[fn send_request_via_socket] recv failed: errno %d", errno);
+        ESP_LOGE(TAG, "[fn cb_fun_send_request_via_socket] recv failed: errno %d", errno);
         return LORAWAN_NO_CONNECTION;
     }
 
     // Data received
-    ESP_LOGI(TAG, "[fn send_request_via_socket] Received %d bytes from %s:", rx_len, STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
+    ESP_LOGI(TAG, "[fn cb_fun_send_request_via_socket] Received %d bytes from %s:", rx_len, STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
     log_binary_data(rx_buffer, rx_len);
 
     StreamsError streams_err = response_callback(rx_buffer, rx_len);
     if (streams_err < 0) {
-        ESP_LOGI(TAG, "[fn send_request_via_socket] response_callback returned with error code: %s, ", streams_error_to_string(streams_err));
+        ESP_LOGI(TAG, "[fn cb_fun_send_request_via_socket] response_callback returned with error code: %s, ", streams_error_to_string(streams_err));
     }
 
     // Before we leave this function we need to test the p_caller_user_data that should point to a test_p_caller_user_data_wrapper_t instance now
     if (p_caller_user_data != NULL) {
-        test_p_caller_user_data_wrapper_t* callable = (test_p_caller_user_data_wrapper_t*)(p_caller_user_data);
-        callable->fun_ptr("send_request_via_socket");
-    } else {
-        ESP_LOGE(TAG, "[fn send_request_via_socket] p_caller_user_data has been set in prepare_socket_and_send_message() but now it's NULL");
+        test_p_caller_user_data_wrapper_t *callable = (test_p_caller_user_data_wrapper_t *)(p_caller_user_data);
+        callable->fun_ptr("cb_fun_send_request_via_socket");
+    }
+    else {
+        ESP_LOGE(TAG, "[fn cb_fun_send_request_via_socket] p_caller_user_data has been set in prepare_socket_and_send_message_via_callback_io() but now it's NULL");
     }
 
     // We arrived at this point so we assume that no LoRaWanError occurred.
     return LORAWAN_OK;
 }
 
- int parse_app_srv_connector_mock_address(dest_addr_t *p_dest_addr) {
+int parse_app_srv_connector_mock_address(dest_addr_t *p_dest_addr) {
     struct http_parser_url parsed_url;
     http_parser_url_init(&parsed_url);
 
-    const char* url_prefix = "http://";
+    const char *url_prefix = "http://";
     char app_srv_connector_mock_address_as_url[256];
     strcpy(app_srv_connector_mock_address_as_url, url_prefix);
     strcat(app_srv_connector_mock_address_as_url, STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
@@ -356,10 +366,10 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
         strncpy(
             parsed_host,
             app_srv_connector_mock_address_as_url + parsed_url.field_data[UF_HOST].off,
-            parsed_url.field_data[UF_HOST].len
-        );
+            parsed_url.field_data[UF_HOST].len);
         ESP_LOGI(TAG, "[fn parse_app_srv_connector_mock_address] parsed host is '%s'", parsed_host);
-    } else {
+    }
+    else {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -370,11 +380,11 @@ LoRaWanError send_request_via_socket(const uint8_t *request_data, size_t length,
         strncpy(
             parsed_port,
             app_srv_connector_mock_address_as_url + parsed_url.field_data[UF_PORT].off,
-            parsed_url.field_data[UF_PORT].len
-        );
+            parsed_url.field_data[UF_PORT].len);
         parsed_port_u16 = parsed_url.port;
         ESP_LOGI(TAG, "[fn parse_app_srv_connector_mock_address] parsed port string is '%s'. Port u16 = %d", parsed_port, parsed_port_u16);
-    } else {
+    }
+    else {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -397,15 +407,15 @@ int get_handle_of_prepared_socket(dest_addr_t *p_dest_addr)
     int addr_family = 0;
     int ip_protocol = 0;
 
-    #if defined(CONFIG_EXAMPLE_IPV4)
-        addr_family = AF_INET;
-        ip_protocol = IPPROTO_IP;
-    #elif defined(CONFIG_EXAMPLE_IPV6)
-        addr_family = AF_INET6;
-        ip_protocol = IPPROTO_IPV6;
-    #endif
+#if defined(CONFIG_EXAMPLE_IPV4)
+    addr_family = AF_INET;
+    ip_protocol = IPPROTO_IP;
+#elif defined(CONFIG_EXAMPLE_IPV6)
+    addr_family = AF_INET6;
+    ip_protocol = IPPROTO_IPV6;
+#endif
 
-    int sock =  socket(addr_family, SOCK_STREAM, ip_protocol);
+    int sock = socket(addr_family, SOCK_STREAM, ip_protocol);
     if (sock < 0) {
         ESP_LOGE(TAG, "[fn get_handle_of_prepared_socket] Unable to create socket: errno %d", errno);
         return sock;
@@ -429,69 +439,128 @@ void shut_down_socket(int sock_handle) {
     }
 }
 
-void prepare_socket_and_send_message(dest_addr_t* dest_addr ) {
+void prepare_socket_and_send_message_via_callback_io(dest_addr_t *dest_addr) {
     s_socket_handle = get_handle_of_prepared_socket(dest_addr);
 
     // Prepare testing p_caller_user_data
     test_p_caller_user_data_wrapper_t some_caller_user_data;
     some_caller_user_data.fun_ptr = &test_p_caller_user_data;
 
-    ESP_LOGI(TAG, "[fn prepare_socket_and_send_message] Calling send_message for message_data of length %d \n\n", MESSAGE_DATA_LENGTH);
-    send_message(message_data, MESSAGE_DATA_LENGTH, send_request_via_socket, STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH, &some_caller_user_data);
+    ESP_LOGI(TAG, "[fn prepare_socket_and_send_message_via_callback_io] Calling send_message for MESSAGE_DATA of length %d \n\n", MESSAGE_DATA_LENGTH);
+    send_message(MESSAGE_DATA, MESSAGE_DATA_LENGTH, cb_fun_send_request_via_socket, STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH, &some_caller_user_data);
 
-    ESP_LOGI(TAG, "[fn prepare_socket_and_send_message] Shutting down socket");
+    ESP_LOGI(TAG, "[fn prepare_socket_and_send_message_via_callback_io] Shutting down socket");
     shut_down_socket(s_socket_handle);
 }
 
-void send_message_via_streams_poc_lib(void) {
-    ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Preparing WIFI");
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      ESP_ERROR_CHECK(nvs_flash_erase());
-      ret = nvs_flash_init();
-    }
-
-    ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] ESP_WIFI_MODE_STA");
-    wifi_init_sta();
-
-    ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Preparing netif and creating default event loop\n");
-    ESP_ERROR_CHECK(esp_netif_init());
-
-    ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Preparing socket for future send_request_via_socket() calls");
-#if defined(CONFIG_EXAMPLE_IPV4)
-    dest_addr_t dest_addr;
-#elif defined(CONFIG_EXAMPLE_IPV6)
-    dest_addr_t dest_addr = { 0 };
-#endif    
-    
-    if( 0 == parse_app_srv_connector_mock_address(&dest_addr) ) {
+void send_message_via_callback_io(dest_addr_t *p_dest_addr) {
+    if (0 == parse_app_srv_connector_mock_address(p_dest_addr)) {
         while (1) {
-            prepare_socket_and_send_message(&dest_addr);
-            ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Waiting 5 seconds to send message again");
+            prepare_socket_and_send_message_via_callback_io(p_dest_addr);
+            ESP_LOGI(TAG, "[fn send_message_via_callback_io] Waiting 5 seconds to send message again");
             sleep(5);
         }
-    } else {
-        ESP_LOGI(TAG, "[fn send_message_via_streams_poc_lib] Could not parse address of lorawan application-server-connector-mock");
+    }
+    else {
+        ESP_LOGI(TAG, "[fn send_message_via_callback_io] Could not parse address of lorawan application-server-connector-mock");
     }
 }
 
-void app_main(void)
-{
+typedef struct {
+    resolve_request_response_t response_callback;
+    LoRaWanError status;
+} http_response_recv_t;
+
+void http_response_recv_receive_response(http_response_recv_t* p_receiver, uint16_t status, const uint8_t *body_bytes, size_t body_length) {
+    if (status >= 200 && status < 300) {
+        p_receiver->response_callback(body_bytes, body_length);
+        p_receiver->status = LORAWAN_OK;
+    }
+    else {
+        ESP_LOGE(TAG, "[fn http_response_recv_receive_response] Received HTPP error. Status: %d", status);
+        p_receiver->status = LORAWAN_IOTA_BRIDGE_CONNECTOR_ERROR;
+    }
+}
+
+void receive_http_response(uint16_t status, const uint8_t *body_bytes, size_t body_length, void *p_caller_user_data) {
+    if (p_caller_user_data != NULL) {
+        http_response_recv_t *p_receiver = (http_response_recv_t*)(p_caller_user_data);
+        http_response_recv_receive_response(p_receiver, status, body_bytes, body_length);
+    }
+    else {
+        ESP_LOGE(TAG, "[fn receive_http_response] p_caller_user_data is NULL");
+    }
+}
+
+LoRaWanError send_request_via_wifi(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void *p_caller_user_data) {
+    iota_bridge_tcpip_proxy_options_t iota_bridge_proxy_opt = {
+        .dev_eui = get_base_mac_48_as_mocked_u64_dev_eui(),
+        .iota_bridge_url = STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL
+    };
+
+    http_response_recv_t response_receiver = {
+        .response_callback = response_callback
+    };
+
+    post_binary_request_to_iota_bridge(request_data, length, &iota_bridge_proxy_opt, receive_http_response, &response_receiver);
+    return response_receiver.status;
+}
+
+void init_sensor_via_callback_io(void) {
+    ESP_LOGI(TAG, "[fn init_sensor_via_callback_io] Starting sensor_manager using IOTA-Bridge: %s", STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL);
+    start_sensor_manager(
+        send_request_via_wifi,
+        STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
+        NULL);
+}
+
+
+void prepare_callback_based_sensor_processing(bool do_sensor_initialization) {
+    ESP_LOGI(TAG, "[fn prepare_callback_based_sensor_processing] Preparing WIFI");
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+
+    ESP_LOGI(TAG, "[fn prepare_callback_based_sensor_processing] ESP_WIFI_MODE_STA");
+    wifi_init_sta();
+
+    ESP_LOGI(TAG, "[fn prepare_callback_based_sensor_processing] Preparing netif and creating default event loop\n");
+    ESP_ERROR_CHECK(esp_netif_init());
+
+    ESP_LOGI(TAG, "[fn prepare_callback_based_sensor_processing] Preparing socket for future cb_fun_send_request_via_socket() calls");
+#if defined(CONFIG_EXAMPLE_IPV4)
+    dest_addr_t dest_addr;
+#elif defined(CONFIG_EXAMPLE_IPV6)
+    dest_addr_t dest_addr = {0};
+#endif
+
+    if (do_sensor_initialization) {
+        init_sensor_via_callback_io();
+    }
+    else {
+        send_message_via_callback_io(&dest_addr);
+    }
+}
+
+void app_main(void) {
     ESP_LOGI(TAG, "[fn app_main] Sensor App is starting!\n");
 
     /* Print chip information */
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
     ESP_LOGI(TAG, "[fn app_main] This is %s chip with %d CPU cores, WiFi%s%s, ",
-            CONFIG_IDF_TARGET,
-            chip_info.cores,
-            (chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
-            (chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "");
+             CONFIG_IDF_TARGET,
+             chip_info.cores,
+             (chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
+             (chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : ""
+    );
 
     ESP_LOGI(TAG, "[fn app_main] silicon revision %d, ", chip_info.revision);
 
-//    ESP_LOGI(TAG, "[fn app_main] %dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
-//            (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+    //    ESP_LOGI(TAG, "[fn app_main] %dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
+    //            (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
     ESP_LOGI(TAG, "[fn app_main] Free heap: %ld\n", esp_get_free_heap_size());
 
@@ -501,21 +570,25 @@ void app_main(void)
     }
 
     if (is_streams_channel_initialized(STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH)) {
-        ESP_LOGI(TAG, "[fn app_main] Streams channel already initialized. Calling C function send_message_via_streams_poc_lib()");
-        send_message_via_streams_poc_lib();
-    } else {
-        ESP_LOGI(TAG, "[fn app_main] Streams channel for this sensor has not been initialized. Calling start_sensor_manager()");
-        start_sensor_manager_wifi(
+        ESP_LOGI(TAG, "[fn app_main] Streams channel already initialized. Calling prepare_callback_based_sensor_processing() to send messages");
+        prepare_callback_based_sensor_processing(false);
+    }
+    else if (!USE_START_SENSOR_MANAGER_LWIP) {
+        ESP_LOGI(TAG, "[fn app_main] Streams channel for this sensor has not been initialized. Calling prepare_callback_based_sensor_processing() to initialize the sensor using start_sensor_manager()");
+        prepare_callback_based_sensor_processing(true);
+    }
+    else {
+        ESP_LOGI(TAG, "[fn app_main] Streams channel for this sensor has not been initialized. Calling start_sensor_manager_lwip()");
+        start_sensor_manager_lwip(
             STREAMS_POC_LIB_TEST_WIFI_SSID,
             STREAMS_POC_LIB_TEST_WIFI_PASS,
             STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,
-            STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH
-        );
+            STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH);
     }
 
     if (STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH != NULL && wl_handle != WL_INVALID_HANDLE) {
         ESP_LOGI(TAG, "[fn app_main] unmounting vfs_fat");
-        ESP_ERROR_CHECK( esp_vfs_fat_spiflash_unmount(STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH, wl_handle));
+        ESP_ERROR_CHECK(esp_vfs_fat_spiflash_unmount(STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH, wl_handle));
     }
 
     ESP_LOGI(TAG, "[fn app_main] Exiting Sensor App");

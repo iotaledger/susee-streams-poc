@@ -1,4 +1,5 @@
 use log::*;
+
 use sensor_lib::{
     process_main_esp_rs,
     process_main_esp_rs_wifi,
@@ -6,9 +7,15 @@ use sensor_lib::{
     streams_poc_lib_api_types::{
         StreamsError,
         send_request_via_lorawan_t,
-    }
-    // HttpClient,
-    // HttpClientOptions,
+        http_response_call_back_t,
+        iota_bridge_tcpip_proxy_options_t,
+    },
+    esp_rs::LoraWanRestClient,
+};
+
+use streams_tools::{
+    LoraWanRestClientOptions,
+    binary_persist::IotaBridgeTcpIpProxySettings
 };
 
 use std::{
@@ -118,11 +125,26 @@ pub extern "C" fn send_message(
 /// For more details about the possible remote commands have a look into the CLI help of those
 /// two applications.
 ///
-/// The "sensor_manager" repetitively polls commands from the IOTA-Bridge and executes them. To stop
+/// The "sensor_manager" repetitively polls commands from the iota-bridge and executes them. To stop
 /// the sensor_manager command poll loop please return LoRaWanError::EXIT_SENSOR_MANAGER in your
 /// implementation of the lorawan_send_callback.
 ///
-/// @param lorawan_send_callback    Callback function allowing the Streams POC library to send requests via LoRaWAN.
+/// In general the connection from the Sensor application to the iota-bridge can be realized in one
+/// of the following ways:
+///
+/// * Via LoRaWAN, Bluetooth, a serial wired connection or similar connections that are managed by
+///   the Sensor application and using a proxy that transmits the binary packages to the
+///   iota-bridge (e.g. an 'Application Server Connector').
+///   Here the used iota-bridge is configured in the settings of the proxy.
+///   To implement the proxy application the function post_binary_request_to_iota_bridge() can be
+///   used to send the payloads to/from the iota-bridge via the "/lorawan-rest/binary_request"
+///   REST API endpoint.
+/// * Via WiFi, managed by the streams-poc-lib or via an other esp-lwIP based connection.
+///   Use function start_sensor_manager_lwip() instead.
+///
+/// @param send_callback            Callback function allowing the Streams POC library to send
+///                                 requests via LoRaWAN, serial wired connections or other
+///                                 connection types that are managed by the application.
 ///                                 See send_request_via_lorawan_t help above for more details.
 /// @param vfs_fat_path             Optional.
 ///                                 Path of the directory where the streams channel user state data and
@@ -135,7 +157,7 @@ pub extern "C" fn send_message(
 ///                                 If no p_caller_user_data is provided set p_caller_user_data = NULL.
 #[no_mangle]
 pub extern "C" fn start_sensor_manager(
-    lorawan_send_callback: send_request_via_lorawan_t,
+    send_callback: send_request_via_lorawan_t,
     vfs_fat_path: *const c_char,
     p_caller_user_data: *mut cty::c_void
 ) -> i32 {
@@ -148,9 +170,9 @@ pub extern "C" fn start_sensor_manager(
     match future::block_on(async {
         debug!("[fn start_sensor_manager()] Start future::block_on");
         process_main_esp_rs(
-            lorawan_send_callback,
+            send_callback,
+            opt_vfs_fat_path,
             p_caller_user_data,
-            opt_vfs_fat_path
         ).await
     }){
         Ok(_) => {},
@@ -163,15 +185,26 @@ pub extern "C" fn start_sensor_manager(
 }
 
 /// Alternative variant of the start_sensor_manager() function using a streams-poc-lib controlled
-/// wifi connection instead of a 'lorawan_send_callback'.
+/// wifi connection or an other esp-lwIP based connection instead of a 'lorawan_send_callback'.
+/// More details regarding esp-lwIP:
+/// * https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-guides/lwip.html
+/// * Function example_connect()
+///   https://github.com/espressif/esp-idf/blob/master/examples/common_components/protocol_examples_common/include/protocol_examples_common.h
 ///
-/// @param wifi_ssid        Name (Service Set Identifier) of the WiFi to login.
-/// @param wifi_pass        Password of the WiFi to login.
-/// @param iota_bridge_url  Same as start_sensor_manager() iota_bridge_url parameter.
+/// @param wifi_ssid        Optional.
+///                         Name (Service Set Identifier) of the WiFi to login.
+///                         If wifi_ssid == NULL, the caller of this function has to provide a
+///                         suitable tcp/ip network connection via esp-lwIP.
+/// @param wifi_pass        Optional.
+///                         Password of the WiFi to login.
+///                         Needed if wifi_ssid != NULL otherwise set wifi_pass to NULL.
+/// @param iota_bridge_url  URL of the iota-bridge instance to connect to.
+///                                 Example:
+///                                    start_sensor_manager_wifi("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
 /// @param vfs_fat_path     Optional.
 ///                         Same as start_sensor_manager() vfs_fat_path parameter.
 #[no_mangle]
-pub extern "C" fn start_sensor_manager_wifi(
+pub extern "C" fn start_sensor_manager_lwip(
     wifi_ssid: *const c_char,
     wifi_pass: *const c_char,
     iota_bridge_url: *const c_char,
@@ -274,6 +307,74 @@ pub extern "C" fn is_streams_channel_initialized(vfs_fat_path: *const c_char) ->
             false
         }
     }
+}
+
+/// Send a data package to the iota-bridge using the "/lorawan-rest/binary_request" REST API endpoint.
+/// This function is NOT used in the Sensor application.
+/// This function can be used in a proxy like application (e.g. Application-Server-Connector) that
+/// is used to transmit payloads and responses to/from the iota-bridge.
+///
+/// @param request_data             Binary request data to be send to the iota-bridge.
+///                                 These data have been received by the Sensor application
+///                                 via the send_callback (parameter of the start_sensor_manager()
+///                                 or send_message() function).
+///                                 The request data are owned by the proxy application.
+/// @param request_length           Length of the request_data
+/// @param iota_bridge_proxy_opt    Defines the url of the iota-bridge and the dev_eui of the sensor.
+/// @param response_call_back       Used to receive the response data coming from the iota-bridge.
+/// @param p_caller_user_data       Optional.
+///                                 Pointer to arbitrary data used by the caller of this function
+///                                 to communicate with the callers own functions.
+///                                 See send_request_via_lorawan_t help above for more details.
+///                                 If no p_caller_user_data is provided set p_caller_user_data = NULL.
+#[no_mangle]
+pub extern "C" fn post_binary_request_to_iota_bridge(
+    request_data: *const cty::uint8_t,
+    request_length: cty::size_t,
+    iota_bridge_proxy_opt: *const iota_bridge_tcpip_proxy_options_t,
+    response_call_back: http_response_call_back_t,
+    p_caller_user_data: *mut cty::c_void
+) {
+    // Per definition function pointers in FFI are not nullable so we can not check for NULL pointers here
+    assert!(!request_data.is_null());
+    assert!(!iota_bridge_proxy_opt.is_null());
+
+    let request_slice = unsafe { slice::from_raw_parts(request_data, request_length) };
+    if let Some(proxy_opt) = IotaBridgeTcpIpProxySettings::new_from_iota_bridge_proxy_opt(iota_bridge_proxy_opt) {
+        post_lorawan_rest_request(request_slice.to_vec(), proxy_opt, response_call_back,  p_caller_user_data);
+    } else {
+        error!("[fn post_binary_request_to_iota_bridge()] Undefined or unvalid iota_bridge_proxy_opt");
+    }
+}
+
+fn post_lorawan_rest_request(
+    request_slice: Vec<u8>,
+    proxy_opt: IotaBridgeTcpIpProxySettings,
+    response_call_back: http_response_call_back_t,
+    p_caller_user_data: *mut cty::c_void
+) {
+    match future::block_on(async {
+        let mut lorawan_rest_client = LoraWanRestClient::new(
+            Some(
+                LoraWanRestClientOptions { iota_bridge_url: proxy_opt.iota_bridge_url.as_str() }
+            )
+        );
+        lorawan_rest_client.post_binary_request_to_iota_bridge(request_slice, proxy_opt.dev_eui.to_string().as_str()).await
+    }) {
+        Ok(response) => {
+            debug!("[fn post_binary_request_to_iota_bridge()] Calling response_call_back with response: {}", response);
+            let body_bytes = response.body.as_ptr();
+            response_call_back(
+                response.status.as_u16(),
+                body_bytes,
+                response.body.len(),
+                p_caller_user_data,
+            );
+        },
+        Err(error) => {
+            error!("[fn post_binary_request_to_iota_bridge()] An error occurred while calling streams_tools::post_binary_request_to_iota_bridge(): {}", error);
+        }
+    };
 }
 
 fn get_optional_string_from_c_char_ptr<'a>(char_ptr_in: *const c_char, argument_name: &str) -> Result<Option<String>> {

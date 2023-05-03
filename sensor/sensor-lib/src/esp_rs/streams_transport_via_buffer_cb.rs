@@ -23,16 +23,14 @@ use std::{
     rc::Rc,
 };
 
-use streams_tools::{
-    http::{
-        RequestBuilderStreams,
-        http_protocol_streams::{
+use streams_tools::{http::{
+    RequestBuilderStreams,
+    http_protocol_streams::{
             MapStreamsErrors,
             EndpointUris,
             QueryParameters,
         },
-    },
-    binary_persist::{
+    }, binary_persist::{
         BinaryPersist,
         TangleMessageCompressed,
         TangleAddressCompressed,
@@ -40,12 +38,12 @@ use streams_tools::{
             IotaBridgeRequestParts,
             IotaBridgeResponseParts,
         },
-    },
-    compressed_state::{
+    }, compressed_state::{
         CompressedStateSend,
         CompressedStateListen,
         CompressedStateManager
     },
+    StreamsTransport,
 };
 
 use hyper::{
@@ -72,8 +70,10 @@ pub struct StreamsTransportViaBufferCallback {
     compressed: CompressedStateManager,
 }
 
-impl StreamsTransportViaBufferCallback {
-    pub fn new(options: Option<RequestViaBufferCallbackOptions>) -> Self {
+impl<'a> StreamsTransport for StreamsTransportViaBufferCallback {
+    type Options = RequestViaBufferCallbackOptions;
+
+    fn new(options: Option<RequestViaBufferCallbackOptions>) -> Self {
         Self {
             request_via_cb: RequestViaBufferCallback::new(options),
             request_builder: RequestBuilderStreams::new(""),
@@ -81,6 +81,9 @@ impl StreamsTransportViaBufferCallback {
             compressed: CompressedStateManager::new(),
         }
     }
+}
+
+impl StreamsTransportViaBufferCallback {
 
     async fn send_message_via_lorawan(&mut self, msg: &TangleMessage) -> Result<()> {
         let req_parts = if self.compressed.get_use_compressed_msg() {
@@ -98,6 +101,37 @@ impl StreamsTransportViaBufferCallback {
 
     async fn recv_message_via_lorawan(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
         log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http]");
+        let req_parts = self.get_request_parts(link)?;
+        let response = self.request(req_parts, link.appinst).await?;
+
+        log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] check for retrials");
+        // TODO: Implement following retrials for bad LoRaWAN connection using EspTimerService if needed.
+        // May be we need to introduce StatusCode::CONTINUE in cases where LoRaWAN connection
+        // is sometimes too bad and retries are a valid strategy to receive the response
+        if response.status_code == StatusCode::CONTINUE {
+            log::warn!("[StreamsTransportViaBufferCallback.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
+        }
+
+        StreamsTransportViaBufferCallback::manage_response_status(&response, link)
+    }
+
+    fn manage_response_status(response: &IotaBridgeResponseParts, link: &TangleAddress) -> Result<TangleMessage> {
+        if response.status_code.is_success() {
+            log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] StatusCode is successful: {}", response.status_code);
+            log::info!("[StreamsTransportViaBufferCallback.recv_message_via_http] Received response with content length of {}", response.body_bytes.len());
+            let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&response.body_bytes.as_slice()).unwrap();
+            log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] return ret_val");
+            Ok(ret_val)
+        } else {
+            log::error!("[StreamsTransportViaBufferCallback.recv_message_via_http] StatusCode is not OK");
+            err!(MapStreamsErrors::from_http_status_codes(
+                response.status_code,
+                 Some(link.to_string())
+            ))
+        }
+    }
+
+    fn get_request_parts(&mut self, link: &TangleAddress) -> Result<IotaBridgeRequestParts> {
         let req_parts = if self.compressed.get_use_compressed_msg() {
             // We do not set the dev_eui here because it will be communicated by the LoraWAN network
             // and therefore will not be send as lorawan payload.
@@ -120,35 +154,9 @@ impl StreamsTransportViaBufferCallback {
                 None
             )?
         };
-
-        let response = self.request(req_parts, link.appinst).await?;
-
-        log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] check for retrials");
-        // TODO: Implement following retrials for bad LoRaWAN connection using EspTimerService if needed.
-        // May be we need to introduce StatusCode::CONTINUE in cases where LoRaWAN connection
-        // is sometimes too bad and retries are a valid strategy to receive the response
-        if response.status_code == StatusCode::CONTINUE {
-            log::warn!("[StreamsTransportViaBufferCallback.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
-        }
-
-        if response.status_code.is_success() {
-            log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] StatusCode is successful: {}", response.status_code);
-            log::info!("[StreamsTransportViaBufferCallback.recv_message_via_http] Received response with content length of {}", response.body_bytes.len());
-            let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&response.body_bytes.as_slice()).unwrap();
-            log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] return ret_val");
-            Ok(ret_val)
-        } else {
-            log::error!("[StreamsTransportViaBufferCallback.recv_message_via_http] StatusCode is not OK");
-            err!(MapStreamsErrors::from_http_status_codes(
-                response.status_code,
-                 Some(link.to_string())
-            ))
-        }
+        Ok(req_parts)
     }
-}
 
-impl StreamsTransportViaBufferCallback
-{
     pub async fn request<'a>(&mut self, req_parts: IotaBridgeRequestParts, channel_id: AppInst) -> Result<IotaBridgeResponseParts> {
         let buffer: Vec<u8> = req_parts.as_vecu8()?;
         log::debug!("[StreamsTransportViaBufferCallback.request] IotaBridgeRequestParts bytes to send: Length: {}\n    {:02X?}", buffer.len(), buffer);

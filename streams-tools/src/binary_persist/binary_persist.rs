@@ -1,7 +1,10 @@
 use std::{
     fmt,
     convert::TryInto,
-    ops::Range,
+    ops::{
+        Range,
+        Deref,
+    },
 };
 
 use anyhow::{
@@ -9,7 +12,6 @@ use anyhow::{
     bail,
     Error,
 };
-use std::ops::Deref;
 
 pub trait RangeIterator<Idx> {
     fn new(first_length: Idx) -> Self;
@@ -234,4 +236,18 @@ pub fn deserialize_vec_u8(struct_name: &str, prop_name: &str, buffer: &&[u8], ra
     let ret_val: Vec<u8> = buffer[range.clone()].to_vec();
     log::debug!("[BinaryPersist for {} - try_from_bytes()] {}: {:02X?}", struct_name, prop_name, buffer[range.start..range.end].to_vec());
     ret_val
+}
+
+pub fn serialize_bool(fn_name: &str, prop_name: &str, value: bool, buffer: &mut [u8], range: &mut Range<usize>) {
+    range.increment(1);
+    let value_u8:u8 = if value {255} else {0};
+    log::debug!("[{}] - persist {}. Value: {}", fn_name, prop_name, value_u8);
+    value_u8.to_bytes(&mut buffer[range.clone()]).expect("Error while serializing u8 into buffer");
+}
+
+pub fn deserialize_bool(fn_name: &str, prop_name: &str, buffer: &[u8], range: &mut Range<usize>) -> Result<bool> {
+    range.increment(1);
+    let ret_val = u8::try_from_bytes(&buffer[range.clone()])? != 0;
+    log::debug!("[{}] - read {}. Value: {}", fn_name, prop_name, ret_val);
+    Ok(ret_val)
 }

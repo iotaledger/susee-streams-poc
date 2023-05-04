@@ -9,9 +9,11 @@ use super::{
     },
 };
 
-use iota_streams::app_channels::api::{
-    tangle::{
-        Bytes,
+use iota_streams::app_channels::{
+    api::{
+        tangle::{
+            Bytes,
+        }
     }
 };
 
@@ -60,17 +62,16 @@ pub async fn send_message(
     Ok(())
 }
 
-pub async fn is_streams_channel_initialized(vfs_fat_path: Option<String>) -> Result<bool>{
+pub async fn is_streams_channel_initialized(vfs_fat_path: Option<String>) -> Result<bool> {
     log::debug!("[fn - is_streams_channel_initialized()] Creating subscriber");
     let client = StreamsTransportViaBufferCallback::new(None);
     let (subscriber, mut vfs_fat_handle) =
         create_subscriber::<StreamsTransportViaBufferCallback, PlainTextWallet>(client, vfs_fat_path).await?;
 
-    let ret_val = subscriber.subscription_link.is_some();
-    log::debug!("[fn - is_streams_channel_initialized()] subscriber.subscription_link.is_some() == {}", ret_val);
+    let ret_val = subscriber.is_channel_initialized().await;
 
-    log::debug!("[fn - is_streams_channel_initialized()] vfs_fat_handle.drop_filesystem()");
+    log::debug!("[fn - is_channel_initialized()] vfs_fat_handle.drop_filesystem()");
     vfs_fat_handle.drop_filesystem()?;
-    log::debug!("[fn - is_streams_channel_initialized()] returning Ok({})", ret_val);
-    Ok(ret_val)
+
+    ret_val
 }

@@ -197,6 +197,11 @@ int32_t start_sensor_manager(send_request_via_lorawan_t send_callback,
  * * Function example_connect()
  *   https://github.com/espressif/esp-idf/blob/master/examples/common_components/protocol_examples_common/include/protocol_examples_common.h
  *
+ * @param iota_bridge_url  URL of the iota-bridge instance to connect to.
+ *                                 Example:
+ *                                    start_sensor_manager_wifi("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
+ * @param vfs_fat_path     Optional.
+ *                         Same as start_sensor_manager() vfs_fat_path parameter.
  * @param wifi_ssid        Optional.
  *                         Name (Service Set Identifier) of the WiFi to login.
  *                         If wifi_ssid == NULL, the caller of this function has to provide a
@@ -204,16 +209,11 @@ int32_t start_sensor_manager(send_request_via_lorawan_t send_callback,
  * @param wifi_pass        Optional.
  *                         Password of the WiFi to login.
  *                         Needed if wifi_ssid != NULL otherwise set wifi_pass to NULL.
- * @param iota_bridge_url  URL of the iota-bridge instance to connect to.
- *                                 Example:
- *                                    start_sensor_manager_wifi("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
- * @param vfs_fat_path     Optional.
- *                         Same as start_sensor_manager() vfs_fat_path parameter.
  */
-int32_t start_sensor_manager_lwip(const char *wifi_ssid,
-                                  const char *wifi_pass,
-                                  const char *iota_bridge_url,
-                                  const char *vfs_fat_path);
+int32_t start_sensor_manager_lwip(const char *iota_bridge_url,
+                                  const char *vfs_fat_path,
+                                  const char *wifi_ssid,
+                                  const char *wifi_pass);
 
 /**
  * Indicates if this sensor instance has already been initialized.

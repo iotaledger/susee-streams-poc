@@ -24,17 +24,36 @@
 #include <http_parser.h>
 
 #include "esp_chip_info.h"
-// #include "esp_spi_flash.h" // is deprecated, please use spi_flash_mmap.h instead
 
 #include "streams_poc_lib.h"
 
 #include <inttypes.h>
 
+// SMCT_CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS
+//      Callback driven, where the callback directly connects to the iota-bridge
+//      via a WiFi connection controlled by the test app.
+// SMCT_CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK
+//      Callback driven, where the callback uses the 'Application Server Connector Mock',
+//      which is connected via a WiFi socket controlled by the test app.
+// SMCT_LWIP:
+//      Direct http communication between streams-poc-lib and iota-bridge
+//      via a lwip connection provided by the test app. Currently a WiFi connect is used, but
+//      other connections that support LWIP can be used equivalent.
+// SMCT_STREAMS_POC_LIB_MANAGED_WIFI
+//      Direct http communication between streams-poc-lib and iota-bridge via a WiFi
+//      connection controlled by the streams-poc-lib.
+typedef enum {
+    SMCT_CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS,
+    SMCT_CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK,
+    SMCT_LWIP,
+    SMCT_STREAMS_POC_LIB_MANAGED_WIFI,
+} sensor_manager_connection_type_t;
+
 /* ########################################################################################
    ############################ Test CONFIG ###############################################
    ######################################################################################## */
 
-#define USE_START_SENSOR_MANAGER_LWIP false
+static const sensor_manager_connection_type_t SENSOR_MANAGER_CONNECTION_TYPE = SMCT_STREAMS_POC_LIB_MANAGED_WIFI;
 
 // Please edit your Wifi credentials here. Needed for Sensor initialization.
 #define STREAMS_POC_LIB_TEST_WIFI_SSID "Susee Demo"
@@ -42,16 +61,18 @@
 // The url of the iota-bridge to connect to. Needed for Sensor initialization.
 #define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.0.101:50000")
 
+#define SEND_MESSAGES_EVERY_X_SEC 5
+
 // IP address and port of the LoRaWAN AppServer Connector Mockup Tool to connect to.
 // Needed for sending messages.
 #define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.0.101:50001")
 
 // Setting STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH to NULL will make the streams-poc-lib
-// using its own vfs_fate partition as been described in streams-poc-lib.h
+// using its own vfs_fat partition as been described in streams-poc-lib.h
 // (sensor/streams-poc-lib/components/streams-poc-lib/include/streams-poc-lib.h)
 //
 // Specifying a STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH here will make the streams-poc-lib
-// using a prepared file system. This test application can only handle vfs_fate base_path
+// using a prepared file system. This test application can only handle vfs_fat base_path
 // names so no subfolders are allowed.
 // Example:
 //          #define STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH ("/awesome-data")
@@ -93,6 +114,8 @@ static int s_socket_handle;
 
 static uint64_t s_mac_id = 0;
 
+static bool s_perform_p_caller_user_data_test = false;
+
 
 // This is the binary representation of the content of the file /test/meter_reading_1.json
 #define MESSAGE_DATA_LENGTH 80 // 213
@@ -126,7 +149,7 @@ const uint8_t MESSAGE_DATA[MESSAGE_DATA_LENGTH] = {
     //        0x2e, 0x30, 0x32, 0x0a, 0x7d
 };
 
-// Function that will be called in cb_fun_send_request_via_socket() to test p_caller_user_data
+// Function that will be called in cb_fun_send_request_via_app_srv_connector_mock() to test p_caller_user_data
 void test_p_caller_user_data(const char *function_name) {
     ESP_LOGI(TAG, "[fn test_p_caller_user_data] This function has successfully been called from within the %s() function", function_name);
 }
@@ -280,8 +303,8 @@ uint64_t get_base_mac_48_as_mocked_u64_dev_eui() {
     return s_mac_id;
 }
 
-LoRaWanError cb_fun_send_request_via_socket(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void *p_caller_user_data) {
-    ESP_LOGI(TAG, "[fn cb_fun_send_request_via_socket] is called with %d bytes of request_data", length);
+LoRaWanError cb_fun_send_request_via_app_srv_connector_mock(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void *p_caller_user_data) {
+    ESP_LOGI(TAG, "[fn cb_fun_send_request_via_app_srv_connector_mock] is called with %d bytes of request_data", length);
 
     log_binary_data(request_data, length);
 
@@ -305,7 +328,7 @@ LoRaWanError cb_fun_send_request_via_socket(const uint8_t *request_data, size_t 
 
     int err = send(s_socket_handle, send_buffer, send_buffer_len, 0);
     if (err < 0) {
-        ESP_LOGE(TAG, "[fn cb_fun_send_request_via_socket] Error occurred during sending: errno %d", errno);
+        ESP_LOGE(TAG, "[fn cb_fun_send_request_via_app_srv_connector_mock] Error occurred during sending: errno %d", errno);
         return LORAWAN_NO_CONNECTION;
     }
 
@@ -313,26 +336,26 @@ LoRaWanError cb_fun_send_request_via_socket(const uint8_t *request_data, size_t 
     int rx_len = recv(s_socket_handle, rx_buffer, sizeof(rx_buffer), 0);
     // Error occurred during receiving
     if (rx_len < 0) {
-        ESP_LOGE(TAG, "[fn cb_fun_send_request_via_socket] recv failed: errno %d", errno);
+        ESP_LOGE(TAG, "[fn cb_fun_send_request_via_app_srv_connector_mock] recv failed: errno %d", errno);
         return LORAWAN_NO_CONNECTION;
     }
 
     // Data received
-    ESP_LOGI(TAG, "[fn cb_fun_send_request_via_socket] Received %d bytes from %s:", rx_len, STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
+    ESP_LOGI(TAG, "[fn cb_fun_send_request_via_app_srv_connector_mock] Received %d bytes from %s:", rx_len, STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
     log_binary_data(rx_buffer, rx_len);
 
     StreamsError streams_err = response_callback(rx_buffer, rx_len);
     if (streams_err < 0) {
-        ESP_LOGI(TAG, "[fn cb_fun_send_request_via_socket] response_callback returned with error code: %s, ", streams_error_to_string(streams_err));
+        ESP_LOGI(TAG, "[fn cb_fun_send_request_via_app_srv_connector_mock] response_callback returned with error code: %s, ", streams_error_to_string(streams_err));
     }
 
     // Before we leave this function we need to test the p_caller_user_data that should point to a test_p_caller_user_data_wrapper_t instance now
-    if (p_caller_user_data != NULL) {
+    if (s_perform_p_caller_user_data_test && (p_caller_user_data != NULL)) {
         test_p_caller_user_data_wrapper_t *callable = (test_p_caller_user_data_wrapper_t *)(p_caller_user_data);
-        callable->fun_ptr("cb_fun_send_request_via_socket");
+        callable->fun_ptr("cb_fun_send_request_via_app_srv_connector_mock");
     }
-    else {
-        ESP_LOGE(TAG, "[fn cb_fun_send_request_via_socket] p_caller_user_data has been set in prepare_socket_and_send_message_via_callback_io() but now it's NULL");
+    else if (s_perform_p_caller_user_data_test && (p_caller_user_data == NULL)) {
+        ESP_LOGE(TAG, "[fn cb_fun_send_request_via_app_srv_connector_mock] p_caller_user_data has been set when the streams-poc-lib function was called, but now it's NULL");
     }
 
     // We arrived at this point so we assume that no LoRaWanError occurred.
@@ -402,6 +425,14 @@ int parse_app_srv_connector_mock_address(dest_addr_t *p_dest_addr) {
     return 0;
 }
 
+void shut_down_socket(int sock_handle) {
+    if (sock_handle != -1) {
+        ESP_LOGI(TAG, "[fn shut_down_socket] Shutting down socket");
+        shutdown(sock_handle, 0);
+        close(sock_handle);
+    }
+}
+
 int get_handle_of_prepared_socket(dest_addr_t *p_dest_addr)
 {
     int addr_family = 0;
@@ -424,47 +455,74 @@ int get_handle_of_prepared_socket(dest_addr_t *p_dest_addr)
 
     int err = connect(sock, (struct sockaddr *)p_dest_addr, sizeof(dest_addr_t));
     if (err != 0) {
-        ESP_LOGE(TAG, "[fn get_handle_of_prepared_socket] Socket unable to connect: errno %d", errno);
-        return sock;
+        ESP_LOGE(TAG, "[fn get_handle_of_prepared_socket] Socket unable to connect the socket: errno %d", errno);
+        shut_down_socket(sock);
+        return -1;
     }
     ESP_LOGI(TAG, "[fn get_handle_of_prepared_socket] Successfully connected");
     return sock;
 }
 
-void shut_down_socket(int sock_handle) {
-    if (sock_handle != -1) {
-        ESP_LOGI(TAG, "[fn shut_down_socket] Shutting down socket");
-        shutdown(sock_handle, 0);
-        close(sock_handle);
+void prepare_socket_and_send_message_via_app_srv_connector_mock(dest_addr_t *p_dest_addr) {
+    s_socket_handle = get_handle_of_prepared_socket(p_dest_addr);
+    if (s_socket_handle > -1) {
+        // Prepare testing p_caller_user_data
+        test_p_caller_user_data_wrapper_t some_caller_user_data;
+        some_caller_user_data.fun_ptr = &test_p_caller_user_data;
+        s_perform_p_caller_user_data_test = true;
+
+        ESP_LOGI(TAG, "[fn prepare_socket_and_send_message_via_app_srv_connector_mock] Calling send_message for MESSAGE_DATA of length %d \n\n", MESSAGE_DATA_LENGTH);
+        send_message(MESSAGE_DATA, MESSAGE_DATA_LENGTH, cb_fun_send_request_via_app_srv_connector_mock, STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH, &some_caller_user_data);
+
+        ESP_LOGI(TAG, "[fn prepare_socket_and_send_message_via_app_srv_connector_mock] Shutting down socket");
+        shut_down_socket(s_socket_handle);
     }
 }
 
-void prepare_socket_and_send_message_via_callback_io(dest_addr_t *dest_addr) {
-    s_socket_handle = get_handle_of_prepared_socket(dest_addr);
-
-    // Prepare testing p_caller_user_data
-    test_p_caller_user_data_wrapper_t some_caller_user_data;
-    some_caller_user_data.fun_ptr = &test_p_caller_user_data;
-
-    ESP_LOGI(TAG, "[fn prepare_socket_and_send_message_via_callback_io] Calling send_message for MESSAGE_DATA of length %d \n\n", MESSAGE_DATA_LENGTH);
-    send_message(MESSAGE_DATA, MESSAGE_DATA_LENGTH, cb_fun_send_request_via_socket, STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH, &some_caller_user_data);
-
-    ESP_LOGI(TAG, "[fn prepare_socket_and_send_message_via_callback_io] Shutting down socket");
-    shut_down_socket(s_socket_handle);
+void send_message_via_app_srv_connector_mock(dest_addr_t *p_dest_addr) {
+    ESP_LOGI(TAG, "[fn send_message_via_app_srv_connector_mock] Sending messages using Application-Server-Connector-Mock: %s", STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
+    while (1) {
+        prepare_socket_and_send_message_via_app_srv_connector_mock(p_dest_addr);
+        ESP_LOGI(TAG, "[fn send_message_via_app_srv_connector_mock] Waiting 5 seconds to send message again");
+        sleep(SEND_MESSAGES_EVERY_X_SEC);
+    }
 }
 
-void send_message_via_callback_io(dest_addr_t *p_dest_addr) {
-    if (0 == parse_app_srv_connector_mock_address(p_dest_addr)) {
-        while (1) {
-            prepare_socket_and_send_message_via_callback_io(p_dest_addr);
-            ESP_LOGI(TAG, "[fn send_message_via_callback_io] Waiting 5 seconds to send message again");
-            sleep(5);
+void init_sensor_via_app_srv_connector_mock(dest_addr_t *p_dest_addr) {
+    ESP_LOGI(TAG, "[fn init_sensor_via_app_srv_connector_mock] Starting sensor_manager using Application-Server-Connector-Mock: %s", STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
+    s_socket_handle = get_handle_of_prepared_socket(p_dest_addr);
+    if (s_socket_handle > -1) {
+        start_sensor_manager(
+            cb_fun_send_request_via_app_srv_connector_mock,
+            STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
+            NULL
+        );
+
+        ESP_LOGI(TAG, "[fn init_sensor_via_app_srv_connector_mock] Shutting down socket");
+        shut_down_socket(s_socket_handle);
+    }
+}
+
+void prepare_sensor_processing_via_app_srv_connector_mock(bool do_sensor_initialization) {
+    #if defined(CONFIG_EXAMPLE_IPV4)
+        dest_addr_t dest_addr;
+    #elif defined(CONFIG_EXAMPLE_IPV6)
+        dest_addr_t dest_addr = {0};
+    #endif
+
+    if (0 == parse_app_srv_connector_mock_address(&dest_addr)) {
+        if (do_sensor_initialization) {
+            init_sensor_via_app_srv_connector_mock(&dest_addr);
+        } else {
+            send_message_via_app_srv_connector_mock(&dest_addr);
         }
     }
     else {
-        ESP_LOGI(TAG, "[fn send_message_via_callback_io] Could not parse address of lorawan application-server-connector-mock");
+        ESP_LOGI(TAG, "[fn prepare_sensor_processing_via_app_srv_connector_mock] Could not parse address of lorawan application-server-connector-mock");
     }
 }
+
+// -----------------------------------------------------------------------------------------
 
 typedef struct {
     resolve_request_response_t response_callback;
@@ -506,41 +564,98 @@ LoRaWanError send_request_via_wifi(const uint8_t *request_data, size_t length, r
     return response_receiver.status;
 }
 
+// --------------------------------------------------------------------------------------------------------------
+
 void init_sensor_via_callback_io(void) {
-    ESP_LOGI(TAG, "[fn init_sensor_via_callback_io] Starting sensor_manager using IOTA-Bridge: %s", STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL);
-    start_sensor_manager(
-        send_request_via_wifi,
-        STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
-        NULL);
+    switch (SENSOR_MANAGER_CONNECTION_TYPE) {
+        case SMCT_CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS: {
+            ESP_LOGI(TAG, "[fn init_sensor_via_callback_io] Starting sensor_manager using IOTA-Bridge: %s", STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL);
+            start_sensor_manager(
+                send_request_via_wifi,
+                STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
+                NULL
+            );
+        }
+        break;
+        case SMCT_CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK:
+            prepare_sensor_processing_via_app_srv_connector_mock(true);
+        break;
+        default:
+            ESP_LOGE(TAG, "[fn init_sensor_via_callback_io] Unexpected SENSOR_MANAGER_CONNECTION_TYPE %d", SENSOR_MANAGER_CONNECTION_TYPE);
+        break;
+    }
 }
 
-
-void prepare_callback_based_sensor_processing(bool do_sensor_initialization) {
-    ESP_LOGI(TAG, "[fn prepare_callback_based_sensor_processing] Preparing WIFI");
+void prepare_lwip_socket_based_sensor_processing(bool do_sensor_initialization) {
+    ESP_LOGI(TAG, "[fn prepare_lwip_socket_based_sensor_processing] Preparing WIFI");
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
 
-    ESP_LOGI(TAG, "[fn prepare_callback_based_sensor_processing] ESP_WIFI_MODE_STA");
+    ESP_LOGI(TAG, "[fn prepare_lwip_socket_based_sensor_processing] ESP_WIFI_MODE_STA");
     wifi_init_sta();
 
-    ESP_LOGI(TAG, "[fn prepare_callback_based_sensor_processing] Preparing netif and creating default event loop\n");
+    ESP_LOGI(TAG, "[fn prepare_lwip_socket_based_sensor_processing] Preparing netif and creating default event loop\n");
     ESP_ERROR_CHECK(esp_netif_init());
 
-    ESP_LOGI(TAG, "[fn prepare_callback_based_sensor_processing] Preparing socket for future cb_fun_send_request_via_socket() calls");
-#if defined(CONFIG_EXAMPLE_IPV4)
-    dest_addr_t dest_addr;
-#elif defined(CONFIG_EXAMPLE_IPV6)
-    dest_addr_t dest_addr = {0};
-#endif
-
     if (do_sensor_initialization) {
-        init_sensor_via_callback_io();
+        switch (SENSOR_MANAGER_CONNECTION_TYPE) {
+            case SMCT_CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS:   // No break
+            case SMCT_CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK:
+                init_sensor_via_callback_io();
+            break;
+            case SMCT_LWIP: {
+                ESP_LOGI(TAG, "[fn prepare_lwip_socket_based_sensor_processing] Calling start_sensor_manager_lwip() without WiFi credentials");
+                start_sensor_manager_lwip(
+                    STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,
+                    STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
+                    NULL,
+                    NULL
+                );
+            }
+            break;
+            default:
+                ESP_LOGE(TAG, "[fn prepare_lwip_socket_based_sensor_processing] Unexpected SENSOR_MANAGER_CONNECTION_TYPE %d", SENSOR_MANAGER_CONNECTION_TYPE);
+            break;
+        }
     }
     else {
-        send_message_via_callback_io(&dest_addr);
+        ESP_LOGI(TAG, "[fn prepare_lwip_socket_based_sensor_processing] Preparing socket for future cb_fun_send_request_via_app_srv_connector_mock() calls");
+        prepare_sensor_processing_via_app_srv_connector_mock(false);
+    }
+}
+
+void process_test() {
+    if (is_streams_channel_initialized(STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH)) {
+        ESP_LOGI(TAG, "[fn process_test] Streams channel already initialized. Going to send messages every %d seconds", SEND_MESSAGES_EVERY_X_SEC);
+        prepare_lwip_socket_based_sensor_processing(false);
+    }
+    else {
+        ESP_LOGI(TAG, "[fn process_test] Streams channel for this sensor has not been initialized. Going to initialize the sensor");
+        switch (SENSOR_MANAGER_CONNECTION_TYPE) {
+            case SMCT_CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS:   // No break
+            case SMCT_CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK:  // No break
+            case SMCT_LWIP: {
+                ESP_LOGI(TAG, "[fn process_test] Calling prepare_lwip_socket_based_sensor_processing() to use start_sensor_manager() later on");
+                prepare_lwip_socket_based_sensor_processing(true);
+            }
+            break;
+            case SMCT_STREAMS_POC_LIB_MANAGED_WIFI: {
+                ESP_LOGI(TAG, "[fn process_test] Calling start_sensor_manager_lwip() using WiFi managed by the streams-poc-lib.");
+                start_sensor_manager_lwip(
+                    STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,
+                    STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
+                    STREAMS_POC_LIB_TEST_WIFI_SSID,
+                    STREAMS_POC_LIB_TEST_WIFI_PASS
+                );
+            }
+            break;
+            default:
+                ESP_LOGE(TAG, "[fn process_test] Unknown SENSOR_MANAGER_CONNECTION_TYPE %d", SENSOR_MANAGER_CONNECTION_TYPE);
+            break;
+        }
     }
 }
 
@@ -569,22 +684,7 @@ void app_main(void) {
         mount_fatfs(&wl_handle);
     }
 
-    if (is_streams_channel_initialized(STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH)) {
-        ESP_LOGI(TAG, "[fn app_main] Streams channel already initialized. Calling prepare_callback_based_sensor_processing() to send messages");
-        prepare_callback_based_sensor_processing(false);
-    }
-    else if (!USE_START_SENSOR_MANAGER_LWIP) {
-        ESP_LOGI(TAG, "[fn app_main] Streams channel for this sensor has not been initialized. Calling prepare_callback_based_sensor_processing() to initialize the sensor using start_sensor_manager()");
-        prepare_callback_based_sensor_processing(true);
-    }
-    else {
-        ESP_LOGI(TAG, "[fn app_main] Streams channel for this sensor has not been initialized. Calling start_sensor_manager_lwip()");
-        start_sensor_manager_lwip(
-            STREAMS_POC_LIB_TEST_WIFI_SSID,
-            STREAMS_POC_LIB_TEST_WIFI_PASS,
-            STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,
-            STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH);
-    }
+    process_test();
 
     if (STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH != NULL && wl_handle != WL_INVALID_HANDLE) {
         ESP_LOGI(TAG, "[fn app_main] unmounting vfs_fat");

@@ -18,7 +18,7 @@ pub mod esp_rs;
 pub use self::esp_rs::{
     main::{
         process_main_esp_rs,
-        process_main_esp_rs_wifi,
+        process_main_esp_rs_lwip,
     },
     streams_poc_lib,
     streams_transport_socket_esprs::{

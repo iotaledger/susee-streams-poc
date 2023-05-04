@@ -70,6 +70,7 @@ use hyper::{
         status,
     }
 };
+use esp_idf_svc::wifi::EspWifi;
 
 fn print_heap_info() {
     unsafe {
@@ -364,13 +365,24 @@ pub async fn process_main_esp_rs(
     ).await
 }
 
-pub async fn process_main_esp_rs_wifi(wifi_ssid: &str, wifi_pass: &str, iota_bridge_url: &str, vfs_fat_path: Option<String>) -> Result<()> {
+pub async fn process_main_esp_rs_lwip(
+    iota_bridge_url: &str,
+    vfs_fat_path: Option<String>,
+    opt_wifi_ssid: Option<String>,
+    opt_wifi_pass: Option<String>,
+) -> Result<()> {
     log::debug!("[fn process_main_esp_rs] process_main() entry");
 
     print_heap_info();
 
+    let _wifi_hdl: Box<EspWifi<'static>>;
+
     log::debug!("[fn process_main_esp_rs] init_wifi");
-    let _wifi_hdl = init_wifi(wifi_ssid, wifi_pass)?;
+    if let Some(wifi_ssid) = opt_wifi_ssid {
+        let wifi_pass = opt_wifi_pass.expect("[fn process_main_esp_rs_lwip()] wifi_ssid is specified but no wifi_pass has been provided.\
+         You always need to provide both wifi_ssid and wifi_pass or set wifi_ssid to NULL");
+        _wifi_hdl = init_wifi(wifi_ssid.as_str(), wifi_pass.as_str())?;
+    }
 
     log::info!("[fn process_main_esp_rs] Using iota-bridge url: {}", iota_bridge_url);
 

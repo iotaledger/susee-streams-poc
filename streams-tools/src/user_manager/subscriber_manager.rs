@@ -14,6 +14,7 @@ use std::{
     ops::Range,
     rc::Rc,
     option::Option::Some,
+    str::FromStr,
     fs::{
         write,
         read,
@@ -338,6 +339,39 @@ impl<ClientT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<ClientT
         } else {
             buffer[range.clone()].fill(0);
         }
+    }
+
+    pub async fn is_channel_initialized(&self) -> Result<bool> {
+        let mut ret_val = false;
+        let null_address = Address::from_str("00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000")?;
+        if let Some(subscription_link) = self.subscription_link {
+            if subscription_link != null_address {
+                if let Some(prev_msg_link) = self.prev_msg_link {
+                    if prev_msg_link != null_address {
+                        if subscription_link != prev_msg_link {
+                            log::debug!("[fn - is_channel_initialized()] subscription_link: {}", subscription_link);
+                            log::debug!("[fn - is_channel_initialized()] prev_msg_link: {}", prev_msg_link);
+                            ret_val = true;
+                        } else {
+                            log::debug!("[fn - is_channel_initialized()] subscription_link == prev_msg_link -> Sensor is not initialized");
+                        }
+                    } else {
+                        log::debug!("[fn - is_channel_initialized()] prev_msg_link == null_address -> Sensor is not initialized");
+                    }
+
+                } else {
+                    log::debug!("[fn - is_channel_initialized()] prev_msg_link is None -> Sensor is not initialized");
+                }
+            } else {
+                log::debug!("[fn - is_channel_initialized()] subscription_link == null_address -> Sensor is not initialized");
+            }
+
+        } else {
+            log::debug!("[fn - is_channel_initialized()] subscription_link is None -> Sensor is not initialized");
+        }
+
+        log::debug!("[fn - is_channel_initialized()] returning Ok({})", ret_val);
+        Ok(ret_val)
     }
 }
 

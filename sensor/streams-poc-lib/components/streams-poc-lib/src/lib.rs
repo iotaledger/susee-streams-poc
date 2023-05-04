@@ -2,7 +2,7 @@ use log::*;
 
 use sensor_lib::{
     process_main_esp_rs,
-    process_main_esp_rs_wifi,
+    process_main_esp_rs_lwip,
     streams_poc_lib,
     streams_poc_lib_api_types::{
         StreamsError,
@@ -191,6 +191,11 @@ pub extern "C" fn start_sensor_manager(
 /// * Function example_connect()
 ///   https://github.com/espressif/esp-idf/blob/master/examples/common_components/protocol_examples_common/include/protocol_examples_common.h
 ///
+/// @param iota_bridge_url  URL of the iota-bridge instance to connect to.
+///                                 Example:
+///                                    start_sensor_manager_wifi("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
+/// @param vfs_fat_path     Optional.
+///                         Same as start_sensor_manager() vfs_fat_path parameter.
 /// @param wifi_ssid        Optional.
 ///                         Name (Service Set Identifier) of the WiFi to login.
 ///                         If wifi_ssid == NULL, the caller of this function has to provide a
@@ -198,34 +203,37 @@ pub extern "C" fn start_sensor_manager(
 /// @param wifi_pass        Optional.
 ///                         Password of the WiFi to login.
 ///                         Needed if wifi_ssid != NULL otherwise set wifi_pass to NULL.
-/// @param iota_bridge_url  URL of the iota-bridge instance to connect to.
-///                                 Example:
-///                                    start_sensor_manager_wifi("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
-/// @param vfs_fat_path     Optional.
-///                         Same as start_sensor_manager() vfs_fat_path parameter.
 #[no_mangle]
 pub extern "C" fn start_sensor_manager_lwip(
-    wifi_ssid: *const c_char,
-    wifi_pass: *const c_char,
     iota_bridge_url: *const c_char,
-    vfs_fat_path: *const c_char
+    vfs_fat_path: *const c_char,
+    wifi_ssid: *const c_char,
+    wifi_pass: *const c_char
 ) -> i32 {
     init_esp_idf_sys_and_logger();
     info!("[fn start_sensor_manager()] Starting");
 
-    let c_wifi_ssid: &CStr = unsafe { CStr::from_ptr(wifi_ssid) };
-    let c_wifi_pass: &CStr = unsafe { CStr::from_ptr(wifi_pass) };
     let c_iota_bridge_url: &CStr = unsafe { CStr::from_ptr(iota_bridge_url) };
     let opt_vfs_fat_path = get_optional_string_from_c_char_ptr(vfs_fat_path, "vfs_fat_path")
-        .expect("Error on converting null terminated C string into utf8 rust String");
+        .expect("Error on converting optional vfs_fat_path to rust String");
+    let opt_wifi_ssid = get_optional_string_from_c_char_ptr(wifi_ssid, "wifi_ssid")
+        .expect("Error on converting optional wifi_ssid to rust String");
+    let opt_wifi_pass = get_optional_string_from_c_char_ptr(wifi_pass, "wifi_pass")
+        .expect("Error on converting optional wifi_pass to rust String");
+
+    if opt_wifi_ssid.is_some() && opt_wifi_pass.is_none() {
+        error!("[fn start_sensor_manager()] wifi_ssid is specified but no wifi_pass has been provided.\
+         You always need to provide both wifi_ssid and wifi_pass or set wifi_ssid to NULL");
+        return -1;
+    }
 
     match future::block_on(async {
         debug!("[fn start_sensor_manager()] Start future::block_on");
-        process_main_esp_rs_wifi(
-            c_wifi_ssid.to_str().expect("wifi_ssid contains invalid utf8 code"),
-            c_wifi_pass.to_str().expect("wifi_pass contains invalid utf8 code"),
+        process_main_esp_rs_lwip(
             c_iota_bridge_url.to_str().expect("iota_bridge_url contains invalid utf8 code"),
-            opt_vfs_fat_path
+            opt_vfs_fat_path,
+            opt_wifi_ssid,
+            opt_wifi_pass,
         ).await
     }){
         Ok(_) => {},

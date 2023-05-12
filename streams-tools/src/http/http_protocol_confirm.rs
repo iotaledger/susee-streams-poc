@@ -74,11 +74,12 @@ impl RequestBuilderConfirm {
             .body(Body::empty())
     }
 
-    pub fn subscription(self: &Self, subscription_link: String, pup_key: String) -> Result<Request<Body>> {
+    pub fn subscription(self: &Self, subscription_link: String, pup_key: String, initialization_cnt: u8) -> Result<Request<Body>> {
         self.tools.send_enumerated_persistable_args(
             Subscription{
                 subscription_link,
                 pup_key,
+                initialization_cnt,
             },
             EndpointUris::SUBSCRIPTION
         )

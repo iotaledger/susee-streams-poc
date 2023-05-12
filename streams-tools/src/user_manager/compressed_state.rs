@@ -25,10 +25,12 @@ pub trait CompressedStateListen {
 
 // Used to register CompressedStateListen listeners at ClientTTrait implementations.
 pub trait CompressedStateSend {
-    // Returns the number of registered listeners
+    // Returns the handle to be used with remove_listener() to unsubscribe the listener
     fn subscribe_listener(&mut self, listener: Rc<dyn CompressedStateListen>) -> Result<usize>;
     // Use this to initialize the ClientTTrait implementation before any iota-bridge communication
     fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool);
+    // Unsubscribe the listener. The handle has been obtained as result from the subscribe_listener() call
+    fn remove_listener(&mut self, handle: usize);
 }
 
 pub struct CompressedStateManager {
@@ -88,11 +90,15 @@ impl CompressedStateSend for CompressedStateManager {
     fn subscribe_listener(&mut self, listener: Rc<dyn CompressedStateListen>) -> Result<usize> {
         listener.set_use_compressed_msg(self.use_compressed_msg.get());
         self.listeners.push(listener);
-        Ok(self.listeners.len())
+        Ok(self.listeners.len() - 1)
     }
 
     fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
         self.set_use_compressed_msg(use_compressed_msg);
+    }
+
+    fn remove_listener(&mut self, handle: usize) {
+        self.listeners.remove(handle);
     }
 }
 

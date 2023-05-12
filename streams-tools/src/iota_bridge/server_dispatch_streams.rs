@@ -79,7 +79,6 @@ use super::{
     LoraWanNodeDataStore,
     PendingRequestDataStore,
     dao::{
-        pending_request::MsgIdTransferType,
         LoraWanNode,
         pending_request,
         PendingRequest,
@@ -144,19 +143,21 @@ impl DispatchStreams
         ret_val
     }
 
-    fn handle_lora_wan_node_not_known(&self, dev_eui: String, msgid: MsgIdTransferType, streams_api_request: StreamsApiRequest) -> Result<Response<Body>> {
+    fn handle_lora_wan_node_not_known(&self, dev_eui: String, address: TangleAddressCompressed, streams_api_request: StreamsApiRequest) -> Result<Response<Body>> {
         log::error!("[IOTA-Bridge - handle_lora_wan_node_not_known] \
-            The lorawan_node with dev_eui {} is not known by this iota-bridge instance. \
+            The lorawan_node with dev_eui {} and initialization_cnt {} is not known by this iota-bridge instance. \
             The current request will be stored by this IOTA-Bridge for later retransmit. \
             Please provide the missing streams channel ID using the '/streams/retransmit' api function.",
-            dev_eui
+                    dev_eui,
+                    address.initialization_cnt,
         );
-
+        let msgid = address.msgid.as_bytes().try_into().unwrap();
         let streams_api_request_bytes = Self::get_streams_api_request_bytes(streams_api_request);
 
         let new_pending_request = PendingRequest::new(
             dev_eui,
             msgid,
+            address.initialization_cnt,
             streams_api_request_bytes,
         );
 
@@ -196,9 +197,10 @@ impl DispatchStreams
         Ok(pending_request)
     }
 
-    fn write_new_lorawan_node_to_db(self: &mut Self, pending_request: &PendingRequest, channel_id: &AppInst) -> anyhow::Result<()> {
+    fn write_new_lorawan_node_to_db(self: &mut Self, pending_request: &PendingRequest, channel_id: &AppInst, initialization_cnt: u8) -> anyhow::Result<()> {
         let lorawan_node = LoraWanNode {
             dev_eui: pending_request.dev_eui.clone(),
+            initialization_cnt,
             streams_channel_id: channel_id.to_string()
         };
         self.lorawan_nodes.write_item_to_db(&lorawan_node)?;
@@ -236,9 +238,34 @@ impl DispatchStreams
     }
 
     async fn retransmit_receive_compressed_message_from_address(self: &mut Self, pending_request: PendingRequest) -> Result<Response<Body>> {
-        let msg_id = MsgId::from(pending_request.msg_id.as_slice()).to_string();
+        let cmpr_addr_str =
+            TangleAddressCompressed {
+                msgid: MsgId::from(pending_request.msg_id.as_slice()),
+                initialization_cnt: pending_request.initialization_cnt,
+            }
+            .to_string();
+
         self.set_request_needs_registered_lorawan_node_on_scope_to_true();
-        self.receive_compressed_message_from_address(msg_id.as_str(), pending_request.dev_eui.as_str()).await
+        self.receive_compressed_message_from_address(cmpr_addr_str.as_str(), pending_request.dev_eui.as_str()).await
+    }
+
+    async fn get_lorawan_node(self: &mut Self, dev_eui_str: &String, link: &TangleAddressCompressed) -> Option<LoraWanNode> {
+        let mut ret_val: Option<LoraWanNode> = None;
+        match self.lorawan_nodes.get_item(dev_eui_str) {
+            Ok(node_and_cb) => {
+                let node = node_and_cb.0;
+                if node.initialization_cnt == link.initialization_cnt {
+                    ret_val = Some(node)
+                } else {
+                    log::warn!("[IOTA-Bridge - get_lorawan_node] LoraWanNode found for dev_eui {} has initialization_cnt {} but message needs initialization_cnt {}",
+                               dev_eui_str, node.initialization_cnt, link.initialization_cnt);
+                }
+            },
+            Err(err) => {
+                log::warn!("[IOTA-Bridge - get_lorawan_node] lorawan_nodes.get_item returned an error for dev_eui {}. Error: {}", dev_eui_str, err);
+            }
+        }
+        ret_val
     }
 }
 
@@ -262,12 +289,14 @@ fn println_receive_message_from_address_for_received_message(message: &TangleMes
     );
 }
 
-fn println_retransmit_for_received_message(request_key: &String, channel_id: &AppInst, streams_req: &StreamsApiRequest) {
+fn println_retransmit_for_received_message(request_key: &String, channel_id: &AppInst, initialization_cnt: u8, streams_req: &StreamsApiRequest) {
     println!(
         "-----------------------------------------------------------------\n\
 [IOTA-Bridge - DispatchStreams] retransmit() - Incoming request_key '{}' to retransmit cashed StreamsApiRequest for LorawanNode with channel_id {}.
+Initialization Count: {}
+Request key:
 {}
-", request_key, channel_id.to_string(), streams_req
+", request_key, channel_id.to_string(), initialization_cnt, streams_req
     );
 }
 
@@ -325,59 +354,57 @@ impl ServerDispatchStreams for DispatchStreams {
         };
 
         let dev_eui_str = dev_eui.to_string();
-        let lora_wan_node = match self.lorawan_nodes.get_item(&dev_eui_str) {
-            Ok(node_and_cb) => node_and_cb.0,
-            Err(err) => {
-                log::warn!("[IOTA-Bridge - send_compressed_message] lorawan_nodes.get_item returned an error for dev_eui {}. Error: {}", dev_eui_str, err);
-                let streams_api_request = StreamsApiRequest{
-                    api_function: StreamsApiFunction::SendCompressedMessage,
-                    address: "".to_string(), // address is not needed for send_message
-                    message: message.clone(),
-                };
-                return self.handle_lora_wan_node_not_known(dev_eui_str, message.link.msgid.as_bytes().try_into().unwrap(), streams_api_request)
-            }
-        };
-
-        let uncompressed_message = match message.to_tangle_message(lora_wan_node.streams_channel_id.as_str()) {
-            Ok(msg) => msg,
-            Err(err) => return get_response_500(format!("Error: {}", err).as_str())
-        };
-
-        self.send_message::<F>(&uncompressed_message).await
+        if let Some(lora_wan_node) = self.get_lorawan_node(&dev_eui_str, &message.link).await {
+            let uncompressed_message = match message.to_tangle_message(lora_wan_node.streams_channel_id.as_str()) {
+                Ok(msg) => msg,
+                Err(err) => return get_response_500(format!("Error: {}", err).as_str())
+            };
+            self.send_message::<F>(&uncompressed_message).await
+        }
+        else {
+            let streams_api_request = StreamsApiRequest{
+                api_function: StreamsApiFunction::SendCompressedMessage,
+                cmpr_address: "".to_string(), // address is not needed for send_message
+                cmpr_message: message.clone(),
+            };
+            return self.handle_lora_wan_node_not_known(dev_eui_str, message.link.clone(), streams_api_request)
+        }
     }
 
-    async fn receive_compressed_message_from_address(self: &mut Self, msgid: &str, dev_eui_str: &str) -> Result<Response<Body>> {
-        let lora_wan_node = match self.lorawan_nodes.get_item(&dev_eui_str.to_string()) {
-            Ok(node_and_cb) => node_and_cb.0,
-            Err(err) => {
-                log::error!("[IOTA-Bridge - receive_compressed_message_from_address] lorawan_nodes.get_item returned an error for dev_eui {}. Error: {}", dev_eui_str, err);
-                let msg_id_instance = MsgId::from_str(msgid).expect(format!("Error on deserializing msg_id from string value '{}'", msgid).as_str());
-                let streams_api_request = StreamsApiRequest{
-                    api_function: StreamsApiFunction::ReceiveCompressedMessageFromAddress,
-                    address: msgid.to_string(),
-                    message: TangleMessageCompressed::default(), // message is not needed for receive_message
-                };
-                return self.handle_lora_wan_node_not_known(dev_eui_str.to_string(), msg_id_instance.as_bytes().to_vec(), streams_api_request);
-            }
-        };
+    async fn receive_compressed_message_from_address(self: &mut Self, cmpr_addr_str: &str, dev_eui_str: &str) -> Result<Response<Body>> {
+        let cmpr_addr = TangleAddressCompressed::from_str(cmpr_addr_str)
+            .expect(format!("Error on deserializing cmpr_addr from string value '{}'", cmpr_addr_str).as_str());
 
-        let full_address_str = TangleAddressCompressed::build_tangle_address_str(msgid, lora_wan_node.streams_channel_id.as_str());
-        self.receive_message_from_address(full_address_str.as_str()).await
+        if let Some(lora_wan_node) = self.get_lorawan_node(&dev_eui_str.to_string(), &cmpr_addr).await {
+            let full_address_str = TangleAddressCompressed::build_tangle_address_str(
+                cmpr_addr.msgid.to_string().as_str(),
+                lora_wan_node.streams_channel_id.as_str()
+            );
+            self.receive_message_from_address(full_address_str.as_str()).await
+        }
+        else {
+            let streams_api_request = StreamsApiRequest{
+                api_function: StreamsApiFunction::ReceiveCompressedMessageFromAddress,
+                cmpr_address: cmpr_addr_str.to_string(),
+                cmpr_message: TangleMessageCompressed::default(), // message is not needed for receive_message
+            };
+            return self.handle_lora_wan_node_not_known(dev_eui_str.to_string(), cmpr_addr, streams_api_request);
+        }
     }
 
-    async fn retransmit(self: &mut Self, request_key: String, channel_id: AppInst) -> Result<Response<Body>> {
+    async fn retransmit(self: &mut Self, request_key: String, channel_id: AppInst, initialization_cnt: u8) -> Result<Response<Body>> {
         let request_key_i64 = ok_or_bail_internal_error_response_500!(Self::decode_request_key_for_retransmit(request_key.clone()));
         let pending_request = ok_or_bail_internal_error_response_500!(self.get_pending_request(&request_key_i64));
-        ok_or_bail_internal_error_response_500!(self.write_new_lorawan_node_to_db(&pending_request, &channel_id));
+        ok_or_bail_internal_error_response_500!(self.write_new_lorawan_node_to_db(&pending_request, &channel_id, initialization_cnt));
 
         let streams_req = StreamsApiRequest::try_from_bytes(pending_request.streams_api_request.as_slice())
             .expect("Error on deserializing StreamsApiRequest");
 
-        println_retransmit_for_received_message(&request_key, &channel_id, &streams_req);
+        println_retransmit_for_received_message(&request_key, &channel_id, initialization_cnt, &streams_req);
 
         let mut ret_val = match streams_req.api_function {
             StreamsApiFunction::SendCompressedMessage => {
-                self.retransmit_send_compressed_message(pending_request.clone(), streams_req.message).await?
+                self.retransmit_send_compressed_message(pending_request.clone(), streams_req.cmpr_message).await?
             }
             StreamsApiFunction::ReceiveCompressedMessageFromAddress => {
                 self.retransmit_receive_compressed_message_from_address(pending_request.clone()).await?

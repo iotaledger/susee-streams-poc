@@ -78,6 +78,7 @@ impl fmt::Display for Confirmation {
 pub struct Subscription {
     pub subscription_link: String,
     pub pup_key: String,
+    pub initialization_cnt: u8,
 }
 
 impl Default for Subscription {
@@ -85,6 +86,7 @@ impl Default for Subscription {
         Subscription {
             subscription_link: String::from("None"),
             pup_key: String::from("None"),
+            initialization_cnt: 0,
         }
     }
 }
@@ -99,27 +101,46 @@ impl EnumeratedPersistableArgs<Confirmation> for Subscription {
 
 impl BinaryPersist for Subscription {
     fn needed_size(&self) -> usize {
-        Confirmation::LENGTH_BYTES + calc_string_binary_length(&self.subscription_link) + calc_string_binary_length(&self.pup_key)
+        let mut ret_val = Confirmation::LENGTH_BYTES;             // CONFIRMATION_TYPE
+        ret_val += calc_string_binary_length(&self.subscription_link);  // SUBSCRIPTION_LINK
+        ret_val += calc_string_binary_length(&self.pup_key);            // PUP_KEY
+        ret_val += 1;                                                   // INITIALIZATION_CNT
+        ret_val
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
         let mut range: Range<usize> = RangeIterator::new(0);
+        // CONFIRMATION_TYPE + SUBSCRIPTION_LINK
         serialize_binary_persistable_and_streams_link(Self::INSTANCE.clone(), &self.subscription_link, buffer, &mut range)?;
+        // PUP_KEY
         serialize_string(&self.pup_key, buffer, &mut range)?;
+        // INITIALIZATION_CNT
+        range.increment(1);
+        self.initialization_cnt.to_bytes(&mut buffer[range.clone()]).expect("Error on persisting initialization_cnt");
         Ok(range.end)
     }
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized {
         let mut range: Range<usize> = RangeIterator::new(0);
+        // CONFIRMATION_TYPE + SUBSCRIPTION_LINK
         let mut ret_val = deserialize_enumerated_persistable_arg_with_one_string::<Subscription, Confirmation>(buffer, &mut range)?;
+        // PUP_KEY
         ret_val.pup_key = deserialize_string(buffer, & mut range)?;
+        // INITIALIZATION_CNT
+        range.increment(1);
+        ret_val.initialization_cnt = u8::try_from_bytes(&buffer[range]).expect("Error on reading initialization_cnt");
+
         Ok(ret_val)
     }
 }
 
 impl fmt::Display for Subscription {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Subscription:\n subscription_link: {}\n pup_key: {}", self.subscription_link, self.pup_key)
+        write!(f, "Subscription:\n subscription_link: {}\n pup_key: {}\n initialization_cnt: {}",
+               self.subscription_link,
+               self.pup_key,
+               self.initialization_cnt,
+        )
     }
 }
 

@@ -20,12 +20,14 @@ use streams_tools::{
     channel_manager::{
         SubscriberData,
     },
+    subscriber_manager::println_maximum_initialization_cnt_reached_warning,
     ChannelManagerPlainTextWallet,
     remote::remote_sensor::{
         RemoteSensor,
         RemoteSensorOptions,
     },
-    UserDataStore
+    UserDataStore,
+    binary_persist::INITIALIZATION_CNT_MAX_VALUE,
 };
 
 use susee_tools::SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC;
@@ -91,11 +93,17 @@ async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, c
     println!("[Management Console] Sending subscribe_announcement_link command to remote sensor.\n");
     let subscription_confirm = remote_manager.subscribe_to_channel(announcement_link.to_string().as_str()).await?;
 
+    if subscription_confirm.initialization_cnt == INITIALIZATION_CNT_MAX_VALUE {
+        println_maximum_initialization_cnt_reached_warning("SManagement Console", subscription_confirm.initialization_cnt);
+    }
+
     println!("
 [Management Console] Received confirmation for successful Subscription from remote sensor.
+                     Initialization count is {}
                      Creating keyload_message for
                             subscription: {}
                             public key: {}\n",
+             subscription_confirm.initialization_cnt,
              subscription_confirm.subscription_link,
              subscription_confirm.pup_key,
     );

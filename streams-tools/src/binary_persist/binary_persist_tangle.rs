@@ -17,7 +17,9 @@ use iota_streams::app::{
 use std::{
     convert::TryInto,
     ops::Range,
-    str::FromStr,
+    str::{
+        FromStr
+    },
     fmt,
     fmt::{
         Debug,
@@ -27,7 +29,8 @@ use std::{
 
 use anyhow::{
     Result,
-    Error
+    Error,
+    bail,
 };
 use log;
 
@@ -138,17 +141,27 @@ impl BinaryPersist for TangleMessage {
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct TangleAddressCompressed {
     pub msgid: MsgId,
+    pub initialization_cnt: u8,
 }
+
+const INITIALIZATION_CNT_SIZE: usize = 1;
+pub const INITIALIZATION_CNT_MAX_VALUE: u8 = u8::MAX;
+
+// Length of a string representation of a TangleAddressCompressed
+// MSGID_SIZE * 2                   -> Hex representation of the MsgId
+// + 1                              -> ':'
+// INITIALIZATION_CNT_SIZE * 2      -> Hex representation of the initialization_cnt
+const TANGLE_ADDRESS_COMPRESSED_STR_LENGTH: usize = MSGID_SIZE * 2 + 1 + INITIALIZATION_CNT_SIZE * 2;
 
 impl fmt::Display for TangleAddressCompressed {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.msgid)
+        write!(f, "{}:{:02x}", self.msgid, self.initialization_cnt)
     }
 }
 
 impl TangleAddressCompressed {
-    pub fn from_tangle_address(address: &TangleAddress) -> Self {
-        Self { msgid: address.msgid }
+    pub fn from_tangle_address(address: &TangleAddress, initialization_cnt: u8) -> Self {
+        Self { msgid: address.msgid, initialization_cnt }
     }
 
     pub fn to_tangle_address(&self, streams_channel_id: &str) -> Result<TangleAddress> {
@@ -165,7 +178,8 @@ impl TangleAddressCompressed {
 impl Default for TangleAddressCompressed {
     fn default() -> Self {
         TangleAddressCompressed {
-            msgid: MsgId::from_str("000000000000000000000000").expect("Error on deserializing MsgId from empty string")
+            msgid: MsgId::from_str("000000000000000000000000").expect("Error on deserializing MsgId from empty string"),
+            initialization_cnt: 0,
         }
     }
 }
@@ -173,26 +187,55 @@ impl Default for TangleAddressCompressed {
 impl FromStr for TangleAddressCompressed {
     type Err = Error;
 
-    fn from_str(msgid_str: &str) -> Result<Self> {
-        let msgid = MsgId::from_str(msgid_str)?;
-        Ok(TangleAddressCompressed{msgid})
+    fn from_str(cmpr_addr_str: &str) -> Result<Self> {
+        //
+        if cmpr_addr_str.len() != TANGLE_ADDRESS_COMPRESSED_STR_LENGTH {
+            bail!("Invalid cmpr_addr_str '{}'. Length needs to be {} but length of given string is {}",
+             cmpr_addr_str, TANGLE_ADDRESS_COMPRESSED_STR_LENGTH, cmpr_addr_str.len())
+        }
+        let msgid_end = MSGID_SIZE * 2;
+        let initialization_cnt_start = msgid_end + 1;
+        let msgid_str = cmpr_addr_str[..msgid_end].to_string();
+        let initialization_cnt_str = cmpr_addr_str[initialization_cnt_start..].to_string();
+
+        let msgid = MsgId::from_str(msgid_str.as_str())?;
+        let initialization_cnt = u8::from_str_radix(&initialization_cnt_str, 16)?;
+
+        Ok(TangleAddressCompressed{msgid, initialization_cnt})
     }
 }
 
 impl BinaryPersist for TangleAddressCompressed {
     fn needed_size(&self) -> usize {
-        MSGID_SIZE
+        // MSGID_SIZE:  msgid
+        // 1:           initialization_cnt
+        MSGID_SIZE + 1
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
-        buffer[..MSGID_SIZE].copy_from_slice(self.msgid.as_bytes());
-        Ok(MSGID_SIZE)
+        if buffer.len() < self.needed_size() {
+            panic!("[BinarySerialize  for TangleAddressCompressed] This compressed TangleAddressCompressed needs {} bytes but \
+                    the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
+        }
+        // MSGID
+        let mut range: Range<usize> = RangeIterator::new(MSGID_SIZE);
+        buffer[range.clone()].copy_from_slice(self.msgid.as_bytes());
+        // INITIALIZATION_CNT
+        range.increment(1);
+        self.initialization_cnt.to_bytes(&mut buffer[range.clone()]).expect("Error on persisting initialization_cnt");
+
+        Ok(range.end)
     }
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
-        Ok(TangleAddressCompressed{
-            msgid: MsgId::from(&buffer[..MSGID_SIZE])
-        })
+        // MSGID
+        let mut range: Range<usize> = RangeIterator::new(MSGID_SIZE);
+        let msgid = MsgId::from(&buffer[range.clone()]);
+        // INITIALIZATION_CNT
+        range.increment(1);
+        let initialization_cnt = u8::try_from_bytes(&buffer[range]).expect("Error on reading initialization_cnt");
+
+        Ok(TangleAddressCompressed{msgid, initialization_cnt})
     }
 }
 
@@ -206,11 +249,11 @@ pub struct TangleMessageCompressed {
 }
 
 impl TangleMessageCompressed {
-    pub fn from_tangle_message(message: &TangleMessage) -> Self {
+    pub fn from_tangle_message(message: &TangleMessage, initialization_cnt: u8) -> Self {
         Self {
             // The usage of dev_eui in TangleMessageCompressed is optional.
             dev_eui: Vec::<u8>::new(),
-            link: TangleAddressCompressed::from_tangle_address(&message.link),
+            link: TangleAddressCompressed::from_tangle_address(&message.link, initialization_cnt),
             body: message.body.clone(),
         }
     }
@@ -347,13 +390,13 @@ impl BinaryPersist for StreamsApiFunction {
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct StreamsApiRequest {
     pub api_function: StreamsApiFunction,
-    pub address: String,
-    pub message: TangleMessageCompressed,
+    pub cmpr_address: String,
+    pub cmpr_message: TangleMessageCompressed,
 }
 
 impl BinaryPersist for StreamsApiRequest {
     fn needed_size(&self) -> usize {
-        self.api_function.needed_size() + USIZE_LEN + self.address.len() + USIZE_LEN + self.message.needed_size()
+        self.api_function.needed_size() + USIZE_LEN + self.cmpr_address.len() + USIZE_LEN + self.cmpr_message.needed_size()
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
@@ -365,13 +408,13 @@ impl BinaryPersist for StreamsApiRequest {
         let mut range: Range<usize> = RangeIterator::new(self.api_function.needed_size());
         BinaryPersist::to_bytes(&self.api_function, &mut buffer[range.clone()]).expect("Could not persist api_function");
         // ADDRESS
-        serialize_string(&self.address, buffer, &mut range)?;
+        serialize_string(&self.cmpr_address, buffer, &mut range)?;
         // MESSAGE
-        let message_len = self.message.needed_size() as u32;
+        let message_len = self.cmpr_message.needed_size() as u32;
         range.increment(USIZE_LEN);
         BinaryPersist::to_bytes(&message_len, &mut buffer[range.clone()]).expect("Could not persist message length");
         range.increment(message_len as usize);
-        self.message.to_bytes(&mut buffer[range.clone()]).expect("Could not persist message");
+        self.cmpr_message.to_bytes(&mut buffer[range.clone()]).expect("Could not persist message");
         
         Ok(range.end)
     }
@@ -390,8 +433,8 @@ impl BinaryPersist for StreamsApiRequest {
 
         Ok(StreamsApiRequest {
             api_function,
-            address,
-            message,
+            cmpr_address: address,
+            cmpr_message: message,
         })
     }
 }
@@ -402,7 +445,7 @@ impl fmt::Display for StreamsApiRequest {
                      api_function: {}
                      address: {}
                      message bytes length: {}
-                ", self.api_function, self.address, self.message.needed_size())
+                ", self.api_function, self.cmpr_address, self.cmpr_message.needed_size())
     }
 }
 
@@ -412,6 +455,19 @@ impl fmt::Display for StreamsApiRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::binary_persist::test_binary_persistance;
+
+    fn get_compressed_address() -> TangleAddressCompressed{
+        TangleAddressCompressed {
+            msgid: MsgId::from_str("f2fceded12d9c7363e0ae9db").expect("Could not build MsgId from string"),
+            initialization_cnt: 0
+        }
+    }
+
+    #[test]
+    fn test_tangle_address_compressed() {
+        test_binary_persistance(get_compressed_address());
+    }
 
     #[test]
     fn test_streams_api_function() {
@@ -426,15 +482,13 @@ mod tests {
     fn test_streams_api_request() {
         let message = TangleMessageCompressed {
             dev_eui: vec![], // Currently the dev_eui is not persisted. See TangleMessageCompressed::to_bytes() for more info
-            link: TangleAddressCompressed {
-                msgid: MsgId::from_str("f2fceded12d9c7363e0ae9db").expect("Could not build MsgId from string"),
-            },
+            link: get_compressed_address(),
             body: BinaryBody::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
         };
         let api_request = StreamsApiRequest {
             api_function: StreamsApiFunction::SendCompressedMessage,
-            address: "address".to_string(),
-            message,
+            cmpr_address: "address".to_string(),
+            cmpr_message: message,
         };
         let mut buffer: Vec<u8> = vec![0; api_request.needed_size()];
         api_request.to_bytes(&mut buffer).expect("Could not serialize api_request");

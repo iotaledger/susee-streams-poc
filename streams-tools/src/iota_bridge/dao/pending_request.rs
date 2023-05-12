@@ -28,16 +28,18 @@ pub type MsgIdTransferType = Vec<u8>;
 pub struct PendingRequest {
     pub dev_eui: String,
     pub msg_id: MsgIdTransferType,
+    pub initialization_cnt: u8,
     pub streams_api_request: Vec<u8>,
     pub request_key: Option<i64>
 }
 
 impl PendingRequest {
-    pub fn new(dev_eui: String, msg_id: MsgIdTransferType, streams_api_request: Vec<u8>) -> Self {
+    pub fn new(dev_eui: String, msg_id: MsgIdTransferType, initialization_cnt: u8, streams_api_request: Vec<u8>) -> Self {
         PendingRequest {
             request_key: None,
             dev_eui,
             msg_id,
+            initialization_cnt,
             streams_api_request,
         }
     }
@@ -78,6 +80,7 @@ impl DaoManager for PendingRequestDaoManager {
                 {} INTEGER NOT NULL PRIMARY KEY,\
                 dev_eui TEXT NOT NULL,\
                 msg_id BLOB NOT NULL,\
+                initialization_cnt INTEGER NOT NULL,\
                 streams_api_request BLOB NOT NULL\
             )
             ", Self::TABLE_NAME, Self::PRIMARY_KEY_COLUMN_NAME).as_str(), [])
@@ -96,19 +99,22 @@ impl DaoManager for PendingRequestDaoManager {
     fn write_item_to_db(&self, item: &PendingRequest) -> Result<Self::PrimaryKeyType> {
         let _rows = if let Some(request_key) = item.request_key {
             self.connection.execute(format!(
-                "INSERT OR REPLACE INTO {} ({}, dev_eui, msg_id, streams_api_request) VALUES (?, ?, ?, ?)", Self::TABLE_NAME, Self::PRIMARY_KEY_COLUMN_NAME).as_str(),
+                "INSERT OR REPLACE INTO {} ({}, dev_eui, msg_id, initialization_cnt, streams_api_request) VALUES (?, ?, ?, ?, ?)",
+                    Self::TABLE_NAME, Self::PRIMARY_KEY_COLUMN_NAME).as_str(),
                 params![
                     &request_key,
                     &item.dev_eui,
                     &item.msg_id,
+                    &item.initialization_cnt,
                     &item.streams_api_request,
             ]).unwrap()
         } else {
             self.connection.execute(format!(
-                "INSERT OR REPLACE INTO {} (dev_eui, msg_id, streams_api_request) VALUES (?, ?, ?)", Self::TABLE_NAME).as_str(),
+                "INSERT OR REPLACE INTO {} (dev_eui, msg_id, initialization_cnt, streams_api_request) VALUES (?, ?, ?, ?)", Self::TABLE_NAME).as_str(),
                 params![
                     &item.dev_eui,
                     &item.msg_id,
+                    &item.initialization_cnt,
                     &item.streams_api_request,
             ]).unwrap()
         };
@@ -120,12 +126,15 @@ impl DaoManager for PendingRequestDaoManager {
         let this = self.clone();
         let dev_eui = item.dev_eui.clone();
         let msg_id = item.msg_id.clone();
+        let initialization_cnt = item.initialization_cnt;
+
         Box::new( move |request_id: Self::PrimaryKeyType, streams_api_request: Vec<u8>| -> Result<usize> {
             let ret_val = streams_api_request.len();
             let new_pending_req = PendingRequest {
                 request_key: Some(request_id),
                 dev_eui,
                 msg_id,
+                initialization_cnt,
                 streams_api_request,
             };
             this.write_item_to_db(&new_pending_req)?;
@@ -161,6 +170,7 @@ mod tests {
 
     const DEV_EUI: &str = "12345678";
     const MSG_ID: [u8; MSGID_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const INITIALIZATION_CNT: u8 = 0;
 
     #[test]
     fn test_pending_request_dao_manager() {
@@ -171,6 +181,7 @@ mod tests {
         let mut pending_request = PendingRequest::new(
             DEV_EUI.to_string(),
             MSG_ID.to_vec(),
+            INITIALIZATION_CNT,
             vec![1, 2, 3]
         );
         let request_key = dao_manager.write_item_to_db(&pending_request).unwrap();
@@ -198,6 +209,7 @@ mod tests {
         let mut pending_request =  PendingRequest::new(
             DEV_EUI.to_string(),
             MSG_ID.to_vec(),
+            INITIALIZATION_CNT,
             vec![1, 2, 3]
         );
 

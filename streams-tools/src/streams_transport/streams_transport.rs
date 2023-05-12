@@ -24,14 +24,5 @@ pub static STREAMS_TOOLS_CONST_DEFAULT_TCP_LISTENER_ADDRESS: &str = "localhost:5
 pub trait StreamsTransport: Clone + TransportOptions + Transport<Address, Message> + TransportDetails<Address> + CompressedStateSend {
     type Options: Default;
     fn new(options: Option<Self::Options>) -> Self;
+    fn set_initialization_cnt(&mut self, value: u8);
 }
-/*
-impl<T> StreamsTransport for T where T: Clone + TransportOptions + Transport<Address, Message> + TransportDetails<Address> + CompressedStateSend {
-    type Options = ();
-
-    fn new(options: Option<Self::Options>) -> Self {
-        unimplemented!()
-    }
-}
-
- */

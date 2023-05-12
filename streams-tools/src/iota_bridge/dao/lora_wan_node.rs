@@ -22,6 +22,7 @@ use std::rc::Rc;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default, Clone)]
 pub struct LoraWanNode {
     pub dev_eui: String,
+    pub initialization_cnt: u8,
     pub streams_channel_id: String,
 }
 
@@ -58,6 +59,7 @@ impl DaoManager for LoraWanNodeDaoManager {
     fn init_db_schema(&self) -> Result<()> {
         self.connection.execute(format!("CREATE TABLE {} (\
                 {} TEXT NOT NULL PRIMARY KEY,\
+                initialization_cnt INTEGER NOT NULL,\
                 streams_channel_id  TEXT NOT NULL\
             )
             ", Self::TABLE_NAME, Self::PRIMARY_KEY_COLUMN_NAME).as_str(), [])
@@ -90,10 +92,12 @@ impl DaoManager for LoraWanNodeDaoManager {
 
     fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType {
         let this = self.clone();
+        let initialization_cnt = item.initialization_cnt;
         Box::new( move |dev_eui: String, streams_channel_id_utf8_bytes: Vec<u8>| -> Result<usize> {
             let ret_val = streams_channel_id_utf8_bytes.len();
             let new_node = LoraWanNode {
                 dev_eui,
+                initialization_cnt,
                 streams_channel_id: String::from_utf8(streams_channel_id_utf8_bytes)
                     .expect("Error while reading streams_channel_id_utf8_bytes into String instance.")
             };

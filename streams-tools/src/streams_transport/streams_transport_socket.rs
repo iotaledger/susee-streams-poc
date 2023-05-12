@@ -119,6 +119,7 @@ pub struct StreamsTransportSocket {
     compressed: CompressedStateManager,
     dev_eui: Option<String>,
     use_lorawan_rest: bool,
+    initialization_cnt: u8,
 }
 
 impl StreamsTransport for StreamsTransportSocket {
@@ -134,8 +135,13 @@ impl StreamsTransport for StreamsTransportSocket {
             request_builder_lorawan_rest: RequestBuilderLorawanRest::new(options.http_url.as_str()),
             compressed: CompressedStateManager::new(),
             dev_eui: options.dev_eui,
-            use_lorawan_rest: options.use_lorawan_rest
+            use_lorawan_rest: options.use_lorawan_rest,
+            initialization_cnt: 0,
         }
+    }
+
+    fn set_initialization_cnt(&mut self, value: u8) {
+        self.initialization_cnt = value;
     }
 }
 
@@ -188,8 +194,9 @@ impl StreamsTransportSocket
     async fn handle_request_retransmit(&mut self, mut response: Response<Body>, channel_id: AppInst) -> Result<Response<Body>> {
         let request_key_bytes = body::to_bytes(response.body_mut()).await.expect("Failed to read body bytes for retrieving the request_key");
         let mut retransmit_request = self.request_builder_streams.retransmit(
+            &Vec::<u8>::from(request_key_bytes),
             channel_id,
-            &Vec::<u8>::from(request_key_bytes)
+            self.initialization_cnt,
         )?;
 
         if self.use_lorawan_rest {
@@ -246,7 +253,7 @@ impl StreamsTransportSocket
             // used in cases where the lorawan-rest API is not used for compressed messages.
             // StreamsTransportViaBufferCallback never sets the DevEUI because it is communicated by the
             // LoraWAN network automatically (compare comment in function StreamsTransportViaBufferCallback::recv_message_via_http()
-            let cmpr_message = TangleMessageCompressed::from_tangle_message(msg);
+            let cmpr_message = TangleMessageCompressed::from_tangle_message(msg, self.initialization_cnt);
             self.request_builder_streams.get_send_message_request_parts(&cmpr_message, EndpointUris::SEND_COMPRESSED_MESSAGE, true, self.dev_eui.clone())?
         } else {
             self.request_builder_streams.get_send_message_request_parts(msg, EndpointUris::SEND_MESSAGE, false, None)?
@@ -258,12 +265,12 @@ impl StreamsTransportSocket
 
     fn get_recv_message_request(&self, link: &TangleAddress) -> Result<IotaBridgeRequestParts> {
         let ret_val = if self.compressed.get_use_compressed_msg() {
-            let cmpr_link = TangleAddressCompressed::from_tangle_address(link);
+            let cmpr_link = TangleAddressCompressed::from_tangle_address(link, self.initialization_cnt);
             self.request_builder_streams.get_receive_message_from_address_request_parts(
                 &cmpr_link,
                 EndpointUris::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS,
                 true,
-                QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_MSGID,
+                QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_CMPR_ADDR,
                 self.dev_eui.clone(),
             )
         } else {
@@ -311,6 +318,10 @@ impl CompressedStateSend for StreamsTransportSocket {
 
     fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
         self.compressed.set_initial_use_compressed_msg_state(use_compressed_msg)
+    }
+
+    fn remove_listener(&mut self, handle: usize) {
+        self.compressed.remove_listener(handle);
     }
 }
 

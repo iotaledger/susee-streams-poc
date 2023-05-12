@@ -24,11 +24,11 @@ use anyhow::{
 use crate::{
     streams_poc_lib_api_types::send_request_via_lorawan_t,
     request_via_buffer_cb::RequestViaBufferCallbackOptions,
+    esp_rs::esp32_subscriber_tools::setup_file_system,
 };
 
 use streams_tools::{
     PlainTextWallet,
-    StreamsTransport
 };
 
 pub async fn send_message(
@@ -37,12 +37,13 @@ pub async fn send_message(
     vfs_fat_path: Option<String>,
     p_caller_user_data: *mut cty::c_void
 ) -> Result<()>{
+    log::debug!("[fn - send_message()] Creating subscriber");
+    let mut vfs_fat_handle = setup_file_system(vfs_fat_path.clone()).await?;
 
-    let streams_transport = StreamsTransportViaBufferCallback::new(
-        Some(RequestViaBufferCallbackOptions { send_callback: lorawan_send_callback, p_caller_user_data})
-    );
-    let (mut subscriber, mut vfs_fat_handle) =
-        create_subscriber::<StreamsTransportViaBufferCallback, PlainTextWallet>(streams_transport, vfs_fat_path).await?;
+    let mut subscriber = create_subscriber::<StreamsTransportViaBufferCallback, PlainTextWallet>(
+        Some(RequestViaBufferCallbackOptions { send_callback: lorawan_send_callback, p_caller_user_data}),
+        &vfs_fat_handle
+    ).await?;
 
     log::info!("[fn - send_message()] Sending {} bytes payload\n", message_bytes.len());
     log::debug!("[fn - send_message()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
@@ -64,9 +65,12 @@ pub async fn send_message(
 
 pub async fn is_streams_channel_initialized(vfs_fat_path: Option<String>) -> Result<bool> {
     log::debug!("[fn - is_streams_channel_initialized()] Creating subscriber");
-    let client = StreamsTransportViaBufferCallback::new(None);
-    let (subscriber, mut vfs_fat_handle) =
-        create_subscriber::<StreamsTransportViaBufferCallback, PlainTextWallet>(client, vfs_fat_path).await?;
+    let mut vfs_fat_handle = setup_file_system(vfs_fat_path.clone()).await?;
+
+    let subscriber = create_subscriber::<StreamsTransportViaBufferCallback, PlainTextWallet>(
+        None,
+        &vfs_fat_handle,
+    ).await?;
 
     let ret_val = subscriber.is_channel_initialized().await;
 

@@ -12,6 +12,7 @@ use anyhow::{
     bail,
     Error,
 };
+use std::fmt::Debug;
 
 pub trait RangeIterator<Idx> {
     fn new(first_length: Idx) -> Self;
@@ -250,4 +251,11 @@ pub fn deserialize_bool(fn_name: &str, prop_name: &str, buffer: &[u8], range: &m
     let ret_val = u8::try_from_bytes(&buffer[range.clone()])? != 0;
     log::debug!("[{}] - read {}. Value: {}", fn_name, prop_name, ret_val);
     Ok(ret_val)
+}
+
+pub fn test_binary_persistance<T: BinaryPersist + PartialEq + Debug>( test_item: T) {
+    let buf = test_item.as_vecu8().expect("Error on persisting test_item");
+    let other_item = T::try_from_bytes(&buf)
+        .expect("Error on reading buffer into another item");
+    assert_eq!(test_item, other_item);
 }

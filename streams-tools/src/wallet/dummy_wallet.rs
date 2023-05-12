@@ -1,7 +1,11 @@
 use super::simple_wallet::SimpleWallet;
 
+use anyhow::Result;
+
 #[derive(Clone, Default)]
-pub struct DummyWallet {}
+pub struct DummyWallet {
+    initialization_cnt: u8
+}
 
 const SEED: &'static str = "--- This is a dummy seed used by a dummy wallet --- This is a dummy seed used ...";
 
@@ -21,8 +25,16 @@ impl SimpleWallet for DummyWallet {
     fn get_serialization_password(&self) -> &str {
         SEREALIZATION_PASSWD
     }
-}
 
+    fn get_initialization_cnt(&self) -> u8 {
+        self.initialization_cnt
+    }
+
+    fn increment_initialization_cnt(&mut self) -> Result<u8> {
+        self.initialization_cnt += 1;
+        Ok(self.initialization_cnt)
+    }
+}
 
 
 // These tests need to be started as follows:

@@ -40,6 +40,10 @@ impl CompressedStateSend for StreamsTransportCapture {
     fn set_initial_use_compressed_msg_state(&self, _use_compressed_msg: bool) {
         unimplemented!()
     }
+
+    fn remove_listener(&mut self, _handle: usize) {
+        unimplemented!()
+    }
 }
 
 #[async_trait(?Send)]

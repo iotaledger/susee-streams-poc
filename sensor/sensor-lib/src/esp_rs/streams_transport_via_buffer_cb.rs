@@ -20,7 +20,7 @@ use iota_streams::{
 
 use std::{
     clone::Clone,
-    rc::Rc,
+    rc::Rc
 };
 
 use streams_tools::{http::{
@@ -64,6 +64,7 @@ use crate::request_via_buffer_cb::{
 
 #[derive(Clone)]
 pub struct StreamsTransportViaBufferCallback {
+    initialization_cnt: u8,
     request_via_cb: RequestViaBufferCallback,
     request_builder: RequestBuilderStreams,
     tangle_client_options: SendOptions,
@@ -75,11 +76,16 @@ impl<'a> StreamsTransport for StreamsTransportViaBufferCallback {
 
     fn new(options: Option<RequestViaBufferCallbackOptions>) -> Self {
         Self {
+            initialization_cnt: 0,
             request_via_cb: RequestViaBufferCallback::new(options),
             request_builder: RequestBuilderStreams::new(""),
             tangle_client_options: SendOptions::default(),
             compressed: CompressedStateManager::new(),
         }
+    }
+
+    fn set_initialization_cnt(&mut self, value: u8) {
+        self.initialization_cnt = value;
     }
 }
 
@@ -89,7 +95,7 @@ impl StreamsTransportViaBufferCallback {
         let req_parts = if self.compressed.get_use_compressed_msg() {
             // Please note the comments in fn recv_message_via_http() below
             // Same principles apply here
-            let cmpr_message = TangleMessageCompressed::from_tangle_message(msg);
+            let cmpr_message = TangleMessageCompressed::from_tangle_message(msg, self.initialization_cnt);
             self.request_builder.get_send_message_request_parts(&cmpr_message, EndpointUris::SEND_COMPRESSED_MESSAGE, true, None)?
         } else {
             self.request_builder.get_send_message_request_parts(msg, EndpointUris::SEND_MESSAGE, false, None)?
@@ -137,12 +143,12 @@ impl StreamsTransportViaBufferCallback {
             // and therefore will not be send as lorawan payload.
             // Please note that due to this BinaryPersist implementation for TangleMessageCompressed
             // does not serialize/deserialize the dev_eui in general.
-            let cmpr_link = TangleAddressCompressed::from_tangle_address(link);
+            let cmpr_link = TangleAddressCompressed::from_tangle_address(link, self.initialization_cnt);
             self.request_builder.get_receive_message_from_address_request_parts(
                 &cmpr_link,
                 EndpointUris::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS,
                 true,
-                QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_MSGID,
+                QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_CMPR_ADDR,
                 None
             )?
         } else {
@@ -180,8 +186,9 @@ impl StreamsTransportViaBufferCallback {
 
     async fn handle_request_retransmit(&mut self, mut response_parts: IotaBridgeResponseParts, channel_id: AppInst) -> Result<IotaBridgeResponseParts> {
         let retransmit_request = self.request_builder.retransmit(
+            &response_parts.body_bytes,
             channel_id,
-            &response_parts.body_bytes
+            self.initialization_cnt,
         )?;
         log::info!("[StreamsTransportViaBufferCallback::handle_request_retransmit()] Received StatusCode::UNPROCESSABLE_ENTITY (422) - Processing {}",
             retransmit_request.uri());
@@ -208,6 +215,10 @@ impl CompressedStateSend for StreamsTransportViaBufferCallback {
     fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
         log::debug!("[StreamsTransportViaBufferCallback::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
         self.compressed.set_initial_use_compressed_msg_state(use_compressed_msg)
+    }
+
+    fn remove_listener(&mut self, handle: usize) {
+        self.compressed.remove_listener(handle);
     }
 }
 

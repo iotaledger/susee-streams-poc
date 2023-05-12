@@ -93,22 +93,26 @@ impl SensorManager {
         Ok(())
     }
 
-    fn println_subscription_details(subscriber: &Subscriber<ClientType>, subscription_link: &Address, comment: &str, key_name: &str) -> Result<Subscription> {
+    fn println_subscription_details(subscriber: &Subscriber<ClientType>, subscription_link: &Address, comment: &str, key_name: &str, init_cnt: u8) -> Result<Subscription> {
         let public_key = get_public_key_str(subscriber);
         println!(
             "[Sensor] {}:
              {} Link:     {}
                   Tangle Index:     {:#}
-             Subscriber public key: {}\n",
+             Subscriber public key: {}
+             Initialization count:  {}\n",
             comment,
             key_name,
             subscription_link.to_string(),
             subscription_link.to_msg_index(),
             public_key,
+            init_cnt,
+
         );
         Ok(Subscription {
             subscription_link: subscription_link.to_string(),
-            pup_key: public_key
+            pup_key: public_key,
+            initialization_cnt: init_cnt,
         })
     }
 
@@ -119,7 +123,8 @@ impl SensorManager {
             if let Some(subscription_link) = subscriber_manager.subscription_link {
                 subscription = Some(
                     Self::println_subscription_details(&subscriber, &subscription_link,
-                        "A subscription with the following details has already been created", "Subscription"
+                        "A subscription with the following details has already been created", "Subscription",
+                        subscriber_manager.get_initialization_cnt()
                     ).expect("Error on println_subscription_details")
                 );
             }
@@ -140,18 +145,19 @@ impl SensorManager {
         }
     }
 
-    pub async fn subscribe_to_channel(announcement_link_str: &str, subscriber_mngr: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<(String, String)> {
+    pub async fn subscribe_to_channel(announcement_link_str: &str, subscriber_mngr: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<(String, String, u8)> {
         let ann_address = Address::from_str(&announcement_link_str)?;
         let sub_msg_link = subscriber_mngr.subscribe(&ann_address).await?;
-
+        let initialization_cnt = subscriber_mngr.get_initialization_cnt();
         Self::println_subscription_details(
             &subscriber_mngr.subscriber.as_ref().unwrap(),
             &sub_msg_link,
             "A subscription with the following details has been created",
             "Subscription",
+            initialization_cnt
         )?;
         let public_key_str = get_public_key_str(&subscriber_mngr.subscriber.as_ref().unwrap());
-        Ok((sub_msg_link.to_string(), public_key_str))
+        Ok((sub_msg_link.to_string(), public_key_str, initialization_cnt))
     }
 
     pub async fn register_keyload_msg(keyload_msg_link_str: &str, subscriber_mngr: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<()> {
@@ -163,6 +169,7 @@ impl SensorManager {
             &keyload_msg_link,
             "Messages will be send in the branch defined by the following keyload message",
             "Keyload  msg",
+            subscriber_mngr.get_initialization_cnt(),
         )?;
 
         Ok(())

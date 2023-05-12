@@ -58,7 +58,12 @@ impl ProcessFinally {
                 } else {
                     let new_lorawan_node = LoraWanNode {
                         dev_eui: dev_eui.clone(),
-                        streams_channel_id: channel_id.clone()
+                        streams_channel_id: channel_id.clone(),
+                        // TODO: In real life the initialization_cnt initially can have values > 0 in case an IOTA-Bridge is deployed
+                        // after the sensor has been reinitialized several times.
+                        // To communicate the initialization_cnt properly the SEND_MESSAGE & RECEIVE_MESSAGE_FROM_ADDRESS need to
+                        // transport the initialization_cnt too.
+                        initialization_cnt: 0,
                     };
                     match self.lorawan_nodes.write_item_to_db(&new_lorawan_node) {
                         Ok(_) => {}

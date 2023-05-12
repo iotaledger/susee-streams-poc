@@ -34,7 +34,8 @@ use crate::{
         deserialize_bool,
         binary_persist_tangle::{
             TANGLE_ADDRESS_BYTE_LEN,
-        }
+        },
+        INITIALIZATION_CNT_MAX_VALUE,
     },
     compressed_state::{
         CompressedStateListen,
@@ -66,6 +67,7 @@ pub struct SubscriberManager<TransportT: StreamsTransport, WalletT: SimpleWallet
     wallet: WalletT,
     serialization_file: Option<String>,
     compressed: Rc<CompressedStateManager>,
+    compressed_subscription_handle: usize,
     is_synced: bool,
     pub subscriber: Option<Subscriber<TransportT>>,
     pub announcement_link: Option<Address>,
@@ -73,21 +75,23 @@ pub struct SubscriberManager<TransportT: StreamsTransport, WalletT: SimpleWallet
     pub prev_msg_link:  Option<Address>,
 }
 
-impl<ClientT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<ClientT, WalletT>
+impl<TransportT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
     where
-        ClientT: StreamsTransport
+        TransportT: StreamsTransport
 {
-    pub async fn new(client: ClientT, wallet: WalletT, serialization_file: Option<String>) -> Self {
+    pub async fn new(mut transport: TransportT, wallet: WalletT, serialization_file: Option<String>) -> Self {
+        transport.set_initialization_cnt(wallet.get_initialization_cnt());
         let mut ret_val = Self {
             wallet,
             is_synced: false,
             serialization_file: serialization_file.clone(),
-            transport: client,
+            transport,
             subscriber: None,
             announcement_link: None,
             subscription_link: None,
             prev_msg_link: None,
             compressed: Rc::new(CompressedStateManager::new()),
+            compressed_subscription_handle: 0,
         };
 
         if let Some(serial_file_name) = serialization_file {
@@ -106,7 +110,7 @@ impl<ClientT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<ClientT
         ret_val
     }
 
-    fn create_subscriber(&mut self) -> Subscriber<ClientT> {
+    fn create_subscriber(&mut self) -> Subscriber<TransportT> {
         self.subscribe_compressed_message_state()
             .expect("Error while doing CompressedStatePublish::subscribe on self.client");
         Subscriber::new(
@@ -117,40 +121,71 @@ impl<ClientT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<ClientT
 
     pub async fn subscribe(&mut self, ann_address: &Address) -> Result<Address> {
         if self.subscriber.is_none() {
-            let mut subscriber = self.create_subscriber();
-            log::debug!("[fn subscribe] subscriber created");
-
-            subscriber.receive_announcement(&ann_address).await?;
-            log::debug!("[fn subscribe] announcement received");
-
-            let sub_msg_link = subscriber.send_subscribe(&ann_address).await?;
-            self.announcement_link = subscriber.announcement_link().clone();
-            self.subscriber = Some(subscriber);
-            self.subscription_link = Some(sub_msg_link);
+            // This SubscriberManager has never subscribed before to a streams channel
+            self.subscribe_with_cleared_client_state(ann_address).await?;
+            // We do not increment_initialization_cnt here.
+            // The initialization_cnt is only incremented in case of re-initializations
         } else {
-        // TODO: When the subscription link is known after import_from_serialization_file
-        //      this fn call can be handled more gracefully here
-            println!("[SubscriberManager.subscribe()] - This subscriber has already subscribed. announcement_link: {}", self.announcement_link.unwrap());
-            bail!("[SubscriberManager.subscribe()] - This subscriber has already subscribed. announcement_link: {}", self.announcement_link.unwrap())
+            if self.wallet.get_initialization_cnt() < INITIALIZATION_CNT_MAX_VALUE {
+                println!("[SubscriberManager.subscribe()]\n\
+                                ------------------------------------------------------------------\n\
+                                An already existing subscription will be replaced by a new one.\n\
+                                Initialization count will be incremented from {} to {}\n\
+                                Maximum Initialization count is {}\n\
+                                ------------------------------------------------------------------\n",
+                         self.wallet.get_initialization_cnt(),
+                         self.wallet.get_initialization_cnt() + 1,
+                         INITIALIZATION_CNT_MAX_VALUE,
+                );
+                self.clear_client_state().await?;
+                self.subscribe_with_cleared_client_state(ann_address).await?;
+                self.wallet.increment_initialization_cnt()?;
+
+                if self.wallet.get_initialization_cnt() == INITIALIZATION_CNT_MAX_VALUE {
+                    println_maximum_initialization_cnt_reached_warning("SubscriberManager.subscribe()", self.wallet.get_initialization_cnt());
+                }
+            }
+            else {
+                bail!("[SubscriberManager.subscribe())] Maximum number of channel initializations has been reached. Initialization count is {}",
+                    self.wallet.get_initialization_cnt())
+            }
         }
-        log::debug!("[fn subscribe] returning subscription_link");
+
         Ok(self.subscription_link.unwrap())
+    }
+
+    pub fn get_initialization_cnt(&self) -> u8 {
+        self.wallet.get_initialization_cnt()
+    }
+
+    async fn subscribe_with_cleared_client_state(&mut self, ann_address: &Address) -> Result<()> {
+        let mut subscriber = self.create_subscriber();
+        log::debug!("[fn subscribe_with_cleared_client_state] subscriber created");
+
+        subscriber.receive_announcement(&ann_address).await?;
+        log::debug!("[fn subscribe_with_cleared_client_state] announcement received");
+
+        let sub_msg_link = subscriber.send_subscribe(&ann_address).await?;
+        self.announcement_link = subscriber.announcement_link().clone();
+        self.subscriber = Some(subscriber);
+        self.subscription_link = Some(sub_msg_link);
+        Ok(())
     }
 
     pub fn register_keyload_msg(&mut self, keyload_address: &Address) -> Result<()> {
         if self.subscriber.is_none(){
-            panic!("[SubscriberManager.subscribe()] - Before registering a keyload message you need to subscribe to a channel. Use subscribe() before using this function.")
+            panic!("[SubscriberManager.register_keyload_msg()] - Before registering a keyload message you need to subscribe to a channel. Use subscribe() before using this function.")
         }
 
         if let Some(prev_msg_link) = self.prev_msg_link {
-            println!("[SubscriberManager.subscribe()] - Replacing the old previous message link with new keyload message link
+            println!("[SubscriberManager.register_keyload_msg()] - Replacing the old previous message link with new keyload message link
                                   Old previous message link: {}
                                   Keyload message link: {}\n",
                    prev_msg_link.to_string(),
                    keyload_address.to_string(),
             )
         } else {
-            println!("[SubscriberManager.subscribe()] - Set keyload message link as new previous message link
+            println!("[SubscriberManager.register_keyload_msg()] - Set keyload message link as new previous message link
                                   Keyload message link: {}\n",
                      keyload_address.to_string(),
             )
@@ -165,10 +200,10 @@ impl<ClientT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<ClientT
     pub async fn send_signed_packet(&mut self, input: &Bytes) -> Result<Address> {
         log::debug!("[fn send_signed_packet] - START");
         if self.subscriber.is_none(){
-            panic!("[SubscriberManager.subscribe()] - Before sending messages you need to subscribe to a channel. Use subscribe() and register_keyload_msg() before using this function.")
+            panic!("[SubscriberManager.send_signed_packet()] - Before sending messages you need to subscribe to a channel. Use subscribe() and register_keyload_msg() before using this function.")
         }
         if self.prev_msg_link.is_none(){
-            panic!("[SubscriberManager.subscribe()] - Before sending messages you need to register a keyload message. Use register_keyload_msg() before using this function.")
+            panic!("[SubscriberManager.send_signed_packet()] - Before sending messages you need to register a keyload message. Use register_keyload_msg() before using this function.")
         }
         log::debug!("[fn send_signed_packet] - sync_subscriber_state");
         self.sync_subscriber_state().await?;
@@ -252,9 +287,7 @@ impl<ClientT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<ClientT
             self.subscription_link = None;
             self.subscriber = None;
             self.transport.set_initial_use_compressed_msg_state(false);
-            if let Some(subscriber) = self.subscriber.as_ref() {
-                subscriber.get_transport().set_initial_use_compressed_msg_state(false);
-            }
+            self.transport.remove_listener(self.compressed_subscription_handle);
 
             log::debug!("[fn clear_client_state] - Ok");
             Ok(())
@@ -265,7 +298,7 @@ impl<ClientT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<ClientT
 
     fn subscribe_compressed_message_state(&mut self) -> Result<()>{
         if self.subscriber.is_none() {
-            self.transport.subscribe_listener(self.compressed.clone())?;
+            self.compressed_subscription_handle = self.transport.subscribe_listener(self.compressed.clone())?;
             Ok(())
         } else {
             bail!("You need to subscribe to self.client before self.subscriber is created.\
@@ -373,6 +406,21 @@ impl<ClientT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<ClientT
         log::debug!("[fn - is_channel_initialized()] returning Ok({})", ret_val);
         Ok(ret_val)
     }
+}
+
+pub fn println_maximum_initialization_cnt_reached_warning(fn_name: &str, current_initialization_cnt: u8) {
+    println!("\n\n[{}] Warning maximum number of initializations reached:\n\n\
+                                ---------------------------------------------------------------\n\
+                                ---------------------- W A R N I N G --------------------------\n\
+                                ---------------------------------------------------------------\n\
+                                The maximum number of initializations has been reached.\n\
+                                The initialization count for this sensor now is {}.\n\
+                                To reset the initialization count, the flash of the sensor\n\
+                                needs to be erased.\n\
+                                ---------------------------------------------------------------\n",
+             fn_name,
+             current_initialization_cnt,
+    );
 }
 
 async fn import_from_serialization_file<ClientT: StreamsTransport, WalletT: SimpleWallet>(

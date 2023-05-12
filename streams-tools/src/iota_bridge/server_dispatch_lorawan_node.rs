@@ -56,7 +56,8 @@ impl ServerDispatchLoraWanNode for DispatchLoraWanNode {
     async fn create_node(self: &mut Self, dev_eui: &str, channel_id: &str) -> Result<Response<Body>> {
         let new_node = LoraWanNode{
             dev_eui: dev_eui.to_string(),
-            streams_channel_id: channel_id.to_string()
+            streams_channel_id: channel_id.to_string(),
+            initialization_cnt: 0,
         };
         match self.lorawan_nodes.write_item_to_db(&new_node) {
             Ok(primary_key) => {

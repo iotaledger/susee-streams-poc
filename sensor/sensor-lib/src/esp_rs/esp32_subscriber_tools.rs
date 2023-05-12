@@ -90,20 +90,25 @@ impl VfsFatHandle {
     }
 }
 
-pub async fn create_subscriber<TransportT, WalletT>(transport: TransportT, opt_vfs_fat_path: Option<String>) -> Result<(SubscriberManager<TransportT, WalletT>, VfsFatHandle)>
+pub async fn setup_file_system(opt_vfs_fat_path: Option<String>) -> Result<VfsFatHandle> {
+    log::debug!("[fn - setup_file_system()] Setting up file system");
+    let mut vfs_fat_handle = VfsFatHandle::new(opt_vfs_fat_path);
+    vfs_fat_handle.setup_filesystem()?;
+    Ok(vfs_fat_handle)
+}
+
+pub async fn create_subscriber<TransportT, WalletT>(transport_opt: Option<TransportT::Options>, vfs_fat_handle: &VfsFatHandle) -> Result<SubscriberManager<TransportT, WalletT>>
 where
     TransportT: StreamsTransport,
     WalletT: SimpleWallet
 {
-    log::debug!("[fn - create_subscriber()] setup_filesystem");
-    let mut vfs_fat_handle = VfsFatHandle::new(opt_vfs_fat_path);
-    vfs_fat_handle.setup_filesystem()?;
+    let mut transport = TransportT::new(transport_opt);
 
     log::debug!("[fn - create_subscriber()] Creating Wallet");
     let wallet_path = vfs_fat_handle.base_path.clone() + "/wallet_sensor.t\txt";
     let wallet = WalletT::new(wallet_path.as_str());
+    transport.set_initialization_cnt(wallet.get_initialization_cnt());
 
-    log::debug!("[fn - create_subscriber()] Creating HttpClient");
     log::debug!("[fn - create_subscriber()] Creating subscriber");
     let subscriber= SubscriberManager::<TransportT, WalletT>::new(
         transport,
@@ -112,5 +117,5 @@ where
     ).await;
 
     log::debug!("[fn - create_subscriber()] subscriber created");
-    Ok((subscriber, vfs_fat_handle))
+    Ok(subscriber)
 }

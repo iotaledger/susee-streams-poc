@@ -98,21 +98,21 @@ pub async fn create_subscriber_manager<'a>(
     cli: &SensorCli<'a>,
 ) -> Result<SubscriberManagerPlainTextWalletHttpClient> {
     let mut wallet = get_wallet(&cli)?;
-    let mut http_client_options: StreamsTransportSocketOptions =
+    let mut streams_transport_options: StreamsTransportSocketOptions =
         StreamsTransportSocketOptions::default();
     if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
-        http_client_options.http_url = iota_bridge_url.to_string();
+        streams_transport_options.http_url = iota_bridge_url.to_string();
     }
     manage_mocked_lorawan_dev_eui(&cli, &mut wallet);
     if wallet.persist.misc_other_data.len() > 0 {
-        http_client_options.dev_eui = Some(wallet.persist.misc_other_data.clone());
+        streams_transport_options.dev_eui = Some(wallet.persist.misc_other_data.clone());
     }
     if cli.matches.is_present(cli.arg_keys.use_lorawan_rest_api) {
-        http_client_options.use_lorawan_rest = true;
+        streams_transport_options.use_lorawan_rest = true;
     }
-    let client = ClientType::new(Some(http_client_options));
+    let transport = ClientType::new(Some(streams_transport_options));
     Ok(SubscriberManagerPlainTextWalletHttpClient::new(
-        client,
+        transport,
         wallet,
         Some(String::from("user-state-sensor.bin")),
     )
@@ -285,11 +285,11 @@ impl<'a> SensorFunctions for CmdProcessor<'a> {
         subscriber_mngr: &mut Self::SubscriberManager,
         confirm_req_builder: &RequestBuilderConfirm,
     ) -> hyper::http::Result<Request<Body>> {
-        let (sub_msg_link, public_key_str) =
+        let (sub_msg_link, public_key_str, initialization_cnt) =
             SensorManager::subscribe_to_channel(announcement_link_str, subscriber_mngr)
                 .await
                 .expect("Error on calling SensorManager::subscribe_to_channel");
-        confirm_req_builder.subscription(sub_msg_link, public_key_str)
+        confirm_req_builder.subscription(sub_msg_link, public_key_str, initialization_cnt)
     }
 
     async fn send_content_as_msg(

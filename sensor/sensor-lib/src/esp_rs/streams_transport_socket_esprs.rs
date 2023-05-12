@@ -99,6 +99,7 @@ pub struct StreamsTransportSocketEspRs {
     tangle_client_options: SendOptions,
     esp_http_client_opt: HttpConfiguration,
     compressed: CompressedStateManager,
+    initialization_cnt: u8,
 }
 
 impl StreamsTransport for StreamsTransportSocketEspRs {
@@ -111,10 +112,15 @@ impl StreamsTransport for StreamsTransportSocketEspRs {
         esp_http_client_opt.timeout = Some(Duration::from_secs(60));
         Self {
             request_builder: RequestBuilderStreams::new(options.http_url.as_str()),
+            initialization_cnt: 0,
             tangle_client_options: SendOptions::default(),
             esp_http_client_opt,
             compressed: CompressedStateManager::new(),
         }
+    }
+
+    fn set_initialization_cnt(&mut self, value: u8) {
+        self.initialization_cnt = value;
     }
 }
 
@@ -135,7 +141,7 @@ impl StreamsTransportSocketEspRs
 
     async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
         let req = if self.compressed.get_use_compressed_msg() {
-            let cmpr_message = TangleMessageCompressed::from_tangle_message(msg);
+            let cmpr_message = TangleMessageCompressed::from_tangle_message(msg, self.initialization_cnt);
             self.request_builder.send_compressed_message(&cmpr_message, None)?
         } else {
             self.request_builder.send_message(msg)?
@@ -150,7 +156,7 @@ impl StreamsTransportSocketEspRs
         log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http]");
         log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http] EspHttpClient created");
         let req = if self.compressed.get_use_compressed_msg() {
-            let cmpr_link = TangleAddressCompressed::from_tangle_address(link);
+            let cmpr_link = TangleAddressCompressed::from_tangle_address(link, self.initialization_cnt);
             self.request_builder.receive_compressed_message_from_address(&cmpr_link, None)?
         } else {
             self.request_builder.receive_message_from_address(link)?
@@ -208,6 +214,10 @@ impl CompressedStateSend for StreamsTransportSocketEspRs {
     fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
         log::debug!("[StreamsTransportSocketEspRs::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
         self.compressed.set_initial_use_compressed_msg_state(use_compressed_msg)
+    }
+
+    fn remove_listener(&mut self, handle: usize) {
+        self.compressed.remove_listener(handle);
     }
 }
 

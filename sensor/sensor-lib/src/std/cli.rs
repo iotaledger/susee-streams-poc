@@ -73,8 +73,8 @@ static USE_LORAWAN_REST_API_ABOUT: &str = "\
 If used the Sensor application will not call iota-bridge API functions directly
 but will use its lorawan-rest API instead.
 This way the Sensor application imitates the behavior of an ESP32-Sensor connected
-via LoRaWAN and a package transceiver connected to the LoRaWAN application server
-that hands over binary packages to the iota-bridge.";
+via LoRaWAN and an 'Application Server Connector' that hands over binary packages
+to the iota-bridge.";
 
 static IOTA_BRIDGE_URL_ABOUT_FMT_STR: &str = "The url of the iota-bridge to connect to.
 See --act-as-remote-control for further information.
@@ -84,6 +84,18 @@ Example: --iota-bridge-url=\"http://192.168.47.11:50000\"";
 
 static PRINTLN_SUBSCRIBER_STATUS_ABOUT: &str = "Print information about the current client status of the sensor.
 In streams the sensor is a subscriber so that this client status is called subscriber status.
+";
+
+static DEV_EUI_ABOUT: &str = "Use the specified LoRaWAN DevEui instead of a random value.
+In case the sensor wallet file (wallet-sensor.txt) of the sensor has been deleted
+the default behavior is to use a random value as new DevEui.
+The generated DevEui then is stored in the sensor wallet file later on so that the
+DevEui is persisted for later use.
+Using this argument the DevEui can be pre defined to have a static DevEui for test
+purposes. This argument is ignored in case the DevEui has already been stored in the
+sensor wallet file.
+
+Example: --dev-eu=12345678
 ";
 
 static CLEAR_CLIENT_STATE_ABOUT: &str = "Deletes the current client status of the sensor so that
@@ -96,6 +108,7 @@ TODO: -----------------------------
 
 pub struct ArgKeys {
     pub base: &'static BaseArgKeys,
+    pub dev_eu: &'static str,
     pub files_to_send: &'static str,
     pub subscribe_announcement_link: &'static str,
     pub register_keyload_msg: &'static str,
@@ -112,6 +125,7 @@ pub struct ArgKeys {
 
 pub static ARG_KEYS: ArgKeys = ArgKeys {
     base: &BASE_ARG_KEYS,
+    dev_eu: "dev-eu",
     files_to_send: "file-to-send",
     subscribe_announcement_link: "subscribe-announcement-link",
     register_keyload_msg: "register-keyload-msg",
@@ -184,6 +198,12 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
                 .short('b')
                 .value_name("IOTA_BRIDGE_URL")
                 .help(iota_bridge_url_about.as_str())
+            )
+            .arg(Arg::new(ARG_KEYS.dev_eu)
+                .long(ARG_KEYS.dev_eu)
+                .short('d')
+                .value_name("DEV_EU")
+                .help(DEV_EUI_ABOUT)
             )
             .arg(Arg::new(ARG_KEYS.println_subscriber_status)
                 .long(ARG_KEYS.println_subscriber_status)

@@ -46,8 +46,6 @@ pub trait DaoManager {
 
     fn write_item_to_db(&self, item: &Self::ItemType) -> Result<Self::PrimaryKeyType>;
 
-    fn update_item_in_db(&self, item: &Self::ItemType) -> Result<usize>;
-
     fn delete_item_in_db(&self, key: &Self::PrimaryKeyType) -> Result<()>;
 
     // Provides a callback for serializing the item into the database.
@@ -227,10 +225,6 @@ impl<DaoManagerT: DaoManager + Clone> DaoDataStore<DaoManagerT> {
         self.items.write_item_to_db(item)
     }
 
-    pub fn update_item_in_db(&self, item: &DaoManagerT::ItemType) -> Result<usize> {
-        self.items.update_item_in_db(item)
-    }
-
     pub fn delete_item_in_db(&self, key: &DaoManagerT::PrimaryKeyType) -> Result<()> {
         self.items.delete_item_in_db(key)
     }
@@ -315,18 +309,6 @@ mod tests {
                 to_params_named(item).unwrap().to_slice().as_slice()
             ).unwrap();
             Ok(item.id.clone())
-        }
-
-        fn update_item_in_db(&self, item: &Self::ItemType) -> Result<usize> {
-            let rows = self.connection.execute(
-                format!(
-                    "UPDATE {} SET some_data = :some_data WHERE {} = :id",
-                    Self::TABLE_NAME,
-                    Self::PRIMARY_KEY_COLUMN_NAME
-                ).as_str(),
-                to_params_named(item).unwrap().to_slice().as_slice()
-            ).unwrap();
-            Ok(rows)
         }
 
         fn delete_item_in_db(&self, key: &Self::PrimaryKeyType) -> Result<()> {
@@ -470,26 +452,6 @@ mod tests {
         test_item_0.some_data.push(7);
 
         serialization_callback(test_item_0.id.clone(), test_item_0.some_data.clone()).unwrap();
-
-        let test_item_from_db_0 = test_item_dao_manager.get_item_from_db(&test_item_0.id).unwrap();
-        assert_eq!(test_item_from_db_0, test_item_0);
-    }
-
-    #[test]
-    fn test_dao_data_store_update_item() {
-        let (test_item_dao_manager,
-            test_item_data_store,
-            mut test_item_0,
-            _serialization_callback,
-        ) = create_data_store_with_item_0();
-
-        // test_item_0.some_data is originally vec![1, 2, 3, 4]
-        // adding some more data here
-        test_item_0.some_data.push(5);
-        test_item_0.some_data.push(6);
-        test_item_0.some_data.push(7);
-
-        test_item_data_store.update_item_in_db(&test_item_0).unwrap();
 
         let test_item_from_db_0 = test_item_dao_manager.get_item_from_db(&test_item_0.id).unwrap();
         assert_eq!(test_item_from_db_0, test_item_0);

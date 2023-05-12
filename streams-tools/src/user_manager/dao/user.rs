@@ -89,16 +89,6 @@ impl DaoManager for UserDaoManager {
         Ok(item.streams_channel_id.clone())
     }
 
-    fn update_item_in_db(&self, item: &User) -> Result<usize> {
-        let rows = self.connection.execute(format!(
-            "UPDATE {} SET streams_user_state = :streams_user_state\
-             WHERE streams_channel_id = ':streams_channel_id'\
-             ", Self::TABLE_NAME).as_str(),
-                                           to_params_named(item).unwrap().to_slice().as_slice())
-            .expect("Error on executing 'UPDATE' for User");
-        Ok(rows)
-    }
-
     fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType {
         let this = self.clone();
         let seed_derive_phrase = item.seed_derivation_phrase.clone();

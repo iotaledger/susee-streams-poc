@@ -82,17 +82,13 @@ impl DaoManager for LoraWanNodeDaoManager {
 
     fn write_item_to_db(&self, item: &LoraWanNode) -> Result<Self::PrimaryKeyType> {
         let _rows = self.connection.execute(format!(
-            "INSERT INTO {} (dev_eui, streams_channel_id) VALUES (:dev_eui, :streams_channel_id)", Self::TABLE_NAME).as_str(),
+            "INSERT OR REPLACE INTO {} (dev_eui, initialization_cnt, streams_channel_id) \
+            VALUES (:dev_eui, :initialization_cnt, :streams_channel_id)", Self::TABLE_NAME).as_str(),
                            to_params_named(item).unwrap().to_slice().as_slice()).unwrap();
         Ok(item.dev_eui.clone())
     }
 
-    fn update_item_in_db(&self, _item: &LoraWanNode) -> Result<usize> {
-        // Currently there is no need to update a lora_wan_node
-        unimplemented!()
-    }
-
-    fn get_serialization_callback(&self, _item: &Self::ItemType) -> Self::SerializationCallbackType {
+    fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType {
         let this = self.clone();
         Box::new( move |dev_eui: String, streams_channel_id_utf8_bytes: Vec<u8>| -> Result<usize> {
             let ret_val = streams_channel_id_utf8_bytes.len();

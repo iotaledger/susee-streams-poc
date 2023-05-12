@@ -53,7 +53,7 @@ typedef enum {
    ############################ Test CONFIG ###############################################
    ######################################################################################## */
 
-static const sensor_manager_connection_type_t SENSOR_MANAGER_CONNECTION_TYPE = SMCT_STREAMS_POC_LIB_MANAGED_WIFI;
+static const sensor_manager_connection_type_t SENSOR_MANAGER_CONNECTION_TYPE = SMCT_CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS;
 
 // Please edit your Wifi credentials here. Needed for Sensor initialization.
 #define STREAMS_POC_LIB_TEST_WIFI_SSID "Susee Demo"

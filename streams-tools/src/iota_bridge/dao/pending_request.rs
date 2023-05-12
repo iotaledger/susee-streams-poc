@@ -116,11 +116,6 @@ impl DaoManager for PendingRequestDaoManager {
         Ok(item.request_key.unwrap_or(self.connection.last_insert_rowid()))
     }
 
-    fn update_item_in_db(&self, _item: &PendingRequest) -> Result<usize> {
-        // Currently there is no need to update a PendingRequest
-        unimplemented!()
-    }
-
     fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType {
         let this = self.clone();
         let dev_eui = item.dev_eui.clone();

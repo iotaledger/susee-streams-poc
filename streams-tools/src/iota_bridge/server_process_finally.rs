@@ -50,10 +50,11 @@ impl ProcessFinally {
                 let channel_id = ok_or_bail_internal_error_response_500!(scope.get_string(DispatchScopeKey::STREAMS_CHANNEL_ID));
                 let dev_eui = ok_or_bail_internal_error_response_500!(scope.get_string(DispatchScopeKey::LORAWAN_DEV_EUI));
 
-                if let Ok(_existing_node_and_serialize_cb) = self.lorawan_nodes.get_item(&dev_eui) {
-                    log::warn!("Attempt to recreate a lorawan_node that already exists.\nDevEUI: '{}'\nStreams-Channel-ID: '{}'\n\
-                                    Please use ...compressed.. versions of the streams IOTA-Bridge API functions after initially using uncompressed ones.",
-                               dev_eui, channel_id);
+                if let Ok(mut existing_node_and_serialize_cb) = self.lorawan_nodes.get_item(&dev_eui) {
+                    match self.handle_existing_node(&channel_id, &dev_eui, &mut existing_node_and_serialize_cb.0) {
+                        Ok(_) => {}
+                        Err(err) => return get_response_500(format!("Could not write new lorawan_node to local database: {}", err).as_str())
+                    }
                 } else {
                     let new_lorawan_node = LoraWanNode {
                         dev_eui: dev_eui.clone(),
@@ -68,6 +69,22 @@ impl ProcessFinally {
             }
         }
         Ok(ret_val)
+    }
+
+    fn handle_existing_node(&self, channel_id: &String, dev_eui: &String, existing_node: &mut LoraWanNode) -> anyhow::Result<()> {
+        if existing_node.streams_channel_id == *channel_id {
+            log::warn!("Attempt to recreate a lorawan_node that already exists.\nDevEUI: '{}'\nStreams-Channel-ID: '{}'\n\
+                                    Please use ...compressed.. versions of the streams IOTA-Bridge API functions after initially using uncompressed ones.",
+                       dev_eui, channel_id);
+            Ok(())
+        } else {
+            log::warn!("A lorawan_node with DevEUI: '{}' already exist for the streams-channel-id '{}'\n\
+                                    The node will be updated using the new channel-id: {} to allow node reinitialization.",
+                       existing_node.dev_eui, existing_node.streams_channel_id, channel_id);
+
+            existing_node.streams_channel_id = channel_id.clone();
+            self.lorawan_nodes.write_item_to_db(&existing_node).map(|_| ())
+        }
     }
 }
 

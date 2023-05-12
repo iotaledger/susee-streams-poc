@@ -74,10 +74,18 @@ fn get_wallet(cli: &SensorCli) -> Result<PlainTextWallet> {
     ))
 }
 
-pub fn manage_mocked_lorawan_dev_eui(wallet: &mut PlainTextWallet) {
+pub fn manage_mocked_lorawan_dev_eui<'a>(cli: &SensorCli<'a>, wallet: &mut PlainTextWallet) {
     if wallet.persist.misc_other_data.len() == 0 {
-        let new_dev_eui = rand::thread_rng().gen_range(0, u64::MAX);
-        wallet.persist.misc_other_data = new_dev_eui.to_string();
+        let new_dev_eui = if cli.matches.is_present(cli.arg_keys.dev_eu) {
+            if let Some(dev_eui_str) = cli.matches.value_of(cli.arg_keys.dev_eu) {
+                dev_eui_str.to_string()
+            } else {
+                panic!("[fn manage_mocked_lorawan_dev_eui] CLI argument {} has been used without specifying the DevEui.", cli.arg_keys.dev_eu)
+            }
+        } else {
+            rand::thread_rng().gen_range(0, u64::MAX).to_string()
+        };
+        wallet.persist.misc_other_data = new_dev_eui;
         wallet.write_wallet_file();
     }
     log::debug!(
@@ -95,7 +103,7 @@ pub async fn create_subscriber_manager<'a>(
     if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
         http_client_options.http_url = iota_bridge_url.to_string();
     }
-    manage_mocked_lorawan_dev_eui(&mut wallet);
+    manage_mocked_lorawan_dev_eui(&cli, &mut wallet);
     if wallet.persist.misc_other_data.len() > 0 {
         http_client_options.dev_eui = Some(wallet.persist.misc_other_data.clone());
     }

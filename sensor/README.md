@@ -119,6 +119,7 @@ without the need to run ESP32 Hardware. The CLI command to mock an ESP32 Sensor 
 The `--act-as-remote-controlled-sensor` argument is especially useful to automatically initialize the x86/PC Sensor
 in interaction with the 
 [*Management Console* `--init-sensor` argument](../management-console/README.md#automatic-sensor-initialization).
+
 If you want to exit the *Sensor* application after the initialization has been finished you can use 
 the `--exit-after-successful-initialization` argument:
 
@@ -130,8 +131,6 @@ the `--exit-after-successful-initialization` argument:
             initialization of the Sensor and the Sensor app should exit after successful
             initialization.
 
-
-
 The x86/PC Sensor application can also be used to test the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge*
 application. This is done using the `--use-lorawan-rest-api` argument:
 
@@ -141,6 +140,23 @@ application. This is done using the `--use-lorawan-rest-api` argument:
             This way the Sensor application imitates the behavior of an ESP32-Sensor connected
             via LoRaWAN and a package transceiver connected to the LoRaWAN application server
             that hands over binary packages to the iota-bridge.
+
+To test the [*Sensor Reinitialization* workflow](../README.md#sensor-reinitialization)
+the mocked DevEUI of the *x86/PC Sensor* needs to be reused.
+This can be achieved using the `--dev-eui` argument:
+
+    -d, --dev-eui <DEV_EUI>
+            Use the specified LoRaWAN DevEui instead of a random value.
+            In case the sensor wallet file (wallet-sensor.txt) of the sensor has been deleted,
+            the default behavior is to use a random value as new DevEui.
+            The generated DevEui then is stored in the sensor wallet file later on so that the
+            DevEui is persisted for later use.
+            Using this argument the DevEui can be pre defined to have a static DevEui for test
+            purposes. This argument is ignored in case the DevEui has already been stored in the
+            sensor wallet file.
+            
+            Example: --dev-eu=12345678
+
 
 ## DevEUIs and Compressed Streams Messages
 
@@ -157,7 +173,7 @@ It would not be even possible to decrypt messages in the *IOTA Bridge*,
 because in the SUSEE project the encryption key never leaves the
 *Sensor* for security reasons.
 
-#### Interaction with the IOTA Bridge
+#### Sensor to Bridge Pairing
 The usage of compressed messages is only possible after one or more normal streams messages have
 been send using the *IOTA Bridge*. The *IOTA Bridge* then learns which Streams Channel ID is used
 by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI.
@@ -169,10 +185,80 @@ The mapping of LoraWAN DevEUI to Streams Channel ID is stored in a
 managed by the *IOTA Bridge*.
 
 In case the *IOTA Bridge* added a *Sensor* to its mapping database, the response of the 
-REST call that caused the new *Sensor* database entry will have a 208 - ALREADY_REPORTED http status.
+REST call that caused the new *Sensor* database entry will have a `208 - ALREADY_REPORTED` http status.
 All *Sensor* applications recognise this http response status and will only use compressed
 messages further on. The Sensor applications store the state whether to use compressed
 messages or not in their local user-state serialization files.
+
+The process decribed above is called *Sensor to Bridge Pairing*.
+
+The following sequence diagram shows the *Sensor to Bridge Pairing* in more detail:
+<img src="Initial Sensor to IOTA-Bridge pairing.png" alt="Initial Sensor to IOTA-Bridge pairing" width="800"/>
+
+#### Sensor to Bridge RE-Pairing
+In case a *Sensor* uses compressed messages and is connected to an *IOTA Bridge* that does not know its
+DevEUI the *IOTA Bridge* can not transmit the *Sensors* request to the *IOTA Tangle*.
+This can happen e.g. if different *IOTA Bridge* instances are used for the
+[Sensor Initialization](../README.md#initialization) and for
+[Sensor Processing](../README.md#sensor-processing).
+
+In this situation *Sensor to Bridge RE-Pairing* allows to transmit the channel-id later on which
+results in a minimum of additional LoRaWAN payload.
+After the IOTA-Bridge receives the missing channel-id, the original compressed request
+is processed and the resulting response is returned to the sensor.
+
+When the *IOTA Bridge* detects that a compressed request can not be processed, the relevant data
+of the request are stored in its
+[local SQLite3 database](../iota-bridge/README.md#caching-of-lorawan-deveuis-and-streams-channel-meta-data).
+
+The Sensor receives a response with status `422 Unprocessable Content` together with a request_key
+(response body) that can be used to address the unprocessed request later on. 
+
+Using the `message/retransmit` endpoint of the *IOTA Bridge* the *Sensor* can provide the request_key
+and *Streams Channel ID* to the *IOTA Bridge*. The bridge then fetches the original request from the
+database and processes the request.
+
+The `message/retransmit` request of the *Sensor* is answered by the *IOTA Bridge* with the response
+that results from the original request that has been addressed using the request_key.
+The status of this response is `208 Already Reported` to make shure that the *Sensor* uses
+compressed requests further on.
+ 
+
+The following sequence diagram shows the *Sensor to Bridge RE-Pairing* in more detail:
+<img src="Sensor to IOTA-Bridge RE-Pairing.png" alt="Sensor to IOTA-Bridge RE-Pairing" width="800"/>
+
+#### Initialization Count
+During the [*Sensor Reinitialization* workflow](../README.md#sensor-reinitialization) a *Sensor* subscribes
+to a new *IOTA Streams Channel* while the *Sensor* DevEUI remains unchanged. *IOTA Bridges* 
+
+The *Initialization Count* property of the SUSEE http protocol allows *IOTA Bridges* to detect reinitialized
+sensors and to update the cached *IOOTA Streams* channel-id to the new channel-id via the
+`messages/transmit` endpoint.
+
+The *Initialization Count* is stored in the *Sensor* wallet file and is incremented when the sensor
+subscribes to a new *Streams* channel.
+
+The *IOTA Bridge* stores the *Initialization Count* together with the channel-id in its
+[local SQLite3 database](../iota-bridge/README.md#caching-of-lorawan-deveuis-and-streams-channel-meta-data)
+to detect reinitialized sensors.
+
+The *Initialization Count* is loged to the console by the *Sensor* applications and by the *Management Console*.
+Sensors can only be reinitialized 255 times. If this limit is reached a warning is loged by the
+*Sensor* and by the *Management Console*.
+
+A the design goals of the SUSEE application protocol has been, that only the *Sensor* and the *IOTA Bridge*
+are involved in the *Sensor to Bridge Pairing and RE-Pairing* process without any needed third party interaction
+e.g. a central management logic. Until the maximum number of *Initialization Counts* is reached no central
+management logic is needed.
+
+In case the maximum number of *Initialization Counts* is reached there are two possible solutions to proceed:
+1. Allow a counter reset to zero. This includes the risk that *IOTA Bridges* with a very outdated cache will
+   not detect a reinitialized *Sensor* which will lead to erroneous communication until another *IOTA Bridge*
+   is used that detects the new *Streams* channel-id.
+2. Use the [`lorawan-node` endpoint](../iota-bridge/README.md#lorawan-node-endpoints) of all *IOTA Bridge*
+   instances to delete the specific *Sensor* from the cache.
+   This is the safest option, but a central management logic is needed to send the *IOTA Bridge*
+   `lorawan-node` requests.
 
 #### Mocked DevEUIs
 

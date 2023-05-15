@@ -60,12 +60,11 @@ static const sensor_manager_connection_type_t SENSOR_MANAGER_CONNECTION_TYPE = S
 #define STREAMS_POC_LIB_TEST_WIFI_PASS "susee-rocks"
 // The url of the iota-bridge to connect to. Needed for Sensor initialization.
 #define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.0.101:50000")
-
-#define SEND_MESSAGES_EVERY_X_SEC 5
-
 // IP address and port of the LoRaWAN AppServer Connector Mockup Tool to connect to.
 // Needed for sending messages.
 #define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.0.101:50001")
+
+#define SEND_MESSAGES_EVERY_X_SEC 5
 
 // Setting STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH to NULL will make the streams-poc-lib
 // using its own vfs_fat partition as been described in streams-poc-lib.h

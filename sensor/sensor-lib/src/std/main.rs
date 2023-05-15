@@ -76,11 +76,11 @@ fn get_wallet(cli: &SensorCli) -> Result<PlainTextWallet> {
 
 pub fn manage_mocked_lorawan_dev_eui<'a>(cli: &SensorCli<'a>, wallet: &mut PlainTextWallet) {
     if wallet.persist.misc_other_data.len() == 0 {
-        let new_dev_eui = if cli.matches.is_present(cli.arg_keys.dev_eu) {
-            if let Some(dev_eui_str) = cli.matches.value_of(cli.arg_keys.dev_eu) {
+        let new_dev_eui = if cli.matches.is_present(cli.arg_keys.dev_eui) {
+            if let Some(dev_eui_str) = cli.matches.value_of(cli.arg_keys.dev_eui) {
                 dev_eui_str.to_string()
             } else {
-                panic!("[fn manage_mocked_lorawan_dev_eui] CLI argument {} has been used without specifying the DevEui.", cli.arg_keys.dev_eu)
+                panic!("[fn manage_mocked_lorawan_dev_eui] CLI argument {} has been used without specifying the DevEui.", cli.arg_keys.dev_eui)
             }
         } else {
             rand::thread_rng().gen_range(0, u64::MAX).to_string()

@@ -59,8 +59,6 @@ sensors are also used, you need to use the CLI argument '--iota-bridge-url'
 to specify this ip address.
 ";
 
-
-
 static EXIT_AFTER_SUCCESSFUL_INITIALIZATION_ABOUT: &str = "\
 If specified in combination with --act-as-remote-controlled-sensor the command poll loop
 will be stopped after a KEYLOAD_REGISTRATION confirmation has been send to confirm
@@ -87,7 +85,7 @@ In streams the sensor is a subscriber so that this client status is called subsc
 ";
 
 static DEV_EUI_ABOUT: &str = "Use the specified LoRaWAN DevEui instead of a random value.
-In case the sensor wallet file (wallet-sensor.txt) of the sensor has been deleted
+In case the sensor wallet file (wallet-sensor.txt) of the sensor has been deleted,
 the default behavior is to use a random value as new DevEui.
 The generated DevEui then is stored in the sensor wallet file later on so that the
 DevEui is persisted for later use.
@@ -95,7 +93,7 @@ Using this argument the DevEui can be pre defined to have a static DevEui for te
 purposes. This argument is ignored in case the DevEui has already been stored in the
 sensor wallet file.
 
-Example: --dev-eu=12345678
+Example: --dev-eui=12345678
 ";
 
 static CLEAR_CLIENT_STATE_ABOUT: &str = "Deletes the current client status of the sensor so that
@@ -108,7 +106,7 @@ TODO: -----------------------------
 
 pub struct ArgKeys {
     pub base: &'static BaseArgKeys,
-    pub dev_eu: &'static str,
+    pub dev_eui: &'static str,
     pub files_to_send: &'static str,
     pub subscribe_announcement_link: &'static str,
     pub register_keyload_msg: &'static str,
@@ -125,7 +123,7 @@ pub struct ArgKeys {
 
 pub static ARG_KEYS: ArgKeys = ArgKeys {
     base: &BASE_ARG_KEYS,
-    dev_eu: "dev-eu",
+    dev_eui: "dev-eui",
     files_to_send: "file-to-send",
     subscribe_announcement_link: "subscribe-announcement-link",
     register_keyload_msg: "register-keyload-msg",
@@ -199,10 +197,10 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
                 .value_name("IOTA_BRIDGE_URL")
                 .help(iota_bridge_url_about.as_str())
             )
-            .arg(Arg::new(ARG_KEYS.dev_eu)
-                .long(ARG_KEYS.dev_eu)
+            .arg(Arg::new(ARG_KEYS.dev_eui)
+                .long(ARG_KEYS.dev_eui)
                 .short('d')
-                .value_name("DEV_EU")
+                .value_name("DEV_EUI")
                 .help(DEV_EUI_ABOUT)
             )
             .arg(Arg::new(ARG_KEYS.println_subscriber_status)

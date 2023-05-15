@@ -5,7 +5,7 @@ The *IOTA Bridge* is a REST service for messages transferred between the followi
 * *Management Console*
 * All kinds of *Sensor* applications like *ESP32 Sensor* and *x86/PC Sensor*
 * *IOTA Tangle* nodes
-* Services accessing the LoRaWAN AP-Server
+* Services accessing the LoRaWAN AP-Server (a.k.a. *Application Server Connector*)
 
 It provides a REST API to:
 * Send streams packages that will be attached to the tangle using an IOTA Node
@@ -62,10 +62,14 @@ IotaBridgeRequest packages can be posted to the *IOTA Bridge* using the `lorawan
 
 To demonstrate the usage of the API here is a cURL example:
 ```bash
-    curl --location --request POST 'http://192.168.47.11:50000/lorawan-rest/binary_request?deveui=4711' \
+    curl --location --request POST 'http://127.0.0.0:50000/lorawan-rest/binary_request?deveui=4711' \
          --header 'Content-Type: application/octet-stream' \
-         --data-binary '@~/path-to-my-develop-folder/susee-streams-poc/test/iota-bridge/request_parts.bin'
+         --data-binary '@request_parts.bin'
 ```
+The folder [../test/iota-bridge](../test/iota-bridge) contains several curl script files that can be executed
+to send requests to a running *IOTA Bridge* listening to local host. The above given example can be found in the
+file [curl-lorawan_rest-binary_request.sh](../test/iota-bridge/curl-lorawan_rest-binary_request.sh) in the
+test/iota-bridge folder.
 
 **Underlying usecase:**<br>
 Given you are using the streams-poc-lib function

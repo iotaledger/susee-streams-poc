@@ -3,14 +3,15 @@
 The *streams-poc-lib* provides C bindings for all functions needed in the SUSEE-Module (a.k.a. *Sensor*) to
 use IOTA Streams for energy meter data transmissions.
 
-This project contains the *streams-poc-lib* RUST library and a test application - implemented in the `main/main.c` file - to test the library functionality
+This project contains the *streams-poc-lib* RUST library and a test application - implemented in the
+[main.c](./main/main.c) file - to test the library functionality
 using a WIFI socket instead of a LoRaWAN connection
 
 The API of the *streams-poc-lib* can be found in the file `components/streams-poc-lib/include/streams_poc_lib.h`
 
 An already build static library file for ESP32-C3 can be found here: `components/streams-poc-lib/lib/libstreams_poc_lib.a`
 
-The `main.c` file is build using the Espressif IDF (esp-idf) build process. The *streams-poc-lib* is build via cargo
+The [main.c](./main/main.c) file is build using the Espressif IDF (esp-idf) build process. The *streams-poc-lib* is build via cargo
 (RUST build tool and package manager) which is integrated into the CMake files of the esp-idf build system.
 Using the Espressif build utils (e.g. *idf.py*) you don't need to care about the integrated RUST cargo build process. 
 
@@ -65,13 +66,13 @@ Please note that the "*release/v4.4.3*" is also used in the
 
 for the ESP_IDF_VERSION environment variable. 
 
-To build the `main.c` file and *streams-poc-lib* you will need to do the following:
+To build the [main.c](./main/main.c) file and *streams-poc-lib* you will need to do the following:
 ```bash
 get_idf
 idf.py flash monitor
 ``` 
-Please replace the ip address in the above given example with the ip address of the machine
-that runs the specific application (*Iota Bridge* & *AppServer Connector Mockup Tool*).
+The ip address, eventually needed WiFi credentials and several other test options
+can be configured in the `Test CONFIG` section at the top of the [main.c](./main/main.c) file.
 
 ## Using the test application
 
@@ -96,10 +97,29 @@ please follow the instructions of the *Automatic Sensor Initialization* section 
 [README](../../README.md#automatic-sensor-initialization)
 to initialize the Sensor.
 
+The test application provides different connection types for the *Sensor* to *IOTA Bridge* connection
+in the uninitialized mode:
+* CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS<br>
+  Callback driven, where the callback directly connects to the *IOTA Bridge* via a WiFi connection
+  controlled by the *Sensor* test app.
+* CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK<br>
+  Callback driven, where the callback uses the *Application Server Connector Mock* which is connected
+  via a WiFi socket controlled by the *Sensor* test app.
+* LWIP<br>
+  Direct http communication between the *streams-poc-lib* and the *IOTA Bridge* via a lwip connection provided
+  by the *Sensor* test app.
+* STREAMS_POC_LIB_MANAGED_WIFI<br>
+  Direct http communication between the *streams-poc-lib* and the *IOTA Bridge* via a WiFi connection
+  controlled by the *streams-poc-lib*.
+
+The connection type for the uninitialized mode can be set in the `Test CONFIG` section of the
+[main.c](./main/main.c) file.
+
 ##### Initialized mode
 In the Initialized mode the application sends an example message using the 'send_message()' function of the
 *streams-poc-lib*. This is followed by calls of the 'send_request_via_lorawan_t' and 'resolve_request_response_t'
-functions as they have been declared in the 'streams_poc_lib.h' interface and as they are defined in the `src/main.c` file.
+functions as they have been declared in the 'streams_poc_lib.h' interface and as they are defined in the
+[main.c](./main/main.c) file.
 
 To run the test application in the *Initialized* mode you need to run the *AppServer Connector Mockup Tool*
 which will mock the behavior of the LoRaWan Application Server.
@@ -129,5 +149,8 @@ In the second shell:
 for both applications. 
 
 The *streams-poc-lib* test application will communicate with the *AppServer Connector Mockup Tool*
-via 192.168.47.11:50001. Please note that, for the *streams-poc-lib* test application this has been defined at compile
-time using a `STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS` #define in the `main/main.c` file.
+via 192.168.47.11:50001. Please note that, for the *streams-poc-lib* test application this has been
+defined at compile time using a 
+`STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS` #define in the [main.c](./main/main.c) file.
+
+The connection type settings for the uninitialized mode described above are ignored in the initialized mode.

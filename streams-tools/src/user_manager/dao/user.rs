@@ -79,7 +79,7 @@ impl DaoManager for UserDaoManager {
 
     fn write_item_to_db(&self, item: &User) -> Result<Self::PrimaryKeyType> {
         let _rows = self.connection.execute(format!(
-            "INSERT INTO {} (streams_channel_id, streams_user_state, seed_derivation_phrase) VALUES (\
+            "INSERT OR REPLACE INTO {} (streams_channel_id, streams_user_state, seed_derivation_phrase) VALUES (\
                                 :streams_channel_id,\
                                 :streams_user_state,\
                                 :seed_derivation_phrase\

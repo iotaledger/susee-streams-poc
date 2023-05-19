@@ -167,6 +167,8 @@ reduce the LoRaWAN payload size.
 The usage of compressed messages is only possible after one or more normal streams messages have
 been send. The *IOTA Bridge* then learns which Streams Channel ID is used
 by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI.
+Additionally the [initialization count](../sensor/README.md#initialization-count)
+is stored to allow [*Sensor* reinitialization detection](../test/README.md#sensor-reinitialization).
 
 The mapping of LoraWAN DevEUI to Streams Channel meta data is stored in a local SQLite3 database.
 The database file "iota-bridge.sqlite3" is stored in the directory where the

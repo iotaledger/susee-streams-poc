@@ -3,19 +3,19 @@
 This folder contains several *Sensor* specific projects for x86/PC and ESP32-C3
 platforms. Here is an overview about the contained sub folders:
 
-* main-rust<br>
+* [main-rust](./main-rust)<br>
   A *Sensor* application for x86/PC written in Rust
-* main-rust-esp-rs<br>
+* [main-rust-esp-rs](./main-rust-esp-rs)<br>
   A *Sensor* application for ESP32-C3 written in Rust using
   [esp-rs/esp-idf-sys](https://github.com/esp-rs/esp-idf-sys) and the
   [Espressif IDF SDK](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/about.html)
-* sensor-lib<br>
+* [sensor-lib](./sensor-lib)<br>
   A Rust library containing shared sources for all *Sensor* applications and the
   *streams-poc-lib*
-* streams-poc-lib<br>
+* [streams-poc-lib](./streams-poc-lib)<br>
   A static library providing C bindings for all functions needed in the SUSEE-Module
   and a test application written in C to test the library
-* main-streams-poc-lib-pio<br>
+* [main-streams-poc-lib-pio](./main-streams-poc-lib-pio)<br>
   A [PlatformIO](https://platformio.org/) project to build the *streams-poc-lib* test
   application. This project demonstrates how to integrate the *streams-poc-lib* files
   in a PlatformIO project.
@@ -60,6 +60,7 @@ all Sensor applications provide CLI commands to manage the Streams usage:
                   --------  WARNING  ---------- Currently there is no confirmation cli dialog
                   -----------------------------       use this option carefully!
                               
+### Remote Control CLI commands
 As all Sensor applications running on ESP32 do not provide an interactive terminal, the 
 *x86/PC Sensor* can be used to remote control the ESP32
 applications. The x86/PC Sensor provides following CLI commands to manage the
@@ -120,6 +121,8 @@ The `--act-as-remote-controlled-sensor` argument is especially useful to automat
 in interaction with the 
 [*Management Console* `--init-sensor` argument](../management-console/README.md#automatic-sensor-initialization).
 
+### Exit after successful initialization
+
 If you want to exit the *Sensor* application after the initialization has been finished you can use 
 the `--exit-after-successful-initialization` argument:
 
@@ -131,6 +134,8 @@ the `--exit-after-successful-initialization` argument:
             initialization of the Sensor and the Sensor app should exit after successful
             initialization.
 
+### Use LoRaWAN Rest API
+
 The x86/PC Sensor application can also be used to test the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge*
 application. This is done using the `--use-lorawan-rest-api` argument:
 
@@ -140,6 +145,8 @@ application. This is done using the `--use-lorawan-rest-api` argument:
             This way the Sensor application imitates the behavior of an ESP32-Sensor connected
             via LoRaWAN and a package transceiver connected to the LoRaWAN application server
             that hands over binary packages to the iota-bridge.
+
+### Static DevEUI
 
 To test the [*Sensor Reinitialization* workflow](../README.md#sensor-reinitialization)
 the mocked DevEUI of the *x86/PC Sensor* needs to be reused.
@@ -229,7 +236,7 @@ The following sequence diagram shows the *Sensor to Bridge RE-Pairing* in more d
 
 #### Initialization Count
 During the [*Sensor Reinitialization* workflow](../README.md#sensor-reinitialization) a *Sensor* subscribes
-to a new *IOTA Streams Channel* while the *Sensor* DevEUI remains unchanged. *IOTA Bridges* 
+to a new *IOTA Streams Channel* while the *Sensor* DevEUI remains unchanged.
 
 The *Initialization Count* property of the SUSEE http protocol allows *IOTA Bridges* to detect reinitialized
 sensors and to update the cached *IOOTA Streams* channel-id to the new channel-id via the
@@ -246,12 +253,12 @@ The *Initialization Count* is loged to the console by the *Sensor* applications 
 Sensors can only be reinitialized 255 times. If this limit is reached a warning is loged by the
 *Sensor* and by the *Management Console*.
 
-A the design goals of the SUSEE application protocol has been, that only the *Sensor* and the *IOTA Bridge*
-are involved in the *Sensor to Bridge Pairing and RE-Pairing* process without any needed third party interaction
-e.g. a central management logic. Until the maximum number of *Initialization Counts* is reached no central
+A design goal of the SUSEE application protocol has been, to only include the *Sensor* and the *IOTA Bridge*
+in the '*Sensor to Bridge Pairing*' and the '*Sensor to Bridge RE-Pairing*' process and to avoid any needed
+third party interaction e.g. a central management logic. Until the maximum number of *Initialization Counts* is reached no central
 management logic is needed.
 
-In case the maximum number of *Initialization Counts* is reached there are two possible solutions to proceed:
+In case the maximum number of *Initialization Counts* is reached there are several possible solutions to proceed:
 1. Allow a counter reset to zero. This includes the risk that *IOTA Bridges* with a very outdated cache will
    not detect a reinitialized *Sensor* which will lead to erroneous communication until another *IOTA Bridge*
    is used that detects the new *Streams* channel-id.
@@ -285,7 +292,7 @@ and how the DevEUI is transfered to the *IOTA Bridge*:
 * **x86/PC Sensor**<br>
   The LoRaWAN DevEUI is mocked using a persistent random value. The random value is stored
   in the wallet file together with the Streams channel
-  [plain text seed](../README.md#common-cli-options-and-io-files).
+  [plain text seed](../README.md#common-file-persistence).
   The *x86/PC Sensor* application does not use the 
   [AppServer Connector Mockup Tool](../app-srv-connector-mock)
   to access the `/lorawan-rest` endpoints of the *IOTA Bridge*. Instead, it uses the

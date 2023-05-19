@@ -156,7 +156,7 @@ The *Management Console* and the [*Sensor* applications](./sensor/) use the foll
   
   As the wallet file contains the plain text seed (not encrypted) make absolutely sure to<br>
   **DO NOT USE THIS WALLET FOR PRODUCTION PURPOSES**<br>
-  Instead implement the [SimpleWallet trait](streams-tools/src/plain_text_wallet.rs)
+  Instead implement the [SimpleWallet trait](streams-tools/src/wallet/plain_text_wallet.rs)
   using a secure wallet library like [stronghold](https://github.com/iotaledger/stronghold.rs).
   <br><br>
   The *Management Console* uses the seed to derive seeds for each managed channel.
@@ -166,8 +166,8 @@ The *Management Console* and the [*Sensor* applications](./sensor/) use the foll
   *ESP32 Sensor*<br>
   The text file used for the plain text wallet is stored using
   [VFS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/vfs.html?highlight=vfs)
-  and [FAT paths]()https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/fatfs.html.
-  For production purposes the seed to be stored in
+  and [FAT paths](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/fatfs.html).
+  For production purposes the seed needs to be stored in
   [encrypted flash or NVM storage](https://docs.espressif.com/projects/esp-jumpstart/en/latest/security.html).
 
 * User state<br>
@@ -181,9 +181,10 @@ The *Management Console* and the [*Sensor* applications](./sensor/) use the foll
   The *ESP32 Sensor* reads and persists its user state every time a command is received
   from the *IOTA-Bridge*. Like the wallet text file the state is persisted in a FAT partition located in the SPI
   flash memory of the ESP32 board. This way the user state is secured against power outages of the ESP32.
-  
-<br>
-*IOTA Bridge*<br>
+
+<br>  
+
+**IOTA Bridge**<br>
 The *IOTA Bridge* stores a map of LoraWAN DevEUIs and *Streams* channel IDs in a local SQLite3
 database "iota-bridge.sqlite3". More details can be found in the 
 [Compressed Streams Messages](sensor/README.md#deveuis-and-compressed-streams-messages)
@@ -451,6 +452,11 @@ The *Application Server Connector* and *Application Server Connector* are contro
 Dataflow of the *Sensor Processing Workflow*:
 
 <img src="sensor-processing-diagram.jpg" alt="Sensor Processing Workflow" width="800"/>
+
+To allow the [reinitialization](#sensor-reinitialization) and
+[Add/Remove Subscriber](#addremove-subscriber) workflows the SUSEE application
+protocoll needs to provide the ability to switch between *Sensor Processing*,
+*Add/Remove Subscriber* and *Sensor Reinitialization* workflows on demand.
 
 #### Add/Remove Subscriber
 

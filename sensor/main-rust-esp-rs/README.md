@@ -4,6 +4,21 @@ A *Sensor* application for ESP32-C3 written in Rust using
 [esp-rs/esp-idf-sys](https://github.com/esp-rs/esp-idf-sys) and the
 [Espressif IDF SDK](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/about.html)
 
+    ----------------------------------------------
+    MAINTAINANCE MODE FOR ESP32 SENSOR APPLICATION
+    ----------------------------------------------
+    The ESP32 Sensor is currently only maintained but its functionality will not be
+    extended to support tests for the latest versions of the SUSEE application protocol.
+
+For tests on ESP32 devices, the
+[*streams-poc-lib test application*](../streams-poc-lib)
+is the recommended application.
+
+The *ESP32 Sensor* crate is maintained to facilitate the software development
+process of ESP32 platform specific code (contained in the 
+[sensor-lib](../sensor-lib/src/esp_rs))
+using cargo build utils. 
+
 ## About
 
 This Sensor application can be build and flashed to ESP32-C3 platforms using tools

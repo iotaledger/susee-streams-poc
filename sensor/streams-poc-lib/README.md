@@ -71,8 +71,30 @@ To build the [main.c](./main/main.c) file and *streams-poc-lib* you will need to
 get_idf
 idf.py flash monitor
 ``` 
-The ip address, eventually needed WiFi credentials and several other test options
-can be configured in the `Test CONFIG` section at the top of the [main.c](./main/main.c) file.
+
+#### Test config
+
+The *Test CONFIG* section at the top of `main.c` file includes several
+precompiler macro defines that need to be configured.
+
+The *streams-poc-lib test application* always communicates via WiFi sockets to
+mock the missing LoRaWAN network, so you'll need to specify WiFi credentials
+for your test environment:
+```` C
+  #define STREAMS_POC_LIB_TEST_WIFI_SSID "Susee Demo"
+  #define STREAMS_POC_LIB_TEST_WIFI_PASS "susee-rocks"
+````
+Additionally you need to specify at least one of the following ip addresses
+(both are recommended) to allow the test application to connect to the
+*IOTA Bridge* or [*AppServer Connector Mockup Tool*](../../app-srv-connector-mock).
+Please replace the preconfigured ip addresses (`192.168.47.11` in the example below)
+with the ip address of the device that runs the
+specific service. Please do not edit the port numbers.
+
+```` C
+#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.47.11:50000")
+#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.47.11:50001")
+````
 
 ## Using the test application
 
@@ -80,24 +102,50 @@ The test application runs in two different modes:
 * Uninitialized
 * Initialized
 
-##### Uninitialized mode
+If the *streams-poc-lib test application* has not been *initialized*
+before it will run in the *Uninitialized mode*
+until it is successfully initialized and powered down.
+
+After the *initialization* and a reboot of the device the test application
+will run in the *Initialized mode*.
+
+Additionally to the background information provided here,
+you can find usage examples in the
+[test README](../../test#sensor-initialization) file.
+
+### Uninitialized mode
 In the Uninitialized mode the application behaves like the standalone *ESP32 Sensor* application. 
-It communicates directly with the *IOTA Bridge* using a WiFi socket connection that is managed
-by the *streams-poc-lib* [start_sensor_manager()](components/streams-poc-lib/include/streams_poc_lib.h)
-function.
+In this mode the *Management Console* or *Sensor Remote Cotrol* application can be used to initialize
+the sensor.
 
-In this mode the *Management Console* or *Sensor Remote Cotrol* application can be used to initialize the sensor.
+This is done using the `--init-sensor` option of the *Management Console*
+([project directory](../../management-console))
+which uses the *IOTA Bridge* application ([project directory](../../iota-bridge)) to remote control
+the *Sensor*.
 
-The easiest way is to use the `--init-sensor` option of the *Management Console* ([project directory](../../management-console))
-which uses the *IOTA Bridge* application ([project directory](../../iota-bridge)) to remote control the Sensor.
-
-After you've built the *Management Console* and *IOTA Bridge* as being
+After you've built the *Management Console* and the *IOTA Bridge* as being
 described in the [main README.md file of the susee-streams-poc repository](../../README.md#build)
 please follow the instructions of the *Automatic Sensor Initialization* section of the
-[README](../../README.md#automatic-sensor-initialization)
-to initialize the Sensor.
+[test README](../../test/README.md#automatic-sensor-initialization---streams-poc-lib-test-application).
 
-The test application provides different connection types for the *Sensor* to *IOTA Bridge* connection
+#### Connection type for the uninitialized mode
+The [start_sensor_manager()](components/streams-poc-lib/include/streams_poc_lib.h)
+and `start_sensor_manager_lwip()` functions provide several binary i/o and
+[Espressif LWIP stack](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/lwip.html)
+options. The test application therefore provides different
+connection types to test these options.
+
+Depending on the connection type, the
+*IOTA Bridge* is connected directly via a WiFi socket (managed
+by the test application or by the *streams-poc-lib*) or by the
+[*AppServer Connector Mockup Tool*](../../app-srv-connector-mock).
+In case a connection type is based on *callback i/o*, the *streams-poc-lib*
+interface uses callback functions to transfer the payload data to the 
+*streams-poc-lib test application*. The test application then transfers
+the payload data to the *IOTA Bridge* or *AppServer Connector Mockup Tool*
+via a WiFi socket connection.
+
+Here is a list of connection types for the *Sensor* to *IOTA Bridge* connection
 in the uninitialized mode:
 * CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS<br>
   Callback driven, where the callback directly connects to the *IOTA Bridge* via a WiFi connection
@@ -105,6 +153,8 @@ in the uninitialized mode:
 * CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK<br>
   Callback driven, where the callback uses the *Application Server Connector Mock* which is connected
   via a WiFi socket controlled by the *Sensor* test app.
+  This connection type uses the same callback functions that are used in the
+  [initialized mode](#initialized-mode) to mock the LoRaWAN network. 
 * LWIP<br>
   Direct http communication between the *streams-poc-lib* and the *IOTA Bridge* via a lwip connection provided
   by the *Sensor* test app.
@@ -115,7 +165,7 @@ in the uninitialized mode:
 The connection type for the uninitialized mode can be set in the `Test CONFIG` section of the
 [main.c](./main/main.c) file.
 
-##### Initialized mode
+### Initialized mode
 In the Initialized mode the application sends an example message using the 'send_message()' function of the
 *streams-poc-lib*. This is followed by calls of the 'send_request_via_lorawan_t' and 'resolve_request_response_t'
 functions as they have been declared in the 'streams_poc_lib.h' interface and as they are defined in the
@@ -129,7 +179,10 @@ Additionally the *Iota Bridge* is needed. Start both applications in the `target
 We recommend to use only binaries build in release mode because the needed *proof of work* needs a lot of time
 if applications are build in debug mode.
 
-In this example we start both applications on the same machine in separate shells.
+In the followimg example we start both applications on the same machine in
+separate shells (additionally to the following example you can also follow the
+test description, provided in the
+[test README](../../test#send-messages-using-the-sensor) file.).
 
 In the first shell:
 ```bash
@@ -149,8 +202,43 @@ In the second shell:
 for both applications. 
 
 The *streams-poc-lib* test application will communicate with the *AppServer Connector Mockup Tool*
-via 192.168.47.11:50001. Please note that, for the *streams-poc-lib* test application this has been
-defined at compile time using a 
+via 192.168.47.11:50001. For the *streams-poc-lib* test application,
+this has been defined at compile time using the 
 `STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS` #define in the [main.c](./main/main.c) file.
 
-The connection type settings for the uninitialized mode described above are ignored in the initialized mode.
+Please note, that the connection type settings for the *Uninitialized mode*
+described [above](#connection-type-for-the-uninitialized-mode)
+are ignored in the initialized mode.
+
+### Sensor Initialization vs Reinitialization
+
+As the [DevEUI](../README.md#mocked-deveuis) of the *streams-poc-lib test application* is derived from the 
+[base MAC address of the ESP32 MCU](../README.md#mocked-deveuis)
+the DevEUI will remain the same even if the device flash storage has
+been erased.
+
+The difference between an [initialization](../../README.md#initialization) 
+and [reinitialization](../../README.md#sensor-reinitialization) using the
+*streams-poc-lib test application* just includes that a new
+[random seed](../../README.md#common-file-persistence)
+is generated and the [initialization count](../README.md#initialization-count)
+is set to zero.
+
+As a consequence of the *initialization count* reset and the static DevEUI, an
+*IOTA Bridge* having cached an outdated *IOTA Streams* channel id
+with *initialization count* zero, has no possibility
+to detect that the channel id has been changed. Therefore, the 
+*streams-poc-lib test application* should only be initialized once.
+
+If the *Streams* channel needs to be replaced after the *initialization*,
+a *reinitialization* should be processed. Otherwise, in case the device flash has
+been erased, the databases of all deployed
+*IOTA Bridge* instances need to be cleared, or the specific dataset in these
+*IOTA Bridge* databases needs to be updated/deleted using the *IOTA Bridge*
+[lorawan-node API endpoint](../../iota-bridge/README.md#lorawan-node-endpoints).
+
+To test a *Sensor* reinitialization using the *streams-poc-lib test application*
+you just need to follow the initialization steps described in the
+*Automatic Sensor Initialization* section of the
+[test README](../../test/README.md#automatic-sensor-initialization---streams-poc-lib-test-application)
+and avoid erasing the device flash storage.

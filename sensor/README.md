@@ -31,7 +31,7 @@ There are three different Sensor applications for different purposes:
 | *x86/PC Sensor*            | x86/PC | Test the *Sensor* Rust code on x86/PC platforms and mock *ESP32 Sensors* for integration tests on x86/PCs | Rust |
 
 In addition to the common CLI options described in the
-[CLI API section of the main README file](../README.md#common-cli-options-and-io-files)
+[CLI API section of the main README file](../README.md#common-cli-options)
 all Sensor applications provide CLI commands to manage the Streams usage:
  
     -s, --subscribe-announcement-link <SUBSCRIBE_ANNOUNCEMENT_LINK>

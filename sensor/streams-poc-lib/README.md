@@ -182,7 +182,7 @@ if applications are build in debug mode.
 In the followimg example we start both applications on the same machine in
 separate shells (additionally to the following example you can also follow the
 test description, provided in the
-[test README](../../test#send-messages-using-the-sensor) file.).
+[test README](../../test#send-messages-using-the-sensor) file).
 
 In the first shell:
 ```bash

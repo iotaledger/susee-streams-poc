@@ -24,7 +24,7 @@ and [Build](../README.md#build) section of the main README of this repository.
 ## AppServer Connector Mockup Tool CLI
 
 Additionally to those commands described in the
-[CLI API section of the main README file](../README.md#common-cli-options-and-io-files)
+[CLI API section of the main README file](../README.md#common-cli-options)
 the *AppServer Connector Mockup Tool* provides these CLI commands:
 
     -b, --iota-bridge-url <IOTA_BRIDGE_URL>

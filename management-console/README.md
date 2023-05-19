@@ -11,7 +11,7 @@ and [Build](../README.md#build) section of the main README of this repository.
 ## Management Console CLI
 
 In addition to the common CLI options described in the
-[CLI API section of the main README file](../README.md#common-cli-options-and-io-files)
+[CLI API section of the main README file](../README.md#common-cli-options)
 the *Management Console* offers the following CLI arguments.
 
 #### Streams Channel Management

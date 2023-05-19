@@ -263,7 +263,7 @@ Similar to the *streams-poc-lib test application*, the *ESP32 Sensor* needs to b
 and flashed on the *Sensor* device. This is described
 [here](../sensor/main-rust-esp-rs/README.md#prerequisites).
 
-Please note that the [environment variables]((../sensor/main-rust-esp-rs/README.md#build))
+Please note that the [environment variables](../sensor/main-rust-esp-rs/README.md#build)
 `SENSOR_MAIN_POC_WIFI_SSID`, `..._WIFI_PASS`
 and `..._IOTA_BRIDGE_URL` need to be set correctly, equivalent to the precompiler
 macros used in the *streams-poc-lib test application*
@@ -741,7 +741,7 @@ Again the CLI command is almost the same as used in the
 ```
 ## Send messages using the *Sensor*
 
-The following sections show how to send messages using a *streams-poc-lib test application* and *x86/PC Sebsor*. 
+The following sections show how to send messages using a *streams-poc-lib test application* and *x86/PC Sensor*. 
 
 ### Send messages - streams-poc-lib test application
 

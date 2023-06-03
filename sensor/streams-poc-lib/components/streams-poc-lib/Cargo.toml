@@ -20,7 +20,7 @@ anyhow = "1.0.40"
 cty = "0.2.2"
 
 [dependencies.iota-streams]
-git = "https://github.com/iotaledger/streams"
+git = "https://github.com/chrisgitiota/streams"
 branch="v1"
 default-features = false
 features = ["std", "tangle"]

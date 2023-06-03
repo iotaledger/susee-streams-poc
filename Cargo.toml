@@ -62,5 +62,5 @@ iota-client = { version = "1.1.1", git = "https://github.com/chrisgitiota/iota.r
 #esp-idf-hal = { version = "0.40", git = "https://github.com/chrisgitiota/esp-idf-hal.git", branch="for-susee" }
 # esp-idf-hal = { version = "0.40", path = "../../esp-rs/esp-idf-hal" }
 
-#[patch."https://github.com/iotaledger/streams"]
-#iota-streams = { version = "0.1.2", path = "../../iotaledger/streams" }
+#[patch."https://github.com/chrisgitiota/streams"]
+#iota-streams = { version = "0.1.2", path = "../../chrisgitiota/streams" }

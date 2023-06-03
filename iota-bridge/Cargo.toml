@@ -19,7 +19,7 @@ hex-literal = "0.3.4"
 env_logger = "0.9"
 
 [dependencies.iota-streams]
-git = "https://github.com/iotaledger/streams"
+git = "https://github.com/chrisgitiota/streams"
 branch="v1"
 
 [dependencies.clap]

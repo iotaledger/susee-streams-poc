@@ -45,7 +45,7 @@ serde_rusqlite = { version = "0.33", git = "https://github.com/twistedfall/serde
 fallible-streaming-iterator = {version = "0.1.9", optional = true}
 
 [dependencies.iota-streams]
-git = "https://github.com/iotaledger/streams"
+git = "https://github.com/chrisgitiota/streams"
 branch="v1"
 default-features = false
 features = ["std", "tangle"]

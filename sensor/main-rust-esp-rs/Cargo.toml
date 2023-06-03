@@ -18,7 +18,7 @@ log = "0.4"
 anyhow = "1.0.40"
 
 [dependencies.iota-streams]
-git = "https://github.com/iotaledger/streams"
+git = "https://github.com/chrisgitiota/streams"
 branch="v1"
 default-features = false
 features = ["std", "tangle"]

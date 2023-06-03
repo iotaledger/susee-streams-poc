@@ -18,7 +18,7 @@ bee-message = { version  = "0.1.6", default-features = false, features = ["serde
 bee-rest-api = { version = "0.1.7", default-features = false }
 
 [dependencies.iota-streams-core]
-git = "https://github.com/iotaledger/streams"
+git = "https://github.com/chrisgitiota/streams"
 branch="v1"
 package="iota-streams-core"
 default-features = false

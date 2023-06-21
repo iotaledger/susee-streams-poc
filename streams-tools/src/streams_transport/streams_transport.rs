@@ -17,8 +17,8 @@ pub trait WrappedClient {
 }
 
 pub static STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT: u16 = 50000;
-pub static STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL: &str = "http://localhost:50000";
-pub static STREAMS_TOOLS_CONST_DEFAULT_TCP_LISTENER_ADDRESS: &str = "localhost:50001";
+pub static STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL: &str = "http://127.0.0.1:50000";
+pub static STREAMS_TOOLS_CONST_DEFAULT_TCP_LISTENER_ADDRESS: &str = "127.0.0.1:50001";
 
 
 pub trait StreamsTransport: Clone + TransportOptions + Transport<Address, Message> + TransportDetails<Address> + CompressedStateSend {

@@ -120,7 +120,7 @@ fn create_seed_from_derivation_phrase(master_seed: &str, seed_derivation_phrase:
         })
         .collect::<String>();
 
-    println!("seed_derivation_phrase: {}", derived_seed);
+    log::debug!("[fn - create_seed_from_derivation_phrase()] seed_derivation_phrase: {}", derived_seed);
     String::from(derived_seed)
 }
 

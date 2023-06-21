@@ -1,11 +1,11 @@
 use std::{
     fmt::Display,
-    rc::Rc,
 };
 
 use rusqlite::{
     Connection,
     Rows,
+    Statement
 };
 
 use serde_rusqlite::from_rows_ref;
@@ -25,14 +25,16 @@ pub trait DaoManager {
     type ItemType: DeserializeOwned;
     type PrimaryKeyType: Display;
     type SerializationCallbackType;
+    type OptionsType;
 
     const ITEM_TYPE_NAME: &'static str;
     const DAO_MANAGER_NAME: &'static str;
-    const TABLE_NAME: &'static str;
     const PRIMARY_KEY_COLUMN_NAME: &'static str;
     const DB_SCHEMA_VERSION: DbSchemaVersionType;
 
-    fn new_from_connection(connection: Rc<Connection>) -> Self;
+    fn new(options: Self::OptionsType) -> Self;
+
+    fn get_table_name(&self) -> String;
 
     fn get_connection(&self) -> &Connection;
 
@@ -42,7 +44,9 @@ pub trait DaoManager {
 
     fn get_item_from_db(&self, key: &Self::PrimaryKeyType) -> Result<Self::ItemType>;
 
-    fn search_item(&self, channel_starts_with: &str) -> Result<Self::ItemType>;
+    fn search_item(&self, key_starts_with: &str) -> Result<Self::ItemType>;
+
+    fn find_all(&self, key_starts_with: &str) -> Result<Vec<Self::ItemType>>;
 
     fn write_item_to_db(&self, item: &Self::ItemType) -> Result<Self::PrimaryKeyType>;
 
@@ -59,26 +63,44 @@ pub trait DaoManager {
     fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType;
 }
 
-pub fn get_item_from_db<'de, DaoManagerT: DaoManager>(
+fn get_rows_from_statement<'a, DaoManagerT: DaoManager>(_dao_manager: &DaoManagerT, statement: &'a mut Statement, statement_str: &String) -> Rows<'a> {
+    statement.query([])
+        .expect(format!("Error on querying prepared 'SELECT * FROM' statement for {}. Statement: {}",
+                        DaoManagerT::ITEM_TYPE_NAME,
+                        statement_str).as_str())
+}
+
+pub fn find_all_items_in_db<'a, DaoManagerT: DaoManager>(
+    dao_manager: &DaoManagerT,
+    starts_with: &DaoManagerT::PrimaryKeyType
+) -> Result<Vec<DaoManagerT::ItemType>>
+{
+    let (mut statement, statement_str) = build_query_statement(dao_manager, starts_with, Some(true))?;
+    let mut rows = get_rows_from_statement(dao_manager, &mut statement, &statement_str);
+    let mut res = from_rows_ref::<DaoManagerT::ItemType>(&mut rows);
+    let mut ret_val = Vec::<DaoManagerT::ItemType>::new();
+    while let Some(item) = res.next() {
+        let to_push = item
+            .expect(format!("Error on unwrapping next {} from_rows_ref",
+                            DaoManagerT::ITEM_TYPE_NAME).as_str());
+        ret_val.push(to_push);
+    }
+    Ok(ret_val)
+}
+
+pub fn get_item_from_db<'a, DaoManagerT: DaoManager>(
     dao_manager: &DaoManagerT,
     primary_key: &DaoManagerT::PrimaryKeyType,
     starts_with: Option<bool>
 ) -> Result<DaoManagerT::ItemType>
 {
-    let statement_str = build_query_statement(dao_manager, primary_key, starts_with)?;
-    let mut statement = dao_manager.get_connection().prepare(statement_str.as_str())
-        .expect(format!("Error on preparing 'SELECT * FROM' for {}. Statement: {}",
-                        DaoManagerT::ITEM_TYPE_NAME,
-                        statement_str).as_str());
-    let rows = statement.query([])
-        .expect(format!("Error on querying prepared 'SELECT * FROM' statement for {}. Statement: {}",
-                        DaoManagerT::ITEM_TYPE_NAME,
-                        statement_str).as_str());
+    let (mut statement, statement_str) = build_query_statement(dao_manager, primary_key, starts_with)?;
+    let rows = get_rows_from_statement(dao_manager, &mut statement, &statement_str);
     get_item_from_single_row_rowset(dao_manager, primary_key, rows, statement_str)
 }
 
-fn get_item_from_single_row_rowset<'de, DaoManagerT: DaoManager>(
-    _dao_manager: &DaoManagerT,
+fn get_item_from_single_row_rowset<'a, DaoManagerT: DaoManager>(
+    dao_manager: &DaoManagerT,
     key: &DaoManagerT::PrimaryKeyType,
     mut rows: Rows, statement_str: String
 ) -> Result<DaoManagerT::ItemType>
@@ -93,7 +115,7 @@ fn get_item_from_single_row_rowset<'de, DaoManagerT: DaoManager>(
             bail!("Found more than one {} in table '{}' having a matching '{}' column value starting with '{}'\n\
                    Used SQL statement: {}",
                 DaoManagerT::ITEM_TYPE_NAME,
-                DaoManagerT::TABLE_NAME,
+                dao_manager.get_table_name(),
                 DaoManagerT::PRIMARY_KEY_COLUMN_NAME,
                 key,
                 statement_str,
@@ -104,7 +126,7 @@ fn get_item_from_single_row_rowset<'de, DaoManagerT: DaoManager>(
         bail!("Could not find any {} in table '{}' for column '{}' with key '{}'\n\
         Used SQL statement: {}",
             DaoManagerT::ITEM_TYPE_NAME,
-            DaoManagerT::TABLE_NAME,
+            dao_manager.get_table_name(),
             DaoManagerT::PRIMARY_KEY_COLUMN_NAME,
             key,
             statement_str,
@@ -112,11 +134,11 @@ fn get_item_from_single_row_rowset<'de, DaoManagerT: DaoManager>(
     }
 }
 
-fn build_query_statement<DaoManagerT: DaoManager>(
-    _dao_manager: &DaoManagerT,
+fn build_query_statement<'a, DaoManagerT: DaoManager>(
+    dao_manager: &'a DaoManagerT,
     primary_key: &DaoManagerT::PrimaryKeyType,
     starts_with: Option<bool>
-) -> Result<String>
+) -> Result<(Statement<'a>, String)>
 {
     let mut operator = "=";
     let mut wildcard = "";
@@ -126,15 +148,19 @@ fn build_query_statement<DaoManagerT: DaoManager>(
             wildcard = "%";
         }
     }
-    let statement = format!("SELECT * FROM {} WHERE {} {} '{}{}'",
-                            DaoManagerT::TABLE_NAME,
+    let statement_str = format!("SELECT * FROM {} WHERE {} {} '{}{}'",
+                            dao_manager.get_table_name(),
                             DaoManagerT::PRIMARY_KEY_COLUMN_NAME,
 
                             operator,
                             primary_key,
                             wildcard,
     );
-    Ok(statement)
+    let statement = dao_manager.get_connection().prepare(statement_str.as_str())
+        .expect(format!("Error on preparing 'SELECT * FROM' for {}. Statement: {}",
+                        DaoManagerT::ITEM_TYPE_NAME,
+                        statement_str).as_str());
+    Ok((statement, statement_str))
 }
 
 pub fn get_schema_version_in_database<DaoManagerT: DaoManager>(dao_manager: &DaoManagerT) -> Result<DbSchemaVersionType> {
@@ -147,7 +173,7 @@ pub fn get_schema_version_in_database<DaoManagerT: DaoManager>(dao_manager: &Dao
     // can read out the version.
     let statement_str = format!(
         "SELECT name FROM sqlite_schema WHERE type='table' AND name='{}'",
-        DaoManagerT::TABLE_NAME
+        dao_manager.get_table_name()
     );
     let mut statement = dao_manager.get_connection().prepare(statement_str.as_str())
         .expect(format!("Error on preparing statement '{}'", statement_str).as_str());
@@ -166,7 +192,7 @@ pub fn update_db_schema_to_current_version<DaoManagerT: DaoManager>(dao_manager:
         dao_manager.init_db_schema()
             .expect(format!("Error on initializing the database for item {} resp. table {}",
                             DaoManagerT::ITEM_TYPE_NAME,
-                            DaoManagerT::TABLE_NAME
+                            dao_manager.get_table_name()
             ).as_str());
     }
     Ok(())
@@ -174,34 +200,19 @@ pub fn update_db_schema_to_current_version<DaoManagerT: DaoManager>(dao_manager:
 
 #[derive(Clone)]
 pub struct DaoDataStore<DaoManagerT: DaoManager + Clone> {
-    _connection: Rc<Connection>,
     items: DaoManagerT,
-    _file_path_and_name: String
 }
 
 impl<DaoManagerT: DaoManager + Clone> DaoDataStore<DaoManagerT> {
 
-    pub fn open_or_create_db(file_path_and_name: &str) -> Result<Connection>{
-        let connection = Connection::open(file_path_and_name)
-            .expect(format!("Error on open/create SQlite database file '{}'", file_path_and_name).as_str());
-        Ok(connection)
-    }
-
-    pub fn new_from_db_file(file_path_and_name: &str) -> Self {
-        let connection: Rc<Connection> = Rc::new(Self::open_or_create_db(file_path_and_name).unwrap());
-        Self::new_from_connection(connection, Some(String::from(file_path_and_name)))
-    }
-
-    pub fn new_from_connection(connection: Rc<Connection>, file_path_and_name: Option<String>) -> Self {
-        let items = DaoManagerT::new_from_connection(connection.clone());
+    pub fn new(options: DaoManagerT::OptionsType) -> Self {
+        let items = DaoManagerT::new(options);
         items.update_db_schema_to_current_version()
             .expect(format!("Error on updating database schema for {}.{}",
                             DaoManagerT::DAO_MANAGER_NAME, DaoManagerT::ITEM_TYPE_NAME).as_str());
 
         DaoDataStore {
-            _connection: connection,
             items,
-            _file_path_and_name: if let Some(file_name) = file_path_and_name {file_name} else {"No file path and name given".to_string()},
         }
     }
 
@@ -211,10 +222,18 @@ impl<DaoManagerT: DaoManager + Clone> DaoDataStore<DaoManagerT> {
         Ok((item, serialization_callback))
     }
 
+    pub fn find_all(&self, key_starts_with: &str) -> Result<Vec<DaoManagerT::ItemType>> {
+        self.items.find_all(key_starts_with)
+    }
+
     pub fn get_item(&self, key: &DaoManagerT::PrimaryKeyType) -> Result<(DaoManagerT::ItemType, DaoManagerT::SerializationCallbackType)>{
         let item = self.items.get_item_from_db(key)?;
         let serialization_callback = self.items.get_serialization_callback(&item);
         Ok((item, serialization_callback))
+    }
+
+    pub fn get_item_read_only(&self, key: &DaoManagerT::PrimaryKeyType) -> Result<DaoManagerT::ItemType> {
+        self.items.get_item_from_db(key)
     }
 
     pub fn get_serialization_callback(&self, item: &DaoManagerT::ItemType) -> DaoManagerT::SerializationCallbackType {
@@ -228,7 +247,26 @@ impl<DaoManagerT: DaoManager + Clone> DaoDataStore<DaoManagerT> {
     pub fn delete_item_in_db(&self, key: &DaoManagerT::PrimaryKeyType) -> Result<()> {
         self.items.delete_item_in_db(key)
     }
+}
 
+#[derive(Clone)]
+pub struct DbFileBasedDaoManagerOptions {
+    pub file_path_and_name: String,
+}
+
+pub trait DbFileBasedDaoManagerOpt: Clone {
+    fn file_path_and_name(&self) -> String;
+
+    fn get_new_connection(&self) -> Connection {
+        Connection::open(self.file_path_and_name())
+            .expect(format!("Error on open/create SQlite database file '{}'", self.file_path_and_name()).as_str())
+    }
+}
+
+impl DbFileBasedDaoManagerOpt for DbFileBasedDaoManagerOptions {
+    fn file_path_and_name(&self) -> String {
+        self.file_path_and_name.clone()
+    }
 }
 
 // These tests need to be started as follows:
@@ -256,26 +294,33 @@ mod tests {
         connection: Rc<Connection>,
     }
 
+    #[derive(Clone)]
+    pub struct TestItemDaoManagerOptions{
+        pub connection: Rc<Connection>
+    }
+
     impl<'a> DaoManager for TestItemDaoManager {
         type ItemType = TestItem;
         type PrimaryKeyType = String;
         type SerializationCallbackType = SerializationCallbackRefToClosureString;
+        type OptionsType = TestItemDaoManagerOptions;
 
         const ITEM_TYPE_NAME: &'static str = "TestItem";
         const DAO_MANAGER_NAME: &'static str = "TestItemDaoManager";
-        const TABLE_NAME: &'static str = "test_item";
         const PRIMARY_KEY_COLUMN_NAME: &'static str = "id";
         const DB_SCHEMA_VERSION: DbSchemaVersionType = 1;
 
-        fn new_from_connection(connection: Rc<Connection>) -> Self {
+        fn new(options: TestItemDaoManagerOptions) -> Self {
             TestItemDaoManager {
-                connection,
+                connection: options.connection
             }
         }
 
         fn get_connection(&self) -> &Connection {
             &self.connection
         }
+
+        fn get_table_name(&self) -> String { "test_item".to_string() }
 
         fn update_db_schema_to_current_version(&self) -> Result<()> {
             update_db_schema_to_current_version(self)
@@ -286,7 +331,7 @@ mod tests {
                 {} TEXT NOT NULL PRIMARY KEY,\
                 some_data BLOB NOT NULL\
             )
-            ", Self::TABLE_NAME, Self::PRIMARY_KEY_COLUMN_NAME).as_str(), [])
+            ", self.get_table_name(), Self::PRIMARY_KEY_COLUMN_NAME).as_str(), [])
                 .expect("Error on executing 'CREATE TABLE' for TestItem");
             Ok(())
         }
@@ -299,11 +344,15 @@ mod tests {
             get_item_from_db(self, &id_starts_with.to_string(), Some(true))
         }
 
+        fn find_all(&self, key_starts_with: &str) -> Result<Vec<Self::ItemType, Global>, Error> {
+            unimplemented!()
+        }
+
         fn write_item_to_db(&self, item: &Self::ItemType) -> Result<Self::PrimaryKeyType> {
             let _rows = self.connection.execute(
                 format!(
                     "INSERT OR REPLACE INTO {} ({}, some_data) VALUES (:id, :some_data)",
-                    Self::TABLE_NAME,
+                    self.get_table_name(),
                     Self::PRIMARY_KEY_COLUMN_NAME
                 ).as_str(),
                 to_params_named(item).unwrap().to_slice().as_slice()
@@ -315,7 +364,7 @@ mod tests {
             let _rows = self.connection.execute(
                 format!(
                     "DELETE FROM {} WHERE {} = '{}'",
-                    Self::TABLE_NAME,
+                    self.get_table_name(),
                     Self::PRIMARY_KEY_COLUMN_NAME,
                     key
                 ).as_str(),
@@ -339,7 +388,7 @@ mod tests {
 
     #[test]
     fn test_item_dao_manager() {
-        let test_item_dao_manager = TestItemDaoManager::new_from_connection(Rc::new(Connection::open_in_memory().unwrap()));
+        let test_item_dao_manager = TestItemDaoManager::new(Rc::new(Connection::open_in_memory().unwrap()));
         test_item_dao_manager.init_db_schema().unwrap();
 
         let test_item = TestItem { id: "test".to_string(), some_data: vec![1, 2, 3, 4] };
@@ -364,7 +413,7 @@ mod tests {
     }
 
     fn create_data_store_with_item_0() -> (TestItemDaoManager, DaoDataStore<TestItemDaoManager>, TestItem, SerializationCallbackRefToClosureString) {
-        let test_item_dao_manager = TestItemDaoManager::new_from_connection(
+        let test_item_dao_manager = TestItemDaoManager::new(
             Rc::new(Connection::open_in_memory().unwrap())
         );
         test_item_dao_manager.init_db_schema().unwrap();

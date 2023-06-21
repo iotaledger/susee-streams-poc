@@ -18,6 +18,8 @@ pub mod iota_bridge;
 #[cfg(feature = "dao")]
 pub mod dao_helpers;
 
+#[cfg(feature = "explorer")]
+pub mod explorer;
 
 pub use {
     wallet::{

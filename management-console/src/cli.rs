@@ -22,6 +22,7 @@ pub struct ArgKeys {
     pub iota_bridge_url: &'static str,
     pub println_channel_status: &'static str,
     pub channel_starts_with: &'static str,
+    pub run_explorer_api_server: &'static str,
 }
 
 pub static ARG_KEYS: ArgKeys = ArgKeys {
@@ -33,6 +34,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     iota_bridge_url: "iota-bridge-url",
     println_channel_status: "println-channel-status",
     channel_starts_with: "channel-starts-with",
+    run_explorer_api_server: "run-explorer-api-server"
 };
 
 static SUBSCRIPTION_LINK_ABOUT: &str = "Add a Sensor to a Streams channel.
@@ -127,6 +129,14 @@ with the remote sensor via the IOTA-Bridge:
                                 # a KEYLOAD_REGISTRATION Confirmation
 ";
 
+static RUN_EXPLORER_API_SERVER_ABOUT: &str = "Start an http rest api server to explore sensor messages stored on the tangle
+
+Example:
+
+    >   ./management-console --run-explorer-api-server
+";
+
+
 static IOTA_BRIDGE_URL_ABOUT_FMT_STR: &str = "The url of the iota-bridge to connect to.
 See --init-sensor for further information.
 Default value is {}
@@ -187,6 +197,12 @@ pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
             .short('i')
             .help(INIT_SENSOR_ABOUT)
             .requires(ARG_KEYS.iota_bridge_url)
+            .takes_value(false)
+        )
+        .arg(Arg::new(ARG_KEYS.run_explorer_api_server)
+            .long(ARG_KEYS.run_explorer_api_server)
+            .short('r')
+            .help(RUN_EXPLORER_API_SERVER_ABOUT)
             .takes_value(false)
         )
         .arg(Arg::new(ARG_KEYS.iota_bridge_url)

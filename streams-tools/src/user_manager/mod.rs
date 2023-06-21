@@ -3,6 +3,11 @@ pub mod compressed_state;
 
 #[cfg(feature = "std")]
 pub mod channel_manager;
+#[cfg(feature = "std")]
+pub mod multi_channel_management;
+#[cfg(feature = "std")]
+pub mod message_manager;
+
 
 #[cfg(feature = "dao")]
 pub mod dao;
@@ -23,6 +28,9 @@ pub use {
     subscriber_manager::{
         SubscriberManagerPlainTextWallet
     },
+    message_manager::{
+        MessageManager,
+    }
 };
 
 #[cfg(feature = "dao")]

@@ -1,13 +1,4 @@
-use crate::{
-    helpers::SerializationCallbackRefToClosureI64,
-    dao_helpers::{
-        DaoManager,
-        DbSchemaVersionType,
-        DaoDataStore,
-        get_item_from_db,
-        update_db_schema_to_current_version,
-    }
-};
+use anyhow::Result;
 
 use serde::{
     Deserialize,
@@ -19,8 +10,18 @@ use rusqlite::{
     params,
 };
 
-use anyhow::Result;
-use std::rc::Rc;
+use crate::{
+    helpers::SerializationCallbackRefToClosureI64,
+    dao_helpers::{
+        DaoManager,
+        DbSchemaVersionType,
+        DaoDataStore,
+        DbFileBasedDaoManagerOptions,
+        DbFileBasedDaoManagerOpt,
+        get_item_from_db,
+        update_db_schema_to_current_version,
+    }
+};
 
 pub type MsgIdTransferType = Vec<u8>;
 
@@ -45,31 +46,43 @@ impl PendingRequest {
     }
 }
 
-#[derive(Clone)]
 pub struct PendingRequestDaoManager {
-    connection: Rc<Connection>,
+    connection: Connection,
+    options: DbFileBasedDaoManagerOptions,
+}
+
+impl Clone for PendingRequestDaoManager {
+    fn clone(&self) -> Self {
+        PendingRequestDaoManager{
+            connection: self.options.get_new_connection(),
+            options: self.options.clone(),
+        }
+    }
 }
 
 impl DaoManager for PendingRequestDaoManager {
     type ItemType = PendingRequest;
     type PrimaryKeyType = i64;
     type SerializationCallbackType = SerializationCallbackRefToClosureI64;
+    type OptionsType = DbFileBasedDaoManagerOptions;
 
     const ITEM_TYPE_NAME: &'static str = "PendingRequest";
     const DAO_MANAGER_NAME: &'static str = "PendingRequestDaoManager";
-    const TABLE_NAME: &'static str = "pending_request";
     const PRIMARY_KEY_COLUMN_NAME: &'static str = "request_key";
     const DB_SCHEMA_VERSION: DbSchemaVersionType = 1;
 
-    fn new_from_connection(connection: Rc<Connection>) -> Self {
-        PendingRequestDaoManager {
-            connection,
+    fn new(options: DbFileBasedDaoManagerOptions) -> Self {
+        PendingRequestDaoManager{
+            connection: options.get_new_connection(),
+            options,
         }
     }
 
     fn get_connection(&self) -> &Connection {
         &self.connection
     }
+
+    fn get_table_name(&self) -> String { "pending_request".to_string() }
 
     fn update_db_schema_to_current_version(&self) -> Result<()> {
         update_db_schema_to_current_version(self)
@@ -83,7 +96,7 @@ impl DaoManager for PendingRequestDaoManager {
                 initialization_cnt INTEGER NOT NULL,\
                 streams_api_request BLOB NOT NULL\
             )
-            ", Self::TABLE_NAME, Self::PRIMARY_KEY_COLUMN_NAME).as_str(), [])
+            ", self.get_table_name(), Self::PRIMARY_KEY_COLUMN_NAME).as_str(), [])
             .expect("Error on executing 'CREATE TABLE' for PendingRequest");
         Ok(())
     }
@@ -92,7 +105,11 @@ impl DaoManager for PendingRequestDaoManager {
         get_item_from_db(self, request_key, None)
     }
 
-    fn search_item(&self, _dev_eui_msg_id_starts_with: &str) -> Result<PendingRequest>{
+    fn search_item(&self, _request_key_starts_with: &str) -> Result<PendingRequest>{
+        unimplemented!()
+    }
+
+    fn find_all(&self, _request_key_starts_with: &str) -> Result<Vec<Self::ItemType>> {
         unimplemented!()
     }
 
@@ -100,7 +117,7 @@ impl DaoManager for PendingRequestDaoManager {
         let _rows = if let Some(request_key) = item.request_key {
             self.connection.execute(format!(
                 "INSERT OR REPLACE INTO {} ({}, dev_eui, msg_id, initialization_cnt, streams_api_request) VALUES (?, ?, ?, ?, ?)",
-                    Self::TABLE_NAME, Self::PRIMARY_KEY_COLUMN_NAME).as_str(),
+                    self.get_table_name(), Self::PRIMARY_KEY_COLUMN_NAME).as_str(),
                 params![
                     &request_key,
                     &item.dev_eui,
@@ -110,7 +127,7 @@ impl DaoManager for PendingRequestDaoManager {
             ]).unwrap()
         } else {
             self.connection.execute(format!(
-                "INSERT OR REPLACE INTO {} (dev_eui, msg_id, initialization_cnt, streams_api_request) VALUES (?, ?, ?, ?)", Self::TABLE_NAME).as_str(),
+                "INSERT OR REPLACE INTO {} (dev_eui, msg_id, initialization_cnt, streams_api_request) VALUES (?, ?, ?, ?)", self.get_table_name()).as_str(),
                 params![
                     &item.dev_eui,
                     &item.msg_id,
@@ -123,7 +140,7 @@ impl DaoManager for PendingRequestDaoManager {
     }
 
     fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType {
-        let this = self.clone();
+        let options = self.options.clone();
         let dev_eui = item.dev_eui.clone();
         let msg_id = item.msg_id.clone();
         let initialization_cnt = item.initialization_cnt;
@@ -137,6 +154,7 @@ impl DaoManager for PendingRequestDaoManager {
                 initialization_cnt,
                 streams_api_request,
             };
+            let this = PendingRequestDaoManager::new(options);
             this.write_item_to_db(&new_pending_req)?;
             Ok(ret_val)
         })
@@ -147,7 +165,7 @@ impl DaoManager for PendingRequestDaoManager {
         let _rows = self.connection.execute(
             format!(
                 "DELETE FROM {} WHERE {} = {}",
-                Self::TABLE_NAME,
+                self.get_table_name(),
                 Self::PRIMARY_KEY_COLUMN_NAME,
                 key
             ).as_str(),
@@ -175,7 +193,7 @@ mod tests {
     #[test]
     fn test_pending_request_dao_manager() {
         let connection = Rc::new(Connection::open_in_memory().unwrap());
-        let dao_manager = PendingRequestDaoManager::new_from_connection(connection.clone());
+        let dao_manager = PendingRequestDaoManager::new(connection.clone());
         dao_manager.init_db_schema().unwrap();
 
         let mut pending_request = PendingRequest::new(
@@ -203,7 +221,7 @@ mod tests {
 
     fn create_data_store_with_item_0() -> (PendingRequestDaoManager, PendingRequestDataStore, PendingRequest, SerializationCallbackRefToClosureI64) {
         let connection = Rc::new(Connection::open_in_memory().unwrap());
-        let dao_manager = PendingRequestDaoManager::new_from_connection(connection.clone());
+        let dao_manager = PendingRequestDaoManager::new(connection.clone());
         dao_manager.init_db_schema().unwrap();
 
         let mut pending_request =  PendingRequest::new(

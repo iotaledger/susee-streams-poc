@@ -1,18 +1,10 @@
-use anyhow::Result;
-
-mod cli;
-
-use streams_tools::{
-    STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT,
-    iota_bridge::{
-        LoraWanNodeDataStore,
-        PendingRequestDataStore,
-    },
-    IotaBridge,
+use std::{
+    net::SocketAddr,
 };
 
 use hyper::{
     Server,
+    server::conn::AddrStream,
     service::{
         make_service_fn,
         service_fn,
@@ -24,19 +16,26 @@ use hyper::{
     }
 };
 
+use tokio::sync::oneshot;
+use anyhow::Result;
+
+use streams_tools::{
+    STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT,
+    iota_bridge::{
+        LoraWanNodeDataStore,
+        PendingRequestDataStore,
+    },
+    dao_helpers::DbFileBasedDaoManagerOptions,
+    IotaBridge,
+};
+
 use cli::{
     IotaBridgeCli,
     ARG_KEYS,
     get_arg_matches,
 };
 
-use std::{
-    net::SocketAddr,
-};
-use std::rc::Rc;
-use hyper::server::conn::AddrStream;
-use tokio::sync::oneshot;
-use rusqlite::Connection;
+mod cli;
 
 async fn handle_request(mut client: IotaBridge<'_>, request: Request<Body>)
                         -> Result<Response<Body>, hyper::http::Error>
@@ -63,11 +62,11 @@ async fn run() {
     let cli = IotaBridgeCli::new(&matches_and_options, &ARG_KEYS) ;
     println!("[IOTA Bridge] Using node '{}' for tangle connection", cli.node);
 
-    let file_path_and_name = "iota-bridge.sqlite3";
-    let db_connection = Rc::new(Connection::open(file_path_and_name)
-        .expect(format!("Error on open/create SQlite database file '{}'", file_path_and_name).as_str()));
-    let lora_wan_node_store = LoraWanNodeDataStore::new_from_connection(db_connection.clone(), None);
-    let pending_request_store = PendingRequestDataStore::new_from_connection(db_connection, None);
+    let db_connection_opt = DbFileBasedDaoManagerOptions {
+        file_path_and_name: "iota-bridge.sqlite3".to_string()
+    };
+    let lora_wan_node_store = LoraWanNodeDataStore::new(db_connection_opt.clone());
+    let pending_request_store = PendingRequestDataStore::new(db_connection_opt);
     let client = IotaBridge::new(cli.node, lora_wan_node_store, pending_request_store);
 
     let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT).into();

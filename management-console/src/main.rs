@@ -2,10 +2,44 @@ use core::str::FromStr;
 
 use anyhow::{
     Result,
+    bail,
 };
+
 use iota_streams::{
     app_channels::api::tangle::Address,
     core::prelude::hex,
+};
+
+use streams_tools::{
+    channel_manager::{
+        SubscriberData,
+    },
+    subscriber_manager::println_maximum_initialization_cnt_reached_warning,
+    ChannelManagerPlainTextWallet,
+    multi_channel_management::{
+        MultiChannelManagerOptions,
+        get_initial_channel_manager,
+        get_channel_manager_for_channel_id,
+        get_channel_manager_for_channel_starts_with
+    },
+    remote::remote_sensor::{
+        RemoteSensor,
+        RemoteSensorOptions,
+    },
+    UserDataStore,
+    binary_persist::INITIALIZATION_CNT_MAX_VALUE,
+    explorer::{
+        run_explorer_api_server,
+        ExplorerOptions,
+    },
+    helpers::get_channel_id_from_link,
+    dao_helpers::DbFileBasedDaoManagerOptions,
+};
+
+use susee_tools::{
+    SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC,
+    SUSEE_CONST_SECRET_PASSWORD,
+    get_wallet_filename
 };
 
 use cli::{
@@ -14,26 +48,63 @@ use cli::{
     ManagementConsoleCli,
 };
 
-use multi_channel_management::create_channel_manager;
-
-use streams_tools::{
-    channel_manager::{
-        SubscriberData,
-    },
-    subscriber_manager::println_maximum_initialization_cnt_reached_warning,
-    ChannelManagerPlainTextWallet,
-    remote::remote_sensor::{
-        RemoteSensor,
-        RemoteSensorOptions,
-    },
-    UserDataStore,
-    binary_persist::INITIALIZATION_CNT_MAX_VALUE,
-};
-
-use susee_tools::SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC;
-
 mod cli;
-mod multi_channel_management;
+
+const MESSAGE_EXPLORER_LISTENER_ADDRESS: &str = "127.0.0.1:8080";
+
+pub async fn create_channel_manager<'a>(user_store: &mut UserDataStore, cli: &ManagementConsoleCli<'a>) -> Option<ChannelManagerPlainTextWallet> {
+    let mut ret_val = None;
+    let options = get_multi_channel_manager_options(cli).ok()?;
+    if cli.matches.is_present(cli.arg_keys.create_channel)
+        || cli.matches.is_present(cli.arg_keys.init_sensor) {
+        ret_val = Some(get_initial_channel_manager(user_store, &options).await.unwrap());
+    }
+    else if cli.matches.is_present(cli.arg_keys.subscription_link) {
+        let sub_msg_link_str = cli.matches.value_of(cli.arg_keys.subscription_link).unwrap();
+        if let Some(channel_id ) = get_channel_id_from_link(sub_msg_link_str) {
+            ret_val = Some(get_channel_manager_for_channel_id(channel_id.as_str(), user_store, &options).await.unwrap());
+        } else {
+            println!("[Management Console] Could not parse channel_id from CLI argument '--{}'. Argument value is {}",
+                     cli.arg_keys.subscription_link,
+                     sub_msg_link_str,
+            )
+        }
+    } else if cli.matches.is_present(cli.arg_keys.println_channel_status) {
+        ret_val = Some(get_channel_manager_for_cli_arg_channel_starts_with(user_store, &options, cli, false).await.unwrap());
+    }
+
+    ret_val
+}
+
+fn get_management_console_wallet_filename<'a>(cli: &ManagementConsoleCli<'a>) -> Result<String> {
+    get_wallet_filename(
+        &cli.matches,
+        cli.arg_keys.base.wallet_file,
+        "wallet-management-console.txt",
+    )
+}
+
+fn get_multi_channel_manager_options<'a>(cli: &ManagementConsoleCli<'a>) -> Result<MultiChannelManagerOptions> {
+    let wallet_filename= get_management_console_wallet_filename(cli)?;
+    Ok(MultiChannelManagerOptions{
+        iota_node_url: cli.node.to_string(),
+        wallet_filename,
+        streams_user_serialization_password: SUSEE_CONST_SECRET_PASSWORD.to_string()
+    })
+}
+
+pub async fn get_channel_manager_for_cli_arg_channel_starts_with<'a>(
+    user_store: &mut UserDataStore,
+    options: &MultiChannelManagerOptions,
+    cli: &ManagementConsoleCli<'a>,
+    update_user_on_exit: bool
+) -> Result<ChannelManagerPlainTextWallet> {
+    if let Some(channel_starts_with) = cli.matches.value_of(cli.arg_keys.channel_starts_with) {
+        get_channel_manager_for_channel_starts_with(channel_starts_with, user_store, options, update_user_on_exit).await
+    } else {
+        bail!("[Management Console] You need to specify CLI argument '--{}'", cli.arg_keys.channel_starts_with);
+    }
+}
 
 fn println_announcement_link(link: &Address, comment: &str) {
     println!(
@@ -76,7 +147,7 @@ async fn println_channel_status<'a> (channel_manager: &mut ChannelManagerPlainTe
 }
 
 
-async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>) -> Result<()>{
+async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>) -> Result<()> {
     println!("[Management Console] Initializing remote sensor");
     let announcement_link = create_channel(channel_manager).await?;
 
@@ -148,6 +219,9 @@ async fn send_keyload_message<'a> (channel_manager: &mut ChannelManagerPlainText
     Ok(keyload_msg_link)
 }
 
+const DB_FILE_PATH_AND_NAME: &str = "user-states-management-console.sqlite3";
+
+
 #[tokio::main]
 async fn main() -> Result<()> {
 
@@ -157,30 +231,47 @@ async fn main() -> Result<()> {
 
     println!("[Management Console] Using node '{}' for tangle connection", cli.node);
 
-    let mut user_store = UserDataStore::new_from_db_file("user-states-management-console.sqlite3");
 
-    let mut print_usage_help = true;
+    let db_connection_opt = DbFileBasedDaoManagerOptions {
+        file_path_and_name: DB_FILE_PATH_AND_NAME.to_string()
+    };
+    let mut user_store = UserDataStore::new(db_connection_opt);
+
+    let mut print_usage_help = false;
     if let Some(mut channel_manager) = create_channel_manager(&mut user_store, &cli).await {
         if cli.matches.is_present(cli.arg_keys.create_channel) {
             create_channel(&mut channel_manager).await?;
-            print_usage_help = false;
         } else if cli.matches.is_present(cli.arg_keys.subscription_link) {
             send_keyload_message_cli(&mut channel_manager, &cli).await?;
-            print_usage_help = false;
         } else if cli.matches.is_present(cli.arg_keys.init_sensor) {
             init_sensor(&mut channel_manager, &cli).await?;
-            print_usage_help = false;
         } else if cli.matches.is_present(cli.arg_keys.println_channel_status) {
             println_channel_status(&mut channel_manager, &cli ).await;
-            print_usage_help = false;
+        } else {
+            print_usage_help = true;
         }
+    } else if cli.matches.is_present(cli.arg_keys.run_explorer_api_server) {
+        run_explorer_api_server(
+            user_store,
+            ExplorerOptions {
+                iota_node_url: cli.node.to_string(),
+                wallet_filename: get_management_console_wallet_filename(&cli)?,
+                db_file_name: DB_FILE_PATH_AND_NAME.to_string(),
+                listener_ip_address_port: MESSAGE_EXPLORER_LISTENER_ADDRESS.to_string(),
+                streams_user_serialization_password: SUSEE_CONST_SECRET_PASSWORD.to_string()
+            }
+        ).await?;
+    } else {
+        println!("[Management Console] Error: Could not create channel_manager");
+        print_usage_help = true;
     }
 
     if print_usage_help {
-        println!("[Management Console] You need to specify one of these options: --{}, --{}, --{} or --{}\n",
+        println!("[Management Console] You need to specify one of these options: --{}, --{}, --{}, --{} or --{}\n",
                  cli.arg_keys.create_channel,
                  cli.arg_keys.subscription_link,
                  cli.arg_keys.init_sensor,
+                 cli.arg_keys.run_explorer_api_server,
                  cli.arg_keys.println_channel_status,
         );
     }

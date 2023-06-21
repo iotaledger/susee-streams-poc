@@ -1,5 +1,7 @@
+use std::str::FromStr;
 use rand::Rng;
 use anyhow::Result;
+use iota_streams::app::transport::tangle::TangleAddress;
 
 pub fn create_psk_seed() -> [u8; 32] {
     rand::thread_rng().gen::<[u8; 32]>()
@@ -13,6 +15,10 @@ pub fn get_channel_id_from_link(streams_link: &str) -> Option<String> {
         break;
     }
     ret_val
+}
+
+pub fn get_tangle_address_from_strings(channel_id: &str, message_id: &str) -> Result<TangleAddress> {
+    TangleAddress::from_str(format!("{}:{}", channel_id, message_id).as_str())
 }
 
 // -------------------------------------------------------------------------------------
@@ -37,13 +43,13 @@ pub fn get_channel_id_from_link(streams_link: &str) -> Option<String> {
 // https://stevedonovan.github.io/rustifications/2018/08/18/rust-closures-are-hard.html
 // -------------------------------------------------------------------------------------
 
-pub trait SerializationCallbackCloneBox<PrimaryKeyType: Clone>: FnOnce(PrimaryKeyType, Vec<u8>) -> Result<usize> {
+pub trait SerializationCallbackCloneBox<PrimaryKeyType: Clone>: FnOnce(PrimaryKeyType, Vec<u8>) -> Result<usize>  + Send + Sync {
     fn clone_box(&self) -> Box<dyn SerializationCallbackCloneBox<PrimaryKeyType>>;
 }
 
 impl<T, PrimaryKeyType> SerializationCallbackCloneBox<PrimaryKeyType> for T
     where
-        T: 'static + FnOnce(PrimaryKeyType, Vec<u8>) -> Result<usize> + Clone,
+        T: 'static + FnOnce(PrimaryKeyType, Vec<u8>) -> Result<usize> + Clone + Send + Sync,
         PrimaryKeyType: Clone,
 {
     fn clone_box(&self) -> Box<dyn SerializationCallbackCloneBox<PrimaryKeyType>> {

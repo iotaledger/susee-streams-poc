@@ -1,3 +1,4 @@
+mod shared;
 mod messages;
 mod nodes;
 mod app_state;

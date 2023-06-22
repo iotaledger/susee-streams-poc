@@ -12,7 +12,14 @@ use iota_streams::{
     }
 };
 
-use crate::dao::message::{MessageDataStore, MessageDataStoreOptions, Message as DaoMessage};
+use crate::{
+    dao_helpers::Limit,
+    dao::message::{
+        MessageDataStore,
+        MessageDataStoreOptions,
+        Message as DaoMessage
+    }
+};
 
 pub struct MessageManager<'a,Trans: Transport<Address, Message> + Clone> {
     source: &'a mut dyn IntoMessages<Trans>,
@@ -45,8 +52,8 @@ impl<'a,Trans: Transport<Address, Message> + Clone> MessageManager<'a,Trans> {
         Ok(num_messages_stored)
     }
 
-    pub fn index(&self) -> Result<Vec<DaoMessage>> {
-        self.message_data_store.find_all("")
+    pub fn index(&self, limit: Option<Limit>) -> Result<(Vec<DaoMessage>, usize)> {
+        self.message_data_store.find_all("", limit)
     }
 
     pub fn get(&self, message_id: &str) -> Result<DaoMessage> {

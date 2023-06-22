@@ -1,6 +1,4 @@
-use std::{
-    fmt::Display,
-};
+use std::fmt;
 
 use rusqlite::{
     Connection,
@@ -9,7 +7,9 @@ use rusqlite::{
 };
 
 use serde_rusqlite::from_rows_ref;
-use serde::de::DeserializeOwned;
+use serde::de::{
+    DeserializeOwned,
+};
 
 use anyhow::{
     Result,
@@ -20,10 +20,23 @@ use fallible_streaming_iterator::FallibleStreamingIterator;
 
 pub type DbSchemaVersionType = i32;
 
+pub struct Limit {
+    pub limit: usize,
+    pub offset: usize,
+}
+
+impl fmt::Display for Limit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LIMIT {} OFFSET {}", self.limit, self.offset)
+    }
+}
+
+const MAX_NUMBER_OF_ROWS_TO_FETCH: usize = 1000;
+
 pub trait DaoManager {
 
     type ItemType: DeserializeOwned;
-    type PrimaryKeyType: Display;
+    type PrimaryKeyType: fmt::Display;
     type SerializationCallbackType;
     type OptionsType;
 
@@ -46,7 +59,7 @@ pub trait DaoManager {
 
     fn search_item(&self, key_starts_with: &str) -> Result<Self::ItemType>;
 
-    fn find_all(&self, key_starts_with: &str) -> Result<Vec<Self::ItemType>>;
+    fn find_all(&self, key_starts_with: &str, limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)>;
 
     fn write_item_to_db(&self, item: &Self::ItemType) -> Result<Self::PrimaryKeyType>;
 
@@ -63,29 +76,47 @@ pub trait DaoManager {
     fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType;
 }
 
-fn get_rows_from_statement<'a, DaoManagerT: DaoManager>(_dao_manager: &DaoManagerT, statement: &'a mut Statement, statement_str: &String) -> Rows<'a> {
+fn get_rows_from_statement<'a>(statement: &'a mut Statement, statement_str: &String, item_type_name: &str) -> Rows<'a> {
     statement.query([])
-        .expect(format!("Error on querying prepared 'SELECT * FROM' statement for {}. Statement: {}",
-                        DaoManagerT::ITEM_TYPE_NAME,
+        .expect(format!("Error on querying prepared 'SELECT ... FROM' statement for {}. Statement: {}",
+                        item_type_name,
                         statement_str).as_str())
+}
+
+fn get_value_from_statement<'a, ValueTypeT>(statement: &'a mut Statement, statement_str: &String, item_type_name: &str) -> Vec<ValueTypeT>
+where
+    ValueTypeT: DeserializeOwned
+{
+    let mut rows = get_rows_from_statement(statement, &statement_str, item_type_name);
+    let mut res = from_rows_ref::<ValueTypeT>(&mut rows);
+    let mut ret_val = Vec::<ValueTypeT>::new();
+    while let Some(item) = res.next() {
+        let to_push = item
+            .expect(format!("Error on unwrapping next {} from_rows_ref", item_type_name).as_str());
+        ret_val.push(to_push);
+    }
+    ret_val
 }
 
 pub fn find_all_items_in_db<'a, DaoManagerT: DaoManager>(
     dao_manager: &DaoManagerT,
-    starts_with: &DaoManagerT::PrimaryKeyType
-) -> Result<Vec<DaoManagerT::ItemType>>
+    starts_with: &DaoManagerT::PrimaryKeyType,
+    limit: Option<Limit>
+) -> Result<(Vec<DaoManagerT::ItemType>, usize)>
 {
-    let (mut statement, statement_str) = build_query_statement(dao_manager, starts_with, Some(true))?;
-    let mut rows = get_rows_from_statement(dao_manager, &mut statement, &statement_str);
-    let mut res = from_rows_ref::<DaoManagerT::ItemType>(&mut rows);
-    let mut ret_val = Vec::<DaoManagerT::ItemType>::new();
-    while let Some(item) = res.next() {
-        let to_push = item
-            .expect(format!("Error on unwrapping next {} from_rows_ref",
-                            DaoManagerT::ITEM_TYPE_NAME).as_str());
-        ret_val.push(to_push);
-    }
-    Ok(ret_val)
+    let limit_offset =  limit.or(Some(
+        Limit{
+            limit: MAX_NUMBER_OF_ROWS_TO_FETCH,
+            offset: 0
+        }
+    ));
+    let (mut statement, statement_str) = build_query_statement(dao_manager, starts_with, Some(true), limit_offset)?;
+    let ret_val = get_value_from_statement::<DaoManagerT::ItemType>(&mut statement, &statement_str, DaoManagerT::ITEM_TYPE_NAME);
+
+    let (mut cnt_statement, cnt_statement_str) = build_select_count_statement(dao_manager, starts_with, Some(true))?;
+    let counts = get_value_from_statement::<usize>(&mut cnt_statement, &cnt_statement_str, "count");
+
+    Ok((ret_val, counts[0]))
 }
 
 pub fn get_item_from_db<'a, DaoManagerT: DaoManager>(
@@ -94,8 +125,8 @@ pub fn get_item_from_db<'a, DaoManagerT: DaoManager>(
     starts_with: Option<bool>
 ) -> Result<DaoManagerT::ItemType>
 {
-    let (mut statement, statement_str) = build_query_statement(dao_manager, primary_key, starts_with)?;
-    let rows = get_rows_from_statement(dao_manager, &mut statement, &statement_str);
+    let (mut statement, statement_str) = build_query_statement(dao_manager, primary_key, starts_with, None)?;
+    let rows = get_rows_from_statement(&mut statement, &statement_str, DaoManagerT::ITEM_TYPE_NAME);
     get_item_from_single_row_rowset(dao_manager, primary_key, rows, statement_str)
 }
 
@@ -134,27 +165,46 @@ fn get_item_from_single_row_rowset<'a, DaoManagerT: DaoManager>(
     }
 }
 
+struct StatementParts {
+    operator: String,
+    wildcard: String,
+    limit_offset: String,
+}
+
+impl StatementParts {
+    pub fn new<'a, DaoManagerT: DaoManager>(starts_with: Option<bool>, limit: Option<Limit>) -> StatementParts {
+        let mut operator = "=";
+        let mut wildcard = "";
+        let limit_offset = limit.map_or("".to_string(), |lim_offset| lim_offset.to_string());
+        if let Some(starts_with) = starts_with {
+            if starts_with {
+                operator = "LIKE";
+                wildcard = "%";
+            }
+        }
+        StatementParts {
+            operator: operator.to_string(),
+            wildcard: wildcard.to_string(),
+            limit_offset,
+        }
+    }
+}
+
 fn build_query_statement<'a, DaoManagerT: DaoManager>(
     dao_manager: &'a DaoManagerT,
     primary_key: &DaoManagerT::PrimaryKeyType,
-    starts_with: Option<bool>
+    starts_with: Option<bool>,
+    limit: Option<Limit>,
 ) -> Result<(Statement<'a>, String)>
 {
-    let mut operator = "=";
-    let mut wildcard = "";
-    if let Some(starts_with) = starts_with {
-        if starts_with {
-            operator = "LIKE";
-            wildcard = "%";
-        }
-    }
-    let statement_str = format!("SELECT * FROM {} WHERE {} {} '{}{}'",
-                            dao_manager.get_table_name(),
-                            DaoManagerT::PRIMARY_KEY_COLUMN_NAME,
-
-                            operator,
-                            primary_key,
-                            wildcard,
+    let parts = StatementParts::new::<DaoManagerT>(starts_with, limit);
+    let statement_str = format!("SELECT * FROM {t_name} WHERE {prim_col} {op} '{p_key}{wldcrd}' {lim_ofs}",
+                                t_name = dao_manager.get_table_name(),
+                                prim_col = DaoManagerT::PRIMARY_KEY_COLUMN_NAME,
+                                p_key = primary_key,
+                                op = parts.operator,
+                                wldcrd = parts.wildcard,
+                                lim_ofs = parts.limit_offset,
     );
     let statement = dao_manager.get_connection().prepare(statement_str.as_str())
         .expect(format!("Error on preparing 'SELECT * FROM' for {}. Statement: {}",
@@ -162,6 +212,28 @@ fn build_query_statement<'a, DaoManagerT: DaoManager>(
                         statement_str).as_str());
     Ok((statement, statement_str))
 }
+
+fn build_select_count_statement<'a, DaoManagerT: DaoManager>(
+    dao_manager: &'a DaoManagerT,
+    primary_key: &DaoManagerT::PrimaryKeyType,
+    starts_with: Option<bool>,
+) -> Result<(Statement<'a>, String)>
+{
+    let parts = StatementParts::new::<DaoManagerT>(starts_with, None);
+    let statement_str = format!("SELECT COUNT(*) FROM {t_name} WHERE {prim_col} {op} '{p_key}{wldcrd}'",
+                                t_name = dao_manager.get_table_name(),
+                                prim_col = DaoManagerT::PRIMARY_KEY_COLUMN_NAME,
+                                p_key = primary_key,
+                                op = parts.operator,
+                                wldcrd = parts.wildcard,
+    );
+    let statement = dao_manager.get_connection().prepare(statement_str.as_str())
+        .expect(format!("Error on preparing 'SELECT COUNT(*) FROM' for {}. Statement: {}",
+                        DaoManagerT::ITEM_TYPE_NAME,
+                        statement_str).as_str());
+    Ok((statement, statement_str))
+}
+
 
 pub fn get_schema_version_in_database<DaoManagerT: DaoManager>(dao_manager: &DaoManagerT) -> Result<DbSchemaVersionType> {
     // Currently we do not manage updates of db schemas. We are using only the initial
@@ -222,8 +294,8 @@ impl<DaoManagerT: DaoManager + Clone> DaoDataStore<DaoManagerT> {
         Ok((item, serialization_callback))
     }
 
-    pub fn find_all(&self, key_starts_with: &str) -> Result<Vec<DaoManagerT::ItemType>> {
-        self.items.find_all(key_starts_with)
+    pub fn find_all(&self, key_starts_with: &str, limit: Option<Limit>) -> Result<(Vec<DaoManagerT::ItemType>, usize)> {
+        self.items.find_all(key_starts_with, limit)
     }
 
     pub fn get_item(&self, key: &DaoManagerT::PrimaryKeyType) -> Result<(DaoManagerT::ItemType, DaoManagerT::SerializationCallbackType)>{
@@ -344,7 +416,7 @@ mod tests {
             get_item_from_db(self, &id_starts_with.to_string(), Some(true))
         }
 
-        fn find_all(&self, key_starts_with: &str) -> Result<Vec<Self::ItemType, Global>, Error> {
+        fn find_all(&self, key_starts_with: &str, limit: Option<Limit>) -> Result<(Vec<Self::ItemType, Global>, usize), Error> {
             unimplemented!()
         }
 

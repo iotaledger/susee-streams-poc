@@ -20,7 +20,8 @@ use crate::{
         threading_helpers::{
             Worker,
             run_worker_in_own_thread,
-        }
+        },
+        shared::page_dto::PagingOptions,
     },
     user_manager::{
         multi_channel_management::{
@@ -30,6 +31,7 @@ use crate::{
         MessageManager,
         UserDataStore,
     },
+    dao_helpers::Limit,
     helpers::get_tangle_address_from_strings,
 };
 
@@ -50,11 +52,12 @@ impl MessagesState {
     }
 }
 
-pub(crate) async fn index(state: &AppState, channel_id: &str) -> Result<MessageList> {
+pub(crate) async fn index(state: &AppState, channel_id: &str, paging_opt: Option<PagingOptions>) -> Result<(MessageList, usize)> {
     run_worker_in_own_thread::<IndexWorker>(IndexWorkerOptions::new(
         &state.messages,
         &state.user_store,
-        channel_id
+        channel_id,
+        paging_opt,
     )).await
 }
 
@@ -64,15 +67,17 @@ struct IndexWorkerOptions {
     u_store: UserDataStore,
     multi_channel_mngr_opt: MultiChannelManagerOptions,
     db_file_name: String,
+    paging_opt: Option<PagingOptions>,
 }
 
 impl IndexWorkerOptions {
-    pub fn new(messages: &MessagesState, user_store: &UserDataStore, channel_id: &str) -> IndexWorkerOptions {
+    pub fn new(messages: &MessagesState, user_store: &UserDataStore, channel_id: &str, paging_opt: Option<PagingOptions>) -> IndexWorkerOptions {
         IndexWorkerOptions{
             channel_id: channel_id.to_string(),
             u_store: user_store.clone(),
             multi_channel_mngr_opt: messages.as_multi_channel_manager_options(),
-            db_file_name: messages.db_file_name.clone()
+            db_file_name: messages.db_file_name.clone(),
+            paging_opt,
         }
     }
 }
@@ -82,9 +87,9 @@ struct IndexWorker;
 #[async_trait(?Send)]
 impl Worker for IndexWorker {
     type OptionsType = IndexWorkerOptions;
-    type ResultType = MessageList;
+    type ResultType = (MessageList, usize);
 
-    async fn run(opt: IndexWorkerOptions) -> Result<MessageList> {
+    async fn run(opt: IndexWorkerOptions) -> Result<(MessageList, usize)> {
         let mut channel_manager = get_channel_manager_for_channel_id(
             &opt.channel_id,
             &opt.u_store,
@@ -97,7 +102,8 @@ impl Worker for IndexWorker {
                 opt.db_file_name
             );
             msg_mngr.sync().await?;
-            if let Ok(msg_meta_data_list) = msg_mngr.index() {
+            let db_limit_offset = opt.paging_opt.map(|paging_opt| Limit::from(paging_opt));
+            if let Ok((msg_meta_data_list, items_count_total)) = msg_mngr.index(db_limit_offset) {
                 let mut ret_val = MessageList::new();
                 for msg_meta_data in msg_meta_data_list {
                     let address = get_tangle_address_from_strings(opt.channel_id.as_str(), msg_meta_data.message_id.as_str())
@@ -112,7 +118,7 @@ impl Worker for IndexWorker {
                         });
                     }
                 }
-                Ok(ret_val)
+                Ok((ret_val, items_count_total))
             } else {
                 Err(AppError::InternalServerError(
                     format!("Could not get a msg_meta_data_list for channel {} from msg_mngr", opt.channel_id)

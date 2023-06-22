@@ -16,6 +16,7 @@ use crate::{
         DaoDataStore,
         DbFileBasedDaoManagerOpt,
         DbFileBasedDaoManagerOptions,
+        Limit,
         get_item_from_db,
         find_all_items_in_db,
         update_db_schema_to_current_version,
@@ -97,8 +98,8 @@ impl DaoManager for LoraWanNodeDaoManager {
         get_item_from_db(self, &dev_eui_with.to_string(), Some(true))
     }
 
-    fn find_all(&self, dev_eui_with: &str) -> Result<Vec<Self::ItemType>> {
-        find_all_items_in_db(self, &dev_eui_with.to_string())
+    fn find_all(&self, dev_eui_with: &str, limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {
+        find_all_items_in_db(self, &dev_eui_with.to_string(), limit)
     }
 
     fn write_item_to_db(&self, item: &LoraWanNode) -> Result<Self::PrimaryKeyType> {

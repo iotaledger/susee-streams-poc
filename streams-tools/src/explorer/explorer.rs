@@ -97,7 +97,7 @@ pub async fn run_explorer_api_server(user_store: UserDataStore, options: Explore
                 tracing::debug_span!("http-request")
             })
             .on_request(|request: &Request<Body>, _span: &Span| {
-                tracing::info!("started {} {}", request.method(), request.uri().path())
+                tracing::info!("started {} {}", request.method(), request.uri())
             })
             .on_response(
                 DefaultOnResponse::new()

@@ -18,6 +18,7 @@ use crate::{
         DaoDataStore,
         DbFileBasedDaoManagerOptions,
         DbFileBasedDaoManagerOpt,
+        Limit,
         get_item_from_db,
         update_db_schema_to_current_version,
     }
@@ -109,7 +110,7 @@ impl DaoManager for PendingRequestDaoManager {
         unimplemented!()
     }
 
-    fn find_all(&self, _request_key_starts_with: &str) -> Result<Vec<Self::ItemType>> {
+    fn find_all(&self, _request_key_starts_with: &str, _limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {
         unimplemented!()
     }
 

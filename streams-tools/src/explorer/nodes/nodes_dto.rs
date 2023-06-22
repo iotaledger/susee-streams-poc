@@ -8,8 +8,6 @@ pub struct Node {
     pub channel_id: String,
 }
 
-pub type NodeList = Vec<Node>;
-
 /*
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewNode {

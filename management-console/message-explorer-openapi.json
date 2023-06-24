@@ -1,0 +1,300 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SUSEE Message Explorer",
+    "description": "Explore messages of SUSEE nodes",
+    "license": {
+      "name": "Apache-2.0/MIT"
+    },
+    "version": "0.1.2"
+  },
+  "paths": {
+    "/messages": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "List messages",
+        "description": "List messages\n\nList messages of a specific node.\nFiltering the messages by the nodes channel id is obligatory.",
+        "operationId": "index",
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "query",
+            "description": "Filter by Streams channel-id. Find existing channel-id of existing nodes using the '/node' endpoint",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "maxLength": 80,
+              "minLength": 80
+            },
+            "example": "0ec89c9e5e80c25e24e665fadedf58e7948be80d8bf61c270736974ec2cb36090000000000000000"
+          },
+          {
+            "name": "page",
+            "in": "path",
+            "description": "Which page to get. Index range is [0 ...]",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0.0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "path",
+            "description": "Maximum number of items per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10,
+              "minimum": 0.0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully responded with list of Messages"
+          },
+          "400": {
+            "description": "Channel with specified channel-id does not exist"
+          }
+        }
+      }
+    },
+    "/messages/{msg_id}": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "get",
+        "parameters": [
+          {
+            "name": "msg_id",
+            "in": "path",
+            "description": "Message id of the requested message (includes the channel id)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully responded requested message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message with specified id not found"
+          }
+        }
+      }
+    },
+    "/nodes": {
+      "get": {
+        "tags": [
+          "nodes"
+        ],
+        "operationId": "index",
+        "parameters": [
+          {
+            "name": "channel_id_start",
+            "in": "query",
+            "description": "Optional. Specify the beginning of the Streams channels ID",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "example": "0ec"
+          },
+          {
+            "name": "page",
+            "in": "path",
+            "description": "Which page to get. Index range is [0 ...]",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0.0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "path",
+            "description": "Maximum number of items per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0.0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully responded with list of Nodes"
+          }
+        }
+      }
+    },
+    "/nodes/{channel_id}": {
+      "get": {
+        "tags": [
+          "nodes"
+        ],
+        "operationId": "get",
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "description": "Streams channel id of the requested node",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully responded requested node",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Node"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Node with specified id not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DataT": {
+        "type": "object",
+        "title": "JSON array"
+      },
+      "Message": {
+        "type": "object",
+        "required": [
+          "id",
+          "public_text",
+          "private_text_decrypted"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "private_text_decrypted": {
+            "type": "string"
+          },
+          "public_text": {
+            "type": "string"
+          }
+        }
+      },
+      "Node": {
+        "type": "object",
+        "required": [
+          "channel_id"
+        ],
+        "properties": {
+          "channel_id": {
+            "type": "string"
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataT"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "PageMeta": {
+        "type": "object",
+        "required": [
+          "page_indx",
+          "items_count",
+          "items_limit",
+          "page_count_total",
+          "items_count_total",
+          "has_prev_page",
+          "has_next_page"
+        ],
+        "properties": {
+          "has_next_page": {
+            "type": "boolean"
+          },
+          "has_prev_page": {
+            "type": "boolean"
+          },
+          "items_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          },
+          "items_count_total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          },
+          "items_limit": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          },
+          "page_count_total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          },
+          "page_indx": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "susee message explorer"
+    }
+  ]
+}

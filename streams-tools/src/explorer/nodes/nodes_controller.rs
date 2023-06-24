@@ -28,6 +28,18 @@ use super::{
 };
 use crate::explorer::shared::page_dto::Page;
 
+#[utoipa::path(
+    get,
+    path = "/nodes",
+    responses(
+        (status = 200, description = "Successfully responded with list of Nodes")
+    ),
+    params(
+        NodeConditions,
+        ("page" = u32, Path, description = "Which page to get. Index range is [0 ...]"),
+        ("limit" = u32, Path, description = "Maximum number of items per page"),
+    )
+)]
 pub (crate) async fn index(
     Query(conditions): Query<NodeConditions>,
     optional_paging: Option<Query<PagingOptions>>,
@@ -44,6 +56,17 @@ pub (crate) async fn index(
     wrap_with_page_meta_and_json_serialize(ret_val, paging.unwrap(), items_cnt_total)
 }
 
+#[utoipa::path(
+    get,
+    path = "/nodes/{channel_id}",
+    responses(
+        (status = 200, description = "Successfully responded requested node", body = [Node]),
+        (status = 404, description = "Node with specified id not found")
+    ),
+    params(
+        ("channel_id" = i32, Path, description = "Streams channel id of the requested node"),
+    )
+)]
 pub (crate) async fn get(Path(channel_id): Path<String>, Extension(state): Extension<AppState>) -> Result<Json<Node>, AppError> {
     service::get(&channel_id, &state.user_store).map(|resp| Json(resp))
 }

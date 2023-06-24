@@ -90,11 +90,16 @@ impl Worker for IndexWorker {
     type ResultType = (MessageList, usize);
 
     async fn run(opt: IndexWorkerOptions) -> Result<(MessageList, usize)> {
-        let mut channel_manager = get_channel_manager_for_channel_id(
-            &opt.channel_id,
-            &opt.u_store,
-            &opt.multi_channel_mngr_opt,
-        ).await?;
+        let mut channel_manager = match get_channel_manager_for_channel_id(
+                &opt.channel_id,
+                &opt.u_store,
+                &opt.multi_channel_mngr_opt,
+            ).await {
+            Ok(mngr) => mngr,
+            Err(_) => {
+                return Err(AppError::ChannelDoesNotExist(opt.channel_id))
+            }
+        };
         if let Some(author) = channel_manager.author.as_mut() {
             let mut msg_mngr = MessageManager::new(
                 author,

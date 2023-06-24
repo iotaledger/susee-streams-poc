@@ -3,26 +3,20 @@ use serde::{
     Serialize
 };
 
-#[derive(Serialize, Deserialize, Debug)]
+use utoipa::{
+    IntoParams,
+    ToSchema
+};
+
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct Node {
     pub channel_id: String,
 }
 
-/*
-#[derive(Serialize, Deserialize, Debug)]
-pub struct NewNode {
-    pub name: String,
-    pub msg: Option<String>,
-    pub age: Option<i16>,
-}
-*/
-
-#[derive(Serialize, Deserialize, Debug)]
+/// Filter existing nodes
+#[derive(Serialize, Deserialize, Debug, IntoParams)]
 pub struct NodeConditions {
+    /// Optional. Specify the beginning of the Streams channels ID
+    #[param(max_length=80, min_length=1, example ="0ec")]
     pub channel_id_start: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ChannelId {
-    pub id: String,
 }

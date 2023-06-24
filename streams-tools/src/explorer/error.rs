@@ -9,7 +9,11 @@ use axum::{
     Json
 };
 
-#[derive(Debug)]
+use utoipa::{
+    ToSchema
+};
+
+#[derive(Debug, ToSchema)]
 pub enum AppError {
     InternalServerError(String),
     AtLeastOneConditionNeeded(String),

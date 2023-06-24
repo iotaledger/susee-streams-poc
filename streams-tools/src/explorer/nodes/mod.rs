@@ -5,4 +5,9 @@ mod nodes_router;
 
 pub use {
     nodes_router::*,
+    nodes_dto::*,
+    nodes_controller::{
+        __path_index,
+        __path_get,
+    }
 };

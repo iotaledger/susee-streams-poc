@@ -129,11 +129,21 @@ with the remote sensor via the IOTA-Bridge:
                                 # a KEYLOAD_REGISTRATION Confirmation
 ";
 
-static RUN_EXPLORER_API_SERVER_ABOUT: &str = "Start an http rest api server to explore sensor messages stored on the tangle
+static RUN_EXPLORER_API_SERVER_ABOUT: &str = "Run an http rest api server to explore sensor messages stored on the tangle
+Default value for LISTENER_ADDRESS is 127.0.0.1:8080.
+
+After the server has been started you may want to:
+* fetch an overview about available paths from http://127.0.0.1:8080
+* explore the swagger-ui open-api documentation via http://127.0.0.1:8080/swagger-ui
 
 Example:
 
     >   ./management-console --run-explorer-api-server
+
+Specify the listener address and port for server like this:
+Example:
+
+    >   ./management-console --run-explorer-api-server 192.168.47.11:7777
 ";
 
 
@@ -203,7 +213,9 @@ pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
             .long(ARG_KEYS.run_explorer_api_server)
             .short('r')
             .help(RUN_EXPLORER_API_SERVER_ABOUT)
-            .takes_value(false)
+            .value_name("LISTENER_ADDRESS")
+            .default_missing_value("127.0.0.1:8080")
+            .conflicts_with_all(&[ARG_KEYS.init_sensor, ARG_KEYS.create_channel, ARG_KEYS.subscription_pub_key, ARG_KEYS.subscription_link])
         )
         .arg(Arg::new(ARG_KEYS.iota_bridge_url)
             .long(ARG_KEYS.iota_bridge_url)

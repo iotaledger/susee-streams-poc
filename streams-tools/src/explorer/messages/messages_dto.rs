@@ -3,6 +3,11 @@ use serde::{
     Serialize
 };
 
+use utoipa::{
+    IntoParams,
+    ToSchema
+};
+
 use iota_streams::{
     app_channels::{
         Bytes,
@@ -10,7 +15,7 @@ use iota_streams::{
     }
 };
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct Message {
     pub id: String,
     pub public_text: String,
@@ -37,12 +42,10 @@ impl From<UnwrappedMessage> for Message {
 
 pub type MessageList = Vec<Message>;
 
-#[derive(Serialize, Deserialize, Debug)]
+/// Filter existing messages
+#[derive(Serialize, Deserialize, Debug, IntoParams)]
 pub struct MessageConditions {
+    /// Filter by Streams channel-id. Find existing channel-id of existing nodes using the '/node' endpoint
+    #[param(required=true, max_length=80, min_length=80, example ="0ec89c9e5e80c25e24e665fadedf58e7948be80d8bf61c270736974ec2cb36090000000000000000")]
     pub channel_id: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct MessageId {
-    pub id: String,
 }

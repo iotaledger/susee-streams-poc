@@ -50,8 +50,6 @@ use cli::{
 
 mod cli;
 
-const MESSAGE_EXPLORER_LISTENER_ADDRESS: &str = "127.0.0.1:8080";
-
 pub async fn create_channel_manager<'a>(user_store: &mut UserDataStore, cli: &ManagementConsoleCli<'a>) -> Option<ChannelManagerPlainTextWallet> {
     let mut ret_val = None;
     let options = get_multi_channel_manager_options(cli).ok()?;
@@ -251,13 +249,14 @@ async fn main() -> Result<()> {
             print_usage_help = true;
         }
     } else if cli.matches.is_present(cli.arg_keys.run_explorer_api_server) {
+        let message_explorer_listener_address = cli.matches.value_of(cli.arg_keys.run_explorer_api_server).unwrap();
         run_explorer_api_server(
             user_store,
             ExplorerOptions {
                 iota_node_url: cli.node.to_string(),
                 wallet_filename: get_management_console_wallet_filename(&cli)?,
                 db_file_name: DB_FILE_PATH_AND_NAME.to_string(),
-                listener_ip_address_port: MESSAGE_EXPLORER_LISTENER_ADDRESS.to_string(),
+                listener_ip_address_port: message_explorer_listener_address.to_string(),
                 streams_user_serialization_password: SUSEE_CONST_SECRET_PASSWORD.to_string()
             }
         ).await?;

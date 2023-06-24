@@ -1,3 +1,5 @@
+use std::cmp;
+
 use serde::{
     Deserialize,
     Serialize
@@ -8,16 +10,23 @@ use axum::{
     Json,
 };
 
-use crate::dao_helpers::Limit;
-use crate::explorer::error::AppError;
+use utoipa::{
+    IntoParams,
+    ToSchema
+};
 
-#[derive(Serialize, Deserialize, Debug)]
+use crate::{
+    dao_helpers::Limit,
+    explorer::error::AppError,
+};
+
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct Page<DataT> {
     pub data: Vec<DataT>,
     pub meta: PageMeta,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct PageMeta {
     pub page_indx: u32,
     pub items_count: u32,
@@ -30,22 +39,37 @@ pub struct PageMeta {
 
 impl PageMeta {
     pub fn new(paging_opt: PagingOptions, items_count: usize, items_count_total: usize) -> PageMeta {
-        let page_count_total = (items_count_total as f32 / paging_opt.limit as f32).ceil() as u32;
+        let page_count_total: u32 = if paging_opt.limit > 0 {
+            (items_count_total as f32 / paging_opt.limit as f32).ceil() as u32
+        } else {
+            0
+        };
+        let has_next_page = if page_count_total > 1 {
+            (page_count_total - 1) > paging_opt.page
+        } else {
+            false
+        };
+        let page_indx = cmp::min(paging_opt.page, page_count_total);
         PageMeta {
-            page_indx: paging_opt.page,
+            page_indx,
             items_count: items_count as u32,
             items_limit: paging_opt.limit,
             page_count_total,
             items_count_total: items_count_total as u32,
-            has_prev_page: paging_opt.page > 0,
-            has_next_page: (page_count_total - 1) > paging_opt.page,
+            has_prev_page: page_indx > 0,
+            has_next_page,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Control pagination of result list
+#[derive(Serialize, Deserialize, Debug, Clone, IntoParams)]
 pub struct PagingOptions {
+    /// Which page to get. Index range is [0 ...]
+    #[param(default=0)]
     pub page: u32,
+    /// Maximum number of items per page
+    #[param(default=10)]
     pub limit: u32,
 }
 

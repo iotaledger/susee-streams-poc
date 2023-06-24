@@ -36,7 +36,7 @@ const MAX_NUMBER_OF_ROWS_TO_FETCH: usize = 1000;
 pub trait DaoManager {
 
     type ItemType: DeserializeOwned;
-    type PrimaryKeyType: fmt::Display;
+    type PrimaryKeyType: fmt::Display + ToString;
     type SerializationCallbackType;
     type OptionsType;
 
@@ -110,10 +110,11 @@ pub fn find_all_items_in_db<'a, DaoManagerT: DaoManager>(
             offset: 0
         }
     ));
-    let (mut statement, statement_str) = build_query_statement(dao_manager, starts_with, Some(true), limit_offset)?;
+    let search_all_starting_with = starts_with.to_string().len() > 0;
+    let (mut statement, statement_str) = build_query_statement(dao_manager, starts_with, Some(search_all_starting_with), limit_offset)?;
     let ret_val = get_value_from_statement::<DaoManagerT::ItemType>(&mut statement, &statement_str, DaoManagerT::ITEM_TYPE_NAME);
 
-    let (mut cnt_statement, cnt_statement_str) = build_select_count_statement(dao_manager, starts_with, Some(true))?;
+    let (mut cnt_statement, cnt_statement_str) = build_select_count_statement(dao_manager, starts_with, Some(search_all_starting_with))?;
     let counts = get_value_from_statement::<usize>(&mut cnt_statement, &cnt_statement_str, "count");
 
     Ok((ret_val, counts[0]))
@@ -165,6 +166,7 @@ fn get_item_from_single_row_rowset<'a, DaoManagerT: DaoManager>(
     }
 }
 
+#[derive(Clone)]
 struct StatementParts {
     operator: String,
     wildcard: String,
@@ -198,12 +200,10 @@ fn build_query_statement<'a, DaoManagerT: DaoManager>(
 ) -> Result<(Statement<'a>, String)>
 {
     let parts = StatementParts::new::<DaoManagerT>(starts_with, limit);
-    let statement_str = format!("SELECT * FROM {t_name} WHERE {prim_col} {op} '{p_key}{wldcrd}' {lim_ofs}",
+    let where_condition = get_where_condition::<DaoManagerT>(primary_key, starts_with, parts.clone());
+    let statement_str = format!("SELECT * FROM {t_name} {where} {lim_ofs}",
                                 t_name = dao_manager.get_table_name(),
-                                prim_col = DaoManagerT::PRIMARY_KEY_COLUMN_NAME,
-                                p_key = primary_key,
-                                op = parts.operator,
-                                wldcrd = parts.wildcard,
+                                where = where_condition,
                                 lim_ofs = parts.limit_offset,
     );
     let statement = dao_manager.get_connection().prepare(statement_str.as_str())
@@ -213,6 +213,19 @@ fn build_query_statement<'a, DaoManagerT: DaoManager>(
     Ok((statement, statement_str))
 }
 
+fn get_where_condition<DaoManagerT: DaoManager>(primary_key: &<DaoManagerT as DaoManager>::PrimaryKeyType, starts_with: Option<bool>, parts: StatementParts) -> String {
+    if starts_with.unwrap_or(false) {
+        format!("WHERE {prim_col} {op} '{p_key}{wldcrd}'",
+                prim_col = DaoManagerT::PRIMARY_KEY_COLUMN_NAME,
+                p_key = primary_key,
+                op = parts.operator,
+                wldcrd = parts.wildcard,
+        )
+    } else {
+        "".to_string()
+    }
+}
+
 fn build_select_count_statement<'a, DaoManagerT: DaoManager>(
     dao_manager: &'a DaoManagerT,
     primary_key: &DaoManagerT::PrimaryKeyType,
@@ -220,12 +233,10 @@ fn build_select_count_statement<'a, DaoManagerT: DaoManager>(
 ) -> Result<(Statement<'a>, String)>
 {
     let parts = StatementParts::new::<DaoManagerT>(starts_with, None);
-    let statement_str = format!("SELECT COUNT(*) FROM {t_name} WHERE {prim_col} {op} '{p_key}{wldcrd}'",
+    let where_condition = get_where_condition::<DaoManagerT>(primary_key, starts_with, parts);
+    let statement_str = format!("SELECT COUNT(*) FROM {t_name} {where}",
                                 t_name = dao_manager.get_table_name(),
-                                prim_col = DaoManagerT::PRIMARY_KEY_COLUMN_NAME,
-                                p_key = primary_key,
-                                op = parts.operator,
-                                wldcrd = parts.wildcard,
+                                where = where_condition,
     );
     let statement = dao_manager.get_connection().prepare(statement_str.as_str())
         .expect(format!("Error on preparing 'SELECT COUNT(*) FROM' for {}. Statement: {}",

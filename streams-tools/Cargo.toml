@@ -50,8 +50,8 @@ tower = { version = "0.4", optional = true, features = ["util"] }
 tower-http = { version = "0.4", optional = true, features = ["cors", "trace"] }
 tracing = { version = "0.1", optional = true }
 tracing-subscriber = { version = "0.3", optional = true, features = ["std", "env-filter"] }
-# utoipa = { version = "3.3", optional = true, features = ["axum_extras"] }
-# utoipa-swagger-ui = { version = "3.3", optional = true, features = ["axum"] }
+utoipa = { version = "3.3", optional = true, features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "3.1", optional = true, features = ["axum"] }
 
 [dependencies.iota-streams]
 git = "https://github.com/chrisgitiota/streams"
@@ -66,4 +66,4 @@ esp_idf = ["embedded-svc", "esp-idf-svc", "esp-idf-sys"]
 dao = ["rusqlite", "serde", "serde_rusqlite", "fallible-streaming-iterator"]
 std = ["tokio", "iota-streams/client", "iota-streams/std"]
 iota_bridge = ["dao", "serde_json", "dashmap"]
-explorer = ["dao", "axum", "tower", "tower-http", "tracing", "tracing-subscriber", "serde_json" ] # , "utoipa", "utoipa-swagger-ui"]
+explorer = ["dao", "axum", "tower", "tower-http", "tracing", "tracing-subscriber", "serde_json", "utoipa", "utoipa-swagger-ui"]

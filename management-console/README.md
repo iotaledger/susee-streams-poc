@@ -42,7 +42,7 @@ the *Management Console* offers the following CLI arguments.
             'user-states-management-console.sqlite3' database file. Use this CLI option to print
             the relevant channel state information from the SQLite database to console.
             Use CLI argument '--channel-starts-with' to select the Streams channel you want to
-            investigate.             
+            investigate.
 
     -s, --channel-starts-with <CHANNEL_STARTS_WITH>
             Specify the Streams channel when processing a management-console
@@ -153,3 +153,30 @@ or [cargo espmonitor](https://github.com/esp-rs/espmonitor).
 If you use the `--init-sensor` option all relevant Streams channel properties like announcement-link,
 subscription_pub_key, ... are logged to the console of the *Management Console* app equivalent to
 the usage of the *Sensor* app when it's used as a *Sensor remote control*. 
+
+#### Run Message Explorer
+
+You can explore the streams channels of existing LoRaWAN nodes and the the messages that have been
+send via these channels using the `--run-explorer-api-server` CLI argument of the
+management console:
+
+    -r, --run-explorer-api-server <LISTENER_ADDRESS>
+            Run an http rest api server to explore sensor messages stored on the tangle
+            Default value for LISTENER_ADDRESS is 127.0.0.1:8080.
+            
+            After the server has been started you may want to:
+            * fetch an overview about available paths from http://127.0.0.1:8080
+            * explore the swagger-ui open-api documentation via http://127.0.0.1:8080/swagger-ui
+            
+            Example:
+            
+                >   ./management-console --run-explorer-api-server
+            
+            Specify the listener address and port for server like this:
+            Example:
+            
+                >   ./management-console --run-explorer-api-server 192.168.47.11:7777
+                      
+Alternatively to the live swagger-ui open-api documentation, available when the server is started,
+you can view the REST api documentation
+in the [Swagger Editor](https://editor.swagger.io/?url=./message-explorer-openapi.json).

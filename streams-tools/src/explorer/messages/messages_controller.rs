@@ -29,6 +29,22 @@ use super::{
 use crate::explorer::messages::messages_dto::Message;
 use crate::explorer::shared::page_dto::Page;
 
+/// List messages
+///
+/// List messages of a specific node.
+/// Filtering the messages by the nodes channel id is obligatory.
+#[utoipa::path(
+    get,
+    path = "/messages",
+    responses(
+        (status = 200, description = "Successfully responded with list of Messages"),
+        (status = 400, description = "Channel with specified channel-id does not exist"),
+    ),
+    params(
+        MessageConditions,
+        PagingOptions,
+    )
+)]
 pub (crate) async fn index(
     Query(conditions): Query<MessageConditions>,
     optional_paging: Option<Query<PagingOptions>>,
@@ -43,7 +59,17 @@ pub (crate) async fn index(
     }
 }
 
-#[axum::debug_handler]
+#[utoipa::path(
+    get,
+    path = "/messages/{msg_id}",
+    responses(
+        (status = 200, description = "Successfully responded requested message", body = [Message]),
+        (status = 404, description = "Message with specified id not found")
+    ),
+    params(
+        ("msg_id" = i32, Path, description = "Message id of the requested message (includes the channel id)"),
+    )
+)]
 pub (crate) async fn get(Path(msg_id): Path<String>, Extension(state): Extension<AppState>) -> impl IntoResponse {
     let ret_val = service::get(&state.messages, &state.user_store, msg_id.as_str()).await.map(|resp| Json(resp));
     ret_val.into_response()

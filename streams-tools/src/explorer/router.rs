@@ -14,6 +14,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use super::{
     nodes,
     messages,
+    error::AppError,
     shared::page_dto,
 };
 
@@ -55,6 +56,7 @@ pub fn router() -> Router {
             page_dto::Page<messages::Message>,
             page_dto::PageMeta,
             DataT,
+            AppError,
         ),
     ),
     tags(

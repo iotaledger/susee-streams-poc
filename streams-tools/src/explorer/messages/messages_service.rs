@@ -21,7 +21,7 @@ use crate::{
             Worker,
             run_worker_in_own_thread,
         },
-        shared::page_dto::PagingOptions,
+        shared::PagingOptions,
     },
     user_manager::{
         multi_channel_management::{

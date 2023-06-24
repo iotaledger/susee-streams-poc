@@ -19,6 +19,7 @@ use crate::{
         DbFileBasedDaoManagerOptions,
         DbFileBasedDaoManagerOpt,
         Limit,
+        MatchType,
         get_item_from_db,
         update_db_schema_to_current_version,
     }
@@ -103,7 +104,7 @@ impl DaoManager for PendingRequestDaoManager {
     }
 
     fn get_item_from_db(&self, request_key: &Self::PrimaryKeyType) -> Result<PendingRequest> {
-        get_item_from_db(self, request_key, None)
+        get_item_from_db(self, request_key, MatchType::ExactMatch)
     }
 
     fn search_item(&self, _request_key_starts_with: &str) -> Result<PendingRequest>{

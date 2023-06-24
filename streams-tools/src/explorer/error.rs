@@ -13,13 +13,24 @@ use utoipa::{
     ToSchema
 };
 
+
+// Usually utoipa uses the IntoResponses trait to map AppError to http status codes.
+// As several AppError options use the same http status code, this will not work for us.
+// https://docs.rs/utoipa/latest/utoipa/trait.IntoResponses.html
+
+#[allow(dead_code)]
 #[derive(Debug, ToSchema)]
 pub enum AppError {
+    /// An internal server error occurred
     InternalServerError(String),
+    /// At least one condition query parameter is needed
     AtLeastOneConditionNeeded(String),
+    /// A channel with the specified channel-id does not exist
     ChannelDoesNotExist(String),
-//    Generic(StatusCode),
+    /// A generic error occurred, see http status code and message for more details
     GenericWithMessage(StatusCode, String),
+//     /// A generic error occurred, see http status code for more details
+//    Generic(StatusCode),
 }
 
 impl IntoResponse for AppError {
@@ -45,7 +56,6 @@ impl IntoResponse for AppError {
 }
 
 pub type Result<T> = result::Result<T, AppError>;
-
 
 impl From<anyhow::Error> for AppError {
     fn from(inner: anyhow::Error) -> Self {

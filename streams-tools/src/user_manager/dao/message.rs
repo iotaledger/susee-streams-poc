@@ -17,6 +17,7 @@ use crate::{
         DbSchemaVersionType,
         DbFileBasedDaoManagerOpt,
         Limit,
+        MatchType,
         get_item_from_db,
         find_all_items_in_db,
         update_db_schema_to_current_version,
@@ -97,11 +98,11 @@ impl DaoManager for MessageDaoManager {
     }
 
     fn get_item_from_db(&self, key: &Self::PrimaryKeyType) -> Result<Message> {
-        get_item_from_db(self, key, None)
+        get_item_from_db(self, key, MatchType::ExactMatch)
     }
 
     fn search_item(&self, channel_starts_with: &str) -> Result<Message>{
-        get_item_from_db(self, &channel_starts_with.to_string(), Some(true))
+        get_item_from_db(self, &channel_starts_with.to_string(),  MatchType::StartsWith)
     }
 
     fn find_all(&self, channel_starts_with: &str, limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {

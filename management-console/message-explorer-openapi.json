@@ -14,8 +14,8 @@
         "tags": [
           "messages"
         ],
-        "summary": "List messages",
-        "description": "List messages\n\nList messages of a specific node.\nFiltering the messages by the nodes channel id is obligatory.",
+        "summary": "List messages of a node",
+        "description": "List messages of a node\n\nList messages of a Streams channel of a specific node.",
         "operationId": "messages_index",
         "parameters": [
           {
@@ -68,7 +68,7 @@
         }
       }
     },
-    "/messages/{msg_id}": {
+    "/messages/{message_id}": {
       "get": {
         "tags": [
           "messages"
@@ -76,13 +76,17 @@
         "operationId": "messages_get",
         "parameters": [
           {
-            "name": "msg_id",
+            "name": "message_id",
             "in": "path",
-            "description": "Message id of the requested message (includes the channel id)",
+            "description": "Streams message id (includes the channel id). Message ids can be listed using the '/messages' endpoint.",
             "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 105,
+              "minLength": 105
+            },
+            "allowReserved": true,
+            "example": "0ec89c9e5e80c25e24e665fadedf58e7948be80d8bf61c270736974ec2cb36090000000000000000:84d48c0cc279564b467f7e74"
           }
         ],
         "responses": {
@@ -100,7 +104,7 @@
             }
           },
           "404": {
-            "description": "Message with specified id not found"
+            "description": "Message with specified msg_id does not exist"
           }
         }
       }
@@ -169,11 +173,14 @@
           {
             "name": "channel_id",
             "in": "path",
-            "description": "Streams channel id of the requested node",
+            "description": "Streams channel-id. Channel ids of existing nodes can be listed using the '/node' endpoint",
             "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 80
+            },
+            "example": "0ec89c9e5e80c25e24e665fadedf58e7948be80d8bf61c270736974ec2cb36090000000000000000"
           }
         ],
         "responses": {
@@ -190,8 +197,8 @@
               }
             }
           },
-          "404": {
-            "description": "Node with specified id not found"
+          "400": {
+            "description": "Node with specified channel_id does not exist"
           }
         }
       }
@@ -199,6 +206,62 @@
   },
   "components": {
     "schemas": {
+      "AppError": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "InternalServerError"
+            ],
+            "properties": {
+              "InternalServerError": {
+                "type": "string",
+                "description": "An internal server error occurred"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "AtLeastOneConditionNeeded"
+            ],
+            "properties": {
+              "AtLeastOneConditionNeeded": {
+                "type": "string",
+                "description": "At least one condition query parameter is needed"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "ChannelDoesNotExist"
+            ],
+            "properties": {
+              "ChannelDoesNotExist": {
+                "type": "string",
+                "description": "A channel with the specified channel-id does not exist"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "GenericWithMessage"
+            ],
+            "properties": {
+              "GenericWithMessage": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        ]
+      },
       "DataT": {
         "type": "object",
         "title": "JSON array"

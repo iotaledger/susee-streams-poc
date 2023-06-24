@@ -11,7 +11,8 @@ use crate::{
     explorer::{
         error::AppError,
         app_state::AppState,
-        shared::page_dto::{
+        shared::{
+            Page,
             PagingOptions,
             get_paging,
             wrap_with_page_meta_and_json_serialize,
@@ -23,10 +24,10 @@ use super::{
     nodes_dto::{
         Node,
         NodeConditions,
+        ChannelId,
     },
     nodes_service as service,
 };
-use crate::explorer::shared::page_dto::Page;
 
 #[utoipa::path(
     get,
@@ -62,12 +63,12 @@ pub (crate) async fn index(
     path = "/nodes/{channel_id}",
     responses(
         (status = 200, description = "Successfully responded requested node", body = [Node]),
-        (status = 404, description = "Node with specified id not found")
+        (status = 400, description = "Node with specified channel_id does not exist")
     ),
     params(
-        ("channel_id" = i32, Path, description = "Streams channel id of the requested node"),
+        ChannelId,
     )
 )]
-pub (crate) async fn get(Path(channel_id): Path<String>, Extension(state): Extension<AppState>) -> Result<Json<Node>, AppError> {
-    service::get(&channel_id, &state.user_store).map(|resp| Json(resp))
+pub (crate) async fn get(Path(id): Path<ChannelId>, Extension(state): Extension<AppState>) -> Result<Json<Node>, AppError> {
+    service::get(&id.channel_id, &state.user_store).map(|resp| Json(resp))
 }

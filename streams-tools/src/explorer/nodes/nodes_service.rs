@@ -8,8 +8,11 @@ use crate::{
         UserDaoManager,
     },
     explorer::{
-        error::Result,
-        shared::page_dto::PagingOptions,
+        error::{
+            Result,
+            AppError,
+        },
+        shared::PagingOptions,
     },
 };
 
@@ -24,6 +27,11 @@ pub(crate) fn index(channel_id_start: &str, user_store: &UserDataStore, paging_o
 }
 
 pub(crate) fn get(channel_id: &<UserDaoManager as DaoManager>::PrimaryKeyType, user_store: &UserDataStore) -> Result<Node> {
-    let (user, _) = user_store.get_item(channel_id)?;
+    let user = match user_store.get_item(channel_id) {
+        Ok((user, _)) => user,
+        Err(_) => {
+            return Err(AppError::ChannelDoesNotExist(channel_id.to_string()))
+        }
+    };
     Ok(Node { channel_id: user.streams_channel_id.clone() })
 }

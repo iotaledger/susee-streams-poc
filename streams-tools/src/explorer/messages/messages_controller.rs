@@ -12,7 +12,8 @@ use crate::{
     explorer::{
         error::AppError,
         app_state::AppState,
-        shared::page_dto::{
+        shared::{
+            Page,
             PagingOptions,
             get_paging,
             wrap_with_page_meta_and_json_serialize,
@@ -22,17 +23,16 @@ use crate::{
 
 use super::{
     messages_dto::{
+        Message,
+        MessageId,
         MessageConditions,
     },
     messages_service as service,
 };
-use crate::explorer::messages::messages_dto::Message;
-use crate::explorer::shared::page_dto::Page;
 
-/// List messages
+/// List messages of a node
 ///
-/// List messages of a specific node.
-/// Filtering the messages by the nodes channel id is obligatory.
+/// List messages of a Streams channel of a specific node.
 #[utoipa::path(
     get,
     operation_id = "messages_index",
@@ -63,16 +63,16 @@ pub (crate) async fn index(
 #[utoipa::path(
     get,
     operation_id = "messages_get",
-    path = "/messages/{msg_id}",
+    path = "/messages/{message_id}",
     responses(
         (status = 200, description = "Successfully responded requested message", body = [Message]),
-        (status = 404, description = "Message with specified id not found")
+        (status = 404, description = "Message with specified msg_id does not exist")
     ),
     params(
-        ("msg_id" = i32, Path, description = "Message id of the requested message (includes the channel id)"),
+        MessageId,
     )
 )]
-pub (crate) async fn get(Path(msg_id): Path<String>, Extension(state): Extension<AppState>) -> impl IntoResponse {
-    let ret_val = service::get(&state.messages, &state.user_store, msg_id.as_str()).await.map(|resp| Json(resp));
+pub (crate) async fn get(Path(id): Path<MessageId>, Extension(state): Extension<AppState>) -> impl IntoResponse {
+    let ret_val = service::get(&state.messages, &state.user_store, id.message_id.as_str()).await.map(|resp| Json(resp));
     ret_val.into_response()
 }

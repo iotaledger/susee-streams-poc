@@ -76,6 +76,13 @@ pub trait DaoManager {
     fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType;
 }
 
+#[derive(Clone, PartialEq)]
+pub enum MatchType {
+    ExactMatch,
+    StartsWith,
+    ListEverything,
+}
+
 fn get_rows_from_statement<'a>(statement: &'a mut Statement, statement_str: &String, item_type_name: &str) -> Rows<'a> {
     statement.query([])
         .expect(format!("Error on querying prepared 'SELECT ... FROM' statement for {}. Statement: {}",
@@ -110,11 +117,15 @@ pub fn find_all_items_in_db<'a, DaoManagerT: DaoManager>(
             offset: 0
         }
     ));
-    let search_all_starting_with = starts_with.to_string().len() > 0;
-    let (mut statement, statement_str) = build_query_statement(dao_manager, starts_with, Some(search_all_starting_with), limit_offset)?;
+    let match_type = if starts_with.to_string().len() > 0 {
+        MatchType::StartsWith
+    } else {
+        MatchType::ListEverything
+    };
+    let (mut statement, statement_str) = build_query_statement(dao_manager, starts_with, match_type.clone(), limit_offset)?;
     let ret_val = get_value_from_statement::<DaoManagerT::ItemType>(&mut statement, &statement_str, DaoManagerT::ITEM_TYPE_NAME);
 
-    let (mut cnt_statement, cnt_statement_str) = build_select_count_statement(dao_manager, starts_with, Some(search_all_starting_with))?;
+    let (mut cnt_statement, cnt_statement_str) = build_select_count_statement(dao_manager, starts_with, match_type)?;
     let counts = get_value_from_statement::<usize>(&mut cnt_statement, &cnt_statement_str, "count");
 
     Ok((ret_val, counts[0]))
@@ -123,10 +134,10 @@ pub fn find_all_items_in_db<'a, DaoManagerT: DaoManager>(
 pub fn get_item_from_db<'a, DaoManagerT: DaoManager>(
     dao_manager: &DaoManagerT,
     primary_key: &DaoManagerT::PrimaryKeyType,
-    starts_with: Option<bool>
+    match_type: MatchType
 ) -> Result<DaoManagerT::ItemType>
 {
-    let (mut statement, statement_str) = build_query_statement(dao_manager, primary_key, starts_with, None)?;
+    let (mut statement, statement_str) = build_query_statement(dao_manager, primary_key, match_type, None)?;
     let rows = get_rows_from_statement(&mut statement, &statement_str, DaoManagerT::ITEM_TYPE_NAME);
     get_item_from_single_row_rowset(dao_manager, primary_key, rows, statement_str)
 }
@@ -174,15 +185,13 @@ struct StatementParts {
 }
 
 impl StatementParts {
-    pub fn new<'a, DaoManagerT: DaoManager>(starts_with: Option<bool>, limit: Option<Limit>) -> StatementParts {
+    pub fn new<'a, DaoManagerT: DaoManager>(match_type: MatchType, limit: Option<Limit>) -> StatementParts {
         let mut operator = "=";
         let mut wildcard = "";
         let limit_offset = limit.map_or("".to_string(), |lim_offset| lim_offset.to_string());
-        if let Some(starts_with) = starts_with {
-            if starts_with {
-                operator = "LIKE";
-                wildcard = "%";
-            }
+        if match_type == MatchType::StartsWith {
+            operator = "LIKE";
+            wildcard = "%";
         }
         StatementParts {
             operator: operator.to_string(),
@@ -195,12 +204,12 @@ impl StatementParts {
 fn build_query_statement<'a, DaoManagerT: DaoManager>(
     dao_manager: &'a DaoManagerT,
     primary_key: &DaoManagerT::PrimaryKeyType,
-    starts_with: Option<bool>,
+    match_type: MatchType,
     limit: Option<Limit>,
 ) -> Result<(Statement<'a>, String)>
 {
-    let parts = StatementParts::new::<DaoManagerT>(starts_with, limit);
-    let where_condition = get_where_condition::<DaoManagerT>(primary_key, starts_with, parts.clone());
+    let parts = StatementParts::new::<DaoManagerT>(match_type.clone(), limit);
+    let where_condition = get_where_condition::<DaoManagerT>(primary_key, match_type, parts.clone());
     let statement_str = format!("SELECT * FROM {t_name} {where} {lim_ofs}",
                                 t_name = dao_manager.get_table_name(),
                                 where = where_condition,
@@ -213,8 +222,8 @@ fn build_query_statement<'a, DaoManagerT: DaoManager>(
     Ok((statement, statement_str))
 }
 
-fn get_where_condition<DaoManagerT: DaoManager>(primary_key: &<DaoManagerT as DaoManager>::PrimaryKeyType, starts_with: Option<bool>, parts: StatementParts) -> String {
-    if starts_with.unwrap_or(false) {
+fn get_where_condition<DaoManagerT: DaoManager>(primary_key: &<DaoManagerT as DaoManager>::PrimaryKeyType, match_type: MatchType, parts: StatementParts) -> String {
+    if match_type != MatchType::ListEverything {
         format!("WHERE {prim_col} {op} '{p_key}{wldcrd}'",
                 prim_col = DaoManagerT::PRIMARY_KEY_COLUMN_NAME,
                 p_key = primary_key,
@@ -229,11 +238,11 @@ fn get_where_condition<DaoManagerT: DaoManager>(primary_key: &<DaoManagerT as Da
 fn build_select_count_statement<'a, DaoManagerT: DaoManager>(
     dao_manager: &'a DaoManagerT,
     primary_key: &DaoManagerT::PrimaryKeyType,
-    starts_with: Option<bool>,
+    match_type: MatchType,
 ) -> Result<(Statement<'a>, String)>
 {
-    let parts = StatementParts::new::<DaoManagerT>(starts_with, None);
-    let where_condition = get_where_condition::<DaoManagerT>(primary_key, starts_with, parts);
+    let parts = StatementParts::new::<DaoManagerT>(match_type.clone(), None);
+    let where_condition = get_where_condition::<DaoManagerT>(primary_key, match_type, parts);
     let statement_str = format!("SELECT COUNT(*) FROM {t_name} {where}",
                                 t_name = dao_manager.get_table_name(),
                                 where = where_condition,
@@ -420,11 +429,11 @@ mod tests {
         }
 
         fn get_item_from_db(&self, key: &Self::PrimaryKeyType) -> Result<TestItem> {
-            get_item_from_db(self, key, None)
+            get_item_from_db(self, key, MatchType::ExactMatch)
         }
 
         fn search_item(&self, id_starts_with: &str) -> Result<Self::ItemType> {
-            get_item_from_db(self, &id_starts_with.to_string(), Some(true))
+            get_item_from_db(self, &id_starts_with.to_string(),  MatchType::StartsWith)
         }
 
         fn find_all(&self, key_starts_with: &str, limit: Option<Limit>) -> Result<(Vec<Self::ItemType, Global>, usize), Error> {

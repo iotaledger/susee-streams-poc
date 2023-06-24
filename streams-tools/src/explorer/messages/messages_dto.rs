@@ -49,3 +49,11 @@ pub struct MessageConditions {
     #[param(required=true, max_length=80, min_length=80, example ="0ec89c9e5e80c25e24e665fadedf58e7948be80d8bf61c270736974ec2cb36090000000000000000")]
     pub channel_id: Option<String>,
 }
+
+/// Specify the message id
+#[derive(Serialize, Deserialize, Debug, IntoParams)]
+pub struct MessageId {
+    /// Streams message id (includes the channel id). Message ids can be listed using the '/messages' endpoint.
+    #[param(allow_reserved, max_length=105, min_length=105, example ="0ec89c9e5e80c25e24e665fadedf58e7948be80d8bf61c270736974ec2cb36090000000000000000:84d48c0cc279564b467f7e74")]
+    pub message_id: String,
+}

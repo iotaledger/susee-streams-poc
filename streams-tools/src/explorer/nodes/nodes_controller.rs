@@ -30,14 +30,14 @@ use crate::explorer::shared::page_dto::Page;
 
 #[utoipa::path(
     get,
+    operation_id = "nodes_index",
     path = "/nodes",
     responses(
         (status = 200, description = "Successfully responded with list of Nodes")
     ),
     params(
         NodeConditions,
-        ("page" = u32, Path, description = "Which page to get. Index range is [0 ...]"),
-        ("limit" = u32, Path, description = "Maximum number of items per page"),
+        PagingOptions,
     )
 )]
 pub (crate) async fn index(
@@ -58,6 +58,7 @@ pub (crate) async fn index(
 
 #[utoipa::path(
     get,
+    operation_id = "nodes_get",
     path = "/nodes/{channel_id}",
     responses(
         (status = 200, description = "Successfully responded requested node", body = [Node]),

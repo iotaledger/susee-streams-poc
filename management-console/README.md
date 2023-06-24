@@ -179,4 +179,7 @@ management console:
                       
 Alternatively to the live swagger-ui open-api documentation, available when the server is started,
 you can view the REST api documentation
-in the [Swagger Editor](https://editor.swagger.io/?url=./message-explorer-openapi.json).
+in the [online Swagger Editor](https://editor-next.swagger.io/).
+Use the editors '_open file_' function to open the
+latest [message-explorer-openapi.json](./message-explorer-openapi.json) file.
+The file needs to be located on your local machine to open it.

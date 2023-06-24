@@ -35,6 +35,7 @@ use crate::explorer::shared::page_dto::Page;
 /// Filtering the messages by the nodes channel id is obligatory.
 #[utoipa::path(
     get,
+    operation_id = "messages_index",
     path = "/messages",
     responses(
         (status = 200, description = "Successfully responded with list of Messages"),
@@ -61,6 +62,7 @@ pub (crate) async fn index(
 
 #[utoipa::path(
     get,
+    operation_id = "messages_get",
     path = "/messages/{msg_id}",
     responses(
         (status = 200, description = "Successfully responded requested message", body = [Message]),

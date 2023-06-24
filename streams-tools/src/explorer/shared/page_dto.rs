@@ -64,6 +64,7 @@ impl PageMeta {
 
 /// Control pagination of result list
 #[derive(Serialize, Deserialize, Debug, Clone, IntoParams)]
+#[into_params(style = Form, parameter_in = Query)]
 pub struct PagingOptions {
     /// Which page to get. Index range is [0 ...]
     #[param(default=0)]

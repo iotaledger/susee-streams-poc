@@ -16,7 +16,7 @@
         ],
         "summary": "List messages",
         "description": "List messages\n\nList messages of a specific node.\nFiltering the messages by the nodes channel id is obligatory.",
-        "operationId": "index",
+        "operationId": "messages_index",
         "parameters": [
           {
             "name": "channel_id",
@@ -33,7 +33,7 @@
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "Which page to get. Index range is [0 ...]",
             "required": false,
             "schema": {
@@ -41,11 +41,12 @@
               "format": "int32",
               "default": 0,
               "minimum": 0.0
-            }
+            },
+            "style": "form"
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Maximum number of items per page",
             "required": false,
             "schema": {
@@ -53,7 +54,8 @@
               "format": "int32",
               "default": 10,
               "minimum": 0.0
-            }
+            },
+            "style": "form"
           }
         ],
         "responses": {
@@ -71,7 +73,7 @@
         "tags": [
           "messages"
         ],
-        "operationId": "get",
+        "operationId": "messages_get",
         "parameters": [
           {
             "name": "msg_id",
@@ -108,7 +110,7 @@
         "tags": [
           "nodes"
         ],
-        "operationId": "index",
+        "operationId": "nodes_index",
         "parameters": [
           {
             "name": "channel_id_start",
@@ -125,25 +127,29 @@
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "Which page to get. Index range is [0 ...]",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
+              "default": 0,
               "minimum": 0.0
-            }
+            },
+            "style": "form"
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Maximum number of items per page",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
+              "default": 10,
               "minimum": 0.0
-            }
+            },
+            "style": "form"
           }
         ],
         "responses": {
@@ -158,7 +164,7 @@
         "tags": [
           "nodes"
         ],
-        "operationId": "get",
+        "operationId": "nodes_get",
         "parameters": [
           {
             "name": "channel_id",

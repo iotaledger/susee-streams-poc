@@ -183,3 +183,7 @@ in the [online Swagger Editor](https://editor-next.swagger.io/).
 Use the editors '_open file_' function to open the
 latest [message-explorer-openapi.json](./message-explorer-openapi.json) file.
 The file needs to be located on your local machine to open it.
+
+Have a look into the [test documentation](../test#view-sensor-messages-using-the-message-explorer)
+to find out more about how to use the swagger-ui to list messages of a specific sensor.
+

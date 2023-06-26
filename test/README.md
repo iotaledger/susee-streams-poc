@@ -819,17 +819,17 @@ argument of the *Management-Console* CLI:
       2023-06-26T11:42:49.840054Z  INFO listening on 127.0.0.1:8080
 ```
 
-The REST API of the *Message Explorer* can be tested using the Swagger Editor which is provided by the
+The REST API of the *Message Explorer* can be tested using the swagger-ui which is provided by the
 *Message Explorer* also, and can be opened using the following link: http://127.0.0.1:8080/swagger-ui
 
-<img src="message-explorer-swagger-ui-screenshot.png" alt="Swagger Editor of the Message Explorer" width="800"/>
+<img src="message-explorer-swagger-ui-screenshot.png" alt="Swagger UI of the Message Explorer" width="600"/>
 
-Using the `Try it out` buttons of the Swagger Editor, you can list messages of a specific Sensor.
+Using the `Try it out` buttons of the swagger-ui, you can list messages of a specific Sensor.
 Please note that a *Sensor* is called *Node* here (used in the sense of LoRaWAN Node).
 
-<img src="swagger-ui-try-it-out.png" alt="Try-it-out Button of the Swagger Editor" width="800"/>
+<img src="swagger-ui-try-it-out.png" alt="Try-it-out Button of the Swagger UI" width="600"/>
 
-Click on the links provided below to open the endpoint specific Swagger Editor form, which allows to edit
+Click on the links provided below to open the endpoint specific swagger-ui form, which allows to edit
 and execute API requests after you have pressed `Try it out`:
 
 * List all existing Sensors using the

@@ -832,17 +832,18 @@ Please note that a *Sensor* is called *Node* here (used in the sense of LoRaWAN 
 Click on the links provided below to open the endpoint specific swagger-ui form, which allows to edit
 and execute API requests after you have pressed `Try it out`:
 
-* List all existing Sensors using the
+* List all existing *Nodes* using the
   [GET /nodes](http://127.0.0.1:8080/swagger-ui/#/nodes/nodes_index) endpoint. After pressing the `Try it out`
-  and `Execute` buttons, the *Message Explorer* will respond to the request with a list of all existing *Sensors*.
+  and `Execute` buttons, the *Message Explorer* will respond to the request with a list of all existing *Nodes*
+  resp. *Sensors*.
   
-* Copy the channel-id of the Sensor of interest from the *Sensor* result list.
+* Copy the channel-id of the *Sensor* of interest from the *Node* result list.
   
-* List all messages of the *Sensor* using the
+* List all messages of the *Node* using the
   [GET /messages](http://127.0.0.1:8080/swagger-ui/#/messages/messages_index) endpoint.
   You need to paste the copied channel-id into the `channel_id` form field before you can execute this
   request.
 
-You can also use the *Message Explorer* to set the `name` and `external_id` field of a specific Sensor.
+You can also use the *Message Explorer* to set the `name` and `external_id` field of a specific *Node*.
 This can be done using the [PUT nodes/{channel_id}](http://127.0.0.1:8080/swagger-ui/#/nodes/nodes_put)
 endpoint.

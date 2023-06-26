@@ -9,5 +9,6 @@ pub use {
     nodes_controller::{
         __path_index,
         __path_get,
+        __path_put,
     }
 };

@@ -45,6 +45,7 @@ pub fn router() -> Router {
     paths(
         nodes::index,
         nodes::get,
+        nodes::put,
         messages::index,
         messages::get,
     ),

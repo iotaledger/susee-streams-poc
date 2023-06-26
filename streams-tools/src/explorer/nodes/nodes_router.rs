@@ -1,5 +1,5 @@
 use axum::{
-    routing::get,
+    routing,
     Router,
 };
 
@@ -7,8 +7,9 @@ use super::nodes_controller as controller;
 
 pub fn routes() -> Router {
     Router::new()
-        .route("/", get(controller::index))
-        .route("/:channel_id", get(controller::get))
+        .route("/", routing::get(controller::index))
+        .route("/:channel_id", routing::get(controller::get))
+        .route("/:channel_id", routing::put(controller::put))
 }
 
-pub const INFO: &str = "Search for nodes and view node details";
+pub const INFO: &str = "Search for nodes and view + update node details";

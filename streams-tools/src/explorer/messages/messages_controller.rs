@@ -60,6 +60,7 @@ pub (crate) async fn index(
     }
 }
 
+/// Get a specific message
 #[utoipa::path(
     get,
     operation_id = "messages_get",

@@ -29,7 +29,7 @@
               "maxLength": 80,
               "minLength": 80
             },
-            "example": "0ec89c9e5e80c25e24e665fadedf58e7948be80d8bf61c270736974ec2cb36090000000000000000"
+            "example": "cbd12e732e3c6df93c6fc189bf0d0553c2219d644402bae7caa8968aa5ba15dc0000000000000000"
           },
           {
             "name": "page",
@@ -73,6 +73,8 @@
         "tags": [
           "messages"
         ],
+        "summary": "Get a specific message",
+        "description": "Get a specific message",
         "operationId": "messages_get",
         "parameters": [
           {
@@ -86,7 +88,7 @@
               "minLength": 105
             },
             "allowReserved": true,
-            "example": "0ec89c9e5e80c25e24e665fadedf58e7948be80d8bf61c270736974ec2cb36090000000000000000:84d48c0cc279564b467f7e74"
+            "example": "cbd12e732e3c6df93c6fc189bf0d0553c2219d644402bae7caa8968aa5ba15dc0000000000000000:84d48c0cc279564b467f7e74"
           }
         ],
         "responses": {
@@ -114,12 +116,14 @@
         "tags": [
           "nodes"
         ],
+        "summary": "Search for Nodes",
+        "description": "Search for Nodes\n\nSearch for Nodes by Streams channel id, Name or external id",
         "operationId": "nodes_index",
         "parameters": [
           {
             "name": "channel_id_start",
             "in": "query",
-            "description": "Optional. Specify the beginning of the Streams channels ID",
+            "description": "Streams channels ID starts with the specified value",
             "required": false,
             "schema": {
               "type": "string",
@@ -128,6 +132,28 @@
               "minLength": 1
             },
             "example": "0ec"
+          },
+          {
+            "name": "external_id",
+            "in": "query",
+            "description": "External id equals the specified value",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "minLength": 1
+            }
+          },
+          {
+            "name": "name_start",
+            "in": "query",
+            "description": "Name starts with the specified value",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "minLength": 1
+            }
           },
           {
             "name": "page",
@@ -168,6 +194,8 @@
         "tags": [
           "nodes"
         ],
+        "summary": "Get a specific Node",
+        "description": "Get a specific Node",
         "operationId": "nodes_get",
         "parameters": [
           {
@@ -180,12 +208,62 @@
               "maxLength": 80,
               "minLength": 80
             },
-            "example": "0ec89c9e5e80c25e24e665fadedf58e7948be80d8bf61c270736974ec2cb36090000000000000000"
+            "example": "cbd12e732e3c6df93c6fc189bf0d0553c2219d644402bae7caa8968aa5ba15dc0000000000000000"
           }
         ],
         "responses": {
           "200": {
             "description": "Successfully responded requested node",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Node"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Node with specified channel_id does not exist"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "nodes"
+        ],
+        "summary": "Update a specific Node",
+        "description": "Update a specific Node\n\nUpdate the Node specified by the 'channel_id' path parameter.\nThe 'channel_id' field of the Node provided in the request body will be ignored.\nOnly Node fields 'external_id' and 'name' will be updated.",
+        "operationId": "nodes_put",
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "description": "Streams channel-id. Channel ids of existing nodes can be listed using the '/node' endpoint",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 80
+            },
+            "example": "cbd12e732e3c6df93c6fc189bf0d0553c2219d644402bae7caa8968aa5ba15dc0000000000000000"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Node"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully updated requested node",
             "content": {
               "application/json": {
                 "schema": {
@@ -288,10 +366,18 @@
       "Node": {
         "type": "object",
         "required": [
-          "channel_id"
+          "channel_id",
+          "name",
+          "external_id"
         ],
         "properties": {
           "channel_id": {
+            "type": "string"
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "name": {
             "type": "string"
           }
         }

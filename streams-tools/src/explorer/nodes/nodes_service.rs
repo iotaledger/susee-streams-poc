@@ -57,8 +57,24 @@ pub(crate) fn index(conditions: NodeConditions, user_store: &UserDataStore, pagi
 }
 
 pub(crate) fn get(channel_id: &<UserDaoManager as DaoManager>::PrimaryKeyType, user_store: &UserDataStore) -> Result<Node> {
+    let user = match user_store.get_item_read_only(channel_id) {
+        Ok(user) => user,
+        Err(_) => {
+            return Err(AppError::ChannelDoesNotExist(channel_id.to_string()))
+        }
+    };
+    Ok(user.into())
+}
+
+
+pub(crate) fn put(channel_id: &<UserDaoManager as DaoManager>::PrimaryKeyType, user_store: &UserDataStore, node: Node) -> Result<Node> {
     let user = match user_store.get_item(channel_id) {
-        Ok((user, _)) => user,
+        Ok((mut user, _)) => {
+            user.name = node.name;
+            user.external_id = node.external_id;
+            user_store.write_item_to_db(&user)?;
+            user
+        },
         Err(_) => {
             return Err(AppError::ChannelDoesNotExist(channel_id.to_string()))
         }

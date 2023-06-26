@@ -33,6 +33,6 @@ pub struct NodeConditions {
 #[derive(Serialize, Deserialize, Debug, IntoParams)]
 pub struct ChannelId {
     /// Streams channel-id. Channel ids of existing nodes can be listed using the '/node' endpoint
-    #[param(max_length=80, min_length=80, example ="0ec89c9e5e80c25e24e665fadedf58e7948be80d8bf61c270736974ec2cb36090000000000000000")]
+    #[param(max_length=80, min_length=80, example ="cbd12e732e3c6df93c6fc189bf0d0553c2219d644402bae7caa8968aa5ba15dc0000000000000000")]
     pub channel_id: String,
 }

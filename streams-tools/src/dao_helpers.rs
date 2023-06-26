@@ -61,6 +61,8 @@ pub trait DaoManager {
 
     fn find_all(&self, key_starts_with: &str, limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)>;
 
+    fn filter(&self, conditions: Vec<Condition>, limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)>;
+
     fn write_item_to_db(&self, item: &Self::ItemType) -> Result<Self::PrimaryKeyType>;
 
     fn delete_item_in_db(&self, key: &Self::PrimaryKeyType) -> Result<()>;
@@ -111,21 +113,35 @@ pub fn find_all_items_in_db<'a, DaoManagerT: DaoManager>(
     limit: Option<Limit>
 ) -> Result<(Vec<DaoManagerT::ItemType>, usize)>
 {
+    let match_type = if starts_with.to_string().len() > 0 {
+        MatchType::StartsWith
+    } else {
+        MatchType::ListEverything
+    };
+    let conditions = vec![Condition{
+        column_name: DaoManagerT::PRIMARY_KEY_COLUMN_NAME.to_string(),
+        column_value: starts_with.to_string(),
+        match_type
+    }];
+    filter_items(dao_manager, &conditions, limit)
+}
+
+pub fn filter_items<'a, DaoManagerT: DaoManager>(
+    dao_manager: &DaoManagerT,
+    conditions: &Vec<Condition>,
+    limit: Option<Limit>
+) -> Result<(Vec<DaoManagerT::ItemType>, usize)>
+{
     let limit_offset =  limit.or(Some(
         Limit{
             limit: MAX_NUMBER_OF_ROWS_TO_FETCH,
             offset: 0
         }
     ));
-    let match_type = if starts_with.to_string().len() > 0 {
-        MatchType::StartsWith
-    } else {
-        MatchType::ListEverything
-    };
-    let (mut statement, statement_str) = build_query_statement(dao_manager, starts_with, match_type.clone(), limit_offset)?;
+    let (mut statement, statement_str) = build_query_statement(dao_manager, conditions, limit_offset)?;
     let ret_val = get_value_from_statement::<DaoManagerT::ItemType>(&mut statement, &statement_str, DaoManagerT::ITEM_TYPE_NAME);
 
-    let (mut cnt_statement, cnt_statement_str) = build_select_count_statement(dao_manager, starts_with, match_type)?;
+    let (mut cnt_statement, cnt_statement_str) = build_select_count_statement(dao_manager, conditions)?;
     let counts = get_value_from_statement::<usize>(&mut cnt_statement, &cnt_statement_str, "count");
 
     Ok((ret_val, counts[0]))
@@ -137,7 +153,12 @@ pub fn get_item_from_db<'a, DaoManagerT: DaoManager>(
     match_type: MatchType
 ) -> Result<DaoManagerT::ItemType>
 {
-    let (mut statement, statement_str) = build_query_statement(dao_manager, primary_key, match_type, None)?;
+    let conditions = vec![Condition{
+        column_name: DaoManagerT::PRIMARY_KEY_COLUMN_NAME.to_string(),
+        column_value: primary_key.to_string(),
+        match_type
+    }];
+    let (mut statement, statement_str) = build_query_statement(dao_manager, &conditions, None)?;
     let rows = get_rows_from_statement(&mut statement, &statement_str, DaoManagerT::ITEM_TYPE_NAME);
     get_item_from_single_row_rowset(dao_manager, primary_key, rows, statement_str)
 }
@@ -177,39 +198,95 @@ fn get_item_from_single_row_rowset<'a, DaoManagerT: DaoManager>(
     }
 }
 
+
 #[derive(Clone)]
-struct StatementParts {
+pub struct Condition {
+    column_name: String,
+    column_value: String,
+    match_type: MatchType
+}
+
+pub struct Conditions<'a>(pub &'a mut Vec<Condition>);
+
+impl<'a> Conditions<'a> {
+    pub fn add(&mut self, opt_value: Option<String>, column_name: &str, match_type: MatchType) {
+        if let Some(column_value) = opt_value {
+            (*self.0).push(
+                Condition{
+                    column_name: column_name.to_string(),
+                    column_value,
+                    match_type
+                }
+            );
+        }
+    }
+
+    pub fn has_any_where_part(&self) -> bool {
+        (*self.0).iter().filter(|cond| cond.match_type != MatchType::ListEverything ).count() > 0
+    }
+}
+
+#[derive(Clone)]
+struct WherePart {
+    column_name: String,
+    column_value: String,
     operator: String,
     wildcard: String,
+}
+
+impl From<Condition> for WherePart {
+    fn from(value: Condition) -> Self {
+        let mut operator = "=";
+        let mut wildcard = "";
+        if value.match_type == MatchType::StartsWith {
+            operator = "LIKE";
+            wildcard = "%";
+        };
+        WherePart{
+            column_name: value.column_name.to_string(),
+            column_value: value.column_value.to_string(),
+            operator: operator.to_string(),
+            wildcard: wildcard.to_string(),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct StatementParts {
+    where_parts: Vec<WherePart>,
+    needs_where_part: bool,
     limit_offset: String,
 }
 
 impl StatementParts {
-    pub fn new<'a, DaoManagerT: DaoManager>(match_type: MatchType, limit: Option<Limit>) -> StatementParts {
-        let mut operator = "=";
-        let mut wildcard = "";
+    pub fn new<'a, DaoManagerT: DaoManager>(limit: Option<Limit>, mut conditions: Vec<Condition>) -> StatementParts {
         let limit_offset = limit.map_or("".to_string(), |lim_offset| lim_offset.to_string());
-        if match_type == MatchType::StartsWith {
-            operator = "LIKE";
-            wildcard = "%";
-        }
-        StatementParts {
-            operator: operator.to_string(),
-            wildcard: wildcard.to_string(),
+        let mut ret_val = StatementParts {
+            where_parts: Vec::new(),
+            needs_where_part: Conditions(&mut conditions).has_any_where_part(),
             limit_offset,
+        };
+        ret_val.add_where_parts(conditions);
+        ret_val
+    }
+    
+    pub fn add_where_parts(&mut self, conditions: Vec<Condition>) {
+        for cond in conditions {
+            if cond.match_type != MatchType::ListEverything {
+                self.where_parts.push(cond.into())
+            }
         }
     }
 }
 
 fn build_query_statement<'a, DaoManagerT: DaoManager>(
     dao_manager: &'a DaoManagerT,
-    primary_key: &DaoManagerT::PrimaryKeyType,
-    match_type: MatchType,
+    conditions: &Vec<Condition>,
     limit: Option<Limit>,
 ) -> Result<(Statement<'a>, String)>
 {
-    let parts = StatementParts::new::<DaoManagerT>(match_type.clone(), limit);
-    let where_condition = get_where_condition::<DaoManagerT>(primary_key, match_type, parts.clone());
+    let parts = StatementParts::new::<DaoManagerT>(limit, conditions.clone());
+    let where_condition = get_where_condition::<DaoManagerT>(parts.clone());
     let statement_str = format!("SELECT * FROM {t_name} {where} {lim_ofs}",
                                 t_name = dao_manager.get_table_name(),
                                 where = where_condition,
@@ -222,14 +299,21 @@ fn build_query_statement<'a, DaoManagerT: DaoManager>(
     Ok((statement, statement_str))
 }
 
-fn get_where_condition<DaoManagerT: DaoManager>(primary_key: &<DaoManagerT as DaoManager>::PrimaryKeyType, match_type: MatchType, parts: StatementParts) -> String {
-    if match_type != MatchType::ListEverything {
-        format!("WHERE {prim_col} {op} '{p_key}{wldcrd}'",
-                prim_col = DaoManagerT::PRIMARY_KEY_COLUMN_NAME,
-                p_key = primary_key,
-                op = parts.operator,
-                wldcrd = parts.wildcard,
-        )
+fn get_where_condition<DaoManagerT: DaoManager>(parts: StatementParts) -> String {
+    if parts.needs_where_part {
+        let mut ret_val = "WHERE ".to_string();
+        for (idx, where_part) in parts.where_parts.iter().enumerate() {
+            if idx > 0 {
+                ret_val += " AND ";
+            }
+            ret_val += format!("{col_name} {op} '{col_val}{wldcrd}'",
+                    col_name = where_part.column_name,
+                    col_val = where_part.column_value,
+                    op = where_part.operator,
+                    wldcrd = where_part.wildcard,
+            ).as_str();
+        }
+        ret_val
     } else {
         "".to_string()
     }
@@ -237,12 +321,11 @@ fn get_where_condition<DaoManagerT: DaoManager>(primary_key: &<DaoManagerT as Da
 
 fn build_select_count_statement<'a, DaoManagerT: DaoManager>(
     dao_manager: &'a DaoManagerT,
-    primary_key: &DaoManagerT::PrimaryKeyType,
-    match_type: MatchType,
+    conditions: &Vec<Condition>,
 ) -> Result<(Statement<'a>, String)>
 {
-    let parts = StatementParts::new::<DaoManagerT>(match_type.clone(), None);
-    let where_condition = get_where_condition::<DaoManagerT>(primary_key, match_type, parts);
+    let parts = StatementParts::new::<DaoManagerT>(None, conditions.clone());
+    let where_condition = get_where_condition::<DaoManagerT>(parts);
     let statement_str = format!("SELECT COUNT(*) FROM {t_name} {where}",
                                 t_name = dao_manager.get_table_name(),
                                 where = where_condition,
@@ -316,6 +399,10 @@ impl<DaoManagerT: DaoManager + Clone> DaoDataStore<DaoManagerT> {
 
     pub fn find_all(&self, key_starts_with: &str, limit: Option<Limit>) -> Result<(Vec<DaoManagerT::ItemType>, usize)> {
         self.items.find_all(key_starts_with, limit)
+    }
+
+    pub fn filter(&self, conditions: Vec<Condition>, limit: Option<Limit>) -> Result<(Vec<DaoManagerT::ItemType>, usize)> {
+        self.items.filter(conditions, limit)
     }
 
     pub fn get_item(&self, key: &DaoManagerT::PrimaryKeyType) -> Result<(DaoManagerT::ItemType, DaoManagerT::SerializationCallbackType)>{

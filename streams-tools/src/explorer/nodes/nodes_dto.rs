@@ -11,14 +11,22 @@ use utoipa::{
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct Node {
     pub channel_id: String,
+    pub name: String,
+    pub external_id: String,
 }
 
 /// Filter existing nodes
 #[derive(Serialize, Deserialize, Debug, IntoParams)]
 pub struct NodeConditions {
-    /// Optional. Specify the beginning of the Streams channels ID
+    /// Streams channels ID starts with the specified value
     #[param(max_length=80, min_length=1, example ="0ec")]
     pub channel_id_start: Option<String>,
+    /// External id equals the specified value
+    #[param(min_length=1)]
+    pub external_id: Option<String>,
+    /// Name starts with the specified value
+    #[param(min_length=1)]
+    pub name_start: Option<String>,
 }
 
 /// Specify the IOTA Streams channel id

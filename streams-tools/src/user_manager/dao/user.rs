@@ -18,6 +18,8 @@ use crate::{
         DbFileBasedDaoManagerOpt,
         Limit,
         MatchType,
+        Condition,
+        filter_items,
         get_item_from_db,
         find_all_items_in_db,
         update_db_schema_to_current_version,
@@ -29,6 +31,8 @@ pub struct User {
     pub streams_channel_id: String,
     pub streams_user_state: Vec<u8>,
     pub seed_derivation_phrase: String,
+    pub name: String,
+    pub external_id: String,
 }
 
 pub struct UserDaoManager{
@@ -77,7 +81,9 @@ impl DaoManager for UserDaoManager {
         self.connection.execute(format!("CREATE TABLE {} (\
             {} TEXT NOT NULL PRIMARY KEY,\
             streams_user_state BLOB NOT NULL,\
-            seed_derivation_phrase TEXT NOT NULL\
+            seed_derivation_phrase TEXT NOT NULL,\
+            name TEXT,\
+            external_id TEXT\
             )
             ", self.get_table_name(), Self::PRIMARY_KEY_COLUMN_NAME).as_str(), [])
             .expect("Error on executing 'CREATE TABLE' for User");
@@ -96,12 +102,18 @@ impl DaoManager for UserDaoManager {
         find_all_items_in_db(self, &channel_starts_with.to_string(), limit)
     }
 
+    fn filter(&self, conditions: Vec<Condition>, limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {
+        filter_items(self, &conditions, limit)
+    }
+
     fn write_item_to_db(&self, item: &User) -> Result<Self::PrimaryKeyType> {
         let _rows = self.connection.execute(format!(
-            "INSERT OR REPLACE INTO {} (streams_channel_id, streams_user_state, seed_derivation_phrase) VALUES (\
+            "INSERT OR REPLACE INTO {} (streams_channel_id, streams_user_state, seed_derivation_phrase, name, external_id) VALUES (\
                                 :streams_channel_id,\
                                 :streams_user_state,\
-                                :seed_derivation_phrase\
+                                :seed_derivation_phrase,\
+                                :name,\
+                                :external_id\
             )", self.get_table_name()).as_str(),
                                            to_params_named(item).unwrap().to_slice().as_slice())
             .expect("Error on executing 'INSERT INTO' for User");
@@ -111,12 +123,16 @@ impl DaoManager for UserDaoManager {
     fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType {
         let this = self.clone();
         let seed_derive_phrase = item.seed_derivation_phrase.clone();
+        let name = item.name.clone();
+        let external_id = item.external_id.clone();
         Box::new( move |streams_channel_id: String, user_state: Vec<u8>| -> Result<usize> {
             let mut new_user = User::default();
             let ret_val = user_state.len();
             new_user.streams_user_state = user_state;
             new_user.streams_channel_id = streams_channel_id;
             new_user.seed_derivation_phrase = seed_derive_phrase.clone();
+            new_user.name = name.clone();
+            new_user.external_id = external_id.clone();
             this.write_item_to_db(&new_user)?;
             Ok(ret_val)
         })

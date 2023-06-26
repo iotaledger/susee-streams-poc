@@ -18,6 +18,8 @@ use crate::{
         DbFileBasedDaoManagerOpt,
         Limit,
         MatchType,
+        Condition,
+        filter_items,
         get_item_from_db,
         find_all_items_in_db,
         update_db_schema_to_current_version,
@@ -107,6 +109,10 @@ impl DaoManager for MessageDaoManager {
 
     fn find_all(&self, channel_starts_with: &str, limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {
         find_all_items_in_db(self, &channel_starts_with.to_string(), limit)
+    }
+
+    fn filter(&self, conditions: Vec<Condition>, limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {
+        filter_items(self, &conditions, limit)
     }
 
     fn write_item_to_db(&self, item: &Message) -> Result<Self::PrimaryKeyType> {

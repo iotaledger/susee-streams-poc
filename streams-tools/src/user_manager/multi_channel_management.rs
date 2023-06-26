@@ -36,11 +36,8 @@ pub struct MultiChannelManagerOptions {
 pub async fn get_initial_channel_manager<'a>(user_store: &UserDataStore, options: &MultiChannelManagerOptions) -> Result<ChannelManager<PlainTextWallet>> {
     let mut new_opt = ChannelManagerOptions::default();
     let wallet = get_wallet(options, None)?;
-    let initial_user_having_seed_derivation_phrase = User{
-        streams_channel_id: "".to_string(),
-        streams_user_state: vec![],
-        seed_derivation_phrase: wallet.seed_derivation_phrase.as_ref().unwrap().clone()
-    };
+    let mut initial_user_having_seed_derivation_phrase = User::default();
+    initial_user_having_seed_derivation_phrase.seed_derivation_phrase = wallet.seed_derivation_phrase.as_ref().unwrap().clone();
     new_opt.serialize_user_state_callback = Some(
         user_store.get_serialization_callback(&initial_user_having_seed_derivation_phrase)
     );

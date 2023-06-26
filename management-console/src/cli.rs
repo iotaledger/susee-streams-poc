@@ -140,7 +140,7 @@ Example:
 
     >   ./management-console --run-explorer-api-server
 
-Specify the listener address and port for server like this:
+Specify the listener address and port for the server like this:
 Example:
 
     >   ./management-console --run-explorer-api-server 192.168.47.11:7777

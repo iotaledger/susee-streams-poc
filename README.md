@@ -35,9 +35,10 @@ roles and technical components of the SUSEE project please see below in the
   * Can also be used to imitate an *ESP32 Sensor* on x86/PC platforms including
     the possibility to be remote controlled
 * [Management Console](management-console)<br>
-  * Imitates the processes needed for *Initialization* of the *Sensor* and the monitoring of *Sensor Processing*
+  * [Admin](#roles)-Tool to process workflows needed for *Initialization* of the *Sensor* and the monitoring of *Sensor Processing*
   * Manages the *Add/Remove Subscriber* workflows
   * Manages multiple channels resp. *Sensors* using a local SQLite3 database
+  * Provides a [Message Explorer](management-console#run-message-explorer) to explore the *Sensor* messages 
 
 ###### How is IOTA Streams used?
 The *Streams* channel used for the SUSEE project generally can be described as follows:

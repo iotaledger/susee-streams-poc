@@ -116,7 +116,7 @@ impl DaoManager for PendingRequestDaoManager {
         unimplemented!()
     }
 
-    fn filter(&self, conditions: Vec<Condition>, limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {
+    fn filter(&self, _conditions: Vec<Condition>, _limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {
         unimplemented!()
     }
 

@@ -739,6 +739,7 @@ Again the CLI command is almost the same as used in the
 ```bash
     > ./sensor -c -b "http://192.168.47.11:50000" --register-keyload-msg "9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:dc4567247bbb6396057bfba9"
 ```
+
 ## Send messages using the *Sensor*
 
 The following sections show how to send messages using a *streams-poc-lib test application* and *x86/PC Sensor*. 
@@ -804,3 +805,44 @@ is the `target/release` folder:
     
     Sending Message again in 5 secs
 ```
+
+## View Sensor messages using the *Message Explorer*
+
+Messages that have been send by *Sensors* can be explored using the *Message Explorer* which can
+be started using the
+[--run-explorer-api-server](../management-console/README.md#run-message-explorer)
+argument of the *Management-Console* CLI:
+
+```bash
+    > ./management-console --run-explorer-api-server
+      [Management Console] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
+      2023-06-26T11:42:49.840054Z  INFO listening on 127.0.0.1:8080
+```
+
+The REST API of the *Message Explorer* can be tested using the Swagger Editor which is provided by the
+*Message Explorer* also, and can be opened using the following link: http://127.0.0.1:8080/swagger-ui
+
+<img src="message-explorer-swagger-ui-screenshot.png" alt="Swagger Editor of the Message Explorer" width="800"/>
+
+Using the `Try it out` buttons of the Swagger Editor, you can list messages of a specific Sensor.
+Please note that a *Sensor* is called *Node* here (used in the sense of LoRaWAN Node).
+
+<img src="swagger-ui-try-it-out.png" alt="Try-it-out Button of the Swagger Editor" width="800"/>
+
+Click on the links provided below to open the endpoint specific Swagger Editor form, which allows to edit
+and execute API requests after you have pressed `Try it out`:
+
+* List all existing Sensors using the
+  [GET /nodes](http://127.0.0.1:8080/swagger-ui/#/nodes/nodes_index) endpoint. After pressing the `Try it out`
+  and `Execute` buttons, the *Message Explorer* will respond to the request with a list of all existing *Sensors*.
+  
+* Copy the channel-id of the Sensor of interest from the *Sensor* result list.
+  
+* List all messages of the *Sensor* using the
+  [GET /messages](http://127.0.0.1:8080/swagger-ui/#/messages/messages_index) endpoint.
+  You need to paste the copied channel-id into the `channel_id` form field before you can execute this
+  request.
+
+You can also use the *Message Explorer* to set the `name` and `external_id` field of a specific Sensor.
+This can be done using the [PUT nodes/{channel_id}](http://127.0.0.1:8080/swagger-ui/#/nodes/nodes_put)
+endpoint.

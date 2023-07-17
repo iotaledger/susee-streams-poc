@@ -1,0 +1,36 @@
+[build]
+# Uncomment the relevant target for your chip here (ESP32, ESP32-S2, ESP32-S3 or ESP32-C3)
+#target = "xtensa-esp32-espidf"
+#target = "xtensa-esp32s2-espidf"
+#target = "xtensa-esp32s3-espidf"
+target = "riscv32imc-esp-espidf"
+
+[target.xtensa-esp32-espidf]
+linker = "ldproxy"
+
+[target.xtensa-esp32s2-espidf]
+linker = "ldproxy"
+
+[target.xtensa-esp32s3-espidf]
+linker = "ldproxy"
+
+[target.riscv32imc-esp-espidf]
+linker = "ldproxy"
+
+# Future - necessary for the experimental "native build" of esp-idf-sys with ESP32C3
+# See also https://github.com/ivmarkov/embuild/issues/16
+rustflags = ["-C", "default-linker-libraries"]
+
+[unstable]
+
+build-std = ["std", "panic_abort"]
+build-std-features = ["panic_immediate_abort"]
+
+[env]
+ESP_IDF_VERSION = { value = "tag:v4.4.3" }
+
+# https://github.com/esp-rs/esp-idf-sys/commit/f41277be083a539c0bfda17650cccceaed195619
+# - If an activated esp-idf is available and $ESP_IDF_TOOLS_INSTALL_DIR == "fromenv" or unset, use it.
+# - If $IDF_PATH is valid, use it as a user-provided esp-idf repository (but installer manages tools).
+# - Otherwise, the installer manages everything and respects $ESP_IDF_REPOSITORY and $ESP_IDF_VERSION.
+ESP_IDF_TOOLS_INSTALL_DIR = "fromenv"

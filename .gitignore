@@ -4,7 +4,8 @@
 /**/wallet-*.txt
 /**/user-state-*.bin
 /.embuild/espressif/
-/sensor/main-rust-esp-rs/build/CMakeFiles/
 Cargo.lock.bak-*
-/sensor/main-idf/build/
 /temp-apps/
+/sensor/main-rust-esp-rs/build/CMakeFiles/
+/sensor/streams-poc-lib/build/
+/sensor/streams-poc-lib/components/streams-poc-lib/target/

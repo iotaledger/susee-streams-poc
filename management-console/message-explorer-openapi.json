@@ -1,0 +1,455 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SUSEE Message Explorer",
+    "description": "Explore messages of SUSEE nodes",
+    "license": {
+      "name": "Apache-2.0/MIT"
+    },
+    "version": "0.1.2"
+  },
+  "paths": {
+    "/messages": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "List messages of a node",
+        "description": "List messages of a node\n\nList messages of a Streams channel of a specific node.",
+        "operationId": "messages_index",
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "query",
+            "description": "Filter by Streams channel-id. Find existing channel-id of existing nodes using the '/node' endpoint",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "maxLength": 80,
+              "minLength": 80
+            },
+            "example": "cbd12e732e3c6df93c6fc189bf0d0553c2219d644402bae7caa8968aa5ba15dc0000000000000000"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Which page to get. Index range is [0 ...]",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0.0
+            },
+            "style": "form"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10,
+              "minimum": 0.0
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully responded with list of Messages"
+          },
+          "400": {
+            "description": "Channel with specified channel-id does not exist"
+          }
+        }
+      }
+    },
+    "/messages/{message_id}": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Get a specific message",
+        "description": "Get a specific message",
+        "operationId": "messages_get",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "description": "Streams message id (includes the channel id). Message ids can be listed using the '/messages' endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 105,
+              "minLength": 105
+            },
+            "allowReserved": true,
+            "example": "cbd12e732e3c6df93c6fc189bf0d0553c2219d644402bae7caa8968aa5ba15dc0000000000000000:84d48c0cc279564b467f7e74"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully responded requested message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message with specified msg_id does not exist"
+          }
+        }
+      }
+    },
+    "/nodes": {
+      "get": {
+        "tags": [
+          "nodes"
+        ],
+        "summary": "Search for Nodes",
+        "description": "Search for Nodes\n\nSearch for Nodes by Streams channel id, Name or external id",
+        "operationId": "nodes_index",
+        "parameters": [
+          {
+            "name": "channel_id_start",
+            "in": "query",
+            "description": "Streams channels ID starts with the specified value",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "example": "0ec"
+          },
+          {
+            "name": "external_id",
+            "in": "query",
+            "description": "External id equals the specified value",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "minLength": 1
+            }
+          },
+          {
+            "name": "name_start",
+            "in": "query",
+            "description": "Name starts with the specified value",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "minLength": 1
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Which page to get. Index range is [0 ...]",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0.0
+            },
+            "style": "form"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10,
+              "minimum": 0.0
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully responded with list of Nodes"
+          }
+        }
+      }
+    },
+    "/nodes/{channel_id}": {
+      "get": {
+        "tags": [
+          "nodes"
+        ],
+        "summary": "Get a specific Node",
+        "description": "Get a specific Node",
+        "operationId": "nodes_get",
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "description": "Streams channel-id. Channel ids of existing nodes can be listed using the '/node' endpoint",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 80
+            },
+            "example": "cbd12e732e3c6df93c6fc189bf0d0553c2219d644402bae7caa8968aa5ba15dc0000000000000000"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully responded requested node",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Node"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Node with specified channel_id does not exist"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "nodes"
+        ],
+        "summary": "Update a specific Node",
+        "description": "Update a specific Node\n\nUpdate the Node specified by the 'channel_id' path parameter.\nThe 'channel_id' field of the Node provided in the request body will be ignored.\nOnly Node fields 'external_id' and 'name' will be updated.",
+        "operationId": "nodes_put",
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "description": "Streams channel-id. Channel ids of existing nodes can be listed using the '/node' endpoint",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 80
+            },
+            "example": "cbd12e732e3c6df93c6fc189bf0d0553c2219d644402bae7caa8968aa5ba15dc0000000000000000"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Node"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully updated requested node",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Node"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Node with specified channel_id does not exist"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AppError": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "InternalServerError"
+            ],
+            "properties": {
+              "InternalServerError": {
+                "type": "string",
+                "description": "An internal server error occurred"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "AtLeastOneConditionNeeded"
+            ],
+            "properties": {
+              "AtLeastOneConditionNeeded": {
+                "type": "string",
+                "description": "At least one condition query parameter is needed"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "ChannelDoesNotExist"
+            ],
+            "properties": {
+              "ChannelDoesNotExist": {
+                "type": "string",
+                "description": "A channel with the specified channel-id does not exist"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "GenericWithMessage"
+            ],
+            "properties": {
+              "GenericWithMessage": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        ]
+      },
+      "DataT": {
+        "type": "object",
+        "title": "JSON array"
+      },
+      "Message": {
+        "type": "object",
+        "required": [
+          "id",
+          "public_text",
+          "private_text_decrypted"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "private_text_decrypted": {
+            "type": "string"
+          },
+          "public_text": {
+            "type": "string"
+          }
+        }
+      },
+      "Node": {
+        "type": "object",
+        "required": [
+          "channel_id",
+          "name",
+          "external_id"
+        ],
+        "properties": {
+          "channel_id": {
+            "type": "string"
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataT"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "PageMeta": {
+        "type": "object",
+        "required": [
+          "page_indx",
+          "items_count",
+          "items_limit",
+          "page_count_total",
+          "items_count_total",
+          "has_prev_page",
+          "has_next_page"
+        ],
+        "properties": {
+          "has_next_page": {
+            "type": "boolean"
+          },
+          "has_prev_page": {
+            "type": "boolean"
+          },
+          "items_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          },
+          "items_count_total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          },
+          "items_limit": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          },
+          "page_count_total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          },
+          "page_indx": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "susee message explorer"
+    }
+  ]
+}

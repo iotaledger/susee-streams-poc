@@ -1,38 +1,35 @@
 use embedded_svc::{
-    ipv4,
-    ping::Ping,
     wifi::{
         Wifi,
         Configuration,
         ClientConfiguration,
         AccessPointConfiguration,
-        Status,
-        ClientStatus,
-        ClientConnectionStatus,
-        ClientIpStatus,
-        ApStatus,
-        ApIpStatus,
     }
 };
 
 use esp_idf_svc::{
     wifi::{
         EspWifi,
+        WifiWait,
     },
-    netif::{
-        EspNetifStack,
-    },
-    sysloop::{
-        EspSysLoopStack
+    eventloop::{
+        EspSystemEventLoop
     },
     nvs::{
-        EspDefaultNvs,
+        EspDefaultNvsPartition,
     },
     ping,
+    netif::{
+        EspNetifWait,
+        EspNetif
+    }
+};
+
+use esp_idf_hal::{
+    peripherals::Peripherals,
 };
 
 use std::{
-    sync::Arc,
     time::Duration
 };
 
@@ -41,8 +38,7 @@ use anyhow::{
     bail,
 };
 
-const SSID: &str = env!("SENSOR_MAIN_POC_WIFI_SSID");
-const PASS: &str = env!("SENSOR_MAIN_POC_WIFI_PASS");
+use smol::net::Ipv4Addr;
 
 // *************************************************************************************************
 // *                                                                                               *
@@ -51,37 +47,41 @@ const PASS: &str = env!("SENSOR_MAIN_POC_WIFI_PASS");
 // *                                                                                               *
 // *************************************************************************************************
 
-pub fn init_wifi() -> Result<(Box<EspWifi>, ipv4::ClientSettings)> {
-    let netif_stack = Arc::new(EspNetifStack::new()?);
-    let sys_loop_stack = Arc::new(EspSysLoopStack::new()?);
-    let default_nvs = Arc::new(EspDefaultNvs::new()?);
+pub fn init_wifi(wifi_ssid: &str, wifi_pass: &str) -> Result<Box<EspWifi<'static>>> {
+    let sys_loop = EspSystemEventLoop::take()?;
+    let peripherals = Peripherals::take().unwrap();
+    let default_nvs_part = EspDefaultNvsPartition::take()?;
 
-    let mut wifi = Box::new(EspWifi::new(netif_stack, sys_loop_stack, default_nvs)?);
+    let mut wifi = Box::new(EspWifi::new(
+        peripherals.modem,
+        sys_loop.clone(),
+        Some(default_nvs_part)
+    )?);
 
     println!("Wifi created, about to scan");
 
     let ap_infos = wifi.scan()?;
 
-    let ours = ap_infos.into_iter().find(|a| a.ssid == SSID);
+    let ours = ap_infos.into_iter().find(|a| a.ssid == wifi_ssid);
 
     let channel = if let Some(ours) = ours {
         println!(
             "Found configured access point {} on channel {}",
-            SSID, ours.channel
+            wifi_ssid, ours.channel
         );
         Some(ours.channel)
     } else {
         println!(
             "Configured access point {} not found during scanning, will go with unknown channel",
-            SSID
+            wifi_ssid
         );
         None
     };
 
     wifi.set_configuration(&Configuration::Mixed(
         ClientConfiguration {
-            ssid: SSID.into(),
-            password: PASS.into(),
+            ssid: wifi_ssid.into(),
+            password: wifi_pass.into(),
             channel,
             ..Default::default()
         },
@@ -92,37 +92,48 @@ pub fn init_wifi() -> Result<(Box<EspWifi>, ipv4::ClientSettings)> {
         },
     ))?;
 
-    println!("Wifi configuration set, about to get status");
+    println!("Wifi configuration set, about to wifi.start()");
+    wifi.start()?;
 
-    wifi.wait_status_with_timeout(Duration::from_secs(20), |status| !status.is_transitional())
-        .map_err(|e| anyhow::anyhow!("Unexpected Wifi status: {:?}", e))?;
-
-    let status = wifi.get_status();
-
-    let client_settings: ipv4::ClientSettings;
-    if let Status(
-        ClientStatus::Started(ClientConnectionStatus::Connected(ClientIpStatus::Done(ip_settings))),
-        ApStatus::Started(ApIpStatus::Done),
-    ) = status
+    if !WifiWait::new(&sys_loop)?
+        .wait_with_timeout(Duration::from_secs(20), || wifi.is_started().unwrap())
     {
-        println!("Wifi connected");
-        client_settings = ip_settings;
-    } else {
-        bail!("Unexpected Wifi status: {:?}", status);
+        bail!("Wifi did not start");
     }
 
-    Ok((wifi, client_settings))
+    println!("Connecting wifi...");
+
+
+    wifi.connect()?;
+
+    if !EspNetifWait::new::<EspNetif>(wifi.sta_netif(), &sys_loop)?.wait_with_timeout(
+        Duration::from_secs(20),
+        || {
+            wifi.is_connected().unwrap()
+                && wifi.sta_netif().get_ip_info().unwrap().ip != Ipv4Addr::new(0, 0, 0, 0)
+        },
+    ) {
+        bail!("Wifi did not connect or did not receive a DHCP lease");
+    }
+
+    let ip_info = wifi.sta_netif().get_ip_info()?;
+
+    println!("Wifi DHCP info: {:?}", ip_info);
+
+    ping(&ip_info.subnet.gateway)?;
+
+    Ok(wifi)
 }
 
-pub fn ping(ip_settings: &ipv4::ClientSettings) -> Result<()> {
-    println!("About to do some pings for {:?}", ip_settings);
+pub fn ping(ipv4_addr: &Ipv4Addr) -> Result<()> {
+    println!("About to do some pings for {:?}", ipv4_addr);
 
     let ping_summary =
-        ping::EspPing::default().ping(ip_settings.subnet.gateway, &Default::default())?;
+        ping::EspPing::default().ping(ipv4_addr.clone(), &Default::default())?;
     if ping_summary.transmitted != ping_summary.received {
         bail!(
             "Pinging gateway {} resulted in timeouts",
-            ip_settings.subnet.gateway
+            ipv4_addr
         );
     }
 

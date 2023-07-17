@@ -1,0 +1,56 @@
+[package]
+name = "streams_poc_lib"
+version = "0.1.0"
+authors = ["chrisgitiota <christof.gerritsma@iota.org>"]
+edition = "2018"
+resolver = "2"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+esp-idf-sys = { version = "0.32.1", features = ["native"] }
+esp-idf-svc = { version = "0.45.0", features = ["experimental"] }
+futures-lite = { version = "1.12.0" }
+smol = { version = "1.2"}
+streams-tools = { version = "0.1.2", path = "../../../../streams-tools", default-features = false, features=["smol_rt", "esp_idf"] }
+sensor-lib = { version = "0.1.2", path = "../../../sensor-lib", default-features = false, features = ["smol_rt", "esp_idf"] }
+log = "0.4"
+anyhow = "1.0.40"
+cty = "0.2.2"
+
+[dependencies.iota-streams]
+git = "https://github.com/chrisgitiota/streams"
+branch="v1"
+default-features = false
+features = ["std", "tangle"]
+
+[build-dependencies]
+bindgen = "0.58"
+cbindgen = "0.19"
+
+[features]
+std = []
+
+[profile.dev]
+debug = true
+opt-level = "z"
+panic = "unwind"
+
+[profile.release]
+debug = true
+opt-level = "s"
+panic = "unwind"
+
+[patch.crates-io]
+socket2 = { git = "https://github.com/esp-rs-compat/socket2" }
+getrandom1 = { version = "0.1", git = "https://github.com/esp-rs-compat/getrandom", package = "getrandom", branch="0.1"}
+getrandom = { version = "0.2", git = "https://github.com/rust-random/getrandom.git" }
+smol = { git = "https://github.com/esp-rs-compat/smol" }
+polling = { git = "https://github.com/esp-rs-compat/polling" }
+time = { version = "=0.3.4", git = "https://github.com/time-rs/time", rev="8ec5f4ef2f63321b3dbbec3b4a6c4001fdf26de6" }
+iota-crypto = { version = "0.9.1", git = "https://github.com/iotaledger/crypto.rs.git", rev="6840d43f98ad1a991571268f7a9543025200ca4f" }
+#esp-idf-sys = { version = "0.32.1", path = "/home/christof/Develop/esp-rs/esp-idf-sys/" }
+#esp-idf-hal = { version = "0.38.0", path = "/home/christof/Develop/esp-rs/esp-idf-hal/" }
+#esp-idf-svc = { version = "0.45.0", path = "/home/christof/Develop/esp-rs/esp-idf-svc/" }
+# futures-lite = { version = "1.12.0", path = "/home/christof/Develop/smol-rs/futures-lite/" }

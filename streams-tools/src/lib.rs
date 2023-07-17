@@ -1,30 +1,40 @@
+#![feature(generic_const_exprs)]
+#![feature(hasher_prefixfree_extras)]
+
 pub mod wallet;
+/// cbindgen:ignore
 pub mod user_manager;
-pub mod client;
+pub mod streams_transport;
+pub mod http;
+pub mod binary_persist;
+pub mod remote;
+pub mod lorawan_rest_helpers;
 
 #[cfg(feature = "std")]
 pub mod helpers;
+#[cfg(feature = "iota_bridge")]
+pub mod iota_bridge;
+
+#[cfg(feature = "dao")]
+pub mod dao_helpers;
+
+#[cfg(feature = "explorer")]
+pub mod explorer;
 
 pub use {
     wallet::{
         dummy_wallet::DummyWallet,
         simple_wallet::SimpleWallet,
+        plain_text_wallet::{
+            PlainTextWallet,
+        },
     },
-    client::*,
+    streams_transport::*,
     user_manager::*,
+    lorawan_rest_helpers::*,
 };
 
-#[cfg(feature = "std")]
+#[cfg(feature = "iota_bridge")]
 pub use {
-    wallet::plain_text_wallet::{
-        PlainTextWallet,
-    },
+    iota_bridge::IotaBridge,
 };
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}

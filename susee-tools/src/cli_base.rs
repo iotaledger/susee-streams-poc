@@ -1,4 +1,8 @@
-use clap::{ArgMatches, Command, Arg};
+use clap::{
+    ArgMatches,
+    Command,
+    Arg
+};
 
 pub static NODE_ABOUT: &str = "The url of the iota node to connect to.
 Use 'https://chrysalis-nodes.iota.org' for the mainnet.
@@ -45,30 +49,55 @@ pub static PROJECT_CONSTANTS: ProjectConstants = ProjectConstants {
     default_node: "https://chrysalis-nodes.iota.org",
 };
 
+#[derive(Clone)]
 pub struct CliOptions {
+    pub use_node: bool,
     pub use_wallet: bool,
 }
 
 impl Default for CliOptions {
     fn default() -> Self {
         Self {
+            use_node: true,
             use_wallet: true,
         }
     }
 }
 
+
+pub struct ArgMatchesAndOptions {
+    pub options: CliOptions,
+    pub matches: ArgMatches,
+}
+
+impl ArgMatchesAndOptions {
+    pub fn new(matches: ArgMatches) -> Self {
+        Self {
+            options: CliOptions::default(),
+            matches,
+        }
+    }
+}
+
+
 pub struct Cli<'a, ArgKeysT> {
+    pub options: CliOptions,
     pub matches: &'a ArgMatches,
     pub arg_keys: &'a ArgKeysT,
     pub node: &'a str
 }
 
 impl<'a, ArgKeysT> Cli<'a, ArgKeysT> {
-    pub fn new(arg_matches: &'a ArgMatches, arg_keys: &'a ArgKeysT) -> Self {
+    pub fn new(arg_match_and_opt: &'a ArgMatchesAndOptions, arg_keys: &'a ArgKeysT) -> Self {
         Self {
-            matches: arg_matches,
+            options: arg_match_and_opt.options.clone(),
+            matches: &arg_match_and_opt.matches,
             arg_keys,
-            node: arg_matches.value_of("node").unwrap(),
+            node: if arg_match_and_opt.options.use_node {
+                    arg_match_and_opt.matches.value_of("node").unwrap()
+                } else {
+                    "NONE"
+                },
         }
     }
 
@@ -78,14 +107,17 @@ impl<'a, ArgKeysT> Cli<'a, ArgKeysT> {
         let mut ret_val = Command::new(name)
             .version(PROJECT_CONSTANTS.version)
             .author(PROJECT_CONSTANTS.author)
-            .about(about)
-            .arg(Arg::new(BASE_ARG_KEYS.node)
+            .about(about);
+
+        if options.use_node {
+            ret_val = ret_val.arg(Arg::new(BASE_ARG_KEYS.node)
                 .long(BASE_ARG_KEYS.node)
                 .short('n')
                 .value_name("NODE_URL")
                 .help(NODE_ABOUT)
                 .default_value(PROJECT_CONSTANTS.default_node)
             );
+        }
 
         if options.use_wallet {
             unsafe {

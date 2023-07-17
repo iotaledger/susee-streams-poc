@@ -1,14 +1,14 @@
 use streams_tools::{
-    HttpClient,
+    StreamsTransportSocket,
     SubscriberManagerPlainTextWallet
 };
 
-pub type ClientType = HttpClient; // CaptureClient; //
+pub type ClientType = StreamsTransportSocket; // CaptureClient; //
 type SubscriberManagerPlainTextWalletHttpClient = SubscriberManagerPlainTextWallet<ClientType>;
 
 
 mod sensor_manager;
-mod remote_manager;
 
 pub mod cli;
 pub mod main;
+mod command_fetcher;

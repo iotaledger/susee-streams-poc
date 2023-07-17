@@ -1,0 +1,53 @@
+version: '3.4'
+services:
+  # The management-console is started to run message explorer.
+  # See the README.md file for further details.
+  management-console:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: management-console
+    volumes:
+      - management-console:/app
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  # The iota-bridge can be accessed via
+  #  * localhost:50000
+  #  * port 50000 of the external ip address of the docker host
+  #  * iota-bridge:50000 from within other docker containers
+  iota-bridge:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: iota-bridge
+    volumes:
+      - iota-bridge:/app
+    ports:
+      - "50000:50000"
+
+  # The app-srv-connector-mock can be accessed via
+  #  * localhost:50001
+  #  #  * port 50001 of the external ip address of the docker host
+  #  #  * app-srv-connector-mock:50001 from within other docker containers
+  app-srv-connector-mock:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: app-srv-connector-mock
+    ports:
+      - "50001:50001"
+
+  # The sensor will try to send messages after startup. This will fail, if the sensor has not been
+  # initialized before. See the README.md file for further details.
+  sensor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: sensor
+    volumes:
+      - sensor:/app
+volumes:
+  management-console:
+  iota-bridge:
+  sensor:

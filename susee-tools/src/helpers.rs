@@ -1,17 +1,10 @@
-use clap::{ArgMatches};
+use clap::ArgMatches;
 use anyhow::Result;
 
-use streams_tools::{
-    PlainTextWallet
-};
-
-pub fn get_wallet(arg_matches: &ArgMatches, serialization_password: &str, wallet_file_arg_name: &str, default_wallet_file_name: &str) -> Result<PlainTextWallet>{
-    let wallet_file_name: Option<&str>;
+pub fn get_wallet_filename(arg_matches: &ArgMatches, wallet_file_arg_name: &str, default_wallet_file_name: &str) -> Result<String>{
     if arg_matches.is_present(wallet_file_arg_name) {
-        wallet_file_name = Some(arg_matches.value_of(wallet_file_arg_name).unwrap());
+        Ok(arg_matches.value_of(wallet_file_arg_name).unwrap().to_string())
     } else {
-        wallet_file_name = Some(default_wallet_file_name);
+        Ok(String::from(default_wallet_file_name))
     }
-
-    Ok(PlainTextWallet::new(serialization_password, wallet_file_name))
 }

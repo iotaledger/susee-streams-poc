@@ -32,6 +32,9 @@ pub fn get_message_bytes(key: Message) -> &[u8] {
     }
 }
 
+// These tests need to be started as follows:
+//      > cargo test --package payloads --lib tests
+//
 #[cfg(test)]
 mod tests {
     use super::*;

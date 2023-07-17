@@ -1,3 +1,5 @@
+pub mod command_fetcher;
+
 #[cfg(feature = "std")]
 pub mod std;
 
@@ -5,13 +7,22 @@ pub mod std;
 pub use self::std::main::process_main;
 
 #[cfg(feature = "smol_rt")]
+pub mod request_via_buffer_cb;
+#[cfg(feature = "smol_rt")]
+pub mod streams_poc_lib_api_types;
+
+#[cfg(all(feature = "smol_rt", feature = "esp_idf"))]
 pub mod esp_rs;
 
-#[cfg(feature = "smol_rt")]
+#[cfg(all(feature = "smol_rt", feature = "esp_idf"))]
 pub use self::esp_rs::{
-    main::process_main_esp_rs,
-    http_client_smol_esp_rs::{
-        HttpClient,
-        HttpClientOptions,
+    main::{
+        process_main_esp_rs,
+        process_main_esp_rs_lwip,
+    },
+    streams_poc_lib,
+    streams_transport_socket_esprs::{
+        StreamsTransportSocketEspRs,
+        StreamsTransportSocketEspRsOptions,
     },
 };

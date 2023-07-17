@@ -27,10 +27,11 @@ build-std = ["std", "panic_abort"]
 build-std-features = ["panic_immediate_abort"]
 
 [env]
-# Enables the esp-idf-sys "native" build feature (`cargo build --features native`) to build against ESP-IDF stable (v4.4)
-#ESP_IDF_VERSION = { value = "branch:release/v4.4" }
-# Enables the esp-idf-sys "native" build feature (`cargo build --features native`) to build against ESP-IDF master (v5.0)
-ESP_IDF_VERSION = { value = "master" }
+
+# The esp-idf-sys build features "native" and "std" are enabled per default so we don't need anything to do here
+
+# Use the latest esp-idf tag in the master branch. value = "master" would checkout the latest commit which would be more unstable
+ESP_IDF_VERSION = { value = "tag:v4.4.3" } # { value = "master" }, { value = "branch:release/v4.4" }, { value = "tag:v5.1-dev"  }
 
 # These configurations will pick up your custom "sdkconfig.release", "sdkconfig.debug" or "sdkconfig.defaults[.*]" files
 # that you might put in the root of the project
@@ -40,4 +41,10 @@ ESP_IDF_VERSION = { value = "master" }
 ESP_IDF_SDKCONFIG_DEFAULTS = { value = """
 ./sensor/main-rust-esp-rs/sdkconfig.defaults;
 ./sensor/main-rust-esp-rs/sdkconfig.defaults.esp32c3;
-""" }
+"""}
+# ./sensor/main-rust-esp-rs/sdkconfig.debug;
+
+# esp-idf-sys enables all components per default. Defining ESP_IDF_COMPONENTS here
+# reduces the set of linked components which leads to less compiler errors in case of updated
+# 3rd party dependencies
+ESP_IDF_COMPONENTS = { value = "pthread;fatfs;nvs_flash;esp_wifi;esp_netif;lwip;esp_http_client;wear_levelling;esp_websocket_client;" }

@@ -3,12 +3,15 @@ use esp_idf_sys::EspError;
 
 use log::*;
 use sensor_lib::{
-    process_main_esp_rs,
+    process_main_esp_rs_lwip,
 };
 
+const WIFI_SSID: &str = env!("SENSOR_MAIN_POC_WIFI_SSID");
+const WIFI_PASS: &str = env!("SENSOR_MAIN_POC_WIFI_PASS");
+const IOTA_BRIDGE_URL: &str = env!("SENSOR_MAIN_POC_IOTA_BRIDGE_URL");
+
 fn main() -> Result<(), EspError> {
-    // Temporary. Will disappear once ESP-IDF 4.4 is released, but for now it is necessary to call this function once,
-    // or else some patches to the runtime implemented by esp-idf-sys might not link properly.
+    // Called to ensure that needed esp_idf_sys patches are linked to our binary.
     esp_idf_sys::link_patches();
 
     // Bind the log crate to the ESP Logging facilities
@@ -28,7 +31,12 @@ fn main() -> Result<(), EspError> {
 
     match smol::block_on(async {
         info!("Start smol::block_on");
-        process_main_esp_rs().await
+        process_main_esp_rs_lwip(
+            IOTA_BRIDGE_URL,
+            None,
+            Some(WIFI_SSID.to_string()),
+            Some(WIFI_PASS.to_string()),
+        ).await
     }){
         Ok(_) => {},
         Err(error) => {

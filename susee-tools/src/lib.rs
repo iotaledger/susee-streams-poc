@@ -13,15 +13,9 @@ pub use {
 
 #[cfg(feature = "std")]
 pub use {
-    helpers::get_wallet,
+    helpers::get_wallet_filename,
 };
 
 pub static SUSEE_CONST_SECRET_PASSWORD: &str = "SUSEE";
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub static SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC: u32 = 3;
+pub static SUSEE_CONST_SEND_MESSAGE_REPETITION_WAIT_SEC: u32 = 3;

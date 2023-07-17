@@ -1,0 +1,61 @@
+version: '3.4'
+services:
+  # The management-console is started to run message explorer.
+  # The ports to access the explorer service are published to localhost
+  # to imitate a natively running app.
+  # Use `docker exec -it management-console` followed by management-console CLI
+  # arguments to use the management-console e.g. for sensor initialization:
+  #
+  #   docker exec -it management-console --init-sensor --iota-bridge-url "http://iota-bridge:50000"
+  #
+  management-console:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: management-console
+    volumes:
+      - management-console:/app
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  # The iota-bridge imitates a native running app and can be accessed via 127.0.0.1:50000 as usual
+  # or via iota-bridge:50000 from within other docker containers.
+  iota-bridge:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: iota-bridge
+    volumes:
+      - iota-bridge:/app
+    ports:
+      - "50000:50000"
+
+  # The app-srv-connector-mock imitates a native running app and can be accessed via 127.0.0.1:50001 as usual.
+  # It will connect the iota-bridge via the docker bridge
+  app-srv-connector-mock:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: app-srv-connector-mock
+    ports:
+      - "50001:50001"
+
+  # The sensor will only print some information about its streams client status and exit thereafter.
+  # Use one of the following statements to init the sensor or send messages:
+  #
+  #   Send messages:
+  #     docker exec -it sensor -l -f "test/payloads/meter_reading_1_compact.json" -b "http://iota-bridge:50000"
+  #
+  #   Init:
+  #     docker exec -it sensor --act-as-remote-controlled-sensor --iota-bridge-url "http://iota-bridge:50000"
+  sensor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: sensor
+    volumes:
+      - sensor:/app
+volumes:
+  management-console:
+  iota-bridge:
+  sensor:

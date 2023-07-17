@@ -28,6 +28,10 @@ Please note that the tests provided here underlie
 [several restrictions](../README.md#restrictions-of-the-provided-tests) that are described in
 the main README.
 
+Please also note that you may also process the tests described in this README,
+using the docker images for the SUSEE applications as been described in the
+[docker folder](../docker/README.md).
+
 ## Test workspace
 As all built applications are located in the `target/debug` or `target/release`
 sub-folder of the *susee-streams-poc* repository root folder, the easiest way

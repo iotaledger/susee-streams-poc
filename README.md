@@ -107,6 +107,12 @@ Please follow the steps described in the ESP32 specific application projects:
 * [streams-poc-lib](sensor/streams-poc-lib#build)
 * [PlatformIO Example for streams-poc-lib](sensor/main-streams-poc-lib-pio#prerequisites-and-build)
 
+### Docker
+Most applications described here can be run in docker containers
+that can be build using docker compose.
+Have a look into the [Docker folder README](./docker/README.md)
+for more details.
+
 ## CLI API and file persistence 
 
 ### Common CLI options
@@ -143,11 +149,11 @@ Please have a look at the application specific README files:
 * [Management Console CLI](management-console/README.md#management-console-cli)
 * [CLI of the Sensor Applications](sensor/README.md#cli-of-the-sensor-applications)
 * [IOTA-Bridge Console CLI](iota-bridge/README.md#iota-bridge-console-cli)
-* [AppServer Connector Mockup Tool CLI](app-srv-connector-mock/README.md#lorawan-appserver-mockup-tool-cli)
+* [AppServer Connector Mockup Tool CLI](app-srv-connector-mock/README.md#appserver-connector-mockup-tool-cli)
 
 ### Common file persistence
 
-The *Management Console* and the [*Sensor* applications](./sensor/) use the following files for persistence
+The *Management Console* and the [*Sensor* applications](./sensor/README.md) use the following files for persistence
 * Wallet for the user seed<br><br>
   *x86/PC*<br>
   The applications are using a plain text wallet that stores the automatically generated seed in a text file.
@@ -194,7 +200,10 @@ section.
 ## Test
 
 Automatic tests and examples for manually performed workflows are described in the [README
-of the test folder](./test/). 
+of the test folder](./test/README.md).
+You can also use the
+[provided docker images](./docker/README.md)
+to run tests.
 
 #### Restrictions of the provided tests
 

@@ -2,10 +2,12 @@ use std::str::FromStr;
 
 use hyper::http::StatusCode;
 
-use iota_streams::{
-    core::async_trait,
-    app::transport::tangle::TangleAddress,
+use streams::{
+    Address,
 };
+
+use async_trait::async_trait;
+use lets::transport::tangle::Client;
 
 use crate::{
     explorer::{
@@ -22,8 +24,7 @@ use crate::{
             run_worker_in_own_thread,
         },
         shared::PagingOptions,
-    },
-    user_manager::{
+    }, user_manager::{
         multi_channel_management::{
             MultiChannelManagerOptions,
             get_channel_manager_for_channel_id
@@ -33,6 +34,7 @@ use crate::{
     },
     dao_helpers::Limit,
     helpers::get_tangle_address_from_strings,
+    DummyMsgIndexer,
 };
 
 use super::{
@@ -100,9 +102,9 @@ impl Worker for IndexWorker {
                 return Err(AppError::ChannelDoesNotExist(opt.channel_id))
             }
         };
-        if let Some(author) = channel_manager.author.as_mut() {
-            let mut msg_mngr = MessageManager::new(
-                author,
+        if let Some(user) = channel_manager.user.as_mut() {
+            let mut msg_mngr = MessageManager::<Client<DummyMsgIndexer>>::new(
+                user,
                 opt.channel_id.clone(),
                 opt.db_file_name
             );
@@ -113,8 +115,8 @@ impl Worker for IndexWorker {
                 for msg_meta_data in msg_meta_data_list {
                     let address = get_tangle_address_from_strings(opt.channel_id.as_str(), msg_meta_data.message_id.as_str())
                         .expect("get_tangle_address_from_strings error");
-                    if let Ok(unwrapped_msg) = author.receive_msg(&address).await{
-                        ret_val.push(unwrapped_msg.into());
+                    if let Ok(lets_msg) = user.receive_message(address).await{
+                        ret_val.push(lets_msg.into());
                     } else {
                         ret_val.push(Message {
                             id: address.to_string(),
@@ -136,7 +138,7 @@ impl Worker for IndexWorker {
 }
 
 pub(crate) async fn get(messages: &MessagesState, user_store: &UserDataStore, message_id: &str) -> Result<Message> {
-    if let Ok(tangle_address) = TangleAddress::from_str(message_id) {
+    if let Ok(tangle_address) = Address::from_str(message_id) {
         run_worker_in_own_thread::<GetWorker>(GetWorkerOptions::new(
             tangle_address,
             messages,
@@ -152,13 +154,13 @@ pub(crate) async fn get(messages: &MessagesState, user_store: &UserDataStore, me
 
 #[derive(Clone)]
 struct GetWorkerOptions {
-    tangle_address: TangleAddress,
+    tangle_address: Address,
     u_store: UserDataStore,
     multi_channel_mngr_opt: MultiChannelManagerOptions,
 }
 
 impl GetWorkerOptions {
-    pub fn new(tangle_address: TangleAddress, messages: &MessagesState, user_store: &UserDataStore) -> GetWorkerOptions {
+    pub fn new(tangle_address: Address, messages: &MessagesState, user_store: &UserDataStore) -> GetWorkerOptions {
         GetWorkerOptions{
             tangle_address,
             u_store: user_store.clone(),
@@ -176,12 +178,12 @@ impl Worker for GetWorker {
 
     async fn run(opt: GetWorkerOptions) -> Result<Message> {
         let mut channel_manager = get_channel_manager_for_channel_id(
-            &opt.tangle_address.appinst.to_string(),
+            &opt.tangle_address.base().to_string(),
             &opt.u_store,
             &opt.multi_channel_mngr_opt,
         ).await?;
-        if let Some(author) = channel_manager.author.as_mut() {
-            if let Ok(unwrapped_msg) = author.receive_msg(&opt.tangle_address).await {
+        if let Some(author) = channel_manager.user.as_mut() {
+            if let Ok(unwrapped_msg) = author.receive_message(opt.tangle_address).await {
                 Ok(unwrapped_msg.into())
             } else {
                 Err(AppError::GenericWithMessage(
@@ -190,7 +192,7 @@ impl Worker for GetWorker {
                 ))
             }
         } else {
-            Err(AppError::ChannelDoesNotExist(opt.tangle_address.appinst.to_string()))
+            Err(AppError::ChannelDoesNotExist(opt.tangle_address.base().to_string()))
         }
     }
 }

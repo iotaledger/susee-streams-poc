@@ -1,10 +1,12 @@
-use iota_streams::{
-    app::transport::tangle::client::Client,
+use lets::{
+    transport::tangle::Client,
 };
 
 use std::{
     clone::Clone,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use hyper::{
     Body,
@@ -16,6 +18,7 @@ use hyper::{
 };
 
 use crate::{
+    DummyMsgIndexer,
     iota_bridge::{
         DispatchStreams,
         DispatchCommand,
@@ -30,13 +33,13 @@ use crate::{
     http::{
         dispatch_request,
         http_server_dispatch::NormalDispatchCallbacks
-    }
+    },
 };
 
 #[derive(Clone)]
 pub struct IotaBridge<'a> {
     scope_provide: ServerScopeProvide,
-    dispatch_streams: DispatchStreams,
+    dispatch_streams: DispatchStreams<Client<DummyMsgIndexer>>,
     dispatch_command: DispatchCommand<'a>,
     dispatch_confirm: DispatchConfirm<'a>,
     dispatch_lorawan_node: DispatchLoraWanNode,
@@ -46,12 +49,15 @@ pub struct IotaBridge<'a> {
 
 impl<'a> IotaBridge<'a>
 {
-    pub fn new(url: &str, lora_wan_node_store: LoraWanNodeDataStore, pending_request_store: PendingRequestDataStore) -> Self {
-        let client = Client::new_from_url(url);
+    pub async fn new(url: &str, lora_wan_node_store: LoraWanNodeDataStore, pending_request_store: PendingRequestDataStore) -> IotaBridge<'a> {
+        let indexer = DummyMsgIndexer{};
+        let client = Rc::new(RefCell::new(
+            Client::for_node(url, indexer).await.expect("Could not create client for tangle")
+        ));
 
-        Self {
+        IotaBridge {
             scope_provide: ServerScopeProvide::new(),
-            dispatch_streams: DispatchStreams::new(&client, lora_wan_node_store.clone(), pending_request_store),
+            dispatch_streams: DispatchStreams::new(client, lora_wan_node_store.clone(), pending_request_store),
             dispatch_command: DispatchCommand::new(),
             dispatch_confirm: DispatchConfirm::new(),
             dispatch_lorawan_node: DispatchLoraWanNode::new(lora_wan_node_store.clone()),//, pending_request_store.clone()),

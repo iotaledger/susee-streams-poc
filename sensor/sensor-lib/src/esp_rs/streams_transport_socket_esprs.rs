@@ -46,7 +46,7 @@ use streams_tools::{
     },
     http::{
         RequestBuilderStreams,
-        MapStreamsErrors,
+        MapLetsError,
     },
     binary_persist::{
         BinaryPersist,

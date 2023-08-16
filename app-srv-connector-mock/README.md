@@ -1,6 +1,6 @@
 # AppServer Connector Mockup Tool
 
-This application acts as [*Application Server Connector*](../README.md#modules) and is needed to test
+This application acts as [*Application Server Connector*](../README.md#technical-components) and is needed to test
 the *streams-poc-lib* for the *ESP32 Sensor*.
 The *streams-poc-lib* provides a test application in its main.c file (sensor/streams-poc-lib/main/main.c)
 that can be used to test the library via a WIFI connection instead of a LoRaWAN connection.

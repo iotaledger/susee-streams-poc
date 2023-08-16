@@ -1,25 +1,4 @@
-use iota_streams::{
-    app_channels::api::tangle::{
-        Address,
-        ChannelType,
-        Bytes,
-        PublicKey,
-    },
-    core::Result,
-    app::{
-        transport::tangle::client::Client,
-        identifier::Identifier,
-    }
-};
-
-use crate::{
-    wallet::plain_text_wallet::PlainTextWallet,
-    SimpleWallet,
-    helpers::{
-        get_channel_id_from_link,
-        SerializationCallbackRefToClosureString
-    },
-};
+use std::convert::TryFrom;
 
 use std::{
     path::Path,
@@ -30,24 +9,61 @@ use std::{
 };
 
 use futures::executor::block_on;
-use log;
 
-pub type Author = iota_streams::app_channels::api::tangle::Author<Client>;
+use anyhow::{
+    anyhow,
+    Result
+};
+
+use streams::{
+    Address,
+    User,
+    id::Identifier,
+};
+
+use lets::{
+    transport::tangle::{
+        Client,
+    },
+    id::{
+        Ed25519,
+        Permissioned
+    }
+};
+
+use crypto::{
+    signatures::ed25519,
+};
+
+use crate::{
+    binary_persist::Bytes,
+    wallet::plain_text_wallet::PlainTextWallet,
+    SimpleWallet,
+    helpers::{
+        get_channel_id_from_link,
+        SerializationCallbackRefToClosureString
+    },
+    STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC,
+    DummyMsgIndexer
+};
+
+use log;
 
 pub struct SubscriberData<'a> {
     pub subscription_link: &'a Address,
-    pub public_key: &'a [u8]
+    pub permissioned_public_key: Permissioned<&'a [u8]>,
 }
 
 pub struct ChannelManager<WalletT: SimpleWallet> {
-    client: Client,
+    transport: Client<DummyMsgIndexer>,
     wallet: WalletT,
     serialization_file: Option<String>,
     serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
-    pub author: Option<Author>,
+    base_branch_topic: String,
+    pub node_url: String,
+    pub user: Option<User<Client<DummyMsgIndexer>>>,
     pub announcement_link: Option<Address>,
     pub keyload_link: Option<Address>,
-    pub seq_link:  Option<Address>,
     pub prev_msg_link:  Option<Address>,
 }
 
@@ -57,19 +73,23 @@ async fn import_from_serialization_file<WalletT: SimpleWallet>(file_name: &str, 
 }
 
 async fn import_from_buffer<WalletT: SimpleWallet>(buffer: &Vec<u8>, ret_val: &mut ChannelManager<WalletT>) -> Result<()> {
-    let author = Author::import(
+    let indexer = DummyMsgIndexer{};
+    let user = User::<Client<DummyMsgIndexer>>::restore(
         &buffer,
         ret_val.wallet.get_serialization_password(),
-        ret_val.client.clone()
-    ).await?;
-    if let Some(link) = author.announcement_link() {
+        Client::for_node(ret_val.node_url.as_str(), indexer).await.map_err(|e|anyhow!(e))?
+    ).await.map_err(|e|anyhow!(e))?;
+    if let Some(link) = user.stream_address().clone() {
         ret_val.announcement_link = Some(link.clone());
     }
-    ret_val.author = Some(author);
+    ret_val.user = Some(user);
 
     Ok(())
 }
 
+fn ed25519_from_bytes(key_data: &[u8]) -> ed25519::PublicKey {
+    ed25519::PublicKey::try_from_bytes(<[u8; 32]>::try_from(key_data).unwrap()).unwrap()
+}
 
 #[derive(Default)]
 pub struct ChannelManagerOptions {
@@ -84,26 +104,29 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
     //           Problem: Usage of block_on() here results in panic because of the usage of tokio.
     pub async fn new(node_url: &str, wallet: WalletT, options: Option<ChannelManagerOptions>) -> Self {
         let opt = options.unwrap_or_default();
+        let indexer = DummyMsgIndexer{};
         let mut ret_val = Self {
+            node_url: node_url.to_string(),
             wallet,
+            base_branch_topic: STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC.to_string(),
             serialization_file: opt.serialization_file.clone(),
             serialize_user_state_callback: opt.serialize_user_state_callback,
-            client: Client::new_from_url(node_url),
-            author: None,
+            transport: Client::for_node(node_url, indexer).await
+                .expect(format!("Error on creating tangle client using node_url {}", node_url).as_str()),
+            user: None,
             announcement_link: None,
             keyload_link: None,
-            seq_link: None,
             prev_msg_link: None,
         };
 
         if let Some(serial_file_name) = opt.serialization_file {
             if Path::new(serial_file_name.as_str()).exists(){
                 import_from_serialization_file(serial_file_name.as_str(), &mut ret_val).await
-                    .expect("Error on importing Author state from serialization file");
+                    .expect("Error on importing User state from serialization file");
             }
         } else if let Some(user_state) = opt.user_state {
             import_from_buffer(&user_state, &mut ret_val).await
-                .expect("Error on importing Author state from binary user_state buffer");
+                .expect("Error on importing User state from binary user_state buffer");
         } else {
             log::warn!("No binary user_state or serial_file_name for the user state provided.\n\
             Will use empty Streams user state.")
@@ -113,76 +136,88 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
     }
 
     pub async fn create_announcement(&mut self) -> Result<Address> {
-        if self.author.is_some() {
+        if self.user.is_some() {
             panic!("This channel already has been announced")
         }
-        let mut author = Author::new(
-            self.wallet.get_seed(),
-            ChannelType::SingleBranch,
-            self.client.clone(),
-        );
-        let announcement_link = author.send_announce().await?;
-        self.author = Some(author);
-        self.announcement_link = Some(announcement_link);
-        Ok(announcement_link)
+        let indexer = DummyMsgIndexer{};
+        let mut user= User::builder()
+            .with_identity(Ed25519::from_seed(self.wallet.get_seed()))
+            .with_transport(Client::for_node(self.node_url.as_str(), indexer).await.map_err(|e|anyhow!(e))?)
+            .build();
+
+        let announcement_link = user.create_stream(self.base_branch_topic.as_str()).await
+            .map_err(|e|anyhow!(e))?;
+        self.user = Some(user);
+        self.announcement_link = Some(announcement_link.address());
+        Ok(announcement_link.address())
     }
 
     pub async fn add_subscribers<'a>(&mut self, subscriber_data: &Vec<SubscriberData<'a>>) -> Result<Address> {
-        if self.author.is_none() {
+        if self.user.is_none() {
             panic!("This channel has not been announced. Use create_announcement() before using this function.")
         }
 
-        let author = self.author.as_mut().unwrap() ;
+        let user = self.user.as_mut().unwrap() ;
         for sub_data in subscriber_data {
-            author.receive_subscribe(sub_data.subscription_link).await?;
+            user.receive_message(*sub_data.subscription_link).await.map_err(|e|anyhow!(e))?;
         }
 
-        let keys: Vec<Identifier> = subscriber_data
+        let subscribers: Vec<Permissioned<Identifier>> = subscriber_data
             .into_iter()
             .map(|sub_data| {
-                PublicKey::from_bytes(sub_data.public_key).unwrap().into()
+                match sub_data.permissioned_public_key {
+                    Permissioned::Read(pk_data) => {
+                        Permissioned::<Identifier>::Read(ed25519_from_bytes(pk_data).into())
+                    },
+                    Permissioned::ReadWrite(pk_data, duration) => {
+                        Permissioned::<Identifier>::ReadWrite(ed25519_from_bytes(pk_data).into(), duration)
+                    },
+                    Permissioned::Admin(pk_data) => {
+                        Permissioned::<Identifier>::Admin(ed25519_from_bytes(pk_data).into())
+                    }
+                }
             })
             .collect();
 
-        let (keyload_link, _seq) = author.send_keyload(
-            &self.announcement_link.unwrap(),
-            &keys,
-        ).await?;
+        let keyload_link = user.send_keyload(
+            self.base_branch_topic.as_str(),
+            subscribers.iter().map(Permissioned::as_ref),
+            [],
+        ).await.map_err(|e| anyhow!(e))?;
 
-        self.keyload_link = Some(keyload_link);
-        self.prev_msg_link = Some(keyload_link);
-        self.seq_link = _seq;
-        Ok(keyload_link)
+        self.keyload_link = Some(keyload_link.address());
+        self.prev_msg_link = Some(keyload_link.address());
+        Ok(keyload_link.address())
     }
 
     pub async fn send_signed_packet(&mut self, input: &Bytes) -> Result<Address> {
-        if self.author.is_none() | self.prev_msg_link.is_none(){
+        if self.user.is_none() | self.prev_msg_link.is_none(){
             panic!("This channel has not been announced or no subscribers have been added. Use create_announcement() and add_subscribers() before using this function.")
         }
 
-        let author = self.author.as_mut().unwrap() ;
-        author.sync_state().await.expect("Could not sync_state");
-        let (msg_link, _seq_link) = author.send_signed_packet(
-            &self.prev_msg_link.as_ref().unwrap(),
+        let user = self.user.as_mut().unwrap() ;
+        user.sync().await.expect("Could not sync_state");
+        let msg_link = user.send_signed_packet(
+            self.base_branch_topic.clone(),
             &Bytes::default(),
             input,
-        ).await?;
-        self.prev_msg_link = Some(msg_link);
-        Ok(msg_link)
+        ).await.map_err(|e| anyhow!(e))?;
+        self.prev_msg_link = Some(msg_link.address());
+        Ok(msg_link.address())
     }
 
     async fn export_to_serialization_file(&mut self, file_name: &str) -> Result<()> {
-        if let Some(author) = &self.author {
-            let buffer = author.export( self.wallet.get_serialization_password()).await?;
-            write(file_name, &buffer).expect(format!("Try to write Author state file '{}'", file_name).as_str());
+        if let Some(user) = self.user.as_mut() {
+            let buffer = user.backup( self.wallet.get_serialization_password()).await.map_err(|e| anyhow!(e))?;
+            write(file_name, &buffer).expect(format!("Try to write User state file '{}'", file_name).as_str());
         }
         Ok(())
     }
 
     async fn export_to_serialize_callback(&mut self, serialize_callback: SerializationCallbackRefToClosureString) -> Result<Option<usize>> {
         let mut ret_val = None;
-        if let Some(author) = &self.author {
-            let buffer = author.export( self.wallet.get_serialization_password()).await?;
+        if let Some(user) = self.user.as_mut() {
+            let buffer = user.backup( self.wallet.get_serialization_password()).await.map_err(|e| anyhow!(e))?;
             if let Some(announcement_link) = &self.announcement_link {
                 if let Some(channel_id ) = get_channel_id_from_link(announcement_link.to_string().as_str()) {
                     let bytes_serialized = serialize_callback(channel_id.clone(), buffer)

@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 use hyper::{
     Body,

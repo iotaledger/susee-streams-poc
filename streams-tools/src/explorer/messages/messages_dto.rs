@@ -1,3 +1,5 @@
+use std::str::from_utf8;
+
 use serde::{
     Deserialize,
     Serialize
@@ -8,12 +10,7 @@ use utoipa::{
     ToSchema
 };
 
-use iota_streams::{
-    app_channels::{
-        Bytes,
-        UnwrappedMessage,
-    }
-};
+use streams::Message as StreamsMessage;
 
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct Message {
@@ -22,20 +19,20 @@ pub struct Message {
     pub private_text_decrypted: String,
 }
 
-impl From<UnwrappedMessage> for Message {
-    fn from(unw_msg: UnwrappedMessage) -> Self {
+impl From<StreamsMessage> for Message {
+    fn from(streams_msg: StreamsMessage) -> Self {
         Message {
-            id: unw_msg.link.to_string(),
-            public_text: unw_msg.body
+            id: streams_msg.address.to_string(),
+            public_text: from_utf8(streams_msg
                 .public_payload()
-                .and_then(Bytes::as_str)
+                .unwrap_or(&[]))
                 .unwrap_or("")
                 .to_string(),
-            private_text_decrypted: unw_msg.body
+            private_text_decrypted: from_utf8(streams_msg
                 .masked_payload()
-                .and_then(Bytes::as_str)
+                .unwrap_or(&[]))
                 .unwrap_or("")
-                .to_string()
+                .to_string(),
         }
     }
 }

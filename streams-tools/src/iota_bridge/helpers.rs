@@ -1,18 +1,19 @@
+use std::rc::Rc;
+
 use hyper::{
     Body,
     http::{
         Response,
         Result,
+        StatusCode,
     }
 };
-use iota_streams::core::Errors;
+use lets::error::Error as LetsError;
 
 use crate::http::{
-    http_protocol_streams::MapStreamsErrors,
+    http_protocol_streams::MapLetsError,
     DispatchScope,
 };
-
-use std::rc::Rc;
 
 pub struct DispatchScopeKey {}
 
@@ -47,25 +48,17 @@ pub fn write_to_scope(scope: &Rc<dyn DispatchScope>, value: DispatchScopeValue) 
     }
 }
 
-pub fn log_err_and_respond_500(err: anyhow::Error, fn_name: &str) -> Result<Response<Body>> {
+pub fn log_anyhow_err_and_respond_500(err: anyhow::Error, fn_name: &str) -> Result<Response<Body>> {
     println!("[IOTA-Bridge - {}] Error: {}", fn_name, err);
-
-    // // Following implementation does not work because currently it is not possible to access
-    // // The streams error value. Instead we expect a MessageLinkNotFoundInTangle error to
-    // // make the susee POC run at all.
-    // // TODO: Check how to access the streams error value and fix the implementation here
-    // let streams_error = &MapStreamsErrors::get_indicator_for_uninitialized();
-    // for cause in err.chain() {
-    //     if let Some(streams_err) = cause.downcast_ref::<Errors>() {
-    //         streams_error = streams_err.clone();
-    //         break;
-    //     }
-    // }
-    // let mut status_code = MapStreamsErrors::to_http_status_codes(&streams_error);
-
-    let status_code = MapStreamsErrors::to_http_status_codes(&Errors::MessageLinkNotFoundInTangle(String::from("")));
     let builder = Response::builder()
-        .status(status_code);
+        .status(StatusCode::INTERNAL_SERVER_ERROR);
+    builder.body(Default::default())
+}
+
+pub fn log_lets_err_and_respond_mapped_status_code(lets_err: LetsError, fn_name: &str) -> Result<Response<Body>> {
+    println!("[IOTA-Bridge - {}] Error: {}", fn_name, lets_err);
+    let builder = Response::builder()
+        .status(MapLetsError::to_http_status_codes(&lets_err));
     builder.body(Default::default())
 }
 

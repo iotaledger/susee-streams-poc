@@ -149,7 +149,7 @@ impl<CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, S
     ) -> hyper::http::Result<Request<Body>>
     {
         let mut ret_val: Option<Request<Body>> = None;
-        if let Some(subscriber) = &subscriber_manager.subscriber {
+        if let Some(subscriber) = &subscriber_manager.user {
             if let Some(subscription_link) = subscriber_manager.subscription_link {
                 Self::println_subscription_details(
                     &subscriber,
@@ -235,7 +235,7 @@ impl<CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, S
         let ann_address = Address::from_str(&announcement_link_str).expect("Address::from_str() returned error");
         let sub_msg_link = subscriber_mngr.subscribe(&ann_address).await.expect("subscriber_mngr::subscribe() returned error");
 
-        let subscriber = subscriber_mngr.subscriber.as_ref().unwrap();
+        let subscriber = subscriber_mngr.user.as_ref().unwrap();
 
         Self::println_subscription_details(
             &subscriber,
@@ -263,7 +263,7 @@ impl<CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, S
         subscriber_mngr.register_keyload_msg(&keyload_msg_link).expect("[fn register_keyload_msg] register_keyload_msg err");
 
         Self::println_subscription_details(
-            &subscriber_mngr.subscriber.as_ref().unwrap(),
+            &subscriber_mngr.user.as_ref().unwrap(),
             &keyload_msg_link,
             "Keyload Message",
             "Keyload  msg",

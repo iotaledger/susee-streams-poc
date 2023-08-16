@@ -54,7 +54,7 @@ use hyper::{
     http::Request,
 };
 
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 use rand::Rng;
 

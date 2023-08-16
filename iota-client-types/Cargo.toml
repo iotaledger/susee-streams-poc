@@ -22,3 +22,8 @@ git = "https://github.com/chrisgitiota/streams"
 branch="v1"
 package="iota-streams-core"
 default-features = false
+
+[dependencies.lets]
+git = "https://github.com/chrisgitiota/streams"
+branch="stardust"
+default-features = false

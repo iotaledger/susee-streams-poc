@@ -24,7 +24,7 @@ use crate::{
     }
 };
 
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to

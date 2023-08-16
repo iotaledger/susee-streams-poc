@@ -29,7 +29,7 @@ use super::{
     },
 };
 
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 #[derive(Clone)]
 pub struct ProcessFinally {

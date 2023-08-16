@@ -46,7 +46,7 @@ pub struct ProjectConstants {
 pub static PROJECT_CONSTANTS: ProjectConstants = ProjectConstants {
     version: "0.1.2",
     author: "Christof Gerritsma <christof.gerritsma@iota.org>",
-    default_node: "https://chrysalis-nodes.iota.org",
+    default_node: "https://api.shimmer.network",
 };
 
 #[derive(Clone)]

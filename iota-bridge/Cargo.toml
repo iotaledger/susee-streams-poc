@@ -18,9 +18,9 @@ hyper = { version = "0.14", features = ["full"] }
 hex-literal = "0.3.4"
 env_logger = "0.9"
 
-[dependencies.iota-streams]
+[dependencies.streams]
 git = "https://github.com/chrisgitiota/streams"
-branch="v1"
+branch="stardust"
 
 [dependencies.clap]
 version = "3.0.14"

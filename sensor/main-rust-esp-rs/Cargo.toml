@@ -17,11 +17,11 @@ sensor-lib = { version = "0.1.2", path = "../sensor-lib", default-features = fal
 log = "0.4"
 anyhow = "1.0.40"
 
-[dependencies.iota-streams]
+[dependencies.streams]
 git = "https://github.com/chrisgitiota/streams"
-branch="v1"
+branch="stardust"
 default-features = false
-features = ["std", "tangle"]
+features = ["tangle-client"]
 
 [build-dependencies]
 embuild = "0.28"

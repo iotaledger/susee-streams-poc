@@ -67,7 +67,7 @@ async fn run() {
     };
     let lora_wan_node_store = LoraWanNodeDataStore::new(db_connection_opt.clone());
     let pending_request_store = PendingRequestDataStore::new(db_connection_opt);
-    let client = IotaBridge::new(cli.node, lora_wan_node_store, pending_request_store);
+    let client = IotaBridge::new(cli.node, lora_wan_node_store, pending_request_store).await;
 
     let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT).into();
     if cli.matches.is_present(cli.arg_keys.listener_ip_address_port) {

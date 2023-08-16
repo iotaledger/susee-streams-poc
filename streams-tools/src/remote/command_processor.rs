@@ -11,7 +11,7 @@ use crate::{
     }
 };
 
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 use std::{
     time::Duration,

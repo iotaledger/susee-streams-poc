@@ -3,11 +3,15 @@ use core::str::FromStr;
 use anyhow::{
     Result,
     bail,
+    anyhow
 };
 
-use iota_streams::{
-    app_channels::api::tangle::Address,
-    core::prelude::hex,
+use streams::{
+    Address,
+};
+use streams::id::{
+    PermissionDuration,
+    Permissioned
 };
 
 use streams_tools::{
@@ -108,7 +112,7 @@ fn println_announcement_link(link: &Address, comment: &str) {
     println!(
         "[Management Console] {}:
                      Announcement Link: {}
-                          Tangle Index: {:#}\n",
+                          Tangle Index: {:#?}\n",
         comment,
         link.to_string(),
         link.to_msg_index()
@@ -124,14 +128,14 @@ async fn create_channel(channel_manager: &mut ChannelManagerPlainTextWallet) -> 
 async fn println_channel_status<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>)
 {
     let mut channel_exists = false;
-    if let Some(author) = &channel_manager.author {
+    if let Some(author) = &channel_manager.user {
         let starts_with = cli.matches.value_of(cli.arg_keys.channel_starts_with).expect(
             format!("Error on fetching value from cli.matches for {}", cli.arg_keys.channel_starts_with).as_str()
         );
-        match author.announcement_link() {
+        match author.stream_address() {
             Some(link) => {
                 println_announcement_link(
-                    link,
+                    &link,
                     format!("Channel details for channel ID starting with '{}'", starts_with).as_str()
                 );
                 channel_exists = true
@@ -199,18 +203,18 @@ async fn send_keyload_message_cli<'a> (channel_manager: &mut ChannelManagerPlain
 
 async fn send_keyload_message<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, sub_msg_link_string: &str, pub_key_str: &str) -> Result<Address>
 {
-    let subscription_msg_link = Address::from_str(sub_msg_link_string)?;
+    let subscription_msg_link = Address::from_str(sub_msg_link_string).map_err(|e|anyhow!(e))?;
     let pub_key = hex::decode(pub_key_str).unwrap();
     let keyload_msg_link = channel_manager.add_subscribers(&vec![ SubscriberData {
         subscription_link: & subscription_msg_link,
-        public_key: pub_key.as_slice()
+        permissioned_public_key: Permissioned::ReadWrite(pub_key.as_slice(), PermissionDuration::Perpetual)
     }]).await?;
 
     println!(
         "\
 [Management Console] A keyload message has been created with the following keyload link:
                      Keyload link: {}
-                     Tangle Index: {:#}
+                     Tangle Index: {:#?}
 ", keyload_msg_link.to_string(), keyload_msg_link.to_msg_index()
     );
 

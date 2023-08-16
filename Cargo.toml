@@ -49,7 +49,8 @@ smol = { git = "https://github.com/esp-rs-compat/smol" }
 polling = { git = "https://github.com/esp-rs-compat/polling" }
 time = { version = "=0.3.4", git = "https://github.com/time-rs/time", rev="8ec5f4ef2f63321b3dbbec3b4a6c4001fdf26de6" }
 iota-crypto = { version = "0.9.1", git = "https://github.com/iotaledger/crypto.rs.git", rev="6840d43f98ad1a991571268f7a9543025200ca4f" }
-iota-client = { version = "1.1.1", git = "https://github.com/chrisgitiota/iota.rs.git", branch="version-1-1-1-for-susee" }
+# iota-client = { git = "https://github.com/iotaledger/iota.rs", branch = "develop" }
+iota-sdk = { version = "1.0", path = "../../chrisgitiota/iota-sdk/sdk" }
 
 #esp-idf-sys = { version = "0.32.1", git = "https://github.com/chrisgitiota/esp-idf-sys.git", branch="for-susee" }
 #esp-idf-sys = { version = "0.32.1", git = "https://github.com/esp-rs/esp-idf-sys.git", rev="8a0e9280322071c337300de19efdf2807f7877e2" }
@@ -62,5 +63,7 @@ iota-client = { version = "1.1.1", git = "https://github.com/chrisgitiota/iota.r
 #esp-idf-hal = { version = "0.40", git = "https://github.com/chrisgitiota/esp-idf-hal.git", branch="for-susee" }
 # esp-idf-hal = { version = "0.40", path = "../../esp-rs/esp-idf-hal" }
 
-#[patch."https://github.com/chrisgitiota/streams"]
-#iota-streams = { version = "0.1.2", path = "../../chrisgitiota/streams" }
+[patch."https://github.com/chrisgitiota/streams"]
+streams = { version = "0.2.0", path = "../../chrisgitiota/streams/streams" }
+lets = { version = "0.2.0", path = "../../chrisgitiota/streams/lets" }
+spongos = { version = "0.2.0", path = "../../chrisgitiota/streams/spongos" }

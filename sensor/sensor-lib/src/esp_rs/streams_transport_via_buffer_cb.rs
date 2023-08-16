@@ -26,9 +26,9 @@ use std::{
 use streams_tools::{http::{
     RequestBuilderStreams,
     http_protocol_streams::{
-            MapStreamsErrors,
-            EndpointUris,
-            QueryParameters,
+        MapLetsError,
+        EndpointUris,
+        QueryParameters,
         },
     }, binary_persist::{
         BinaryPersist,

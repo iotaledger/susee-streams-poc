@@ -41,7 +41,8 @@ use crate::{
         CompressedStateListen,
         CompressedStateManager
     },
-    StreamsTransport
+    StreamsTransport,
+    println_esp_compat,
 };
 
 #[cfg(feature = "std")]
@@ -127,7 +128,7 @@ impl<TransportT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<Tran
             // The initialization_cnt is only incremented in case of re-initializations
         } else {
             if self.wallet.get_initialization_cnt() < INITIALIZATION_CNT_MAX_VALUE {
-                println!("[SubscriberManager.subscribe()]\n\
+                println_esp_compat!("[SubscriberManager.subscribe()]\n\
                                 ------------------------------------------------------------------\n\
                                 An already existing subscription will be replaced by a new one.\n\
                                 Initialization count will be incremented from {} to {}\n\
@@ -178,14 +179,14 @@ impl<TransportT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<Tran
         }
 
         if let Some(prev_msg_link) = self.prev_msg_link {
-            println!("[SubscriberManager.register_keyload_msg()] - Replacing the old previous message link with new keyload message link
+            println_esp_compat!("[SubscriberManager.register_keyload_msg()] - Replacing the old previous message link with new keyload message link
                                   Old previous message link: {}
                                   Keyload message link: {}\n",
                    prev_msg_link.to_string(),
                    keyload_address.to_string(),
             )
         } else {
-            println!("[SubscriberManager.register_keyload_msg()] - Set keyload message link as new previous message link
+            println_esp_compat!("[SubscriberManager.register_keyload_msg()] - Set keyload message link as new previous message link
                                   Keyload message link: {}\n",
                      keyload_address.to_string(),
             )
@@ -240,10 +241,10 @@ impl<TransportT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<Tran
                 Some(streams_err) => {
                     match streams_err {
                         StreamsErrors::MessageLinkNotFoundInStore(address) => {
-                            log::debug!("[fn send_signed_packet] - Got MessageLinkNotFoundInStore error for {} - syncing client state", address);
+                            log::debug!("[fn call_subscriber_send_signed_packet] - Got MessageLinkNotFoundInStore error for {} - syncing client state", address);
                             subscriber.sync_state().await?;
                             self.is_synced = true;
-                            log::debug!("[fn send_signed_packet] - subscriber.send_signed_packet() after MessageLinkNotFoundInStore error");
+                            log::debug!("[fn call_subscriber_send_signed_packet] - after MessageLinkNotFoundInStore error");
                             subscriber.send_signed_packet(
                                 prev_msg_link,
                                 &Bytes::default(),
@@ -276,10 +277,10 @@ impl<TransportT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<Tran
             log::debug!("[fn clear_client_state] - START");
 
             if Path::new(serial_file_name.as_str()).exists(){
-                println!("[SubscriberManager.clear_client_state()] - Removing file {}", serial_file_name);
+                println_esp_compat!("[SubscriberManager.clear_client_state()] - Removing file {}", serial_file_name);
                 remove_file(serial_file_name)?;
             } else {
-                println!("[SubscriberManager.clear_client_state()] - Can not remove file {} cause it does not exist.", serial_file_name);
+                println_esp_compat!("[SubscriberManager.clear_client_state()] - Can not remove file {} cause it does not exist.", serial_file_name);
             }
 
             log::debug!("[fn clear_client_state] - Setting all links and subscriber to None");
@@ -409,7 +410,7 @@ impl<TransportT: StreamsTransport, WalletT: SimpleWallet> SubscriberManager<Tran
 }
 
 pub fn println_maximum_initialization_cnt_reached_warning(fn_name: &str, current_initialization_cnt: u8) {
-    println!("\n\n[{}] Warning maximum number of initializations reached:\n\n\
+    println_esp_compat!("\n\n[{}] Warning maximum number of initializations reached:\n\n\
                                 ---------------------------------------------------------------\n\
                                 ---------------------- W A R N I N G --------------------------\n\
                                 ---------------------------------------------------------------\n\

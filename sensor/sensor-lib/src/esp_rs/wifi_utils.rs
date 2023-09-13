@@ -58,20 +58,20 @@ pub fn init_wifi(wifi_ssid: &str, wifi_pass: &str) -> Result<Box<EspWifi<'static
         Some(default_nvs_part)
     )?);
 
-    println!("Wifi created, about to scan");
+    log::info!("Wifi created, about to scan");
 
     let ap_infos = wifi.scan()?;
 
     let ours = ap_infos.into_iter().find(|a| a.ssid == wifi_ssid);
 
     let channel = if let Some(ours) = ours {
-        println!(
+        log::info!(
             "Found configured access point {} on channel {}",
             wifi_ssid, ours.channel
         );
         Some(ours.channel)
     } else {
-        println!(
+        log::info!(
             "Configured access point {} not found during scanning, will go with unknown channel",
             wifi_ssid
         );
@@ -92,7 +92,7 @@ pub fn init_wifi(wifi_ssid: &str, wifi_pass: &str) -> Result<Box<EspWifi<'static
         },
     ))?;
 
-    println!("Wifi configuration set, about to wifi.start()");
+    log::info!("Wifi configuration set, about to wifi.start()");
     wifi.start()?;
 
     if !WifiWait::new(&sys_loop)?
@@ -101,7 +101,7 @@ pub fn init_wifi(wifi_ssid: &str, wifi_pass: &str) -> Result<Box<EspWifi<'static
         bail!("Wifi did not start");
     }
 
-    println!("Connecting wifi...");
+    log::info!("Connecting wifi...");
 
 
     wifi.connect()?;
@@ -118,7 +118,7 @@ pub fn init_wifi(wifi_ssid: &str, wifi_pass: &str) -> Result<Box<EspWifi<'static
 
     let ip_info = wifi.sta_netif().get_ip_info()?;
 
-    println!("Wifi DHCP info: {:?}", ip_info);
+    log::info!("Wifi DHCP info: {:?}", ip_info);
 
     ping(&ip_info.subnet.gateway)?;
 
@@ -126,7 +126,7 @@ pub fn init_wifi(wifi_ssid: &str, wifi_pass: &str) -> Result<Box<EspWifi<'static
 }
 
 pub fn ping(ipv4_addr: &Ipv4Addr) -> Result<()> {
-    println!("About to do some pings for {:?}", ipv4_addr);
+    log::info!("About to do some pings for {:?}", ipv4_addr);
 
     let ping_summary =
         ping::EspPing::default().ping(ipv4_addr.clone(), &Default::default())?;
@@ -137,7 +137,7 @@ pub fn ping(ipv4_addr: &Ipv4Addr) -> Result<()> {
         );
     }
 
-    println!("Pinging done");
+    log::info!("Pinging done");
 
     Ok(())
 }

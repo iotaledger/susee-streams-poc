@@ -1,3 +1,14 @@
+use std::{
+    clone::Clone,
+    rc::Rc
+};
+
+use hyper::{
+    http::{
+        StatusCode,
+    }
+};
+
 use iota_streams::{
     app::{
         transport::{
@@ -15,22 +26,22 @@ use iota_streams::{
         async_trait,
         Result,
         err,
+        Errors,
+        wrapped_err,
+        WrappedError,
     },
 };
 
-use std::{
-    clone::Clone,
-    rc::Rc
-};
-
-use streams_tools::{http::{
-    RequestBuilderStreams,
-    http_protocol_streams::{
+use streams_tools::{
+    http::{
+        RequestBuilderStreams,
+        http_protocol_streams::{
             MapStreamsErrors,
             EndpointUris,
             QueryParameters,
         },
-    }, binary_persist::{
+    },
+    binary_persist::{
         BinaryPersist,
         TangleMessageCompressed,
         TangleAddressCompressed,
@@ -38,18 +49,13 @@ use streams_tools::{http::{
             IotaBridgeRequestParts,
             IotaBridgeResponseParts,
         },
-    }, compressed_state::{
+    },
+    compressed_state::{
         CompressedStateSend,
         CompressedStateListen,
         CompressedStateManager
     },
     StreamsTransport,
-};
-
-use hyper::{
-    http::{
-        StatusCode,
-    }
 };
 
 use iota_client_types::{
@@ -106,16 +112,16 @@ impl StreamsTransportViaBufferCallback {
     }
 
     async fn recv_message_via_lorawan(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
-        log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http]");
+        log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_lorawan]");
         let req_parts = self.get_request_parts(link)?;
         let response = self.request(req_parts, link.appinst).await?;
 
-        log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] check for retrials");
+        log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_lorawan] check for retrials");
         // TODO: Implement following retrials for bad LoRaWAN connection using EspTimerService if needed.
         // May be we need to introduce StatusCode::CONTINUE in cases where LoRaWAN connection
         // is sometimes too bad and retries are a valid strategy to receive the response
         if response.status_code == StatusCode::CONTINUE {
-            log::warn!("[StreamsTransportViaBufferCallback.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
+            log::warn!("[StreamsTransportViaBufferCallback.recv_message_via_lorawan] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
         }
 
         StreamsTransportViaBufferCallback::manage_response_status(&response, link)
@@ -123,13 +129,13 @@ impl StreamsTransportViaBufferCallback {
 
     fn manage_response_status(response: &IotaBridgeResponseParts, link: &TangleAddress) -> Result<TangleMessage> {
         if response.status_code.is_success() {
-            log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] StatusCode is successful: {}", response.status_code);
-            log::info!("[StreamsTransportViaBufferCallback.recv_message_via_http] Received response with content length of {}", response.body_bytes.len());
+            log::debug!("[StreamsTransportViaBufferCallback.manage_response_status] StatusCode is successful: {}", response.status_code);
+            log::info!("[StreamsTransportViaBufferCallback.manage_response_status] Received response with content length of {}", response.body_bytes.len());
             let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&response.body_bytes.as_slice()).unwrap();
-            log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] return ret_val");
+            log::debug!("[StreamsTransportViaBufferCallback.manage_response_status] return ret_val");
             Ok(ret_val)
         } else {
-            log::error!("[StreamsTransportViaBufferCallback.recv_message_via_http] StatusCode is not OK");
+            log::error!("[StreamsTransportViaBufferCallback.manage_response_status] StatusCode is not OK");
             err!(MapStreamsErrors::from_http_status_codes(
                 response.status_code,
                  Some(link.to_string())
@@ -244,8 +250,26 @@ impl Transport<TangleAddress, TangleMessage> for StreamsTransportViaBufferCallba
                 log::info!("[StreamsTransportViaBufferCallback.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string())
             },
             Err(err) => {
-                log::error!("[StreamsTransportViaBufferCallback.recv_message] Received streams error: '{}'", err);
-                ()
+                log::error!("[StreamsTransportViaBufferCallback.recv_message] Received error: '{}'", err);
+                match err {
+                    // We are handling any kind of error as TransportNotAvailable event here
+                    // (originally caused by a transport failure like e.g. LORAWAN_NO_CONNECTION)
+                    // because there is no possibility to correctly match err using iota_streams::core::Error
+                    // items and because of following two facts:
+                    // 1. The error type is ignored in the Streams implementation (api/tangle/messages.rs,
+                    //    fn MessagesState::next(), line 697)
+                    //    Cite:  // Message not found or network error. Right now we are not distinguishing
+                    //           // between each case, ...
+                    //    Which results in a MessageLinkNotFoundInStore error which results in a client
+                    //    resync (user_manager/subscriber_manager.rs, fn SubcriberManager::subscribe()).
+                    // 2. The error handling is reorganised in Streams v"0.2.0".
+                    //    The error handling for TransportNotAvailable will be fixed for Stardust port
+                    //    of the susee-streams-poc
+                    //
+                    // TODO: Fix TransportNotAvailable resp. LORAWAN_NO_CONNECTION error handling in the
+                    //       Stardust port of the susee-streams-poc
+                    &_ => return Err(wrapped_err(Errors::TransportNotAvailable, WrappedError(err))),
+                }
             }
         }
         ret_val

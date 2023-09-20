@@ -198,24 +198,24 @@ impl RequestViaBufferCallback
         let _response_callback_scope_manager = ResponseCallbackScopeManager::new();
         match (self.send_callback)(buffer.as_ptr(), buffer.len(), receive_response, self.p_caller_user_data) {
             LoRaWanError::LORAWAN_OK => {
-                log::debug!("[RequestViaBufferCallback.request_via_lorawan] Successfully send request via LoRaWAN");
+                log::debug!("[RequestViaBufferCallback.request_via_buffer_callback] Successfully send request via LoRaWAN");
                 let receiver = get_response_receiver()?;
                 match receiver.recv().await {
                     Ok(response) => {
-                        log::debug!("[RequestViaBufferCallback.request_via_lorawan] Received response via LoRaWAN");
+                        log::debug!("[RequestViaBufferCallback.request_via_buffer_callback] Received response via LoRaWAN");
                         if response.len() > 0 {
                             match IotaBridgeResponseParts::try_from_bytes(response.as_slice()) {
                                 Ok(response_parts) => {
-                                    log::debug!("[RequestViaBufferCallback.request_via_lorawan] Successfully deserialized response_parts:\n{}", response_parts);
+                                    log::debug!("[RequestViaBufferCallback.request_via_buffer_callback] Successfully deserialized response_parts:\n{}", response_parts);
                                     if !response_parts.status_code.is_success() {
                                         let err_msg = String::from_utf8(response_parts.body_bytes.clone())
                                             .unwrap_or(String::from("Could not deserialize Error message from response Body"));
-                                        log::debug!("[RequestViaBufferCallback.request] Response status is not successful: Error message is:\n{}", err_msg);
+                                        log::debug!("[RequestViaBufferCallback.request_via_buffer_callback] Response status is not successful: Error message is:\n{}", err_msg);
                                     }
                                     Ok(response_parts)
                                 },
                                 Err(e) => {
-                                    log::debug!("[RequestViaBufferCallback.request_via_lorawan] Error on deserializing response_parts: {}", e );
+                                    log::debug!("[RequestViaBufferCallback.request_via_buffer_callback] Error on deserializing response_parts: {}", e );
                                     bail!("Could not deserialize response binary to valid IotaBridgeResponseParts: {}", e)
                                 }
                             }

@@ -110,7 +110,7 @@ impl<CmdFetchT, StreamsTransportT> CmdProcessor<CmdFetchT, StreamsTransportT>
         initialization_cnt: u8
     ) {
         let public_key = get_public_key_str(user);
-        println!(
+        log::info!(
             "[Sensor] {}:
          {} Link:     {}
               Tangle Index:     {:#}
@@ -177,13 +177,13 @@ impl<TSR, CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetc
             }
         }
         if ret_val.is_none() {
-            println!("[Sensor] No subscription found.");
+            log::info!("[Sensor] No subscription found.");
             let to_send = SubscriberStatus::default();
             ret_val = Some( confirm_req_builder.subscriber_status(to_send.previous_message_link, to_send.subscription)?);
         }
 
         if let Some(prev_msg_link) = subscriber_manager.prev_msg_link {
-            println!(
+            log::info!(
                 "[Sensor] Previous message:
          Prev msg link:     {}
              Tangle Index:     {:#}",

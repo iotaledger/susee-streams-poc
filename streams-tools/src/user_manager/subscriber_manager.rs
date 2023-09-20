@@ -51,6 +51,7 @@ use crate::{
     },
     StreamsTransport,
     STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC,
+    println_esp_compat,
 };
 
 #[cfg(feature = "std")]
@@ -187,7 +188,7 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
 
     async fn subscribe_with_dirty_client_state(&mut self, ann_address: Address, initialization_cnt: u8) -> Result<()> {
         if initialization_cnt < INITIALIZATION_CNT_MAX_VALUE {
-            println!("[SubscriberManager.subscribe_with_dirty_client_state()]\n\
+            println_esp_compat!("[SubscriberManager.subscribe_with_dirty_client_state()]\n\
                                 ------------------------------------------------------------------\n\
                                 An already existing subscription will be replaced by a new one.\n\
                                 Initialization count will be incremented from {} to {}\n\
@@ -277,14 +278,14 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
         };
 
         if let Some(prev_msg_link) = self.prev_msg_link {
-            println!("[SubscriberManager.register_keyload_msg()] - Replacing the old previous message link with new keyload message link
+            println_esp_compat!("[SubscriberManager.register_keyload_msg()] - Replacing the old previous message link with new keyload message link
                                   Old previous message link: {}
                                   Keyload message link: {}\n",
                      prev_msg_link.to_string(),
                      keyload_address.to_string(),
             )
         } else {
-            println!("[SubscriberManager.register_keyload_msg()] - Set keyload message link as new previous message link
+            println_esp_compat!("[SubscriberManager.register_keyload_msg()] - Set keyload message link as new previous message link
                                   Keyload message link: {}\n",
                      keyload_address.to_string(),
             )
@@ -460,7 +461,7 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
 }
 
 pub fn println_maximum_initialization_cnt_reached_warning(fn_name: &str, current_initialization_cnt: u8) {
-    println!("\n\n[{}] Warning maximum number of initializations reached:\n\n\
+    println_esp_compat!("\n\n[{}] Warning maximum number of initializations reached:\n\n\
                                 ---------------------------------------------------------------\n\
                                 ---------------------- W A R N I N G --------------------------\n\
                                 ---------------------------------------------------------------\n\

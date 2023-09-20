@@ -1,6 +1,40 @@
 #![feature(generic_const_exprs)]
 #![feature(hasher_prefixfree_extras)]
 
+
+#[macro_export]
+macro_rules! println_esp_compat {
+    () => {
+        $crate::__println_esp_compat!()
+    };
+    ($($arg:tt)*) => {{
+        $crate::__println_esp_compat!($($arg)*);
+    }};
+}
+
+#[cfg(feature = "esp_idf")]
+#[macro_export]
+macro_rules! __println_esp_compat {
+    () => {
+        log::info!("")
+    };
+    ($($arg:tt)*) => {{
+        log::info!($($arg)*);
+    }};
+}
+
+#[cfg(not(feature = "esp_idf"))]
+#[macro_export]
+macro_rules! __println_esp_compat {
+    () => {
+        println!("")
+    };
+    ($($arg:tt)*) => {{
+        println!($($arg)*);
+    }};
+}
+
+
 pub mod wallet;
 /// cbindgen:ignore
 pub mod user_manager;

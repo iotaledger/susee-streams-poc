@@ -24,7 +24,9 @@ use crate::{
             run_worker_in_own_thread,
         },
         shared::PagingOptions,
-    }, user_manager::{
+    },
+    user_manager::{
+        message_indexer::MessageIndexer,
         multi_channel_management::{
             MultiChannelManagerOptions,
             get_channel_manager_for_channel_id
@@ -34,7 +36,6 @@ use crate::{
     },
     dao_helpers::Limit,
     helpers::get_tangle_address_from_strings,
-    DummyMsgIndexer,
 };
 
 use super::{
@@ -103,7 +104,7 @@ impl Worker for IndexWorker {
             }
         };
         if let Some(user) = channel_manager.user.as_mut() {
-            let mut msg_mngr = MessageManager::<Client<DummyMsgIndexer>>::new(
+            let mut msg_mngr = MessageManager::<Client<MessageIndexer>>::new(
                 user,
                 opt.channel_id.clone(),
                 opt.db_file_name

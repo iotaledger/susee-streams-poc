@@ -1,4 +1,33 @@
-use anyhow::{anyhow, Result};
+use std::{
+    clone::Clone,
+    fmt,
+    rc::Rc,
+    time::{
+        Duration,
+    },
+};
+
+use anyhow::{
+    anyhow,
+    Result,
+    bail
+};
+
+use async_trait::async_trait;
+
+use tokio::time;
+
+use hyper::{
+    Client as HyperClient,
+    body as hyper_body,
+    Body,
+    client::HttpConnector, http::{
+        StatusCode,
+        Request,
+        Response,
+    },
+    body
+};
 
 use streams::{
     Address,
@@ -13,17 +42,7 @@ use lets::{
         Error as LetsError,
         Result as LetsResult,
     },
-};
-
-use async_trait::async_trait;
-
-use std::{
-    clone::Clone,
-    fmt,
-    rc::Rc,
-    time::{
-        Duration,
-    },
+    message::TransportMessage,
 };
 
 use crate::{
@@ -45,7 +64,10 @@ use crate::{
         binary_persist_iota_bridge_req::{
             IotaBridgeRequestParts,
             IotaBridgeResponseParts
-        }
+        },
+        LinkedMessage,
+        trans_msg_encode,
+        trans_msg_len,
     },
     compressed_state::{
         CompressedStateSend,
@@ -54,24 +76,6 @@ use crate::{
     },
     StreamsTransport
 };
-
-use hyper::{
-    Client as HyperClient,
-    body as hyper_body,
-    Body,
-    client::HttpConnector, http::{
-        StatusCode,
-        Request,
-        Response,
-    },
-    body
-};
-
-use tokio::time;
-
-use anyhow::bail;
-use lets::message::TransportMessage;
-use crate::binary_persist::{LinkedMessage, trans_msg_encode, trans_msg_len};
 
 pub struct StreamsTransportSocketOptions {
     pub http_url: String,
@@ -304,7 +308,9 @@ impl StreamsTransportSocket
         if response.status().is_success() {
             let bytes = hyper_body::to_bytes(response.into_body()).await
                 .map_err(|_| LetsError::External(anyhow!("Error on reading hyper_body")))?;
-            Ok(<LinkedMessage as BinaryPersist>::try_from_bytes(&bytes).unwrap())
+            let body = <TransportMessage as BinaryPersist>::try_from_bytes(&bytes)
+                .map_err(|e| LetsError::External(e))?;
+            Ok(LinkedMessage { link: link.clone(), body })
         } else {
             Err(MapLetsError::from_http_status_codes(
                 response.status(),

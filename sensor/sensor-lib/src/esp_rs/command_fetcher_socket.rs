@@ -7,9 +7,7 @@ use hyper::{
 };
 
 use embedded_svc::{
-    io::Read,
     http::{
-        Status,
         Headers,
         client::{
             Client as HttpClient,

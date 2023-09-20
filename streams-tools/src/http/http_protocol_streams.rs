@@ -121,6 +121,7 @@ impl MapLetsError {
     pub fn to_http_status_codes(lets_error: &LetsError) -> StatusCode {
         match lets_error {
             LetsError::AddressError(comment, _) => {
+                // TODO: Introduce a new 'More than one found' error in Streams to rid of string comparison
                 if "More than one found".eq(*comment)  {
                     StatusCode::VARIANT_ALSO_NEGOTIATES
                 } else {
@@ -133,7 +134,8 @@ impl MapLetsError {
 
     pub fn from_http_status_codes(http_error: StatusCode, address: Option<Address>, comment: Option<String>) -> LetsError {
         let address = address.unwrap_or(Address::default());
-        let comment = comment.unwrap_or(String::from(MapLetsError::NOT_PROVIDED));
+        // TODO: When the TODO (see above) has been resolved, evaluate if the comment is still needed
+        let _comment = comment.unwrap_or(String::from(MapLetsError::NOT_PROVIDED));
         let reason_for_lets_err = match http_error {
             StatusCode::NOT_EXTENDED => Some("Message not found in tangle"),
             StatusCode::VARIANT_ALSO_NEGOTIATES => Some("More than one found"),

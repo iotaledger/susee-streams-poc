@@ -1,11 +1,10 @@
-use std::convert::TryFrom;
-
 use std::{
     path::Path,
     fs::{
         write,
         read,
-    }
+    },
+    convert::TryFrom
 };
 
 use futures::executor::block_on;
@@ -14,6 +13,8 @@ use anyhow::{
     anyhow,
     Result
 };
+
+use log;
 
 use streams::{
     Address,
@@ -38,16 +39,17 @@ use crypto::{
 use crate::{
     binary_persist::Bytes,
     wallet::plain_text_wallet::PlainTextWallet,
+    user_manager::message_indexer::{
+        MessageIndexer,
+        MessageIndexerOptions,
+    },
     SimpleWallet,
     helpers::{
         get_channel_id_from_link,
         SerializationCallbackRefToClosureString
     },
     STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC,
-    DummyMsgIndexer
 };
-
-use log;
 
 pub struct SubscriberData<'a> {
     pub subscription_link: &'a Address,
@@ -55,13 +57,12 @@ pub struct SubscriberData<'a> {
 }
 
 pub struct ChannelManager<WalletT: SimpleWallet> {
-    transport: Client<DummyMsgIndexer>,
     wallet: WalletT,
     serialization_file: Option<String>,
     serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
     base_branch_topic: String,
     pub node_url: String,
-    pub user: Option<User<Client<DummyMsgIndexer>>>,
+    pub user: Option<User<Client<MessageIndexer>>>,
     pub announcement_link: Option<Address>,
     pub keyload_link: Option<Address>,
     pub prev_msg_link:  Option<Address>,
@@ -73,8 +74,8 @@ async fn import_from_serialization_file<WalletT: SimpleWallet>(file_name: &str, 
 }
 
 async fn import_from_buffer<WalletT: SimpleWallet>(buffer: &Vec<u8>, ret_val: &mut ChannelManager<WalletT>) -> Result<()> {
-    let indexer = DummyMsgIndexer{};
-    let user = User::<Client<DummyMsgIndexer>>::restore(
+    let indexer = MessageIndexer::new(MessageIndexerOptions::default());
+    let user = User::<Client<MessageIndexer>>::restore(
         &buffer,
         ret_val.wallet.get_serialization_password(),
         Client::for_node(ret_val.node_url.as_str(), indexer).await.map_err(|e|anyhow!(e))?
@@ -104,15 +105,12 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
     //           Problem: Usage of block_on() here results in panic because of the usage of tokio.
     pub async fn new(node_url: &str, wallet: WalletT, options: Option<ChannelManagerOptions>) -> Self {
         let opt = options.unwrap_or_default();
-        let indexer = DummyMsgIndexer{};
         let mut ret_val = Self {
             node_url: node_url.to_string(),
             wallet,
             base_branch_topic: STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC.to_string(),
             serialization_file: opt.serialization_file.clone(),
             serialize_user_state_callback: opt.serialize_user_state_callback,
-            transport: Client::for_node(node_url, indexer).await
-                .expect(format!("Error on creating tangle client using node_url {}", node_url).as_str()),
             user: None,
             announcement_link: None,
             keyload_link: None,
@@ -139,7 +137,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
         if self.user.is_some() {
             panic!("This channel already has been announced")
         }
-        let indexer = DummyMsgIndexer{};
+        let indexer = MessageIndexer::new(MessageIndexerOptions::default());
         let mut user= User::builder()
             .with_identity(Ed25519::from_seed(self.wallet.get_seed()))
             .with_transport(Client::for_node(self.node_url.as_str(), indexer).await.map_err(|e|anyhow!(e))?)

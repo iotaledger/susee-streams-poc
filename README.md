@@ -1,5 +1,50 @@
 # SUSEE Streams POC
 
+      ===========================================================================
+      ===                                                                     ===
+      ===                         IMPORTANT NOTE                              ===
+      ===                                                                     ===
+      === On 29 September the IOTA mainnet will be updated to the Stardust    ===
+      === version of the IOTA protocol. The applications and libraries        ===
+      === provided on the 'main' branch of this repository can not be used    ===
+      === after the Stardust update.                                          ===
+      ===                                                                     ===
+      === The 'stardust' branch of this repository includes all needed        ===
+      === resources to use the SUSEE POC applications and libraries together  ===
+      === with IOTA Stardust.                                                 ===
+      ===                                                                     ===
+      === This is the current status of IOTA Stardust usagae of the SUSEE     ===
+      === POC applications:                                                   ===
+      ===                                                                     ===
+      === * All resources can be used together with a prvate tangle for       ===
+      ===   develop and test purposes.                                        ===
+      ===   See folder 'inx-collector' for more details.                      ===
+      === * TODO: Test usage with the IOTA mainnet / Shimmernet using a       ===
+      ===   globaly publicly available VPS to run a Hornet node and all       ===
+      ===   needed inx-plugins                                                ===
+      ===   * TODO:                                                           ===
+      ===     Document all installation steps or create scripts for           ===
+      ===     automation                                                      ===
+      === * TODO: Finish Documentation:                                       ===
+      ===   * Streams-collector section in main readme                        ===
+      ===   * Test/scripts folder: Update all scripts                         ===
+      ===   * Test folder: Update all command line expressions                ===
+      ===   * Test folder: Add a "Start your private tangle" hint to all      ===
+      ===                  test descriptions                                  === 
+      ===   * Test folder: Streams-collector section in main readme           ===
+      ===   * Sensor folder: Mention Streams-collector in readme              ===
+      ===   * streams-poc-lib folder: Mention Streams-collector in readme     ===
+      ===   * main-streams-poc-lib-pio folder:                                ===
+      ===     Mention Streams-collector in readme                             ===
+      ===   * Sensor folder: Mention Streams-collector in main readme         ===
+      === * TODO: Enhance IOTA node default value management to               ===
+      ===         automatically set the correct IOTA node (e.g. .env)         ===
+      ===========================================================================
+
+      References:
+      * https://blog.iota.org/stardust-upgrade-iota-tokenomics/
+      * http://blog.iota.org/content/images/2023/09/Item741---supp09-4.png
+
 ## About
 This project contains five test applications providing command line interfaces (CLI) to evaluate the *IOTA Streams*
 functionality that is used in the SUSEE project. Additionally, the static library *streams-poc-lib* provides C bindings

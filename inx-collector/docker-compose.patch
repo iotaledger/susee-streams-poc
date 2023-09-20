@@ -1,7 +1,7 @@
 2,3d1
 < volumes:
 <   minio_storage:
-5,56d2
+5,57d2
 <   minio:
 <     container_name: minio
 <     image: minio/minio
@@ -17,13 +17,14 @@
 <     command: server --console-address ":9001" /data
 <     ports:
 <       - 9001:9001/tcp
+<       - 9000:9000/tcp
 <     profiles:
 <       - 2-nodes
 <       - 3-nodes
 <       - 4-nodes
 <   inx-collector:
 <     container_name: inx-collector
-<     image: giordyfish/inx-collector:1.1.0
+<     image: chrisgerritsma/streams-collector:latest
 <     stop_grace_period: 5m
 <     restart: unless-stopped
 <     ports:
@@ -47,7 +48,7 @@
 <       - "--storage.secure=${STORAGE_SECURE:-false}"
 <       - "--storage.defaultBucketName=${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default}"
 <       - "--storage.defaultBucketExpirationDays=${STORAGE_DEFAULT_EXPIRATION:-30}"
-<       - "--listener.filters=${LISTENER_FILTERS:-}"
+<       - "--listener.filters={\"filters\": [{\"tag\":\"susee-\", \"tagIsPrefix\": true}]}"
 <       - "--POI.hostUrl=${POI_URL:-http://inx-poi:9687}"
 <       - "--POI.isPlugin=${POI_PLUGIN:-true}"
 <     profiles:

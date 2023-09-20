@@ -115,7 +115,7 @@ fn println_announcement_link(link: &Address, comment: &str) {
                           Tangle Index: {:#?}\n",
         comment,
         link.to_string(),
-        link.to_msg_index()
+        hex::encode(link.to_msg_index())
     );
 }
 
@@ -215,7 +215,7 @@ async fn send_keyload_message<'a> (channel_manager: &mut ChannelManagerPlainText
 [Management Console] A keyload message has been created with the following keyload link:
                      Keyload link: {}
                      Tangle Index: {:#?}
-", keyload_msg_link.to_string(), keyload_msg_link.to_msg_index()
+", keyload_msg_link.to_string(), hex::encode(keyload_msg_link.to_msg_index())
     );
 
     Ok(keyload_msg_link)

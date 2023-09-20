@@ -38,9 +38,9 @@ pub struct EndpointUris {}
 pub const URI_PREFIX_LORAWAN_NODE: &'static str = "/lorawan-node";
 
 impl EndpointUris {
-    pub const CREATE_NODE: &'static str = "/lorawan-node";
-    pub const GET_NODE: &'static str = "/lorawan-node";
-    pub const IS_NODE_KNOWN: &'static str = "/lorawan-node";
+    pub const CREATE_NODE: &'static str = URI_PREFIX_LORAWAN_NODE;
+    pub const GET_NODE: &'static str = URI_PREFIX_LORAWAN_NODE;
+    pub const IS_NODE_KNOWN: &'static str = URI_PREFIX_LORAWAN_NODE;
 
     pub fn get_uri___create_node(dev_eui: &str) -> String {
         format!("{}/{}", Self::CREATE_NODE, dev_eui)

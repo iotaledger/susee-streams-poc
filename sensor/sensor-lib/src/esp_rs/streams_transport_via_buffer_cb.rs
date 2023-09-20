@@ -1,39 +1,49 @@
-use iota_streams::{
-    app::{
-        transport::{
-            Transport,
-            TransportDetails,
-            TransportOptions,
-            tangle::{
-                TangleAddress,
-                TangleMessage,
-                AppInst
-            },
-        },
-    },
-    core::{
-        async_trait,
-        Result,
-        err,
-    },
-};
-
 use std::{
     clone::Clone,
     rc::Rc
 };
 
-use streams_tools::{http::{
-    RequestBuilderStreams,
-    http_protocol_streams::{
+use anyhow::{Result};
+
+use async_trait::async_trait;
+
+use hyper::{
+    http::{
+        StatusCode,
+    }
+};
+
+use streams::{
+    Address,
+    transport::Transport,
+    TransportMessage,
+};
+
+use lets::{
+    address::{
+        AppAddr,
+    },
+    error::{
+        Error as LetsError,
+        Result as LetsResult,
+    },
+};
+
+use streams_tools::{
+    http::{
+        RequestBuilderStreams,
         MapLetsError,
-        EndpointUris,
-        QueryParameters,
+        http_protocol_streams::{
+            EndpointUris,
+            QueryParameters,
         },
     }, binary_persist::{
         BinaryPersist,
         TangleMessageCompressed,
         TangleAddressCompressed,
+        LinkedMessage,
+        trans_msg_encode,
+        trans_msg_len,
         binary_persist_iota_bridge_req::{
             IotaBridgeRequestParts,
             IotaBridgeResponseParts,
@@ -46,17 +56,6 @@ use streams_tools::{http::{
     StreamsTransport,
 };
 
-use hyper::{
-    http::{
-        StatusCode,
-    }
-};
-
-use iota_client_types::{
-    Details,
-    SendOptions
-};
-
 use crate::request_via_buffer_cb::{
     RequestViaBufferCallback,
     RequestViaBufferCallbackOptions
@@ -67,7 +66,6 @@ pub struct StreamsTransportViaBufferCallback {
     initialization_cnt: u8,
     request_via_cb: RequestViaBufferCallback,
     request_builder: RequestBuilderStreams,
-    tangle_client_options: SendOptions,
     compressed: CompressedStateManager,
 }
 
@@ -79,7 +77,6 @@ impl<'a> StreamsTransport for StreamsTransportViaBufferCallback {
             initialization_cnt: 0,
             request_via_cb: RequestViaBufferCallback::new(options),
             request_builder: RequestBuilderStreams::new(""),
-            tangle_client_options: SendOptions::default(),
             compressed: CompressedStateManager::new(),
         }
     }
@@ -91,24 +88,41 @@ impl<'a> StreamsTransport for StreamsTransportViaBufferCallback {
 
 impl StreamsTransportViaBufferCallback {
 
-    async fn send_message_via_lorawan(&mut self, msg: &TangleMessage) -> Result<()> {
+    async fn send_message_via_lorawan(&mut self, msg: &LinkedMessage) -> LetsResult<()> {
         let req_parts = if self.compressed.get_use_compressed_msg() {
             // Please note the comments in fn recv_message_via_http() below
             // Same principles apply here
             let cmpr_message = TangleMessageCompressed::from_tangle_message(msg, self.initialization_cnt);
-            self.request_builder.get_send_message_request_parts(&cmpr_message, EndpointUris::SEND_COMPRESSED_MESSAGE, true, None)?
+            self.request_builder
+                .get_send_message_request_parts(
+                    &cmpr_message,
+                    EndpointUris::SEND_COMPRESSED_MESSAGE,
+                    true,
+                    None
+                )
+                .map_err(|e| LetsError::External(e.into()))?
         } else {
-            self.request_builder.get_send_message_request_parts(msg, EndpointUris::SEND_MESSAGE, false, None)?
+            self.request_builder
+                .get_send_message_request_parts(
+                    msg,
+                    EndpointUris::SEND_MESSAGE,
+                    false,
+                    None
+                )
+                .map_err(|e| LetsError::External(e.into()))?
         };
 
-        self.request(req_parts, msg.link.appinst).await?;
+        self.request(req_parts, msg.link.base()).await
+            .map_err(|e| LetsError::External(e.into()))?;
         Ok(())
     }
 
-    async fn recv_message_via_lorawan(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
+    async fn recv_message_via_lorawan(&mut self, link: &Address) -> LetsResult<LinkedMessage> {
         log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http]");
-        let req_parts = self.get_request_parts(link)?;
-        let response = self.request(req_parts, link.appinst).await?;
+        let req_parts = self.get_request_parts(link)
+            .map_err(|e| LetsError::External(e.into()))?;
+        let response = self.request(req_parts, link.base()).await
+            .map_err(|e| LetsError::External(e.into()))?;
 
         log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] check for retrials");
         // TODO: Implement following retrials for bad LoRaWAN connection using EspTimerService if needed.
@@ -121,23 +135,24 @@ impl StreamsTransportViaBufferCallback {
         StreamsTransportViaBufferCallback::manage_response_status(&response, link)
     }
 
-    fn manage_response_status(response: &IotaBridgeResponseParts, link: &TangleAddress) -> Result<TangleMessage> {
+    fn manage_response_status(response: &IotaBridgeResponseParts, link: &Address) -> LetsResult<LinkedMessage> {
         if response.status_code.is_success() {
             log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] StatusCode is successful: {}", response.status_code);
             log::info!("[StreamsTransportViaBufferCallback.recv_message_via_http] Received response with content length of {}", response.body_bytes.len());
-            let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&response.body_bytes.as_slice()).unwrap();
+            let body = <TransportMessage as BinaryPersist>::try_from_bytes(&response.body_bytes.as_slice()).unwrap();
             log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_http] return ret_val");
-            Ok(ret_val)
+            Ok(LinkedMessage { link: link.clone(), body })
         } else {
             log::error!("[StreamsTransportViaBufferCallback.recv_message_via_http] StatusCode is not OK");
-            err!(MapStreamsErrors::from_http_status_codes(
+            Err(MapLetsError::from_http_status_codes(
                 response.status_code,
-                 Some(link.to_string())
+                Some(link.clone()),
+                 None
             ))
         }
     }
 
-    fn get_request_parts(&mut self, link: &TangleAddress) -> Result<IotaBridgeRequestParts> {
+    fn get_request_parts(&mut self, link: &Address) -> Result<IotaBridgeRequestParts> {
         let req_parts = if self.compressed.get_use_compressed_msg() {
             // We do not set the dev_eui here because it will be communicated by the LoraWAN network
             // and therefore will not be send as lorawan payload.
@@ -163,7 +178,7 @@ impl StreamsTransportViaBufferCallback {
         Ok(req_parts)
     }
 
-    pub async fn request<'a>(&mut self, req_parts: IotaBridgeRequestParts, channel_id: AppInst) -> Result<IotaBridgeResponseParts> {
+    pub async fn request<'a>(&mut self, req_parts: IotaBridgeRequestParts, channel_id: AppAddr) -> Result<IotaBridgeResponseParts> {
         let buffer: Vec<u8> = req_parts.as_vecu8()?;
         log::debug!("[StreamsTransportViaBufferCallback.request] IotaBridgeRequestParts bytes to send: Length: {}\n    {:02X?}", buffer.len(), buffer);
         let mut response_parts = self.request_via_cb.request_via_buffer_callback(buffer).await?;
@@ -184,7 +199,7 @@ impl StreamsTransportViaBufferCallback {
         Ok(response_parts)
     }
 
-    async fn handle_request_retransmit(&mut self, mut response_parts: IotaBridgeResponseParts, channel_id: AppInst) -> Result<IotaBridgeResponseParts> {
+    async fn handle_request_retransmit(&mut self, mut response_parts: IotaBridgeResponseParts, channel_id: AppAddr) -> Result<IotaBridgeResponseParts> {
         let retransmit_request = self.request_builder.retransmit(
             &response_parts.body_bytes,
             channel_id,
@@ -223,53 +238,39 @@ impl CompressedStateSend for StreamsTransportViaBufferCallback {
 }
 
 #[async_trait(?Send)]
-impl Transport<TangleAddress, TangleMessage> for StreamsTransportViaBufferCallback
+impl<'a> Transport<'a> for StreamsTransportViaBufferCallback
 {
-    async fn send_message(&mut self, msg: &TangleMessage) -> anyhow::Result<()> {
-        log::info!("[StreamsTransportViaBufferCallback.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
-        self.send_message_via_lorawan(msg).await
+    type Msg = TransportMessage;
+    type SendResponse = ();
+
+    async fn send_message(&mut self, address: Address, msg: Self::Msg) -> LetsResult<Self::SendResponse> {
+        log::info!("[StreamsTransportViaBufferCallback.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n",
+                 trans_msg_len(&msg), trans_msg_encode(&msg));
+        self.send_message_via_lorawan(&LinkedMessage {
+            link: address,
+            body: msg
+        }).await
     }
 
-    async fn recv_messages(&mut self, _link: &TangleAddress) -> anyhow::Result<Vec<TangleMessage>> {
+    async fn recv_messages(&mut self, _address: Address) -> LetsResult<Vec<Self::Msg>> {
         unimplemented!()
     }
 
-    async fn recv_message(&mut self, link: &TangleAddress) -> anyhow::Result<TangleMessage> {
+    async fn recv_message(&mut self, address: Address) -> LetsResult<Self::Msg> {
         log::debug!("[StreamsTransportViaBufferCallback.recv_message]");
-        let ret_val = self.recv_message_via_lorawan(link).await;
+        let ret_val = self.recv_message_via_lorawan(&address).await;
         log::debug!("[StreamsTransportViaBufferCallback.recv_message] ret_val received");
         match ret_val.as_ref() {
             Ok(msg) => {
                 log::debug!("[StreamsTransportViaBufferCallback.recv_message] ret_val Ok");
-                log::info!("[StreamsTransportViaBufferCallback.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string())
+                log::info!("[StreamsTransportViaBufferCallback.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n",
+                    msg.body_len(), msg.body_hex_encode())
             },
             Err(err) => {
                 log::error!("[StreamsTransportViaBufferCallback.recv_message] Received streams error: '{}'", err);
                 ()
             }
         }
-        ret_val
+        ret_val.map(|linked_msg| linked_msg.body)
     }
-}
-
-#[async_trait(?Send)]
-impl TransportDetails<TangleAddress> for StreamsTransportViaBufferCallback {
-    type Details = Details;
-    async fn get_link_details(&mut self, _link: &TangleAddress) -> anyhow::Result<Self::Details> {
-        unimplemented!()
-    }
-}
-
-impl TransportOptions for StreamsTransportViaBufferCallback {
-    type SendOptions = SendOptions;
-    fn get_send_options(&self) -> SendOptions {
-        self.tangle_client_options.clone()
-    }
-    fn set_send_options(&mut self, opt: SendOptions) {
-        self.tangle_client_options  = opt.clone()
-    }
-
-    type RecvOptions = ();
-    fn get_recv_options(&self) {}
-    fn set_recv_options(&mut self, _opt: ()) {}
 }

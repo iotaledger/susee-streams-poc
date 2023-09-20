@@ -2,7 +2,7 @@
 
 This folder contains resources to run an
 [inx-collector](https://github.com/teleconsys/inx-collector)
-which is needed to use the susee-streams-poc applications
+which is needed to use the susee-streams-poc applications with the
 [Stardust update](https://wiki.iota.org/shimmer/develop/explanations/what-is-stardust/) of the IOTA protocol
 ([IOTA mainnet](https://wiki.iota.org/shimmer/develop/explanations/what-is-shimmer/layer-1-landscape/)
 or [Shimmer Network](https://wiki.iota.org/shimmer/develop/explanations/what-is-shimmer/introduction/)).

@@ -17,7 +17,6 @@ use lets::{
     },
 };
 use crate::{
-    DummyMsgIndexer,
     binary_persist::{
         trans_msg_encode,
         trans_msg_len
@@ -25,14 +24,18 @@ use crate::{
     compressed_state::{
         CompressedStateListen,
         CompressedStateSend
-    }
+    },
+    user_manager::message_indexer::{
+        MessageIndexer,
+        MessageIndexerOptions,
+    },
 };
 
-pub struct StreamsTransportCapture(pub Client<DummyMsgIndexer>);
+pub struct StreamsTransportCapture(pub Client<MessageIndexer>);
 
 impl StreamsTransportCapture {
     pub async fn new_from_url(url: &str) -> Self {
-        let indexer = DummyMsgIndexer{};
+        let indexer = MessageIndexer::new(MessageIndexerOptions::default());
         Self(Client::for_node(url, indexer).await.expect("Error on creating Client"))
     }
 }

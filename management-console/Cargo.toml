@@ -15,7 +15,7 @@ hex = {version = "0.4", default-features = false}
 
 [dependencies.streams]
 git = "https://github.com/chrisgitiota/streams"
-branch="stardust"
+branch="stardust-iota-sdk"
 
 [dependencies.clap]
 version = "3.0.14"

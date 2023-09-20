@@ -121,7 +121,7 @@ impl BinaryPersist for Address {
 
 impl BinaryPersist for TransportMessage {
     fn needed_size(&self) -> usize {
-        self.as_ref().len() + USIZE_LEN
+        self.body().len() + USIZE_LEN
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
@@ -130,13 +130,13 @@ impl BinaryPersist for TransportMessage {
                     the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
         }
         // BODY LENGTH
-        let bytes_len = self.needed_size() as u32;
+        let body_size = self.body().len() as u32;
         let mut range: Range<usize> = RangeIterator::new(USIZE_LEN);
-        u32::to_bytes(&bytes_len, &mut buffer[range.clone()]).expect(format!("Could not persist body size").as_str());
+        u32::to_bytes(&body_size, &mut buffer[range.clone()]).expect(format!("Could not persist body size").as_str());
         // BODY
-        if bytes_len > 0 {
-            range.increment(self.as_ref().len());
-            buffer[range.clone()].copy_from_slice(self.as_ref());
+        if body_size > 0 {
+            range.increment(body_size as usize);
+            buffer[range.clone()].copy_from_slice(self.body());
         }
         Ok(range.end)
     }
@@ -243,7 +243,7 @@ impl TangleAddressCompressed {
 
     pub fn to_tangle_address(&self, streams_channel_id: &str) -> Result<Address> {
         let app_adr = AppAddr::from_str(streams_channel_id)
-            .expect("Error on parsing AppInst from streams_channel_id string");
+            .expect("Error on parsing AppAddr from streams_channel_id string");
         Ok(Address::new(app_adr, self.msgid))
     }
 

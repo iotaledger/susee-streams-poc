@@ -1,28 +1,13 @@
-use iota_streams::{
-    app::{
-        transport::{
-            Transport,
-            TransportDetails,
-            TransportOptions,
-            tangle::{
-                TangleAddress,
-                TangleMessage
-            },
-        },
-    },
-    core::{
-        async_trait,
-        Result,
-        err,
-    },
-};
-
 use std::{
     clone::Clone,
     fmt,
     rc::Rc,
     time::Duration,
 };
+
+use anyhow::{Result};
+
+use async_trait::async_trait;
 
 use hyper::{
     http::{
@@ -35,6 +20,19 @@ use hyper::{
 use esp_idf_svc::{
     http::client::{
         Configuration as HttpConfiguration,
+    },
+};
+
+use streams::{
+    Address,
+    transport::Transport,
+    TransportMessage,
+};
+
+use lets::{
+    error::{
+        Error as LetsError,
+        Result as LetsResult,
     },
 };
 
@@ -51,15 +49,13 @@ use streams_tools::{
     binary_persist::{
         BinaryPersist,
         TangleMessageCompressed,
-        TangleAddressCompressed
+        TangleAddressCompressed,
+        LinkedMessage,
+        trans_msg_encode,
+        trans_msg_len,
     },
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
     StreamsTransport
-};
-
-use iota_client_types::{
-    Details,
-    SendOptions
 };
 
 use crate::{
@@ -96,7 +92,6 @@ impl fmt::Display for StreamsTransportSocketEspRsOptions {
 #[derive(Clone)]
 pub struct StreamsTransportSocketEspRs {
     request_builder: RequestBuilderStreams,
-    tangle_client_options: SendOptions,
     esp_http_client_opt: HttpConfiguration,
     compressed: CompressedStateManager,
     initialization_cnt: u8,
@@ -113,7 +108,6 @@ impl StreamsTransport for StreamsTransportSocketEspRs {
         Self {
             request_builder: RequestBuilderStreams::new(options.http_url.as_str()),
             initialization_cnt: 0,
-            tangle_client_options: SendOptions::default(),
             esp_http_client_opt,
             compressed: CompressedStateManager::new(),
         }
@@ -139,34 +133,40 @@ impl StreamsTransportSocketEspRs
         Ok(response)
     }
 
-    async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
+    async fn send_message_via_http(&mut self, msg: &LinkedMessage) -> LetsResult<()> {
         let req = if self.compressed.get_use_compressed_msg() {
             let cmpr_message = TangleMessageCompressed::from_tangle_message(msg, self.initialization_cnt);
-            self.request_builder.send_compressed_message(&cmpr_message, None)?
+            self.request_builder.send_compressed_message(&cmpr_message, None)
+                .map_err(|e| LetsError::External(e.into()))?
         } else {
-            self.request_builder.send_message(msg)?
+            self.request_builder.send_message(msg)
+                .map_err(|e| LetsError::External(e.into()))?
         };
 
         let mut http_client = HyperEsp32Client::new(&self.esp_http_client_opt, UserAgentName::Main);
-        self.request(req, &mut http_client).await?;
+        self.request(req, &mut http_client).await
+            .map_err(|e| LetsError::External(e.into()))?;
         Ok(())
     }
 
-    async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
+    async fn recv_message_via_http(&mut self, link: &Address) -> LetsResult<LinkedMessage> {
         log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http]");
         log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http] EspHttpClient created");
         let req = if self.compressed.get_use_compressed_msg() {
             let cmpr_link = TangleAddressCompressed::from_tangle_address(link, self.initialization_cnt);
-            self.request_builder.receive_compressed_message_from_address(&cmpr_link, None)?
+            self.request_builder.receive_compressed_message_from_address(&cmpr_link, None)
+                .map_err(|e| LetsError::External(e.into()))?
         } else {
-            self.request_builder.receive_message_from_address(link)?
+            self.request_builder.receive_message_from_address(link)
+                .map_err(|e| LetsError::External(e.into()))?
         };
         let mut http_client = HyperEsp32Client::new(&self.esp_http_client_opt, UserAgentName::Main);
-        let response = self.request(req, &mut http_client).await?;
+        let response = self.request(req, &mut http_client).await
+            .map_err(|e| LetsError::External(e.into()))?;
         self.handle_recv_message_response(response, link).await
     }
 
-    async fn handle_recv_message_response<'a>(&mut self, response: SimpleHttpResponse, link: &TangleAddress) -> Result<TangleMessage> {
+    async fn handle_recv_message_response<'a>(&mut self, response: SimpleHttpResponse, link: &Address) -> LetsResult<LinkedMessage> {
         log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http] check for retrials");
         // TODO: Implement following retrials using EspTimerService if needed.
         // May be StatusCode::CONTINUE is handled by the EspHttpClient
@@ -189,18 +189,19 @@ impl StreamsTransportSocketEspRs
 
         if is_http_status_success(response.status.as_u16()) {
             log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http] StatusCode is successful: {}", response.status);
-            log::info!("[StreamsTransportSocketEspRs.recv_message_via_http] create TangleMessage ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}",
+            log::info!("[StreamsTransportSocketEspRs.recv_message_via_http] create LinkedMessage ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}",
                        response.body.len(),
                        response.body.as_slice()
             );
-            let ret_val = <TangleMessage as BinaryPersist>::try_from_bytes(&response.body).unwrap();
+            let body = <TransportMessage as BinaryPersist>::try_from_bytes(&response.body).unwrap();
             log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http] return ret_val");
-            Ok(ret_val)
+            Ok(LinkedMessage { link: link.clone(), body })
         } else {
             log::error!("[StreamsTransportSocketEspRs.recv_message_via_http] StatusCode is not OK");
-            err!(MapStreamsErrors::from_http_status_codes(
+            Err(MapLetsError::from_http_status_codes(
                 response.status,
-                Some(link.to_string())
+                Some(link.clone()),
+                None
             ))
         }
     }
@@ -222,53 +223,39 @@ impl CompressedStateSend for StreamsTransportSocketEspRs {
 }
 
 #[async_trait(?Send)]
-impl Transport<TangleAddress, TangleMessage> for StreamsTransportSocketEspRs
+impl<'a> Transport<'a> for StreamsTransportSocketEspRs
 {
-    async fn send_message(&mut self, msg: &TangleMessage) -> anyhow::Result<()> {
-        log::info!("[StreamsTransportSocketEspRs.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
-        self.send_message_via_http(msg).await
+    type Msg = TransportMessage;
+    type SendResponse = ();
+
+    async fn send_message(&mut self, address: Address, msg: Self::Msg) -> LetsResult<Self::SendResponse> {
+        log::info!("[StreamsTransportSocketEspRs.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n",
+                 trans_msg_len(&msg), trans_msg_encode(&msg));
+        self.send_message_via_http(&LinkedMessage {
+            link: address,
+            body: msg
+        }).await
     }
 
-    async fn recv_messages(&mut self, _link: &TangleAddress) -> anyhow::Result<Vec<TangleMessage>> {
+    async fn recv_messages(&mut self, _address: Address) -> LetsResult<Vec<Self::Msg>> {
         unimplemented!()
     }
 
-    async fn recv_message(&mut self, link: &TangleAddress) -> anyhow::Result<TangleMessage> {
+    async fn recv_message(&mut self, address: Address) -> LetsResult<Self::Msg> {
         log::debug!("[StreamsTransportSocketEspRs.recv_message]");
-        let ret_val = self.recv_message_via_http(link).await;
+        let ret_val = self.recv_message_via_http(&address).await;
         log::debug!("[StreamsTransportSocketEspRs.recv_message] ret_val received");
         match ret_val.as_ref() {
             Ok(msg) => {
                 log::debug!("[StreamsTransportSocketEspRs.recv_message] ret_val Ok");
-                log::info!("[StreamsTransportSocketEspRs.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string())
+                log::info!("[StreamsTransportSocketEspRs.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n",
+                    msg.body_len(), msg.body_hex_encode())
             },
             Err(err) => {
                 log::error!("[StreamsTransportSocketEspRs.recv_message] Received streams error: '{}'", err);
                 ()
             }
         }
-        ret_val
+        ret_val.map(|linked_msg| linked_msg.body)
     }
-}
-
-#[async_trait(?Send)]
-impl TransportDetails<TangleAddress> for StreamsTransportSocketEspRs {
-    type Details = Details;
-    async fn get_link_details(&mut self, _link: &TangleAddress) -> anyhow::Result<Self::Details> {
-        unimplemented!()
-    }
-}
-
-impl TransportOptions for StreamsTransportSocketEspRs {
-    type SendOptions = SendOptions;
-    fn get_send_options(&self) -> SendOptions {
-        self.tangle_client_options.clone()
-    }
-    fn set_send_options(&mut self, opt: SendOptions) {
-        self.tangle_client_options  = opt.clone()
-    }
-
-    type RecvOptions = ();
-    fn get_recv_options(&self) {}
-    fn set_recv_options(&mut self, _opt: ()) {}
 }

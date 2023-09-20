@@ -18,7 +18,7 @@ env_logger = "0.9"
 
 [dependencies.streams]
 git = "https://github.com/chrisgitiota/streams"
-branch="stardust"
+branch="stardust-iota-sdk"
 default-features = false
 features = ["tangle-client"]
 

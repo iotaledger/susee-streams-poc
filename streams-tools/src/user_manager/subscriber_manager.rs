@@ -59,9 +59,15 @@ use crate::{
 };
 
 #[cfg(feature = "std")]
-use futures::executor::block_on;
+use futures::{
+    executor::block_on,
+    TryStreamExt,
+};
 #[cfg(feature = "smol_rt")]
-use smol::block_on;
+use smol::{
+    block_on,
+    stream::StreamExt
+};
 
 pub struct SubscriberManager<TransportT, WalletT: SimpleWallet>
 {
@@ -147,6 +153,8 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
         User::builder()
             .with_identity(Ed25519::from_seed(self.wallet.get_seed()))
             .with_transport(self.transport.clone())
+            .lean()
+            .is_only_publisher()
             .build()
     }
 
@@ -167,7 +175,7 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
         let mut user = self.create_user();
         log::debug!("[fn subscribe_with_cleared_client_state] user created");
 
-        user.receive_message(ann_address).await.map_err(|e|anyhow!(e))?;
+        user.receive_message(ann_address).await.map_err(|e| anyhow!(e))?;
         log::debug!("[fn subscribe_with_cleared_client_state] announcement received");
 
         let sub_msg_link = user.subscribe().await.map_err(|e| anyhow!(e))?;
@@ -205,10 +213,10 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
 
     pub async fn send_signed_packet(&mut self, input: &Bytes) -> Result<Address> {
         log::debug!("[fn send_signed_packet] - START");
-        if self.user.is_none(){
+        if self.user.is_none() {
             panic!("[SubscriberManager.send_signed_packet()] - Before sending messages you need to subscribe to a channel. Use subscribe() and register_keyload_msg() before using this function.")
         }
-        if self.prev_msg_link.is_none(){
+        if self.prev_msg_link.is_none() {
             panic!("[SubscriberManager.send_signed_packet()] - Before sending messages you need to register a keyload message. Use register_keyload_msg() before using this function.")
         }
         log::debug!("[fn send_signed_packet] - sync_user_state");
@@ -221,7 +229,7 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
     }
 
     async fn call_user_send_signed_packet(&mut self, input: &Bytes) -> Result<Address> {
-        let user = self.user.as_mut().unwrap() ;
+        let user = self.user.as_mut().unwrap();
         log::debug!("[fn call_user_send_signed_packet] - user.send_signed_packet()");
         let response = match user.send_signed_packet(
             self.base_branch_topic.clone(),
@@ -240,7 +248,7 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
                         self.base_branch_topic.clone(),
                         &Bytes::default(),
                         input,
-                    ).await.map_err(|e|anyhow!(e))?
+                    ).await.map_err(|e| anyhow!(e))?
                 },
                 _ => {
                     bail!(streams_err);
@@ -250,14 +258,62 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
         Ok(response.address())
     }
 
-    async fn sync_user_state(&mut self) -> Result<()>{
-        let user = self.user.as_mut().unwrap() ;
+    async fn sync_user_state(&mut self) -> Result<()> {
+        let user = self.user.as_mut().unwrap();
         if !self.compressed.get_use_compressed_msg() || !self.is_synced {
             log::debug!("[fn sync_user_state] - syncing client state");
             user.sync().await.map_err(|e| anyhow!(e))?;
             self.is_synced = true;
         }
         Ok(())
+    }
+
+    pub async fn register_keyload_msg(&mut self, keyload_address: &Address) -> Result<()> {
+        let address_of_fetched_msg: Address;
+        if let Some(user) = self.user.as_mut() {
+            address_of_fetched_msg = Self::fetch_keyload_from_messages(user, keyload_address).await?;
+        } else {
+            bail!("[SubscriberManager.register_keyload_msg()] - Before registering a keyload message you need to subscribe to a channel. Use subscribe() before using this function.")
+        };
+
+        if let Some(prev_msg_link) = self.prev_msg_link {
+            println!("[SubscriberManager.register_keyload_msg()] - Replacing the old previous message link with new keyload message link
+                                  Old previous message link: {}
+                                  Keyload message link: {}\n",
+                     prev_msg_link.to_string(),
+                     keyload_address.to_string(),
+            )
+        } else {
+            println!("[SubscriberManager.register_keyload_msg()] - Set keyload message link as new previous message link
+                                  Keyload message link: {}\n",
+                     keyload_address.to_string(),
+            )
+        }
+
+        self.prev_msg_link = Some(address_of_fetched_msg);
+        Ok(())
+    }
+
+    async fn fetch_keyload_from_messages(user: &mut User<TransportT>, keyload_address: &Address) -> Result<Address> {
+        let initial_msg = user
+            .messages()
+            .try_next()
+            .await?
+            .ok_or(anyhow!("Did not receive an initial_msg"))?;
+
+        if initial_msg.address != *keyload_address {
+            bail!("[SubscriberManager.register_keyload_msg()] - Received initial_msg does not match expected keyload_address.\ninitial: {}\nexpexted: {}",
+            initial_msg.address, keyload_address);
+        }
+
+        let keyload_msg = initial_msg.as_keyload()
+            .ok_or(anyhow!("initial_msg is expected to be a keyload msg but it is something else"))?;
+
+        if !keyload_msg.includes_subscriber(user.identifier().unwrap()) {
+            bail!("[SubscriberManager.register_keyload_msg()] - Received keyload_msg did not include this subscriber.")
+        }
+
+        Ok(initial_msg.address)
     }
 }
 
@@ -277,29 +333,6 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
             compressed: Rc::new(CompressedStateManager::new()),
             compressed_subscription_handle: 0,
         }
-    }
-
-    pub fn register_keyload_msg(&mut self, keyload_address: &Address) -> Result<()> {
-        if self.user.is_none(){
-            panic!("[SubscriberManager.register_keyload_msg()] - Before registering a keyload message you need to subscribe to a channel. Use subscribe() before using this function.")
-        }
-
-        if let Some(prev_msg_link) = self.prev_msg_link {
-            println!("[SubscriberManager.register_keyload_msg()] - Replacing the old previous message link with new keyload message link
-                                  Old previous message link: {}
-                                  Keyload message link: {}\n",
-                     prev_msg_link.to_string(),
-                     keyload_address.to_string(),
-            )
-        } else {
-            println!("[SubscriberManager.register_keyload_msg()] - Set keyload message link as new previous message link
-                                  Keyload message link: {}\n",
-                     keyload_address.to_string(),
-            )
-        }
-        self.prev_msg_link = Some(*keyload_address);
-
-        Ok(())
     }
 
     fn persist_optional_tangle_address(&self, buffer: &mut Vec<u8>, range: &Range<usize>, link_to_persist_opt: Option<Address>) {
@@ -529,7 +562,9 @@ pub fn get_public_key_str<'a, TransportT: StreamsTransport>(user: &User<Transpor
             Identifier::Ed25519(public_key) => {
                 own_public_key_str = hex::encode(public_key.to_bytes().as_slice());
             },
-            _ => {}
+            // The following line is commented out because using our Streams feature set Identifier
+            // only contains Ed25519. Otherwise the line would result in a "warning: unreachable pattern".
+            // _ => {}
         }
 
     }

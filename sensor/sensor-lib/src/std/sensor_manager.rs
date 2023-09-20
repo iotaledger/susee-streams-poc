@@ -86,7 +86,7 @@ impl SensorManager {
         }
         for msg_file in files_to_send {
             let msg_link = Self::send_file_content_as_msg(msg_file, subscriber).await?;
-            println!("[Sensor] Sent msg from file '{}': {}, tangle index: {:#?}\n", msg_file, msg_link, msg_link.to_msg_index());
+            println!("[Sensor] Sent msg from file '{}': {}, tangle index: {:#?}\n", msg_file, msg_link, hex::encode(msg_link.to_msg_index()));
         }
 
         Ok(())
@@ -103,7 +103,7 @@ impl SensorManager {
             comment,
             key_name,
             subscription_link.to_string(),
-            subscription_link.to_msg_index(),
+            hex::encode(subscription_link.to_msg_index()),
             public_key,
             init_cnt,
 
@@ -161,7 +161,7 @@ impl SensorManager {
 
     pub async fn register_keyload_msg(keyload_msg_link_str: &str, subscriber_mngr: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<()> {
         let keyload_msg_link = Address::from_str(&keyload_msg_link_str).map_err(|e| anyhow!(e))?;
-        subscriber_mngr.register_keyload_msg(&keyload_msg_link).expect("[Sensor] Error while registering keyload msg");
+        subscriber_mngr.register_keyload_msg(&keyload_msg_link).await.expect("[Sensor] Error while registering keyload msg");
 
         Self::println_subscription_details(
             &subscriber_mngr.user.as_ref().unwrap(),

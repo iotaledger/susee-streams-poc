@@ -13,6 +13,7 @@ pub static STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT: u16 = 50000;
 pub static STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL: &str = "http://127.0.0.1:50000";
 pub static STREAMS_TOOLS_CONST_DEFAULT_TCP_LISTENER_ADDRESS: &str = "127.0.0.1:50001";
 pub static STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC: &str = "MAIN";
+pub static STREAMS_TOOLS_DEVELOP_INX_COLLECTOR_URL: &str = "http://127.0.0.1:9030";
 
 
 pub trait StreamsTransport: Clone + for <'a> Transport<'a, Msg = TransportMessage> + CompressedStateSend {

@@ -1,24 +1,19 @@
-use streams::{
-    Address,
-};
-
-use lets::{
-    transport::{
-        Transport,
-    },
-    message::TransportMessage,
-    address::{
-        AppAddr,
-    }
-};
-
 use std::{
     clone::Clone,
     str::FromStr,
     rc::Rc,
     convert::TryInto,
+    cell::RefCell,
 };
-use std::cell::RefCell;
+
+use base64::engine::{
+    general_purpose::STANDARD,
+    Engine,
+};
+
+use log;
+
+use anyhow::{bail};
 
 use async_trait::async_trait;
 
@@ -31,9 +26,18 @@ use hyper::{
     }
 };
 
-use base64::engine::{
-    general_purpose::STANDARD,
-    Engine,
+use streams::{
+    Address,
+};
+
+use lets::{
+    transport::{
+        Transport,
+    },
+    message::TransportMessage,
+    address::{
+        AppAddr,
+    }
 };
 
 use crate::{
@@ -83,9 +87,6 @@ use super::{
         PendingRequest,
     }
 };
-
-use log;
-use anyhow::{bail};
 
 pub struct DispatchStreams<TransportT> {
     transport: Rc<RefCell<TransportT>>,
@@ -352,7 +353,10 @@ where
                 Response::builder().status(self.get_success_response_status_code())
                     .body(buffer.into())
             },
-            Err(err) => log_lets_err_and_respond_mapped_status_code(err, "[IOTA-Bridge - DispatchStreams] receive_message_from_address()")
+            Err(err) => {
+                println!("Address msg_index is: {}", hex::encode(address.to_msg_index()));
+                log_lets_err_and_respond_mapped_status_code(err, "receive_message_from_address")
+            }
         }
     }
 

@@ -5,7 +5,6 @@ members = [
     "app-srv-connector-mock",
     "streams-tools",
     "susee-tools",
-    "iota-client-types",
     "sensor/sensor-lib",
     "sensor/main-rust",
     # optional members (not included in default-members - see below)
@@ -19,7 +18,6 @@ default-members = [
     "app-srv-connector-mock",
     "streams-tools",
     "susee-tools",
-    "iota-client-types",
     "sensor/sensor-lib",
     "sensor/main-rust",
 ]
@@ -40,17 +38,21 @@ debug = true # Symbols are nice and they don't increase the size on Flash
 opt-level = 0
 
 [patch.crates-io]
-socket2 = { git = "https://github.com/chrisgitiota/socket2", branch="for-susee" }
-#socket2 = { git = "https://github.com/esp-rs-compat/socket2" }
+#socket2 = { git = "https://github.com/chrisgitiota/socket2", branch="for-susee" }
 #socket2 = { path = "../../chrisgitiota/socket2" }
+socket2 = { version = "0.4.5", git = "https://github.com/esp-rs-compat/socket2" }
 getrandom1 = { version = "0.1", git = "https://github.com/esp-rs-compat/getrandom", package = "getrandom", branch="0.1"}
 getrandom = { version = "0.2", git = "https://github.com/rust-random/getrandom.git" }
-smol = { git = "https://github.com/esp-rs-compat/smol" }
+smol = { version = "1.2", git = "https://github.com/esp-rs-compat/smol" }
+#async-process = {version = "1.7.0", git = "https://github.com/smol-rs/async-process", rev="07165c72f5a257a0973663004a923799f8fa3c3b"}
+async-io = {version = "1.12.0", git = "https://github.com/smol-rs/async-io", tag="v1.12.0"}
+#async-io = {version = "1.12.0", path = "/home/christof/Develop/chrisgitiota/async-io"}
+#signal-hook-registry = { version = "1.4", path = "../../chrisgitiota/signal-hook/signal-hook-registry" }
+
 polling = { git = "https://github.com/esp-rs-compat/polling" }
 time = { version = "=0.3.4", git = "https://github.com/time-rs/time", rev="8ec5f4ef2f63321b3dbbec3b4a6c4001fdf26de6" }
 iota-crypto = { version = "0.9.1", git = "https://github.com/iotaledger/crypto.rs.git", rev="6840d43f98ad1a991571268f7a9543025200ca4f" }
-# iota-client = { git = "https://github.com/iotaledger/iota.rs", branch = "develop" }
-iota-sdk = { version = "1.0", path = "../../chrisgitiota/iota-sdk/sdk" }
+# iota-sdk = { version = "1.0", path = "../../chrisgitiota/iota-sdk/sdk" }
 
 #esp-idf-sys = { version = "0.32.1", git = "https://github.com/chrisgitiota/esp-idf-sys.git", branch="for-susee" }
 #esp-idf-sys = { version = "0.32.1", git = "https://github.com/esp-rs/esp-idf-sys.git", rev="8a0e9280322071c337300de19efdf2807f7877e2" }
@@ -63,7 +65,7 @@ iota-sdk = { version = "1.0", path = "../../chrisgitiota/iota-sdk/sdk" }
 #esp-idf-hal = { version = "0.40", git = "https://github.com/chrisgitiota/esp-idf-hal.git", branch="for-susee" }
 # esp-idf-hal = { version = "0.40", path = "../../esp-rs/esp-idf-hal" }
 
-[patch."https://github.com/chrisgitiota/streams"]
-streams = { version = "0.2.0", path = "../../chrisgitiota/streams/streams" }
-lets = { version = "0.2.0", path = "../../chrisgitiota/streams/lets" }
-spongos = { version = "0.2.0", path = "../../chrisgitiota/streams/spongos" }
+# [patch."https://github.com/chrisgitiota/streams"]
+# streams = { version = "0.2.0", path = "../../chrisgitiota/streams/streams" }
+# lets = { version = "0.2.0", path = "../../chrisgitiota/streams/lets" }
+# spongos = { version = "0.2.0", path = "../../chrisgitiota/streams/spongos" }

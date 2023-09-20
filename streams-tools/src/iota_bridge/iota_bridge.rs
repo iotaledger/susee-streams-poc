@@ -1,12 +1,8 @@
-use lets::{
-    transport::tangle::Client,
-};
-
 use std::{
     clone::Clone,
+    cell::RefCell,
+    rc::Rc,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 
 use hyper::{
     Body,
@@ -17,8 +13,11 @@ use hyper::{
     }
 };
 
+use lets::{
+    transport::tangle::Client,
+};
+
 use crate::{
-    DummyMsgIndexer,
     iota_bridge::{
         DispatchStreams,
         DispatchCommand,
@@ -34,12 +33,16 @@ use crate::{
         dispatch_request,
         http_server_dispatch::NormalDispatchCallbacks
     },
+    user_manager::message_indexer::{
+        MessageIndexer,
+        MessageIndexerOptions,
+    },
 };
 
 #[derive(Clone)]
 pub struct IotaBridge<'a> {
     scope_provide: ServerScopeProvide,
-    dispatch_streams: DispatchStreams<Client<DummyMsgIndexer>>,
+    dispatch_streams: DispatchStreams<Client<MessageIndexer>>,
     dispatch_command: DispatchCommand<'a>,
     dispatch_confirm: DispatchConfirm<'a>,
     dispatch_lorawan_node: DispatchLoraWanNode,
@@ -50,7 +53,7 @@ pub struct IotaBridge<'a> {
 impl<'a> IotaBridge<'a>
 {
     pub async fn new(url: &str, lora_wan_node_store: LoraWanNodeDataStore, pending_request_store: PendingRequestDataStore) -> IotaBridge<'a> {
-        let indexer = DummyMsgIndexer{};
+        let indexer = MessageIndexer::new(MessageIndexerOptions::default());
         let client = Rc::new(RefCell::new(
             Client::for_node(url, indexer).await.expect("Could not create client for tangle")
         ));

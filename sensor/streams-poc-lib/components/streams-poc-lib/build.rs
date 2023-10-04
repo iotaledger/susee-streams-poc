@@ -33,6 +33,9 @@ fn run_cbindgen(cargo_dir: &Path, target_dir: &Path) {
         .include_item("resolve_request_response_t")
         .include_item("send_request_via_lorawan_t")
         .include_item("iota_bridge_tcpip_proxy_options_t")
+        .exclude_item("CREATE_NODE")
+        .exclude_item("GET_NODE")
+        .exclude_item("IS_NODE_KNOWN")
         .generate()
         .expect("Unable to generate bindings")
         .write_to_file(&out);

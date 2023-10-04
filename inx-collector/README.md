@@ -163,7 +163,7 @@ howto.
   # Replace the 0000000... values with the previously created hash and salt for
   # DASHBOARD_PASSWORD and DASHBOARD_SALT
   
-  # We are now ready to start the server as a daemon
+  # We are now ready to start the services in the background
   > docker compose up -d
 ```
 
@@ -178,40 +178,9 @@ You should now be able to access the following endpoints:
 * Minio: https://minio.your-domain.com
 * INX-Collector: http://your-domain.com:9030/block/block/block-id-goes-here
 
-Please note that the REST API of the inx-collector is accessed via http and is not protected
+Please note: The REST API of the inx-collector is accessed via http and is not protected
 by authentication so that anybody can use the API without restrictions.
 This also applies to the REST API of the Hornet service.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Please also note https://wiki.iota.org/hornet/2.0-rc.6/how_tos/post_installation/
-
-
-
-
-
-
-
-
-
-
-
 
 Please note: For instructions on deploying the used
 [object database minio](https://min.io)

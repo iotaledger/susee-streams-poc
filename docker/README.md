@@ -277,10 +277,11 @@ Prepare the server host system:
   > cd susee-poc
 ```
 
-Copy the *IOTA Bridge* executable to the server:
+Upload some resources needed for the installation process to the server host system
+(please replace username `<USER>` and domain name `<SERVER_HOST>` with their actual values):
 ```bash
   # In the folder where this README.md is located (docker folder)
-  > scp server-install-resources/* admin@<SERVER_HOST>:~/susee-poc
+  > scp server-install-resources/* <USER>@<SERVER_HOST>:~/susee-poc
 ```
 
 On the server host system, please edit the file `~/susee-poc/env.example`
@@ -293,4 +294,7 @@ value for the `NODE_HOST` variable.
   # After env.example has been stored
   # Te .env file will be created by the following script execution
   > sudo ./prepare_docker.sh
+  
+    # We are now ready to start the susee-poc services as in the background
+  > docker compose up -d
 ```

@@ -13,6 +13,7 @@ services:
     image: chrisgerritsma/app-srv-connector-mock:latest
     ports:
       - "50001:50001"
+    restart: unless-stopped
     depends_on:
       iota-bridge:
         condition: service_started
@@ -47,6 +48,7 @@ services:
 #      - ./data/management-console:/app/data/management-console
 #    ports:
 #      - "50002:50002"
+#    restart: unless-stopped
 #    command:
 #      - "--node=${NODE_HOST:-localhost}"
 #      - "--run-explorer-api-server=0.0.0.0:50002"
@@ -65,6 +67,7 @@ services:
       - ./data/iota-bridge:/app/data/iota-bridge
     ports:
       - "50000:50000"
+    restart: unless-stopped
     command:
       - "--node=${NODE_HOST:-localhost}"
       - "--listener-ip-address=0.0.0.0:50000"

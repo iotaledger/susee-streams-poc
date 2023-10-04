@@ -32,34 +32,40 @@ use lets::{
 
 use crate::{
     http::http_tools::RequestBuilderTools,
-    streams_transport::streams_transport::STREAMS_TOOLS_DEVELOP_INX_COLLECTOR_URL,
+    streams_transport::streams_transport::STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT,
 };
 
 #[derive(Clone)]
 pub struct MessageIndexerOptions {
-    pub http_url: String,
+    pub iota_node: String,
+    pub port: u16,
 }
 
 impl MessageIndexerOptions {
-    pub fn new(http_url: String) -> Self {
+    pub fn new(iota_node: String) -> Self {
         let mut ret_val = Self::default();
-        ret_val.http_url = http_url;
+        ret_val.iota_node = iota_node;
         ret_val
+    }
+
+    pub fn get_inx_collector_url(&self) -> String {
+        format!("http://{}:{}", self.iota_node, self.port)
     }
 }
 
 impl Default for MessageIndexerOptions {
     fn default() -> Self {
         Self {
-            http_url: STREAMS_TOOLS_DEVELOP_INX_COLLECTOR_URL.to_string(),
+            iota_node: "127.0.0.1".to_string(),
+            port: STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT
         }
     }
 }
 
 impl fmt::Display for MessageIndexerOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "MessageIndexerOptions:\n     http_url: {}",
-               self.http_url
+        write!(f, "MessageIndexerOptions:\n     iota_node: {}\n     port: {}",
+               self.iota_node, self.port
         )
     }
 }
@@ -92,7 +98,7 @@ impl MessageIndexer {
     }
 
     fn get_url(&self, path_and_params: &str) -> String {
-        format!("{}{}", self.options.http_url, path_and_params)
+        format!("{}{}", self.options.get_inx_collector_url(), path_and_params)
     }
 
     async fn get_transport_msg_payload(msg_index_hex_str: &String, response: Response<Body>) -> LetsResult<Vec<TransportMessage>> {

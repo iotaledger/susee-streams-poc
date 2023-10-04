@@ -46,6 +46,7 @@ use crate::{
     SimpleWallet,
     helpers::{
         get_channel_id_from_link,
+        get_iota_node_url,
         SerializationCallbackRefToClosureString
     },
     STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC,
@@ -61,7 +62,7 @@ pub struct ChannelManager<WalletT: SimpleWallet> {
     serialization_file: Option<String>,
     serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
     base_branch_topic: String,
-    pub node_url: String,
+    pub iota_node: String,
     pub user: Option<User<Client<MessageIndexer>>>,
     pub announcement_link: Option<Address>,
     pub keyload_link: Option<Address>,
@@ -74,11 +75,14 @@ async fn import_from_serialization_file<WalletT: SimpleWallet>(file_name: &str, 
 }
 
 async fn import_from_buffer<WalletT: SimpleWallet>(buffer: &Vec<u8>, ret_val: &mut ChannelManager<WalletT>) -> Result<()> {
-    let indexer = MessageIndexer::new(MessageIndexerOptions::default());
+    let indexer = MessageIndexer::new(MessageIndexerOptions::new(ret_val.iota_node.clone()));
     let user = User::<Client<MessageIndexer>>::restore(
         &buffer,
         ret_val.wallet.get_serialization_password(),
-        Client::for_node(ret_val.node_url.as_str(), indexer).await.map_err(|e|anyhow!(e))?
+        Client::for_node(
+            &get_iota_node_url(ret_val.iota_node.as_str()),
+            indexer
+        ).await.map_err(|e|anyhow!(e))?
     ).await.map_err(|e|anyhow!(e))?;
     if let Some(link) = user.stream_address().clone() {
         ret_val.announcement_link = Some(link.clone());
@@ -106,7 +110,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
     pub async fn new(node_url: &str, wallet: WalletT, options: Option<ChannelManagerOptions>) -> Self {
         let opt = options.unwrap_or_default();
         let mut ret_val = Self {
-            node_url: node_url.to_string(),
+            iota_node: node_url.to_string(),
             wallet,
             base_branch_topic: STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC.to_string(),
             serialization_file: opt.serialization_file.clone(),
@@ -137,10 +141,15 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
         if self.user.is_some() {
             panic!("This channel already has been announced")
         }
-        let indexer = MessageIndexer::new(MessageIndexerOptions::default());
+        let indexer = MessageIndexer::new(MessageIndexerOptions::new(self.iota_node.clone()));
         let mut user= User::builder()
             .with_identity(Ed25519::from_seed(self.wallet.get_seed()))
-            .with_transport(Client::for_node(self.node_url.as_str(), indexer).await.map_err(|e|anyhow!(e))?)
+            .with_transport(
+                Client::for_node(
+                    &get_iota_node_url(self.iota_node.as_str()),
+                    indexer
+                ).await.map_err(|e|anyhow!(e))?
+            )
             .build();
 
         let announcement_link = user.create_stream(self.base_branch_topic.as_str()).await

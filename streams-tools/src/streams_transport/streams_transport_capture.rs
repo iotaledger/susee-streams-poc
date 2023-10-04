@@ -29,14 +29,18 @@ use crate::{
         MessageIndexer,
         MessageIndexerOptions,
     },
+    helpers::get_iota_node_url,
 };
 
 pub struct StreamsTransportCapture(pub Client<MessageIndexer>);
 
 impl StreamsTransportCapture {
-    pub async fn new_from_url(url: &str) -> Self {
-        let indexer = MessageIndexer::new(MessageIndexerOptions::default());
-        Self(Client::for_node(url, indexer).await.expect("Error on creating Client"))
+    pub async fn new_from_url(iota_node: &str) -> Self {
+        let indexer = MessageIndexer::new(MessageIndexerOptions::new(iota_node.to_string()));
+        Self(Client::for_node(
+            &get_iota_node_url(iota_node),
+            indexer
+        ).await.expect("Error on creating Client"))
     }
 }
 

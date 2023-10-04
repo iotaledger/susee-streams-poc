@@ -31,6 +31,7 @@ pub type IotaBridgeCli<'a> = Cli<'a, ArgKeys>;
 pub fn get_arg_matches() -> ArgMatchesAndOptions {
     let cli_opt = CliOptions {
         use_node: true,
+        use_data_dir: true,
         use_wallet: false,
     };
     let arg_matches = IotaBridgeCli::get_app(

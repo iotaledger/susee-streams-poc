@@ -43,7 +43,9 @@ use streams_tools::{
 use susee_tools::{
     SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC,
     SUSEE_CONST_SECRET_PASSWORD,
-    get_wallet_filename
+    get_wallet_filename,
+    assert_data_dir_existence,
+    get_data_folder_file_path,
 };
 
 use cli::{
@@ -82,6 +84,7 @@ fn get_management_console_wallet_filename<'a>(cli: &ManagementConsoleCli<'a>) ->
     get_wallet_filename(
         &cli.matches,
         cli.arg_keys.base.wallet_file,
+        &cli.data_dir,
         "wallet-management-console.txt",
     )
 }
@@ -89,7 +92,7 @@ fn get_management_console_wallet_filename<'a>(cli: &ManagementConsoleCli<'a>) ->
 fn get_multi_channel_manager_options<'a>(cli: &ManagementConsoleCli<'a>) -> Result<MultiChannelManagerOptions> {
     let wallet_filename= get_management_console_wallet_filename(cli)?;
     Ok(MultiChannelManagerOptions{
-        iota_node_url: cli.node.to_string(),
+        iota_node: cli.node.to_string(),
         wallet_filename,
         streams_user_serialization_password: SUSEE_CONST_SECRET_PASSWORD.to_string()
     })
@@ -230,12 +233,13 @@ async fn main() -> Result<()> {
     env_logger::init();
     let matches_and_options = get_arg_matches();
     let cli = ManagementConsoleCli::new(&matches_and_options, &ARG_KEYS) ;
+    assert_data_dir_existence(&cli.data_dir)?;
 
     println!("[Management Console] Using node '{}' for tangle connection", cli.node);
 
 
     let db_connection_opt = DbFileBasedDaoManagerOptions {
-        file_path_and_name: DB_FILE_PATH_AND_NAME.to_string()
+        file_path_and_name: get_data_folder_file_path(&cli.data_dir, DB_FILE_PATH_AND_NAME)
     };
     let mut user_store = UserDataStore::new(db_connection_opt);
 
@@ -257,7 +261,7 @@ async fn main() -> Result<()> {
         run_explorer_api_server(
             user_store,
             ExplorerOptions {
-                iota_node_url: cli.node.to_string(),
+                iota_node: cli.node.to_string(),
                 wallet_filename: get_management_console_wallet_filename(&cli)?,
                 db_file_name: DB_FILE_PATH_AND_NAME.to_string(),
                 listener_ip_address_port: message_explorer_listener_address.to_string(),

@@ -143,6 +143,7 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
 
     let cli_opt = CliOptions {
         use_node: false,
+        use_data_dir: false,
         use_wallet: true,
     };
 

@@ -48,7 +48,7 @@ use super::{
 impl MessagesState {
     fn as_multi_channel_manager_options(&self) -> MultiChannelManagerOptions {
         MultiChannelManagerOptions{
-            iota_node_url: self.iota_node_url.clone(),
+            iota_node: self.iota_node_url.clone(),
             wallet_filename: self.wallet_filename.clone(),
             streams_user_serialization_password: self.streams_user_serialization_password.clone()
         }

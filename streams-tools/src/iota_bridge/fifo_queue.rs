@@ -6,7 +6,7 @@ use std::{
 // Time to wait before a FifoQueueElement can be fetched from the fifo queue (using fifo_queue_pop_front()).
 // The time is set to 10 secs because we need to wait for the block being referenced by a milestone
 // before it is processed by the streams-collector.
-pub static FIFO_MIN_WAIT_TIME_SECS: f32 = 10.0;
+pub static FIFO_MIN_WAIT_TIME_SECS: f32 = 25.0;
 
 // This is used to store Commands and Confirmations in the FifoQueue
 pub struct FifoQueueElement {

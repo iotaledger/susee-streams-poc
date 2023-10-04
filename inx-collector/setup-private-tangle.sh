@@ -6,10 +6,10 @@ then
 else
   mkdir priv_tangle
   cd priv_tangle
-  curl -L -O "https://github.com/iotaledger/hornet/releases/download/v2.0.0-rc.6/HORNET-2.0.0-rc.6-private_tangle.tar.gz"
-  tar -zxf HORNET-2.0.0-rc.6-private_tangle.tar.gz
+  curl -L -O "https://github.com/iotaledger/hornet/releases/download/v2.0.0-rc.8/HORNET-2.0.0-rc.8-private_tangle.tar.gz"
+  tar -zxf HORNET-2.0.0-rc.8-private_tangle.tar.gz
 
-  patch -t docker-compose.yml ../docker-compose.patch
+  patch -t docker-compose.yml ../docker-compose.priv_tangle.patch
 
   echo "======================================================================="
   echo "=== Bootstrapping the Hornet Node environment needs sudo privileges ==="

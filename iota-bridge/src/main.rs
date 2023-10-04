@@ -29,6 +29,11 @@ use streams_tools::{
     IotaBridge,
 };
 
+use susee_tools::{
+    assert_data_dir_existence,
+    get_data_folder_file_path,
+};
+
 use cli::{
     IotaBridgeCli,
     ARG_KEYS,
@@ -60,10 +65,12 @@ async fn run() {
     env_logger::init();
     let matches_and_options = get_arg_matches();
     let cli = IotaBridgeCli::new(&matches_and_options, &ARG_KEYS) ;
+    assert_data_dir_existence(&cli.data_dir).expect(
+        format!("Could not create data_dir '{}'", cli.data_dir).as_str());
     println!("[IOTA Bridge] Using node '{}' for tangle connection", cli.node);
 
     let db_connection_opt = DbFileBasedDaoManagerOptions {
-        file_path_and_name: "iota-bridge.sqlite3".to_string()
+        file_path_and_name: get_data_folder_file_path(&cli.data_dir, "iota-bridge.sqlite3")
     };
     let lora_wan_node_store = LoraWanNodeDataStore::new(db_connection_opt.clone());
     let pending_request_store = PendingRequestDataStore::new(db_connection_opt);

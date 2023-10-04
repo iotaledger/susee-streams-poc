@@ -45,6 +45,7 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
     let iota_bridge_url_about = String::from(IOTA_BRIDGE_URL_ABOUT_FMT_STR).replace("{}", STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL);
     let cli_opt = CliOptions {
         use_node: false,
+        use_data_dir: false,
         use_wallet: false,
     };
     let arg_matches = LoraWanAppServerMockCli::get_app(

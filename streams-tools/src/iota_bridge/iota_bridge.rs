@@ -37,6 +37,7 @@ use crate::{
         MessageIndexer,
         MessageIndexerOptions,
     },
+    helpers::get_iota_node_url,
 };
 
 #[derive(Clone)]
@@ -52,10 +53,13 @@ pub struct IotaBridge<'a> {
 
 impl<'a> IotaBridge<'a>
 {
-    pub async fn new(url: &str, lora_wan_node_store: LoraWanNodeDataStore, pending_request_store: PendingRequestDataStore) -> IotaBridge<'a> {
-        let indexer = MessageIndexer::new(MessageIndexerOptions::default());
+    pub async fn new(iota_node: &str, lora_wan_node_store: LoraWanNodeDataStore, pending_request_store: PendingRequestDataStore) -> IotaBridge<'a> {
+        let indexer = MessageIndexer::new(MessageIndexerOptions::new(iota_node.to_string()));
         let client = Rc::new(RefCell::new(
-            Client::for_node(url, indexer).await.expect("Could not create client for tangle")
+            Client::for_node(
+                &get_iota_node_url(iota_node),
+                indexer
+            ).await.expect("Could not create client for tangle")
         ));
 
         IotaBridge {

@@ -27,7 +27,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct MultiChannelManagerOptions {
-    pub iota_node_url: String,
+    pub iota_node: String,
     pub wallet_filename: String,
     //TODO: Needs to be managed by stronghold
     pub streams_user_serialization_password: String,
@@ -43,7 +43,7 @@ pub async fn get_initial_channel_manager<'a>(user_store: &UserDataStore, options
     );
 
     Ok( ChannelManager::new(
-        options.iota_node_url.as_str(),
+        options.iota_node.as_str(),
         wallet,
         Some(new_opt)
     ).await)
@@ -61,7 +61,7 @@ pub async fn get_channel_manager_for_channel_starts_with(channel_starts_with: &s
             user_dao,
             user_state_callback,
             wallet,
-            options.iota_node_url.as_str(),
+            options.iota_node.as_str(),
         ).await
     } else {
         bail!("Could not find matching Streams channel for ID starting with '{}'", channel_starts_with)
@@ -75,7 +75,7 @@ pub async fn get_channel_manager_for_channel_id<'a>(channel_id: &str, user_store
         user_dao,
         Some(serialize_user_state_callback),
         wallet,
-        options.iota_node_url.as_str(),
+        options.iota_node.as_str(),
     ).await
 }
 

@@ -21,6 +21,10 @@ pub fn get_tangle_address_from_strings(channel_id: &str, message_id: &str) -> le
     Address::from_str(format!("{}:{}", channel_id, message_id).as_str())
 }
 
+pub fn get_iota_node_url(iota_node: &str) -> String {
+    format!("https://{}", iota_node)
+}
+
 // -------------------------------------------------------------------------------------
 // SerializationCallbackCloneBox and SerializationCallbackRefToClosure are used to handle
 // closures

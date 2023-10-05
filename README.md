@@ -50,9 +50,6 @@
       ===   * Option 2: https://www.nerdieworks.nl/posts/client-certificate-authentication-with-traefik/
       === * Perform load test for IOTA Bridge simulating 250 Sensors          ===
       ===   sending messages with 5 minute interval                           ===
-      ===   * Avoid panic in x86PC Sensor                                     ===
-      ===     streams_transport/streams_transport_socket.rs:184:14            ===
-      ===     when used with --file-to-send option                            ===
       === * IOTA Bridge log time stamps                                       ===
       === * IOTA Bridge Multithread                                           ===
       === * Message Explorer:                                                 ===

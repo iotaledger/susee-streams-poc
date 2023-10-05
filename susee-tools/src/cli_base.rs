@@ -4,7 +4,7 @@ use clap::{
     Arg
 };
 
-pub static NODE_ABOUT: &str = "The url of the iota node to connect to.
+pub static NODE_ABOUT: &str = "The IP or domain name of the iota node to connect to.
 As you need to provide also a streams inx-collector service instance,
 set this value to the domain name or static ip address of the host system
 that runs the inx-collector and the Hornet node.

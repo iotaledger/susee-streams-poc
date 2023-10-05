@@ -165,7 +165,7 @@ impl StreamsTransportSocket
             req_parts.into_request(RequestBuilderTools::get_request_builder())?
         };
 
-        let mut response = self.get_request_response(request).await;
+        let mut response = self.get_request_response(request).await?;
 
         // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
         // http status which indicates that the iota-bridge has stored all needed
@@ -179,15 +179,13 @@ impl StreamsTransportSocket
         Ok(response)
     }
 
-    async fn get_request_response(&mut self, request: Request<Body>) -> Response<Body> {
-        let mut response = self.hyper_client.request(request).await
-            .expect("Error while sending request via hyper_client");
+    async fn get_request_response(&mut self, request: Request<Body>) -> Result<Response<Body>> {
+        let mut response = self.hyper_client.request(request).await?;
 
         if self.use_lorawan_rest {
-            response = StreamsTransportSocket::handle_lorawan_rest_response(response).await
-                .expect("Error while handling the lorawan_rest_response");
+            response = StreamsTransportSocket::handle_lorawan_rest_response(response).await?;
         }
-        response
+        Ok(response)
     }
 
     async fn handle_request_retransmit(&mut self, mut response: Response<Body>, channel_id: AppAddr) -> Result<Response<Body>> {
@@ -203,7 +201,7 @@ impl StreamsTransportSocket
             retransmit_request = self.get_lorawan_rest_request(retransmit_request_parts)?
         }
 
-        let response = self.get_request_response(retransmit_request).await;
+        let response = self.get_request_response(retransmit_request).await?;
 
         if response.status() != StatusCode::ALREADY_REPORTED {
             log::warn!("[StreamsTransportSocket.handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response.status());

@@ -106,9 +106,9 @@ pub struct RequestViaBufferCallback {
 
 impl RequestViaBufferCallback {
     pub fn new(options: Option<RequestViaBufferCallbackOptions>) -> Self {
-        log::debug!("[RequestViaBufferCallback::new()] Unwrapping options");
+        log::debug!("[fn new()] Unwrapping options");
         let options = options.unwrap_or_else( || RequestViaBufferCallbackOptions::default());
-        log::debug!("[RequestViaBufferCallback::new()] Creating new RequestViaBufferCallback");
+        log::debug!("[fn new()] Creating new RequestViaBufferCallback");
         Self {
             send_callback: options.send_callback,
             p_caller_user_data: options.p_caller_user_data,
@@ -127,14 +127,14 @@ pub extern "C" fn receive_response(response_data: *const cty::uint8_t, length: c
         match future::block_on(response_scope.sender.send(response_copy)) {
             Ok(_) => StreamsError::STREAMS_OK,
             Err(e) => {
-                log::error!("[RequestViaBufferCallback - fn receive_response] Internal async channel has been closed \
+                log::error!("[fn receive_response()] Internal async channel has been closed \
         before response could been transmitted.\n Error: {}\n\
         Returning StreamsError::STREAMS_RESPONSE_INTERNAL_CHANNEL_ERR", e);
                 StreamsError::STREAMS_RESPONSE_INTERNAL_CHANNEL_ERR
             }
         }
     } else {
-        log::error!("[RequestViaBufferCallback - fn receive_response] You need to send a request before calling this function.\
+        log::error!("[fn receive_response()] You need to send a request before calling this function.\
         Returning StreamsError::STREAMS_RESPONSE_RESOLVED_WITHOUT_REQUEST");
         StreamsError::STREAMS_RESPONSE_RESOLVED_WITHOUT_REQUEST
     }
@@ -147,7 +147,7 @@ pub fn get_response_receiver<'a>() -> Result<&'a ResponseCallbackReceiver> {
         if let Some(response_scope) = RESPONSE_CALLBACK_SCOPE.as_ref() {
             Ok(&response_scope.receiver)
         } else {
-            log::error!("[RequestViaBufferCallback - fn receive_response] You need to send a request before calling this function.");
+            log::error!("[fn get_response_receiver()] You need to send a request before calling this function.");
             bail!("Attempt to response before sending a request or echoed (doubled) response for a previous request.")
         }
     }
@@ -198,24 +198,24 @@ impl RequestViaBufferCallback
         let _response_callback_scope_manager = ResponseCallbackScopeManager::new();
         match (self.send_callback)(buffer.as_ptr(), buffer.len(), receive_response, self.p_caller_user_data) {
             LoRaWanError::LORAWAN_OK => {
-                log::debug!("[RequestViaBufferCallback.request_via_buffer_callback] Successfully send request via LoRaWAN");
+                log::debug!("[fn request_via_buffer_callback()] Successfully send request via LoRaWAN");
                 let receiver = get_response_receiver()?;
                 match receiver.recv().await {
                     Ok(response) => {
-                        log::debug!("[RequestViaBufferCallback.request_via_buffer_callback] Received response via LoRaWAN");
+                        log::debug!("[fn request_via_buffer_callback()] Received response via LoRaWAN");
                         if response.len() > 0 {
                             match IotaBridgeResponseParts::try_from_bytes(response.as_slice()) {
                                 Ok(response_parts) => {
-                                    log::debug!("[RequestViaBufferCallback.request_via_buffer_callback] Successfully deserialized response_parts:\n{}", response_parts);
+                                    log::debug!("[fn request_via_buffer_callback()] Successfully deserialized response_parts:\n{}", response_parts);
                                     if !response_parts.status_code.is_success() {
                                         let err_msg = String::from_utf8(response_parts.body_bytes.clone())
                                             .unwrap_or(String::from("Could not deserialize Error message from response Body"));
-                                        log::debug!("[RequestViaBufferCallback.request_via_buffer_callback] Response status is not successful: Error message is:\n{}", err_msg);
+                                        log::debug!("[fn request_via_buffer_callback()] Response status is not successful: Error message is:\n{}", err_msg);
                                     }
                                     Ok(response_parts)
                                 },
                                 Err(e) => {
-                                    log::debug!("[RequestViaBufferCallback.request_via_buffer_callback] Error on deserializing response_parts: {}", e );
+                                    log::debug!("[fn request_via_buffer_callback()] Error on deserializing response_parts: {}", e );
                                     bail!("Could not deserialize response binary to valid IotaBridgeResponseParts: {}", e)
                                 }
                             }

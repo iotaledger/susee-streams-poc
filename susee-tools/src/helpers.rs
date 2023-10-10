@@ -1,6 +1,7 @@
 use std::{
     path::Path,
-    fs
+    fs,
+    env,
 };
 
 use clap::ArgMatches;
@@ -23,4 +24,10 @@ pub fn assert_data_dir_existence(data_dir: &String) -> Result<()>{
 
 pub fn get_data_folder_file_path(data_dir: &String, filename: &'static str) -> String {
     format!("{}/{}", data_dir, filename)
+}
+
+pub fn set_env_rust_log_variable_if_not_defined_by_env(rust_log_value: &str) {
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", rust_log_value)
+    }
 }

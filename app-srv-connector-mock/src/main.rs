@@ -1,10 +1,10 @@
 mod cli;
 
-use cli::{
-    LoraWanAppServerMockCli,
-    ARG_KEYS,
-    get_arg_matches,
+use std::{
+    net::SocketAddr,
 };
+
+use log;
 
 use anyhow::{
     Result,
@@ -40,11 +40,13 @@ use streams_tools::{
     LoraWanRestClientOptions,
 };
 
-use std::{
-    net::SocketAddr,
-};
+use susee_tools::set_env_rust_log_variable_if_not_defined_by_env;
 
-use log;
+use cli::{
+    LoraWanAppServerMockCli,
+    ARG_KEYS,
+    get_arg_matches,
+};
 
 const RECEIVE_IOTA_BRIDGE_REQUEST_BUFFER_SIZE: usize = 2048;
 
@@ -218,6 +220,7 @@ async fn run_tcp_listener_loop(addr_str: &str, iota_bridge_url: &str) {
 
 #[tokio::main]
 async fn main() {
+    set_env_rust_log_variable_if_not_defined_by_env("info");
     env_logger::init();
     let matches_and_options = get_arg_matches();
     let cli = LoraWanAppServerMockCli::new(&matches_and_options, &ARG_KEYS) ;

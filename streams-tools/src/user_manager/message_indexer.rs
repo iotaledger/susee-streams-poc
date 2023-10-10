@@ -135,9 +135,9 @@ impl MessageIndexer {
             anyhow!("Error on converting msg_index '{}' into tag. Error: {}", msg_index_hex_str, e)
         ))?;
         let tag_hex_str = hex::encode(tag);
-        log::debug!("[MessageIndexer - get_messages_by_msg_index()] Request for msg_index {}", msg_index_hex_str);
+        log::debug!("[fn get_streams_collector_request()] Request for msg_index {}", msg_index_hex_str);
         let url = self.get_url(&EndpointUris::get_uri___get_block(&tag_hex_str));
-        log::debug!("[MessageIndexer - posting get request: {}", url);
+        log::debug!("[fn get_streams_collector_request()] posting get request: {}", url);
         let request = RequestBuilderTools::get_request_builder()
             .method("GET")
             .uri(url.clone())

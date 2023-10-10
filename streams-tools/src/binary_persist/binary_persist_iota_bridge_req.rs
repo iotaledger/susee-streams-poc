@@ -165,11 +165,8 @@ impl IotaBridgeRequestParts {
 
 impl fmt::Display for IotaBridgeRequestParts {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "IotaBridgeRequestParts:
-                     method: {}
-                     uri: {}
-                     body length: {}
-                ", self.method, self.uri, self.body_bytes.len())
+        write!(f, "IotaBridgeRequestParts: method: {}, uri: {}, body length: {}",
+               self.method, self.uri, self.body_bytes.len())
     }
 }
 
@@ -316,10 +313,7 @@ impl BinaryPersist for IotaBridgeResponseParts {
 
 impl fmt::Display for IotaBridgeResponseParts {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "IotaBridgeResponseParts:
-                     status: {}
-                     body length: {}
-                ", self.status_code, self.body_bytes.len())
+        write!(f, "IotaBridgeResponseParts: status: {}, body length: {}", self.status_code, self.body_bytes.len())
     }
 }
 

@@ -58,7 +58,7 @@ impl CommandFetcher {
 
     pub fn new(options: Option<CommandFetcherOptions>) -> Self {
         let options = options.unwrap_or_default();
-        log::debug!("[CommandFetcher::new()] Creating new CommandFetcher using options: {}", options);
+        log::debug!("[fn new()] Creating new CommandFetcher using options: {}", options);
         let http_url = options.http_url.clone();
         Self {
             _options: options,
@@ -84,10 +84,10 @@ impl CommandFetcher {
     pub async fn fetch_next_command(& self) -> Result<(Command, Vec<u8>)> {
         let response = self.submit_request().await;
         if response.status().is_success() {
-            log::debug!("[CommandFetcher.fetch_next_command] StatusCode is successful: {}", response.status());
+            log::debug!("[fn fetch_next_command()] StatusCode is successful: {}", response.status());
             self.deserialize_command(response).await
         } else {
-            log::error!("[CommandFetcher.fetch_next_command] HTTP Error. Status: {}", response.status());
+            log::error!("[fn fetch_next_command()] HTTP Error. Status: {}", response.status());
             Ok((Command::NO_COMMAND, Vec::<u8>::default()))
         }
     }
@@ -101,12 +101,12 @@ impl CommandFetcher {
     pub async fn send_confirmation(&self, confirmation_request: Request<Body>) -> Result<()> {
         let http_client = HttpClient::new();
         let response = http_client.request(confirmation_request).await?;
-        log::debug!("[CommandFetcher.send_confirmation] Received HttpResponse");
+        log::debug!("[fn send_confirmation()] Received HttpResponse");
         if response.status().is_success() {
-            log::debug!("[CommandFetcher.send_confirmation] StatusCode is successful: {}", response.status());
+            log::debug!("[fn send_confirmation()] StatusCode is successful: {}", response.status());
             Ok(())
         } else {
-            bail!("[CommandFetcher.send_confirmation] Received HTTP Error as response for confirmation transmission. Status: {}", response.status())
+            bail!("[fn send_confirmation()] Received HTTP Error as response for confirmation transmission. Status: {}", response.status())
         }
     }
 }

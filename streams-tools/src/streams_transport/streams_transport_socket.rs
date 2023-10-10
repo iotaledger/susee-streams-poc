@@ -127,7 +127,7 @@ impl StreamsTransport for StreamsTransportSocket {
 
     fn new(options: Option<StreamsTransportSocketOptions>) -> Self {
         let options = options.unwrap_or_default();
-        println!("[StreamsTransportSocket.new_from_url()] Initializing instance with options:\n{}\n", options);
+        log::info!("[fn new()] Initializing instance with options:\n{}\n", options);
         Self {
             hyper_client: HyperClient::new(),
             request_builder_streams: RequestBuilderStreams::new(options.http_url.as_str()),
@@ -204,8 +204,8 @@ impl StreamsTransportSocket
         let response = self.get_request_response(retransmit_request).await?;
 
         if response.status() != StatusCode::ALREADY_REPORTED {
-            log::warn!("[StreamsTransportSocket.handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response.status());
-            log::warn!("[StreamsTransportSocket.handle_request_retransmit] Will set use_compressed_msg to false for security reasons");
+            log::warn!("[fn handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response.status());
+            log::warn!("[fn handle_request_retransmit] Will set use_compressed_msg to false for security reasons");
             self.compressed.set_use_compressed_msg(false);
         }
 
@@ -219,18 +219,18 @@ impl StreamsTransportSocket
             if bytes.len() > 0 {
                 match IotaBridgeResponseParts::try_from_bytes(bytes.to_vec().as_slice()) {
                     Ok(response_parts) => {
-                        log::debug!("[StreamsTransportSocket.request] Successfully deserialized response_parts:\n{}", response_parts);
+                        log::debug!("[fn handle_lorawan_rest_response()] Successfully deserialized response_parts:\n{}", response_parts);
                         if !response_parts.status_code.is_success() {
                             let err_msg = String::from_utf8(response_parts.body_bytes.clone())
                                 .unwrap_or(String::from("Could not deserialize Error message from response Body"));
-                            log::debug!("[StreamsTransportSocket.request] Response status is not successful: Error message is:\n{}", err_msg);
+                            log::debug!("[fn handle_lorawan_rest_response()] Response status is not successful: Error message is:\n{}", err_msg);
                         }
                         ret_val = Response::builder()
                             .status(response_parts.status_code)
                             .body(Body::from(response_parts.body_bytes))?;
                     },
                     Err(e) => {
-                        log::debug!("[StreamsTransportSocket.request] Error on deserializing response_parts: {}", e);
+                        log::debug!("[fn handle_lorawan_rest_response()] Error on deserializing response_parts: {}", e);
                         bail!("Could not deserialize response binary to valid IotaBridgeResponseParts: {}", e)
                     }
                 }
@@ -238,8 +238,8 @@ impl StreamsTransportSocket
                 bail!("Received 0 bytes response from server.")
             }
         } else {
-            log::error!("[StreamsTransportSocket.request] Received HTTP Error from Iota-Bridge. Status: {}", ret_val.status());
-            log::error!("[StreamsTransportSocket.request] Returning original lorawan-rest response");
+            log::error!("[fn handle_lorawan_rest_response()] Received HTTP Error from Iota-Bridge. Status: {}", ret_val.status());
+            log::error!("[fn handle_lorawan_rest_response()] Returning original lorawan-rest response");
         }
         Ok(ret_val)
     }
@@ -340,7 +340,7 @@ impl<'a> Transport<'a> for StreamsTransportSocket
     type SendResponse = ();
 
     async fn send_message(&mut self, address: Address, msg: Self::Msg) -> LetsResult<Self::SendResponse> {
-        println!("[StreamsTransportSocket.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n",
+        log::info!("[fn send_message()] Sending message with {} bytes tangle-message-payload:\n{}\n",
                  trans_msg_len(&msg), trans_msg_encode(&msg));
         self.send_message_via_http(&LinkedMessage{
             link: address,
@@ -355,7 +355,7 @@ impl<'a> Transport<'a> for StreamsTransportSocket
     async fn recv_message(&mut self, address: Address) -> LetsResult<Self::Msg> {
         let ret_val = self.recv_message_via_http(&address).await;
         match ret_val.as_ref() {
-            Ok(msg) => println!("[StreamsTransportSocket.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n",
+            Ok(msg) => log::info!("[fn recv_message()] Receiving message with {} bytes tangle-message-payload:\n{}\n",
                                 msg.body_len(), msg.body_hex_encode()),
             _ => ()
         }

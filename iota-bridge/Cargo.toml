@@ -17,6 +17,7 @@ tokio = {version = "1.5"}
 hyper = { version = "0.14", features = ["full"] }
 hex-literal = "0.3.4"
 env_logger = "0.9"
+log = "0.4.20"
 
 [dependencies.streams]
 git = "https://github.com/chrisgitiota/streams"

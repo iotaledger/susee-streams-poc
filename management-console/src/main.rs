@@ -14,6 +14,8 @@ use streams::id::{
     Permissioned
 };
 
+use log;
+
 use streams_tools::{
     channel_manager::{
         SubscriberData,
@@ -46,6 +48,7 @@ use susee_tools::{
     get_wallet_filename,
     assert_data_dir_existence,
     get_data_folder_file_path,
+    set_env_rust_log_variable_if_not_defined_by_env,
 };
 
 use cli::{
@@ -68,7 +71,7 @@ pub async fn create_channel_manager<'a>(user_store: &mut UserDataStore, cli: &Ma
         if let Some(channel_id ) = get_channel_id_from_link(sub_msg_link_str) {
             ret_val = Some(get_channel_manager_for_channel_id(channel_id.as_str(), user_store, &options).await.unwrap());
         } else {
-            println!("[Management Console] Could not parse channel_id from CLI argument '--{}'. Argument value is {}",
+            log::error!("[fn create_channel_manager()] Could not parse channel_id from CLI argument '--{}'. Argument value is {}",
                      cli.arg_keys.subscription_link,
                      sub_msg_link_str,
             )
@@ -112,7 +115,7 @@ pub async fn get_channel_manager_for_cli_arg_channel_starts_with<'a>(
 }
 
 fn println_announcement_link(link: &Address, comment: &str) {
-    println!(
+    log::info!(
         "[Management Console] {}:
                      Announcement Link: {}
                           Tangle Index: {:#?}\n",
@@ -147,13 +150,13 @@ async fn println_channel_status<'a> (channel_manager: &mut ChannelManagerPlainTe
         }
     }
     if !channel_exists {
-        println!("[Management Console] No existing channel found.");
+        log::info!("No existing channel found.");
     }
 }
 
 
 async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>) -> Result<()> {
-    println!("[Management Console] Initializing remote sensor");
+    log::info!("Initializing remote sensor");
     let announcement_link = create_channel(channel_manager).await?;
 
     let mut remote_manager_options: Option<RemoteSensorOptions> = None;
@@ -164,17 +167,17 @@ async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, c
         });
     }
     let remote_manager = RemoteSensor::new(remote_manager_options);
-    println!("[Management Console] Using {} as iota-bridge url", remote_manager.get_proxy_url());
+    log::info!("Using {} as iota-bridge url", remote_manager.get_proxy_url());
 
-    println!("[Management Console] Sending subscribe_announcement_link command to remote sensor.\n");
+    log::info!("Sending subscribe_announcement_link command to remote sensor.\n");
     let subscription_confirm = remote_manager.subscribe_to_channel(announcement_link.to_string().as_str()).await?;
 
     if subscription_confirm.initialization_cnt == INITIALIZATION_CNT_MAX_VALUE {
         println_maximum_initialization_cnt_reached_warning("SManagement Console", subscription_confirm.initialization_cnt);
     }
 
-    println!("
-[Management Console] Received confirmation for successful Subscription from remote sensor.
+    log::info!("
+Received confirmation for successful Subscription from remote sensor.
                      Initialization count is {}
                      Creating keyload_message for
                             subscription: {}
@@ -189,10 +192,10 @@ async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, c
         subscription_confirm.pup_key.as_str()
     ).await?;
 
-    println!("[Management Console] Sending register_keyload_msg command to remote sensor.\n");
+    log::info!("Sending register_keyload_msg command to remote sensor.\n");
     let _keyload_registration_confirm = remote_manager.register_keyload_msg(keyload_msg_link.to_string().as_str()).await?;
-    println!("
-[Management Console] Received confirmation for successful KeyloadRegistration from remote sensor.
+    log::info!("
+Received confirmation for successful KeyloadRegistration from remote sensor.
                      =========> Sensor has been fully initialized <===========");
     Ok(())
 }
@@ -213,9 +216,9 @@ async fn send_keyload_message<'a> (channel_manager: &mut ChannelManagerPlainText
         permissioned_public_key: Permissioned::ReadWrite(pub_key.as_slice(), PermissionDuration::Perpetual)
     }]).await?;
 
-    println!(
+    log::info!(
         "\
-[Management Console] A keyload message has been created with the following keyload link:
+A keyload message has been created with the following keyload link:
                      Keyload link: {}
                      Tangle Index: {:#?}
 ", keyload_msg_link.to_string(), hex::encode(keyload_msg_link.to_msg_index())
@@ -229,13 +232,13 @@ const DB_FILE_PATH_AND_NAME: &str = "user-states-management-console.sqlite3";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-
+    set_env_rust_log_variable_if_not_defined_by_env("info");
     env_logger::init();
     let matches_and_options = get_arg_matches();
     let cli = ManagementConsoleCli::new(&matches_and_options, &ARG_KEYS) ;
     assert_data_dir_existence(&cli.data_dir)?;
 
-    println!("[Management Console] Using node '{}' for tangle connection", cli.node);
+    log::info!("Using node '{}' for tangle connection", cli.node);
 
 
     let db_connection_opt = DbFileBasedDaoManagerOptions {
@@ -269,7 +272,7 @@ async fn main() -> Result<()> {
             }
         ).await?;
     } else {
-        println!("[Management Console] Error: Could not create channel_manager");
+        log::error!("[fn main()] Error: Could not create channel_manager");
         print_usage_help = true;
     }
 

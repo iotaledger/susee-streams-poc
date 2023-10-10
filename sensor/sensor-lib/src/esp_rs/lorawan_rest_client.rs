@@ -15,7 +15,7 @@ pub struct LoraWanRestClient {
 impl<'a> LoraWanRestClient {
     pub fn new(options: Option<LoraWanRestClientOptions<'a>>) -> Self {
         let options = options.unwrap_or_default();
-        log::debug!("[LoraWanRestClient.new()] Initializing instance with options:\n       {}\n", options);
+        log::debug!("[fn new()] Initializing instance with options:\n       {}\n", options);
         Self {
             http_client: HyperEsp32Client::new(&Default::default(), UserAgentName::LoraWanRestClient),
             request_builder: RequestBuilderLorawanRest::new(options.iota_bridge_url)
@@ -23,7 +23,7 @@ impl<'a> LoraWanRestClient {
     }
 
     pub async fn post_binary_request_to_iota_bridge(&mut self, request_bytes: Vec<u8>, dev_eui: &str) -> Result<SimpleHttpResponse> {
-        log::debug!("[LoraWanRestClient.post_binary_request_to_iota_bridge()] Sending {} bytes via lora-wan-rest http request to iota-bridge", request_bytes.len());
+        log::debug!("[fn post_binary_request_to_iota_bridge()] Sending {} bytes via lora-wan-rest http request to iota-bridge", request_bytes.len());
         self.http_client.send(
             self.request_builder.post_binary_request(request_bytes, dev_eui)
                 .expect("Error on building http requ\

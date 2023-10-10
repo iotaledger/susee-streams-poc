@@ -66,7 +66,7 @@ impl<'a> Transport<'a> for StreamsTransportCapture
 
     /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
     async fn send_message(&mut self, address: Address, msg: Self::Msg) -> Result<Self::SendResponse> {
-        println!("\n[StreamsTransportCapture.send_message] Sending message with {} bytes payload:\n{}\n", trans_msg_len(&msg), trans_msg_encode(&msg));
+        log::info!("\n[fn send_message()] Sending message with {} bytes payload:\n{}\n", trans_msg_len(&msg), trans_msg_encode(&msg));
         self.0.send_message(address, msg).await
     }
 
@@ -76,7 +76,7 @@ impl<'a> Transport<'a> for StreamsTransportCapture
         match ret_val.as_ref() {
             Ok(msg_vec) => {
                 for (idx, msg) in msg_vec.iter().enumerate() {
-                    println!("[StreamsTransportCapture.recv_messages] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, trans_msg_len(&msg), trans_msg_encode(&msg))
+                    log::info!("[fn recv_messages()] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, trans_msg_len(&msg), trans_msg_encode(&msg))
                 }
             },
             _ => ()

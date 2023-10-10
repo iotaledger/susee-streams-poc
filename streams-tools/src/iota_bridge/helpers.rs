@@ -49,14 +49,14 @@ pub fn write_to_scope(scope: &Rc<dyn DispatchScope>, value: DispatchScopeValue) 
 }
 
 pub fn log_anyhow_err_and_respond_500(err: anyhow::Error, fn_name: &str) -> Result<Response<Body>> {
-    println!("[IOTA-Bridge - {}] Error: {}", fn_name, err);
+    log::error!("[IOTA-Bridge - {}] Error: {}", fn_name, err);
     let builder = Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR);
     builder.body(Default::default())
 }
 
 pub fn log_lets_err_and_respond_mapped_status_code(lets_err: LetsError, fn_name: &str) -> Result<Response<Body>> {
-    println!("[IOTA-Bridge - {}] Error: {}", fn_name, lets_err);
+    log::error!("[IOTA-Bridge - {}] Error: {}", fn_name, lets_err);
     let builder = Response::builder()
         .status(MapLetsError::to_http_status_codes(&lets_err));
     builder.body(Default::default())

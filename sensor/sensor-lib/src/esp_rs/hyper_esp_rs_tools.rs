@@ -52,12 +52,12 @@ pub fn read_stream_into_buffer<R: Read>(r: &mut R, buf: &mut Vec<u8>) -> Result<
         let mut buffer = [0u8; READ_STREAM_SUB_BUFFER_CAPACITY_SIZE];
         let read_result = r.read(&mut buffer);
         internal_buffers.push(buffer);
-        log::debug!("[read_stream_into_buffer] Pushed buffer into internal_buffers vec. internal_buffers-length now is: {}", internal_buffers.len());
+        log::debug!("[fn read_stream_into_buffer()] Pushed buffer into internal_buffers vec. internal_buffers-length now is: {}", internal_buffers.len());
         match read_result {
             Ok(bytes_read) => {
                 log::debug!("[read_stream_into_buffer] Reading bytes into buffer finished: Length: {}", bytes_read);
                 if bytes_read < READ_STREAM_SUB_BUFFER_CAPACITY_SIZE {
-                    log::debug!("[read_stream_into_buffer] bytes_read < READ_STREAM_SUB_BUFFER_CAPACITY_SIZE. size_of_last_sub_buffer is set to {}", bytes_read);
+                    log::debug!("[fn read_stream_into_buffer()] bytes_read < READ_STREAM_SUB_BUFFER_CAPACITY_SIZE. size_of_last_sub_buffer is set to {}", bytes_read);
                     size_of_last_sub_buffer = bytes_read;
                     break;
                 }
@@ -69,24 +69,24 @@ pub fn read_stream_into_buffer<R: Read>(r: &mut R, buf: &mut Vec<u8>) -> Result<
     }
 
     let buf_size = (internal_buffers.len() - 1) * READ_STREAM_SUB_BUFFER_CAPACITY_SIZE + size_of_last_sub_buffer;
-    log::debug!("[read_stream_into_buffer] Calculated over all buf_size is {} bytes", buf_size);
+    log::debug!("[fn read_stream_into_buffer] Calculated over all buf_size is {} bytes", buf_size);
     buf.clear();
     let additional_capacity_needed = buf_size as i32 - buf.capacity() as i32;
-    log::debug!("[read_stream_into_buffer] additional_capacity_needed is {} bytes", additional_capacity_needed);
+    log::debug!("[fn read_stream_into_buffer] additional_capacity_needed is {} bytes", additional_capacity_needed);
     if additional_capacity_needed > 0 {
         buf.reserve(additional_capacity_needed as usize);
     }
     unsafe { buf.set_len(buf_size); }
-    log::debug!("[read_stream_into_buffer] Finished buf.set_len({})", buf_size);
+    log::debug!("[fn read_stream_into_buffer] Finished buf.set_len({})", buf_size);
 
     let pos_of_last_sub_buffer = internal_buffers.len() - 1;
-    log::debug!("[read_stream_into_buffer] pos_of_last_sub_buffer in the internal_buffers vec is {}", pos_of_last_sub_buffer);
+    log::debug!("[fn read_stream_into_buffer] pos_of_last_sub_buffer in the internal_buffers vec is {}", pos_of_last_sub_buffer);
     for (pos, sub_buffer) in internal_buffers.iter().enumerate() {
         let src_size = if pos < pos_of_last_sub_buffer {READ_STREAM_SUB_BUFFER_CAPACITY_SIZE} else {size_of_last_sub_buffer};
-        log::debug!("[read_stream_into_buffer] Processing temporary sub_buffer with index {} in internal_buffers vec. Buffers src_size is {}", pos, src_size);
+        log::debug!("[fn read_stream_into_buffer] Processing temporary sub_buffer with index {} in internal_buffers vec. Buffers src_size is {}", pos, src_size);
         let dst_start = pos * READ_STREAM_SUB_BUFFER_CAPACITY_SIZE;
         let dst_end = dst_start + src_size;
-            log::debug!("[read_stream_into_buffer] Cloning slice of {} bytes from {} to {} into buffer handed to this function",
+            log::debug!("[fn read_stream_into_buffer] Cloning slice of {} bytes from {} to {} into buffer handed to this function",
                     (dst_end - dst_start),
                     dst_start,
                     dst_end
@@ -164,7 +164,7 @@ impl HyperEsp32Client {
     pub fn new(http_configuration: &HttpConfiguration, user_agent_name: UserAgentName ) -> Self {
         Self {
             http_client: Client::wrap(
-                EspHttpConnection::new(http_configuration).expect("[HyperEsp32Client] Error on creating EspHttpConnection")
+                EspHttpConnection::new(http_configuration).expect("[HyperEsp32Client.new] Error on creating EspHttpConnection")
             ),
             user_agent_name,
             url: "".to_string()
@@ -204,7 +204,7 @@ impl HyperEsp32Client {
     fn handle_resulting_response(resulting_response: Result<Response<&mut EspHttpConnection>, EspIOError>) -> Result<SimpleHttpResponse> {
         match resulting_response {
             Ok(mut resp) => {
-                log::debug!("[HyperEsp32Client.send] Received EspHttpResponse");
+                log::debug!("[HyperEsp32Client.handle_resulting_response] Received EspHttpResponse");
                 let (_headers, mut body) = resp.split();
                 let mut buffer = Vec::new();
                 read_stream_into_buffer(&mut body, &mut buffer)?;
@@ -224,11 +224,11 @@ impl HyperEsp32Client {
     fn prepare_esp_http_req(svc_http_method: Method, bytes: &Bytes, esp_http_req: &mut Request<&mut EspHttpConnection>) -> Result<()>{
         match svc_http_method {
             Method::Post => {
-                log::debug!("[HyperEsp32Client.send] Bytes to send: Length: {}\n    {:02X?}", bytes.len(), bytes);
+                log::debug!("[HyperEsp32Client.prepare_esp_http_req] Bytes to send: Length: {}\n    {:02X?}", bytes.len(), bytes);
                 esp_http_req.write_all(&bytes)?;
-                log::debug!("[HyperEsp32Client.send] Sending bytes was successful");
+                log::debug!("[HyperEsp32Client.prepare_esp_http_req] Sending bytes was successful");
                 esp_http_req.flush()?;
-                log::debug!("[HyperEsp32Client.send] Flushing esp_http_req was successful");
+                log::debug!("[HyperEsp32Client.prepare_esp_http_req] Flushing esp_http_req was successful");
             },
             Method::Get => {},
             _ => {
@@ -244,7 +244,7 @@ impl HyperEsp32Client {
             &HyperMethod::GET => Method::Get,
             _ => Method::Unbind,
         };
-        log::debug!("[HyperEsp32Client.send] svc_http_method found");
+        log::debug!("[HyperEsp32Client.get_svc_http_method] svc_http_method found");
         svc_http_method
     }
 }

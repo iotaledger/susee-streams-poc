@@ -102,7 +102,7 @@ impl StreamsTransport for StreamsTransportSocketEspRs {
 
     fn new(options: Option<StreamsTransportSocketEspRsOptions>) -> Self {
         let options = options.unwrap_or_default();
-        log::debug!("[StreamsTransportSocketEspRs::new()] Creating new HttpClient using options: {}", options);
+        log::debug!("[fn new()] Creating new HttpClient using options: {}", options);
         let mut esp_http_client_opt = HttpConfiguration::default();
         esp_http_client_opt.timeout = Some(Duration::from_secs(60));
         Self {
@@ -127,7 +127,7 @@ impl StreamsTransportSocketEspRs
         // http status which indicates that the iota-bridge has stored all needed
         // data to use compressed massages further on.
         if response.status == StatusCode::ALREADY_REPORTED {
-            log::debug!("[StreamsTransportSocketEspRs::request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
+            log::debug!("[fn request()] Received StatusCode::ALREADY_REPORTED - Set use_compressed_msg = true");
             self.compressed.set_use_compressed_msg(true);
         }
         Ok(response)
@@ -150,8 +150,8 @@ impl StreamsTransportSocketEspRs
     }
 
     async fn recv_message_via_http(&mut self, link: &Address) -> LetsResult<LinkedMessage> {
-        log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http]");
-        log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http] EspHttpClient created");
+        log::debug!("[fn recv_message_via_http()]");
+        log::debug!("[fn recv_message_via_http()] EspHttpClient created");
         let req = if self.compressed.get_use_compressed_msg() {
             let cmpr_link = TangleAddressCompressed::from_tangle_address(link, self.initialization_cnt);
             self.request_builder.receive_compressed_message_from_address(&cmpr_link, None)
@@ -167,11 +167,11 @@ impl StreamsTransportSocketEspRs
     }
 
     async fn handle_recv_message_response<'a>(&mut self, response: SimpleHttpResponse, link: &Address) -> LetsResult<LinkedMessage> {
-        log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http] check for retrials");
+        log::debug!("[fn handle_recv_message_response()] check for retrials");
         // TODO: Implement following retrials using EspTimerService if needed.
         // May be StatusCode::CONTINUE is handled by the EspHttpClient
         if response.status == StatusCode::CONTINUE {
-            log::warn!("[StreamsTransportSocketEspRs.recv_message_via_http] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
+            log::warn!("[fn handle_recv_message_response()] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
             // let periodic = getPeriodicTimer(Duration::from_millis(500), move || {
             //     response = send_hyper_request_via_esp_http(
             //             self.request_builder.receive_message_from_address(link)?
@@ -188,16 +188,16 @@ impl StreamsTransportSocketEspRs
         }
 
         if is_http_status_success(response.status.as_u16()) {
-            log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http] StatusCode is successful: {}", response.status);
-            log::info!("[StreamsTransportSocketEspRs.recv_message_via_http] create LinkedMessage ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}",
+            log::debug!("[fn handle_recv_message_response()] StatusCode is successful: {}", response.status);
+            log::info!("[fn handle_recv_message_response()] create LinkedMessage ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}",
                        response.body.len(),
                        response.body.as_slice()
             );
             let body = <TransportMessage as BinaryPersist>::try_from_bytes(&response.body).unwrap();
-            log::debug!("[StreamsTransportSocketEspRs.recv_message_via_http] return ret_val");
+            log::debug!("[fn handle_recv_message_response()] return ret_val");
             Ok(LinkedMessage { link: link.clone(), body })
         } else {
-            log::error!("[StreamsTransportSocketEspRs.recv_message_via_http] StatusCode is not OK");
+            log::error!("[fn handle_recv_message_response()] StatusCode is not OK");
             Err(MapLetsError::from_http_status_codes(
                 response.status,
                 Some(link.clone()),
@@ -213,7 +213,7 @@ impl CompressedStateSend for StreamsTransportSocketEspRs {
     }
 
     fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
-        log::debug!("[StreamsTransportSocketEspRs::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
+        log::debug!("[fn set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
         self.compressed.set_initial_use_compressed_msg_state(use_compressed_msg)
     }
 
@@ -229,7 +229,7 @@ impl<'a> Transport<'a> for StreamsTransportSocketEspRs
     type SendResponse = ();
 
     async fn send_message(&mut self, address: Address, msg: Self::Msg) -> LetsResult<Self::SendResponse> {
-        log::info!("[StreamsTransportSocketEspRs.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n",
+        log::info!("[fn send_message()] Sending message with {} bytes tangle-message-payload:\n{}\n",
                  trans_msg_len(&msg), trans_msg_encode(&msg));
         self.send_message_via_http(&LinkedMessage {
             link: address,
@@ -242,17 +242,17 @@ impl<'a> Transport<'a> for StreamsTransportSocketEspRs
     }
 
     async fn recv_message(&mut self, address: Address) -> LetsResult<Self::Msg> {
-        log::debug!("[StreamsTransportSocketEspRs.recv_message]");
+        log::debug!("[fn recv_message()]");
         let ret_val = self.recv_message_via_http(&address).await;
-        log::debug!("[StreamsTransportSocketEspRs.recv_message] ret_val received");
+        log::debug!("[fn recv_message] ret_val received");
         match ret_val.as_ref() {
             Ok(msg) => {
-                log::debug!("[StreamsTransportSocketEspRs.recv_message] ret_val Ok");
-                log::info!("[StreamsTransportSocketEspRs.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n",
+                log::debug!("[fn recv_message()] ret_val Ok");
+                log::info!("[fn recv_message()] Receiving message with {} bytes tangle-message-payload:\n{}\n",
                     msg.body_len(), msg.body_hex_encode())
             },
             Err(err) => {
-                log::error!("[StreamsTransportSocketEspRs.recv_message] Received streams error: '{}'", err);
+                log::error!("[fn recv_message()] Received streams error: '{}'", err);
                 ()
             }
         }

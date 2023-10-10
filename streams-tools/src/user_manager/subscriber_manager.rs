@@ -51,7 +51,6 @@ use crate::{
     },
     StreamsTransport,
     STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC,
-    println_esp_compat,
 };
 
 #[cfg(feature = "std")]
@@ -120,26 +119,26 @@ where
 
     pub async fn clear_client_state(&mut self) -> Result<()> {
         if let Some(serial_file_name) = self.serialization_file.clone() {
-            log::debug!("[fn clear_client_state] - START");
+            log::debug!("[fn clear_client_state()] START");
 
             if Path::new(serial_file_name.as_str()).exists(){
-                println!("[SubscriberManager.clear_client_state()] - Removing file {}", serial_file_name);
+                log::info!("[fn clear_client_state()] Removing file {}", serial_file_name);
                 remove_file(serial_file_name)?;
             } else {
-                println!("[SubscriberManager.clear_client_state()] - Can not remove file {} cause it does not exist.", serial_file_name);
+                log::info!("[fn clear_client_state()] Can not remove file {} cause it does not exist.", serial_file_name);
             }
 
-            log::debug!("[fn clear_client_state] - Setting all links and user to None");
+            log::debug!("[fn clear_client_state()] Setting all links and user to None");
             self.prev_msg_link = None;
             self.subscription_link = None;
             self.user = None;
             self.transport.set_initial_use_compressed_msg_state(false);
             self.transport.remove_listener(self.compressed_subscription_handle);
 
-            log::debug!("[fn clear_client_state] - Ok");
+            log::debug!("[fn clear_client_state()] Ok");
             Ok(())
         } else {
-            bail!("[SubscriberManager.clear_client_state()] - You need to specify the serialization_file constructor argument before using this function.");
+            bail!("[fn clear_client_state()] You need to specify the serialization_file constructor argument before using this function.");
         }
     }
 }
@@ -174,10 +173,10 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
 
     async fn subscribe_with_cleared_client_state(&mut self, ann_address: Address) -> Result<()> {
         let mut user = self.create_user();
-        log::debug!("[fn subscribe_with_cleared_client_state] user created");
+        log::debug!("[fn subscribe_with_cleared_client_state()] user created");
 
         user.receive_message(ann_address).await.map_err(|e| anyhow!(e))?;
-        log::debug!("[fn subscribe_with_cleared_client_state] announcement received");
+        log::debug!("[fn subscribe_with_cleared_client_state()] announcement received");
 
         let sub_msg_link = user.subscribe().await.map_err(|e| anyhow!(e))?;
         self.announcement_link = user.stream_address().clone();
@@ -188,7 +187,7 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
 
     async fn subscribe_with_dirty_client_state(&mut self, ann_address: Address, initialization_cnt: u8) -> Result<()> {
         if initialization_cnt < INITIALIZATION_CNT_MAX_VALUE {
-            println_esp_compat!("[SubscriberManager.subscribe_with_dirty_client_state()]\n\
+            log::info!("[fn subscribe_with_dirty_client_state()]\n\
                                 ------------------------------------------------------------------\n\
                                 An already existing subscription will be replaced by a new one.\n\
                                 Initialization count will be incremented from {} to {}\n\
@@ -213,25 +212,25 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
     }
 
     pub async fn send_signed_packet(&mut self, input: &Bytes) -> Result<Address> {
-        log::debug!("[fn send_signed_packet] - START");
+        log::debug!("[fn send_signed_packet()] START");
         if self.user.is_none() {
-            panic!("[SubscriberManager.send_signed_packet()] - Before sending messages you need to subscribe to a channel. Use subscribe() and register_keyload_msg() before using this function.")
+            panic!("[SubscriberManager.send_signed_packet()] Before sending messages you need to subscribe to a channel. Use subscribe() and register_keyload_msg() before using this function.")
         }
         if self.prev_msg_link.is_none() {
-            panic!("[SubscriberManager.send_signed_packet()] - Before sending messages you need to register a keyload message. Use register_keyload_msg() before using this function.")
+            panic!("[SubscriberManager.send_signed_packet()] Before sending messages you need to register a keyload message. Use register_keyload_msg() before using this function.")
         }
-        log::debug!("[fn send_signed_packet] - sync_user_state");
+        log::debug!("[fn send_signed_packet()] sync_user_state");
         self.sync_user_state().await?;
-        log::debug!("[fn send_signed_packet] - call_user_send_signed_packet");
+        log::debug!("[fn send_signed_packet()] call_user_send_signed_packet");
         let msg_link = self.call_user_send_signed_packet(input).await?;
-        log::debug!("[fn send_signed_packet] - set new prev_msg_link");
+        log::debug!("[fn send_signed_packet()] set new prev_msg_link");
         self.prev_msg_link = Some(msg_link);
         Ok(msg_link)
     }
 
     async fn call_user_send_signed_packet(&mut self, input: &Bytes) -> Result<Address> {
         let user = self.user.as_mut().unwrap();
-        log::debug!("[fn call_user_send_signed_packet] - user.send_signed_packet()");
+        log::debug!("[fn call_user_send_signed_packet()] user.send_signed_packet()");
         let response = match user.send_signed_packet(
             self.base_branch_topic.clone(),
             &Bytes::default(),
@@ -241,10 +240,10 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
             Ok(response) => response,
             Err(streams_err) => match streams_err {
                 StreamsError::MessageMissing(msg_id, _info_str) => {
-                    log::debug!("[fn send_signed_packet] - Got error MessageMissing for MsgId {} - syncing client state", msg_id);
+                    log::debug!("[fn call_user_send_signed_packet()] Got error MessageMissing for MsgId {} - syncing client state", msg_id);
                     user.sync().await.map_err(|e| anyhow!(e))?;
                     self.is_synced = true;
-                    log::debug!("[fn send_signed_packet] - user.send_signed_packet() after MessageLinkNotFoundInStore error");
+                    log::debug!("[fn call_user_send_signed_packet()] user.send_signed_packet() after MessageLinkNotFoundInStore error");
                     user.send_signed_packet(
                         self.base_branch_topic.clone(),
                         &Bytes::default(),
@@ -262,7 +261,7 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
     async fn sync_user_state(&mut self) -> Result<()> {
         let user = self.user.as_mut().unwrap();
         if !self.compressed.get_use_compressed_msg() || !self.is_synced {
-            log::debug!("[fn sync_user_state] - syncing client state");
+            log::debug!("[fn sync_user_state()] syncing client state");
             user.sync().await.map_err(|e| anyhow!(e))?;
             self.is_synced = true;
         }
@@ -274,18 +273,18 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
         if let Some(user) = self.user.as_mut() {
             address_of_fetched_msg = Self::fetch_keyload_from_messages(user, keyload_address).await?;
         } else {
-            bail!("[SubscriberManager.register_keyload_msg()] - Before registering a keyload message you need to subscribe to a channel. Use subscribe() before using this function.")
+            bail!("[SubscriberManager.register_keyload_msg()] Before registering a keyload message you need to subscribe to a channel. Use subscribe() before using this function.")
         };
 
         if let Some(prev_msg_link) = self.prev_msg_link {
-            println_esp_compat!("[SubscriberManager.register_keyload_msg()] - Replacing the old previous message link with new keyload message link
+            log::info!("[fn register_keyload_msg()] Replacing the old previous message link with new keyload message link
                                   Old previous message link: {}
                                   Keyload message link: {}\n",
                      prev_msg_link.to_string(),
                      keyload_address.to_string(),
             )
         } else {
-            println_esp_compat!("[SubscriberManager.register_keyload_msg()] - Set keyload message link as new previous message link
+            log::info!("[fn register_keyload_msg()] Set keyload message link as new previous message link
                                   Keyload message link: {}\n",
                      keyload_address.to_string(),
             )
@@ -303,7 +302,7 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
             .ok_or(anyhow!("Did not receive an initial_msg"))?;
 
         if initial_msg.address != *keyload_address {
-            bail!("[SubscriberManager.register_keyload_msg()] - Received initial_msg does not match expected keyload_address.\ninitial: {}\nexpexted: {}",
+            bail!("[SubscriberManager.register_keyload_msg()] Received initial_msg does not match expected keyload_address.\ninitial: {}\nexpexted: {}",
             initial_msg.address, keyload_address);
         }
 
@@ -311,7 +310,7 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
             .ok_or(anyhow!("initial_msg is expected to be a keyload msg but it is something else"))?;
 
         if !keyload_msg.includes_subscriber(user.identifier().unwrap()) {
-            bail!("[SubscriberManager.register_keyload_msg()] - Received keyload_msg did not include this subscriber.")
+            bail!("[SubscriberManager.register_keyload_msg()] Received keyload_msg did not include this subscriber.")
         }
 
         Ok(initial_msg.address)
@@ -353,28 +352,28 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
                 if let Some(prev_msg_link) = self.prev_msg_link {
                     if prev_msg_link != null_address {
                         if subscription_link != prev_msg_link {
-                            log::debug!("[fn - is_channel_initialized()] subscription_link: {}", subscription_link);
-                            log::debug!("[fn - is_channel_initialized()] prev_msg_link: {}", prev_msg_link);
+                            log::debug!("[fn is_channel_initialized()] subscription_link: {}", subscription_link);
+                            log::debug!("[fn is_channel_initialized()] prev_msg_link: {}", prev_msg_link);
                             ret_val = true;
                         } else {
-                            log::debug!("[fn - is_channel_initialized()] subscription_link == prev_msg_link -> Sensor is not initialized");
+                            log::debug!("[fn is_channel_initialized()] subscription_link == prev_msg_link -> Sensor is not initialized");
                         }
                     } else {
-                        log::debug!("[fn - is_channel_initialized()] prev_msg_link == null_address -> Sensor is not initialized");
+                        log::debug!("[fn is_channel_initialized()] prev_msg_link == null_address -> Sensor is not initialized");
                     }
 
                 } else {
-                    log::debug!("[fn - is_channel_initialized()] prev_msg_link is None -> Sensor is not initialized");
+                    log::debug!("[fn is_channel_initialized()] prev_msg_link is None -> Sensor is not initialized");
                 }
             } else {
-                log::debug!("[fn - is_channel_initialized()] subscription_link == null_address -> Sensor is not initialized");
+                log::debug!("[fn is_channel_initialized()] subscription_link == null_address -> Sensor is not initialized");
             }
 
         } else {
-            log::debug!("[fn - is_channel_initialized()] subscription_link is None -> Sensor is not initialized");
+            log::debug!("[fn is_channel_initialized()] subscription_link is None -> Sensor is not initialized");
         }
 
-        log::debug!("[fn - is_channel_initialized()] returning Ok({})", ret_val);
+        log::debug!("[fn is_channel_initialized()] returning Ok({})", ret_val);
         Ok(ret_val)
     }
 
@@ -387,9 +386,9 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
     }
 
     async fn export_to_serialization_file(&mut self, file_name: &str) -> Result<()> {
-        log::debug!("[fn export_to_serialization_file] - START");
+        log::debug!("[fn export_to_serialization_file()] START");
         if self.user.is_some() {
-            log::debug!("[fn export_to_serialization_file] - user available");
+            log::debug!("[fn export_to_serialization_file()] user available");
             let static_sized_buffer_front_length =
                 TANGLE_ADDRESS_BYTE_LEN               // PREV_MSG_LINK
                     + TANGLE_ADDRESS_BYTE_LEN               // SUBSCRIPTION_LINK
@@ -397,16 +396,16 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
                     + 1                                     // IS_SYNCED
                 ;
             let mut buffer: Vec<u8> = vec![0; static_sized_buffer_front_length];
-            log::debug!("[fn export_to_serialization_file] - buffer.len: {}", buffer.len());
+            log::debug!("[fn export_to_serialization_file()] buffer.len: {}", buffer.len());
 
             // PREV_MSG_LINK
             let mut range: Range<usize> = RangeIterator::new(TANGLE_ADDRESS_BYTE_LEN);
-            log::debug!("[fn export_to_serialization_file] - persist PREV_MSG_LINK");
+            log::debug!("[fn export_to_serialization_file()] persist PREV_MSG_LINK");
             self.persist_optional_tangle_address(&mut buffer, &mut range, self.prev_msg_link);
 
             // SUBSCRIPTION_LINK
             range.increment(TANGLE_ADDRESS_BYTE_LEN);
-            log::debug!("[fn export_to_serialization_file] - persist SUBSCRIPTION_LINK");
+            log::debug!("[fn export_to_serialization_file()] persist SUBSCRIPTION_LINK");
             self.persist_optional_tangle_address(&mut buffer, &mut range, self.subscription_link);
 
             // USE_COMPRESSED_MSG
@@ -428,19 +427,19 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
             );
 
             // SUBSCRIBER
-            log::debug!("[fn export_to_serialization_file] - persist SUBSCRIBER");
+            log::debug!("[fn export_to_serialization_file()] persist SUBSCRIBER");
             let passw = self.get_serialization_password().to_string();
             let mut persisted_user= vec![];
             if let Some(user) = self.user.as_mut() {
                 persisted_user = user.backup(passw.as_str())
                     .await.map_err(|e| anyhow!(e))?;
-                log::debug!("[SubscriberManager.export_to_serialization_file()] - persisted_user length: {}", persisted_user.len());
+                log::debug!("[fn export_to_serialization_file()] persisted_user length: {}", persisted_user.len());
             }
             buffer.append(&mut persisted_user);
-            log::debug!("[fn export_to_serialization_file] - write file '{}'", file_name);
-            write(file_name, &buffer).expect(format!("[SubscriberManager.subscribe()] - Error while writing User state file '{}'", file_name).as_str());
+            log::debug!("[fn export_to_serialization_file()] write file '{}'", file_name);
+            write(file_name, &buffer).expect(format!("[SubscriberManager.subscribe()] Error while writing User state file '{}'", file_name).as_str());
         }
-        log::debug!("[fn export_to_serialization_file] - Ok");
+        log::debug!("[fn export_to_serialization_file()] Ok");
         Ok(())
     }
 
@@ -448,7 +447,7 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
         if let Some(serial_file_name) = self.serialization_file.clone() {
             self.export_to_serialization_file(serial_file_name.as_str()).await
         } else {
-            bail!("[SubscriberManager.safe_client_status_to_disk()] - You need to specify the serialization_file constructor argument before using this function.");
+            bail!("[SubscriberManager.safe_client_status_to_disk()] You need to specify the serialization_file constructor argument before using this function.");
         }
     }
 
@@ -461,7 +460,7 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
 }
 
 pub fn println_maximum_initialization_cnt_reached_warning(fn_name: &str, current_initialization_cnt: u8) {
-    println_esp_compat!("\n\n[{}] Warning maximum number of initializations reached:\n\n\
+    log::info!("\n\n[{}] Warning maximum number of initializations reached:\n\n\
                                 ---------------------------------------------------------------\n\
                                 ---------------------- W A R N I N G --------------------------\n\
                                 ---------------------------------------------------------------\n\
@@ -479,9 +478,9 @@ async fn import_from_serialization_file<'a, TransportT: StreamsTransport, Wallet
     file_name: &str,
     ret_val: &mut SubscriberManager<TransportT, WalletT>
 ) -> Result<()>{
-    log::debug!("[fn import_from_serialization_file] - START");
-    let buffer = read(file_name).expect(format!("[SubscriberManager::import_from_serialization_file()] - Error while opening channel state file '{}'", file_name).as_str());
-    log::debug!("[fn import_from_serialization_file] - buffer len: {}", buffer.len());
+    log::debug!("[fn import_from_serialization_file()] START");
+    let buffer = read(file_name).expect(format!("[SubscriberManager::import_from_serialization_file()] Error while opening channel state file '{}'", file_name).as_str());
+    log::debug!("[fn import_from_serialization_file()] buffer len: {}", buffer.len());
 
     // PREV_MSG_LINK
     let mut range: Range<usize> = RangeIterator::new(TANGLE_ADDRESS_BYTE_LEN);
@@ -532,7 +531,7 @@ async fn import_from_serialization_file<'a, TransportT: StreamsTransport, Wallet
             .collect();
 
         if sensor_last_state.len() != 1 {
-            bail!("[SubscriberManager.import_from_serialization_file()] - No prev_msg_link or multiple prev_msg_links found: Cnt: {}", sensor_last_state.len())
+            bail!("[SubscriberManager.import_from_serialization_file()] No prev_msg_link or multiple prev_msg_links found: Cnt: {}", sensor_last_state.len())
         }
 
         ret_val.prev_msg_link = Some(sensor_last_state[0].1.link);
@@ -540,7 +539,7 @@ async fn import_from_serialization_file<'a, TransportT: StreamsTransport, Wallet
 */
     ret_val.user = Some(user);
 
-    log::debug!("[fn import_from_serialization_file] - Ok");
+    log::debug!("[fn import_from_serialization_file()] Ok");
     Ok(())
 }
 

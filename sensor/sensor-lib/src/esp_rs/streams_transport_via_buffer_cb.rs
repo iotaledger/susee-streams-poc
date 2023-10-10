@@ -120,18 +120,18 @@ impl StreamsTransportViaBufferCallback {
     }
 
     async fn recv_message_via_lorawan(&mut self, link: &Address) -> LetsResult<LinkedMessage> {
-        log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_lorawan]");
+        log::debug!("[fn recv_message_via_lorawan()]");
         let req_parts = self.get_request_parts(link)
             .map_err(|e| LetsError::External(e.into()))?;
         let response = self.request(req_parts, link.base()).await
             .map_err(|e| LetsError::External(e.into()))?;
 
-        log::debug!("[StreamsTransportViaBufferCallback.recv_message_via_lorawan] check for retrials");
+        log::debug!("[fn recv_message_via_lorawan()] check for retrials");
         // TODO: Implement following retrials for bad LoRaWAN connection using EspTimerService if needed.
         // May be we need to introduce StatusCode::CONTINUE in cases where LoRaWAN connection
         // is sometimes too bad and retries are a valid strategy to receive the response
         if response.status_code == StatusCode::CONTINUE {
-            log::warn!("[StreamsTransportViaBufferCallback.recv_message_via_lorawan] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
+            log::warn!("[fn recv_message_via_lorawan()] Received StatusCode::CONTINUE. Currently no retries implemented. Possible loss of data.")
         }
 
         StreamsTransportViaBufferCallback::manage_response_status(&response, link)
@@ -139,13 +139,13 @@ impl StreamsTransportViaBufferCallback {
 
     fn manage_response_status(response: &IotaBridgeResponseParts, link: &Address) -> LetsResult<LinkedMessage> {
         if response.status_code.is_success() {
-            log::debug!("[StreamsTransportViaBufferCallback.manage_response_status] StatusCode is successful: {}", response.status_code);
-            log::info!("[StreamsTransportViaBufferCallback.manage_response_status] Received response with content length of {}", response.body_bytes.len());
+            log::debug!("[fn manage_response_status()] StatusCode is successful: {}", response.status_code);
+            log::info!("[fn manage_response_status()] Received response with content length of {}", response.body_bytes.len());
             let body = <TransportMessage as BinaryPersist>::try_from_bytes(&response.body_bytes.as_slice()).unwrap();
-            log::debug!("[StreamsTransportViaBufferCallback.manage_response_status] return ret_val");
+            log::debug!("[fn manage_response_status()] return ret_val");
             Ok(LinkedMessage { link: link.clone(), body })
         } else {
-            log::error!("[StreamsTransportViaBufferCallback.manage_response_status] StatusCode is not OK");
+            log::error!("[fn manage_response_status()] StatusCode is not OK");
             Err(MapLetsError::from_http_status_codes(
                 response.status_code,
                 Some(link.clone()),
@@ -182,22 +182,22 @@ impl StreamsTransportViaBufferCallback {
 
     pub async fn request<'a>(&mut self, req_parts: IotaBridgeRequestParts, channel_id: AppAddr) -> Result<IotaBridgeResponseParts> {
         let buffer: Vec<u8> = req_parts.as_vecu8()?;
-        log::debug!("[StreamsTransportViaBufferCallback.request] IotaBridgeRequestParts bytes to send: Length: {}\n    {:02X?}", buffer.len(), buffer);
+        log::debug!("[fn request()] IotaBridgeRequestParts bytes to send: Length: {}\n    {:02X?}", buffer.len(), buffer);
         let mut response_parts = self.request_via_cb.request_via_buffer_callback(buffer).await?;
-        log::debug!("[StreamsTransportViaBufferCallback::request()] response_parts.status_code is {}", response_parts.status_code);
+        log::debug!("[fn request()] response_parts.status_code is {}", response_parts.status_code);
 
         // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
         // http status which indicates that the iota-bridge has stored all needed
         // data to use compressed massages further on.
         if response_parts.status_code == StatusCode::ALREADY_REPORTED {
-            log::info!("[StreamsTransportViaBufferCallback::request()] Received StatusCode::ALREADY_REPORTED (208)- Set use_compressed_msg = true");
+            log::info!("[fn request()] Received StatusCode::ALREADY_REPORTED (208)- Set use_compressed_msg = true");
             self.compressed.set_use_compressed_msg(true);
         }
         if response_parts.status_code == StatusCode::UNPROCESSABLE_ENTITY {
             response_parts = self.handle_request_retransmit(response_parts, channel_id).await?;
         }
 
-        log::info!("[StreamsTransportViaBufferCallback::request()] use_compressed_msg = '{}'", self.compressed.get_use_compressed_msg());
+        log::info!("[fn request()] use_compressed_msg = '{}'", self.compressed.get_use_compressed_msg());
         Ok(response_parts)
     }
 
@@ -207,7 +207,7 @@ impl StreamsTransportViaBufferCallback {
             channel_id,
             self.initialization_cnt,
         )?;
-        log::info!("[StreamsTransportViaBufferCallback::handle_request_retransmit()] Received StatusCode::UNPROCESSABLE_ENTITY (422) - Processing {}",
+        log::info!("[fn handle_request_retransmit()] Received StatusCode::UNPROCESSABLE_ENTITY (422) - Processing {}",
             retransmit_request.uri());
 
         let retransmit_req_parts = IotaBridgeRequestParts::from_request(retransmit_request, false).await;
@@ -215,8 +215,8 @@ impl StreamsTransportViaBufferCallback {
         response_parts = self.request_via_cb.request_via_buffer_callback(retransmit_req_bytes).await?;
 
         if response_parts.status_code != StatusCode::ALREADY_REPORTED {
-            log::warn!("[StreamsTransportViaBufferCallback.handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response_parts.status_code);
-            log::warn!("[StreamsTransportViaBufferCallback.handle_request_retransmit] Will set use_compressed_msg to false for security reasons");
+            log::warn!("[fn handle_request_retransmit()] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response_parts.status_code);
+            log::warn!("[fn handle_request_retransmit()] Will set use_compressed_msg to false for security reasons");
             self.compressed.set_use_compressed_msg(false);
         }
 
@@ -230,7 +230,7 @@ impl CompressedStateSend for StreamsTransportViaBufferCallback {
     }
 
     fn set_initial_use_compressed_msg_state(&self, use_compressed_msg: bool) {
-        log::debug!("[StreamsTransportViaBufferCallback::set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
+        log::debug!("[fn set_initial_use_compressed_msg_state()] use_compressed_msg is set to {}", use_compressed_msg);
         self.compressed.set_initial_use_compressed_msg_state(use_compressed_msg)
     }
 
@@ -246,7 +246,7 @@ impl<'a> Transport<'a> for StreamsTransportViaBufferCallback
     type SendResponse = ();
 
     async fn send_message(&mut self, address: Address, msg: Self::Msg) -> LetsResult<Self::SendResponse> {
-        log::info!("[StreamsTransportViaBufferCallback.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n",
+        log::info!("[fn send_message()] Sending message with {} bytes tangle-message-payload:\n{}\n",
                  trans_msg_len(&msg), trans_msg_encode(&msg));
         self.send_message_via_lorawan(&LinkedMessage {
             link: address,
@@ -259,17 +259,17 @@ impl<'a> Transport<'a> for StreamsTransportViaBufferCallback
     }
 
     async fn recv_message(&mut self, address: Address) -> LetsResult<Self::Msg> {
-        log::debug!("[StreamsTransportViaBufferCallback.recv_message]");
+        log::debug!("[fn recv_message()]");
         let ret_val = self.recv_message_via_lorawan(&address).await;
-        log::debug!("[StreamsTransportViaBufferCallback.recv_message] ret_val received");
+        log::debug!("[fn recv_message()] ret_val received");
         match ret_val.as_ref() {
             Ok(msg) => {
-                log::debug!("[StreamsTransportViaBufferCallback.recv_message] ret_val Ok");
-                log::info!("[StreamsTransportViaBufferCallback.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n",
+                log::debug!("[fn recv_message()] ret_val Ok");
+                log::info!("[fn recv_message()] Receiving message with {} bytes tangle-message-payload:\n{}\n",
                     msg.body_len(), msg.body_hex_encode())
             },
             Err(err) => {
-                log::error!("[StreamsTransportViaBufferCallback.recv_message] Received streams error: '{}'", err);
+                log::error!("[fn recv_message()] Received streams error: '{}'", err);
                 // We are handling any kind of error as TransportNotAvailable event here
                 // (originally caused by a transport failure like e.g. LORAWAN_NO_CONNECTION)
                 // because there is no possibility to correctly match err using iota_streams::core::Error

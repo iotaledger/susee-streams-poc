@@ -70,7 +70,7 @@ pub struct CommandFetcherBufferCb {
 impl CommandFetcherBufferCb {
 
     fn deserialize_command(& self, response: IotaBridgeResponseParts) -> Result<(Command, Vec<u8>)> {
-        log::debug!("[CommandFetcherBufferCb.deserialize_command] response.body_bytes.len() = {}", response.body_bytes.len());
+        log::debug!("[fn deserialize_command()] response.body_bytes.len() = {}", response.body_bytes.len());
         deserialize_command(response.body_bytes)
     }
 }
@@ -81,7 +81,7 @@ impl CommandFetcher for CommandFetcherBufferCb {
 
     fn new(options: Option<CommandFetcherBufferCbOptions>) -> Self {
         let options = options.unwrap_or_default();
-        log::debug!("[CommandFetcherBufferCb::new()] Creating new CommandFetcher using options: {}", options);
+        log::debug!("[fn new()] Creating new CommandFetcher using options: {}", options);
         Self {
             options,
         }
@@ -104,17 +104,17 @@ impl CommandFetcher for CommandFetcherBufferCb {
         let request_bytes: Vec<u8> = request.as_vecu8()?;
         match request_buffer_cb.request_via_buffer_callback(request_bytes).await {
             Ok(response) => {
-                log::debug!("[CommandFetcherBufferCb.fetch_next_command] Received Response");
+                log::debug!("[fn etch_next_command()] Received Response");
                 if response.status_code == HyperStatusCode::OK {
-                    log::debug!("[CommandFetcher.fetch_next_command] StatusCode::OK - deserializing command");
+                    log::debug!("[fn fetch_next_command()] StatusCode::OK - deserializing command");
                     self.deserialize_command(response)
                 } else {
-                    log::error!("[CommandFetcherBufferCb.fetch_next_command] HTTP Error. Status: {}", response.status_code);
+                    log::error!("[fn fetch_next_command()] HTTP Error. Status: {}", response.status_code);
                     Ok((Command::NO_COMMAND, Vec::<u8>::default()))
                 }
             },
             Err(e) => {
-                bail!("[CommandFetcherBufferCb.fetch_next_command] esp_http_req.submit failed: {}", e)
+                bail!("[fn fetch_next_command()] esp_http_req.submit failed: {}", e)
             }
         }
     }
@@ -124,12 +124,12 @@ impl CommandFetcher for CommandFetcherBufferCb {
         let request = IotaBridgeRequestParts::from_request(confirmation_request, false).await;
         let request_bytes = request.as_vecu8()?;
         let response = request_buffer_cb.request_via_buffer_callback(request_bytes).await?;
-        log::debug!("[CommandFetcherBufferCb.send_confirmation] Received response");
+        log::debug!("[fn send_confirmation()] Received response");
         if response.status_code == HyperStatusCode::OK {
-            log::debug!("[CommandFetcherBufferCb.send_confirmation] StatusCode::OK");
+            log::debug!("[fn send_confirmation()] StatusCode::OK");
             Ok(())
         } else {
-            bail!("[CommandFetcherBufferCb.send_confirmation] Received HTTP Error as response for confirmation transmission. Status: {}", response.status_code)
+            bail!("[fn send_confirmation()] Received HTTP Error as response for confirmation transmission. Status: {}", response.status_code)
         }
     }
 }

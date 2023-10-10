@@ -26,12 +26,12 @@ pub (crate) fn deserialize_command(buffer: Vec<u8>) -> anyhow::Result<(Command, 
     let mut ret_val = (Command::NO_COMMAND, Vec::<u8>::default());
     let content_len: usize = buffer.len();
     if content_len >= Command::LENGTH_BYTES {
-        log::debug!("[fn deserialize_command] create Command ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}", content_len, buffer.as_slice());
+        log::debug!("[fn deserialize_command()] create Command ret_val. buffer content:\n    length:{}\n    bytes:{:02X?}", content_len, buffer.as_slice());
         let command = Command::try_from_bytes(&buffer[0..Command::LENGTH_BYTES]).unwrap();
-        log::debug!("[fn deserialize_command] return ret_val");
+        log::debug!("[fn deserialize_command()] return ret_val");
         ret_val = (command, buffer);
     } else {
-        log::error!("[fn deserialize_command] response.content_len() < Command::COMMAND_LENGTH_BYTES");
+        log::error!("[fn deserialize_command()] response.content_len() < Command::COMMAND_LENGTH_BYTES");
     }
     Ok(ret_val)
 }

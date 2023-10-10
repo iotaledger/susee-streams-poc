@@ -1,27 +1,3 @@
-use iota_streams::{
-    app::{
-        transport::{
-            Transport,
-            TransportDetails,
-            TransportOptions,
-            tangle::{
-                TangleAddress,
-                TangleMessage,
-                AppInst,
-                client::{
-                    Details,
-                    SendOptions,
-                }
-            },
-        },
-    },
-    core::{
-        async_trait,
-        Result,
-        err,
-    },
-};
-
 use std::{
     clone::Clone,
     fmt,
@@ -31,10 +7,48 @@ use std::{
     },
 };
 
+use anyhow::{
+    anyhow,
+    Result,
+    bail
+};
+
+use async_trait::async_trait;
+
+use tokio::time;
+
+use hyper::{
+    Client as HyperClient,
+    body as hyper_body,
+    Body,
+    client::HttpConnector, http::{
+        StatusCode,
+        Request,
+        Response,
+    },
+    body
+};
+
+use streams::{
+    Address,
+    transport::Transport,
+};
+
+use lets::{
+    address::{
+        AppAddr,
+    },
+    error::{
+        Error as LetsError,
+        Result as LetsResult,
+    },
+    message::TransportMessage,
+};
+
 use crate::{
     http::{
         RequestBuilderStreams,
-        MapStreamsErrors,
+        MapLetsError,
         http_tools::RequestBuilderTools,
         http_protocol_lorawan_rest::RequestBuilderLorawanRest,
         http_protocol_streams::{
@@ -50,7 +64,10 @@ use crate::{
         binary_persist_iota_bridge_req::{
             IotaBridgeRequestParts,
             IotaBridgeResponseParts
-        }
+        },
+        LinkedMessage,
+        trans_msg_encode,
+        trans_msg_len,
     },
     compressed_state::{
         CompressedStateSend,
@@ -59,22 +76,6 @@ use crate::{
     },
     StreamsTransport
 };
-
-use hyper::{
-    Client as HyperClient,
-    body as hyper_body,
-    Body,
-    client::HttpConnector, http::{
-        StatusCode,
-        Request,
-        Response,
-    },
-    body
-};
-
-use tokio::time;
-
-use anyhow::bail;
 
 pub struct StreamsTransportSocketOptions {
     pub http_url: String,
@@ -112,7 +113,6 @@ impl fmt::Display for StreamsTransportSocketOptions {
 
 #[derive(Clone)]
 pub struct StreamsTransportSocket {
-    tangle_client_options: SendOptions,
     hyper_client: HyperClient<HttpConnector, Body>,
     request_builder_streams: RequestBuilderStreams,
     request_builder_lorawan_rest: RequestBuilderLorawanRest,
@@ -129,7 +129,6 @@ impl StreamsTransport for StreamsTransportSocket {
         let options = options.unwrap_or_default();
         println!("[StreamsTransportSocket.new_from_url()] Initializing instance with options:\n{}\n", options);
         Self {
-            tangle_client_options: SendOptions::default(),
             hyper_client: HyperClient::new(),
             request_builder_streams: RequestBuilderStreams::new(options.http_url.as_str()),
             request_builder_lorawan_rest: RequestBuilderLorawanRest::new(options.http_url.as_str()),
@@ -159,14 +158,14 @@ impl StreamsTransportSocket
         }
     }
 
-    async fn request(&mut self, req_parts: IotaBridgeRequestParts, channel_id: AppInst) -> Result<Response<Body>> {
+    async fn request(&mut self, req_parts: IotaBridgeRequestParts, channel_id: AppAddr) -> Result<Response<Body>> {
         let request = if self.use_lorawan_rest {
             self.get_lorawan_rest_request(req_parts)?
         } else {
             req_parts.into_request(RequestBuilderTools::get_request_builder())?
         };
 
-        let mut response = self.get_request_response(request).await;
+        let mut response = self.get_request_response(request).await?;
 
         // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
         // http status which indicates that the iota-bridge has stored all needed
@@ -180,18 +179,16 @@ impl StreamsTransportSocket
         Ok(response)
     }
 
-    async fn get_request_response(&mut self, request: Request<Body>) -> Response<Body> {
-        let mut response = self.hyper_client.request(request).await
-            .expect("Error while sending request via hyper_client");
+    async fn get_request_response(&mut self, request: Request<Body>) -> Result<Response<Body>> {
+        let mut response = self.hyper_client.request(request).await?;
 
         if self.use_lorawan_rest {
-            response = StreamsTransportSocket::handle_lorawan_rest_response(response).await
-                .expect("Error while handling the lorawan_rest_response");
+            response = StreamsTransportSocket::handle_lorawan_rest_response(response).await?;
         }
-        response
+        Ok(response)
     }
 
-    async fn handle_request_retransmit(&mut self, mut response: Response<Body>, channel_id: AppInst) -> Result<Response<Body>> {
+    async fn handle_request_retransmit(&mut self, mut response: Response<Body>, channel_id: AppAddr) -> Result<Response<Body>> {
         let request_key_bytes = body::to_bytes(response.body_mut()).await.expect("Failed to read body bytes for retrieving the request_key");
         let mut retransmit_request = self.request_builder_streams.retransmit(
             &Vec::<u8>::from(request_key_bytes),
@@ -204,7 +201,7 @@ impl StreamsTransportSocket
             retransmit_request = self.get_lorawan_rest_request(retransmit_request_parts)?
         }
 
-        let response = self.get_request_response(retransmit_request).await;
+        let response = self.get_request_response(retransmit_request).await?;
 
         if response.status() != StatusCode::ALREADY_REPORTED {
             log::warn!("[StreamsTransportSocket.handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response.status());
@@ -247,23 +244,27 @@ impl StreamsTransportSocket
         Ok(ret_val)
     }
 
-    async fn send_message_via_http(&mut self, msg: &TangleMessage) -> Result<()> {
+    async fn send_message_via_http(&mut self, msg: &LinkedMessage) -> LetsResult<()> {
         let req_parts = if self.compressed.get_use_compressed_msg() {
             // In contrast to StreamsTransportViaBufferCallback we set the dev_eui here because it could be
             // used in cases where the lorawan-rest API is not used for compressed messages.
             // StreamsTransportViaBufferCallback never sets the DevEUI because it is communicated by the
             // LoraWAN network automatically (compare comment in function StreamsTransportViaBufferCallback::recv_message_via_http()
             let cmpr_message = TangleMessageCompressed::from_tangle_message(msg, self.initialization_cnt);
-            self.request_builder_streams.get_send_message_request_parts(&cmpr_message, EndpointUris::SEND_COMPRESSED_MESSAGE, true, self.dev_eui.clone())?
+            self.request_builder_streams
+                .get_send_message_request_parts(&cmpr_message, EndpointUris::SEND_COMPRESSED_MESSAGE, true, self.dev_eui.clone())
+                .map_err(|e| LetsError::External(e.into()))?
         } else {
-            self.request_builder_streams.get_send_message_request_parts(msg, EndpointUris::SEND_MESSAGE, false, None)?
+            self.request_builder_streams
+                .get_send_message_request_parts(msg, EndpointUris::SEND_MESSAGE, false, None)
+                .map_err(|e| LetsError::External(e.into()))?
         };
-        let channel_id = msg.link.appinst.clone();
-        self.request(req_parts, channel_id).await?;
+        let channel_id = msg.link.base().clone();
+        self.request(req_parts, channel_id).await.map_err(|e| LetsError::External(e))?;
         Ok(())
     }
 
-    fn get_recv_message_request(&self, link: &TangleAddress) -> Result<IotaBridgeRequestParts> {
+    fn get_recv_message_request(&self, link: &Address) -> Result<IotaBridgeRequestParts> {
         let ret_val = if self.compressed.get_use_compressed_msg() {
             let cmpr_link = TangleAddressCompressed::from_tangle_address(link, self.initialization_cnt);
             self.request_builder_streams.get_receive_message_from_address_request_parts(
@@ -285,10 +286,10 @@ impl StreamsTransportSocket
         Ok(ret_val.expect("Error on creating IotaBridgeRequestParts"))
     }
 
-    async fn recv_message_via_http(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
-        let req = self.get_recv_message_request(link)?;
-        let channel_id = link.appinst.clone();
-        let mut response = self.request(req, channel_id).await?;
+    async fn recv_message_via_http(&mut self, link: &Address) -> LetsResult<LinkedMessage> {
+        let req = self.get_recv_message_request(link).map_err(|e| LetsError::External(e))?;
+        let channel_id = link.base().clone();
+        let mut response = self.request(req, channel_id).await.map_err(|e| LetsError::External(e))?;
         // TODO: This retrials are most probably not needed because they might be handled by hyper
         //       => Clarify and remove unneeded code
         if response.status() == StatusCode::CONTINUE {
@@ -296,17 +297,24 @@ impl StreamsTransportSocket
             while response.status() == StatusCode::CONTINUE {
                 interval.tick().await;
                 response = self.request(
-                    self.get_recv_message_request(link)?,
-                    link.appinst
-                ).await?;
+                    self.get_recv_message_request(link).map_err(|e| LetsError::External(e))?,
+                    link.base()
+                ).await.map_err(|e| LetsError::External(e))?;
             }
         }
 
         if response.status().is_success() {
-            let bytes = hyper_body::to_bytes(response.into_body()).await?;
-            Ok(<TangleMessage as BinaryPersist>::try_from_bytes(&bytes).unwrap())
+            let bytes = hyper_body::to_bytes(response.into_body()).await
+                .map_err(|_| LetsError::External(anyhow!("Error on reading hyper_body")))?;
+            let body = <TransportMessage as BinaryPersist>::try_from_bytes(&bytes)
+                .map_err(|e| LetsError::External(e))?;
+            Ok(LinkedMessage { link: link.clone(), body })
         } else {
-            err!(MapStreamsErrors::from_http_status_codes(response.status(), Some(link.to_string())))
+            Err(MapLetsError::from_http_status_codes(
+                response.status(),
+                Some(link.clone()),
+                Some("receive message via http".to_string())
+            ))
         }
     }
 }
@@ -326,47 +334,31 @@ impl CompressedStateSend for StreamsTransportSocket {
 }
 
 #[async_trait(?Send)]
-impl Transport<TangleAddress, TangleMessage> for StreamsTransportSocket
+impl<'a> Transport<'a> for StreamsTransportSocket
 {
-    async fn send_message(&mut self, msg: &TangleMessage) -> Result<()> {
+    type Msg = TransportMessage;
+    type SendResponse = ();
+
+    async fn send_message(&mut self, address: Address, msg: Self::Msg) -> LetsResult<Self::SendResponse> {
         println!("[StreamsTransportSocket.send_message] Sending message with {} bytes tangle-message-payload:\n{}\n",
-                 msg.body.as_bytes().len() as u32, msg.body.to_string());
-        self.send_message_via_http(msg).await
+                 trans_msg_len(&msg), trans_msg_encode(&msg));
+        self.send_message_via_http(&LinkedMessage{
+            link: address,
+            body: msg
+        }).await
     }
 
-    async fn recv_messages(&mut self, _link: &TangleAddress) -> Result<Vec<TangleMessage>> {
+    async fn recv_messages(&mut self, _address: Address) -> LetsResult<Vec<Self::Msg>> {
         unimplemented!()
     }
 
-    async fn recv_message(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
-        let ret_val = self.recv_message_via_http(link).await;
+    async fn recv_message(&mut self, address: Address) -> LetsResult<Self::Msg> {
+        let ret_val = self.recv_message_via_http(&address).await;
         match ret_val.as_ref() {
             Ok(msg) => println!("[StreamsTransportSocket.recv_message] Receiving message with {} bytes tangle-message-payload:\n{}\n",
-                                msg.body.as_bytes().len() as u32, msg.body.to_string()),
+                                msg.body_len(), msg.body_hex_encode()),
             _ => ()
         }
-        ret_val
+        ret_val.map(|linked_msg| linked_msg.body)
     }
-}
-
-#[async_trait(?Send)]
-impl TransportDetails<TangleAddress> for StreamsTransportSocket {
-    type Details = Details;
-    async fn get_link_details(&mut self, _link: &TangleAddress) -> Result<Self::Details> {
-        unimplemented!()
-    }
-}
-
-impl TransportOptions for StreamsTransportSocket {
-    type SendOptions = SendOptions;
-    fn get_send_options(&self) -> SendOptions {
-        self.tangle_client_options.clone()
-    }
-    fn set_send_options(&mut self, opt: SendOptions) {
-        self.tangle_client_options  = opt.clone()
-    }
-
-    type RecvOptions = ();
-    fn get_recv_options(&self) {}
-    fn set_recv_options(&mut self, _opt: ()) {}
 }

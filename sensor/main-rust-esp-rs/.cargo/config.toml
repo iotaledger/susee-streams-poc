@@ -4,30 +4,39 @@
 #target = "xtensa-esp32s2-espidf"
 #target = "xtensa-esp32s3-espidf"
 target = "riscv32imc-esp-espidf"
+#target = "riscv32imac-esp-espidf.json"
 
 [target.xtensa-esp32-espidf]
 linker = "ldproxy"
+# Uncomment for ESP-IDF 5 and later. Don't forget to also uncomment the `ESP_IDF_VERSION = "release/v5.0"`parameter in the `[env]` section below
+#rustflags = ["--cfg", "espidf_time64"]
 
 [target.xtensa-esp32s2-espidf]
 linker = "ldproxy"
+# Uncomment for ESP-IDF 5 and later. Don't forget to also uncomment the `ESP_IDF_VERSION = "release/v5.0"`parameter in the `[env]` section below
+#rustflags = ["--cfg", "espidf_time64"]
 
 [target.xtensa-esp32s3-espidf]
 linker = "ldproxy"
+# Uncomment for ESP-IDF 5 and later. Don't forget to also uncomment the `ESP_IDF_VERSION = "release/v5.0"`parameter in the `[env]` section below
+#rustflags = ["--cfg", "espidf_time64"]
 
 [target.riscv32imc-esp-espidf]
 linker = "ldproxy"
-
-# Future - necessary for the experimental "native build" of esp-idf-sys with ESP32C3
-# See also https://github.com/ivmarkov/embuild/issues/16
+# TODO: Is `["-C", "default-linker-libraries"]` still necessary? See https://github.com/ivmarkov/embuild/issues/16
+# Necessary for riscv MCUs; see also https://github.com/ivmarkov/embuild/issues/16
 rustflags = ["-C", "default-linker-libraries"]
 
-[unstable]
+[target.riscv32imac-esp-espidf]
+linker = "ldproxy"
+# Uncomment for ESP-IDF 5 and later. Don't forget to also uncomment the `ESP_IDF_VERSION = "release/v5.0"`parameter in the `[env]` section below
+#rustflags = ["--cfg", "espidf_time64"]
 
+[unstable]
 build-std = ["std", "panic_abort"]
-build-std-features = ["panic_immediate_abort"]
+build-std-features = ["panic_immediate_abort"] # Only necessary if building against ESP-IDF tag `v4.3.2` (the minimum supported version); using it reduces the binary size by ~ 10% to 20%
 
 [env]
-
 # The esp-idf-sys build features "native" and "std" are enabled per default so we don't need anything to do here
 
 # Use the latest esp-idf tag in the master branch. value = "master" would checkout the latest commit which would be more unstable

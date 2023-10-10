@@ -5,7 +5,7 @@ include(CMakePrintHelpers)
 # Here's a non-minimal, reasonable set of ESP-IDF components that one might want enabled for Rust:
 #    set(RUST_DEPS "pthread" "esp_http_client" "esp_http_server" "espcoredump" "app_update" "esp_serial_slave_link" "nvs_flash" "spi_flash" "esp_adc_cal" "mqtt")
 
-set(RUST_DEPS "pthread" "driver" "espcoredump" "fatfs" "nvs_flash" "vfs" "esp_wifi" "esp_netif" "lwip" "esp_http_client" "wear_levelling" "esp_event" "esp_websocket_client")
+set(RUST_DEPS "pthread" "driver" "espcoredump" "fatfs" "nvs_flash" "vfs" "esp_wifi" "esp_netif" "lwip" "esp_http_client" "wear_levelling" "esp_event" "esp_websocket_client" "wpa_supplicant")
 
 idf_component_register(
     SRCS "placeholder.c"
@@ -34,7 +34,7 @@ else()
 endif()
 
 # {% if std %}
-set(CARGO_BUILD_STD_ARG -Zbuild-std=std,panic_abort -Zbuild-std-features=panic_immediate_abort)
+set(CARGO_BUILD_STD_ARG -Zbuild-std=core,std,panic_abort -Zbuild-std-features=panic_immediate_abort)
 # {% else %}
 # set(CARGO_BUILD_STD_ARG -Zbuild-std=core,alloc,panic_abort -Zbuild-std-features=panic_immediate_abort)
 # {% endif %}

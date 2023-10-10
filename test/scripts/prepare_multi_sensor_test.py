@@ -1,6 +1,7 @@
 import shutil
 import os
 import subprocess
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -8,6 +9,8 @@ load_dotenv()
 number_of_sensors = int(os.getenv('NUMBER_OF_SENSORS'))
 rust_target_folder = os.getenv('RUST_TARGET_FOLDER')
 workspace_folder = os.getenv('WORKSPACE_FOLDER')
+iota_bridge_url = os.getenv('IOTA_BRIDGE_URL')
+node_host = os.getenv('NODE_HOST')
 
 compiled_sensor_src_path = rust_target_folder + r"/sensor"
 compiled_mng_console_src_path = rust_target_folder + r"/management-console"
@@ -25,5 +28,7 @@ for indx in range(0, number_of_sensors):
     shutil.copy(compiled_sensor_src_path, dst_path)
     print('--- Copied sensor ' + str(indx) + '.\n--- Starting sensor initialization.')
     print('-------------------------------------------------------------------------------------------------------')
-    subprocess.Popen("./management-console --init-sensor --iota-bridge-url \"http://127.0.0.1:50000\" >> prepare_multi_sensor_test.log", cwd=workspace_folder, shell=True)
-    subprocess.run("./sensor --act-as-remote-controlled-sensor --exit-after-successful-initialization > prepare_multi_sensor_test.log", cwd=dst_folder, shell=True)
+    subprocess.Popen("./management-console --init-sensor --iota-bridge-url " + iota_bridge_url + " --node " + node_host + ">> prepare_multi_sensor_test.log", cwd=workspace_folder, shell=True)
+    subprocess.run("./sensor --act-as-remote-controlled-sensor --exit-after-successful-initialization --iota-bridge-url " + iota_bridge_url + " > prepare_multi_sensor_test.log", cwd=dst_folder, shell=True)
+    print('--- Finished sensor initialization. Waiting 30 seconds for the last confirmation to be delivered by the iota-bridge')
+    time.sleep(30)

@@ -9,6 +9,7 @@ mod server_dispatch_lorawan_node;
 mod server_dispatch_lorawan_rest;
 mod server_process_finally;
 mod dispatch_scope;
+mod fifo_queue;
 
 pub use {
     iota_bridge::{

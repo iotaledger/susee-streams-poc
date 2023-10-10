@@ -7,9 +7,7 @@ use hyper::{
 };
 
 use embedded_svc::{
-    io::Read,
     http::{
-        Status,
         Headers,
         client::{
             Client as HttpClient,
@@ -53,7 +51,7 @@ use crate::{
         }
     }
 };
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 pub struct CommandFetcherSocketOptions<'a> {
     pub(crate) http_url: &'a str,

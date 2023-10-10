@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use rand::Rng;
 use anyhow::Result;
-use iota_streams::app::transport::tangle::TangleAddress;
+use streams::Address;
 
 pub fn create_psk_seed() -> [u8; 32] {
     rand::thread_rng().gen::<[u8; 32]>()
@@ -17,8 +17,12 @@ pub fn get_channel_id_from_link(streams_link: &str) -> Option<String> {
     ret_val
 }
 
-pub fn get_tangle_address_from_strings(channel_id: &str, message_id: &str) -> Result<TangleAddress> {
-    TangleAddress::from_str(format!("{}:{}", channel_id, message_id).as_str())
+pub fn get_tangle_address_from_strings(channel_id: &str, message_id: &str) -> lets::error::Result<Address> {
+    Address::from_str(format!("{}:{}", channel_id, message_id).as_str())
+}
+
+pub fn get_iota_node_url(iota_node: &str) -> String {
+    format!("https://{}", iota_node)
 }
 
 // -------------------------------------------------------------------------------------

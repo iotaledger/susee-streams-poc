@@ -4,7 +4,7 @@ use streams_tools::binary_persist::{
     BinaryPersist
 };
 
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 use hyper::{
     Body as HyperBody,

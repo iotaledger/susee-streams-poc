@@ -5,7 +5,6 @@ use embedded_svc::{
     },
     http::{
         Method,
-        Status,
         client::{
             Client,
             Request,

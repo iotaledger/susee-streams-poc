@@ -16,11 +16,11 @@ anyhow = "1.0.40"
 tokio = {version = "1.5"}
 env_logger = "0.9"
 
-[dependencies.iota-streams]
+[dependencies.streams]
 git = "https://github.com/chrisgitiota/streams"
-branch="v1"
+branch="stardust-iota-sdk"
 default-features = false
-features = ["std", "tangle", "client"]
+features = ["tangle-client"]
 
 [dependencies.clap]
 version = "3.0.14"

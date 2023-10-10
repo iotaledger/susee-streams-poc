@@ -1,39 +1,51 @@
-use iota_streams::{
-    app::transport::{
-        Transport,
-        TransportDetails,
-        TransportOptions,
-        tangle::{
-            TangleAddress,
-            TangleMessage,
-            client::{
-                Client,
-                Details,
-                SendOptions,
-            }
-        },
-    },
-    core::{
-        async_trait,
-        Result,
-    },
-};
-
-use crate::compressed_state::{CompressedStateListen, CompressedStateSend};
-
 use std::rc::Rc;
 
-#[derive(Clone)]
-pub struct StreamsTransportCapture(pub Client);
+use async_trait::async_trait;
+
+use anyhow::Result as AnyResult;
+
+use streams::{
+    Address,
+    transport::Transport,
+};
+
+use lets::{
+    error::Result,
+    message::TransportMessage,
+    transport::tangle::{
+        Client,
+    },
+};
+use crate::{
+    binary_persist::{
+        trans_msg_encode,
+        trans_msg_len
+    },
+    compressed_state::{
+        CompressedStateListen,
+        CompressedStateSend
+    },
+    user_manager::message_indexer::{
+        MessageIndexer,
+        MessageIndexerOptions,
+    },
+    helpers::get_iota_node_url,
+};
+
+pub struct StreamsTransportCapture(pub Client<MessageIndexer>);
 
 impl StreamsTransportCapture {
-    pub fn new_from_url(url: &str) -> Self {
-        Self(Client::new_from_url(url))
+    pub async fn new_from_url(iota_node: &str) -> Self {
+        let indexer = MessageIndexer::new(MessageIndexerOptions::new(iota_node.to_string()));
+        Self(Client::for_node(
+            &get_iota_node_url(iota_node),
+            indexer
+        ).await.expect("Error on creating Client"))
     }
 }
 
 impl CompressedStateSend for StreamsTransportCapture {
-    fn subscribe_listener(&mut self, _listener: Rc<dyn CompressedStateListen>) -> Result<usize> {
+    fn subscribe_listener(&mut self, _listener: Rc<dyn CompressedStateListen>) -> AnyResult<usize> {
         unimplemented!()
     }
 
@@ -47,56 +59,28 @@ impl CompressedStateSend for StreamsTransportCapture {
 }
 
 #[async_trait(?Send)]
-impl Transport<TangleAddress, TangleMessage> for StreamsTransportCapture
+impl<'a> Transport<'a> for StreamsTransportCapture
 {
+    type Msg = TransportMessage;
+    type SendResponse = TransportMessage;
+
     /// Send a Streams message over the Tangle with the current timestamp and default SendOptions.
-    async fn send_message(&mut self, msg: &TangleMessage) -> Result<()> {
-        println!("\n[StreamsTransportCapture.send_message] Sending message with {} bytes payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string());
-        self.0.send_message(msg).await
+    async fn send_message(&mut self, address: Address, msg: Self::Msg) -> Result<Self::SendResponse> {
+        println!("\n[StreamsTransportCapture.send_message] Sending message with {} bytes payload:\n{}\n", trans_msg_len(&msg), trans_msg_encode(&msg));
+        self.0.send_message(address, msg).await
     }
 
     /// Receive a message.
-    async fn recv_messages(&mut self, link: &TangleAddress) -> Result<Vec<TangleMessage>> {
-        let ret_val = self.0.recv_messages(link).await;
+    async fn recv_messages(&mut self, address: Address) -> Result<Vec<Self::Msg>> {
+        let ret_val = self.0.recv_messages(address).await;
         match ret_val.as_ref() {
             Ok(msg_vec) => {
                 for (idx, msg) in msg_vec.iter().enumerate() {
-                    println!("[StreamsTransportCapture.recv_messages] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, msg.body.as_bytes().len(), msg.body.to_string())
+                    println!("[StreamsTransportCapture.recv_messages] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, trans_msg_len(&msg), trans_msg_encode(&msg))
                 }
             },
             _ => ()
         }
         ret_val
     }
-
-    async fn recv_message(&mut self, link: &TangleAddress) -> Result<TangleMessage> {
-        let ret_val = self.0.recv_message(link).await;
-        match ret_val.as_ref() {
-            Ok(msg) => println!("[StreamsTransportCapture.recv_message] Receiving message with {} bytes payload:\n{}\n", msg.body.as_bytes().len(), msg.body.to_string()),
-            _ => ()
-        }
-        ret_val
-    }
-}
-
-#[async_trait(?Send)]
-impl TransportDetails<TangleAddress> for StreamsTransportCapture {
-    type Details = Details;
-    async fn get_link_details(&mut self, link: &TangleAddress) -> Result<Self::Details> {
-        self.0.get_link_details(link).await
-    }
-}
-
-impl TransportOptions for StreamsTransportCapture {
-    type SendOptions = SendOptions;
-    fn get_send_options(&self) -> SendOptions {
-        self.0.get_send_options()
-    }
-    fn set_send_options(&mut self, opt: SendOptions) {
-        self.0.set_send_options(opt)
-    }
-
-    type RecvOptions = ();
-    fn get_recv_options(&self) {}
-    fn set_recv_options(&mut self, _opt: ()) {}
 }

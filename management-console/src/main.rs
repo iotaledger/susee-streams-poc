@@ -3,11 +3,15 @@ use core::str::FromStr;
 use anyhow::{
     Result,
     bail,
+    anyhow
 };
 
-use iota_streams::{
-    app_channels::api::tangle::Address,
-    core::prelude::hex,
+use streams::{
+    Address,
+};
+use streams::id::{
+    PermissionDuration,
+    Permissioned
 };
 
 use streams_tools::{
@@ -39,7 +43,9 @@ use streams_tools::{
 use susee_tools::{
     SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC,
     SUSEE_CONST_SECRET_PASSWORD,
-    get_wallet_filename
+    get_wallet_filename,
+    assert_data_dir_existence,
+    get_data_folder_file_path,
 };
 
 use cli::{
@@ -78,6 +84,7 @@ fn get_management_console_wallet_filename<'a>(cli: &ManagementConsoleCli<'a>) ->
     get_wallet_filename(
         &cli.matches,
         cli.arg_keys.base.wallet_file,
+        &cli.data_dir,
         "wallet-management-console.txt",
     )
 }
@@ -85,7 +92,7 @@ fn get_management_console_wallet_filename<'a>(cli: &ManagementConsoleCli<'a>) ->
 fn get_multi_channel_manager_options<'a>(cli: &ManagementConsoleCli<'a>) -> Result<MultiChannelManagerOptions> {
     let wallet_filename= get_management_console_wallet_filename(cli)?;
     Ok(MultiChannelManagerOptions{
-        iota_node_url: cli.node.to_string(),
+        iota_node: cli.node.to_string(),
         wallet_filename,
         streams_user_serialization_password: SUSEE_CONST_SECRET_PASSWORD.to_string()
     })
@@ -108,10 +115,10 @@ fn println_announcement_link(link: &Address, comment: &str) {
     println!(
         "[Management Console] {}:
                      Announcement Link: {}
-                          Tangle Index: {:#}\n",
+                          Tangle Index: {:#?}\n",
         comment,
         link.to_string(),
-        link.to_msg_index()
+        hex::encode(link.to_msg_index())
     );
 }
 
@@ -124,14 +131,14 @@ async fn create_channel(channel_manager: &mut ChannelManagerPlainTextWallet) -> 
 async fn println_channel_status<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>)
 {
     let mut channel_exists = false;
-    if let Some(author) = &channel_manager.author {
+    if let Some(author) = &channel_manager.user {
         let starts_with = cli.matches.value_of(cli.arg_keys.channel_starts_with).expect(
             format!("Error on fetching value from cli.matches for {}", cli.arg_keys.channel_starts_with).as_str()
         );
-        match author.announcement_link() {
+        match author.stream_address() {
             Some(link) => {
                 println_announcement_link(
-                    link,
+                    &link,
                     format!("Channel details for channel ID starting with '{}'", starts_with).as_str()
                 );
                 channel_exists = true
@@ -199,19 +206,19 @@ async fn send_keyload_message_cli<'a> (channel_manager: &mut ChannelManagerPlain
 
 async fn send_keyload_message<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, sub_msg_link_string: &str, pub_key_str: &str) -> Result<Address>
 {
-    let subscription_msg_link = Address::from_str(sub_msg_link_string)?;
+    let subscription_msg_link = Address::from_str(sub_msg_link_string).map_err(|e|anyhow!(e))?;
     let pub_key = hex::decode(pub_key_str).unwrap();
     let keyload_msg_link = channel_manager.add_subscribers(&vec![ SubscriberData {
         subscription_link: & subscription_msg_link,
-        public_key: pub_key.as_slice()
+        permissioned_public_key: Permissioned::ReadWrite(pub_key.as_slice(), PermissionDuration::Perpetual)
     }]).await?;
 
     println!(
         "\
 [Management Console] A keyload message has been created with the following keyload link:
                      Keyload link: {}
-                     Tangle Index: {:#}
-", keyload_msg_link.to_string(), keyload_msg_link.to_msg_index()
+                     Tangle Index: {:#?}
+", keyload_msg_link.to_string(), hex::encode(keyload_msg_link.to_msg_index())
     );
 
     Ok(keyload_msg_link)
@@ -226,12 +233,13 @@ async fn main() -> Result<()> {
     env_logger::init();
     let matches_and_options = get_arg_matches();
     let cli = ManagementConsoleCli::new(&matches_and_options, &ARG_KEYS) ;
+    assert_data_dir_existence(&cli.data_dir)?;
 
     println!("[Management Console] Using node '{}' for tangle connection", cli.node);
 
 
     let db_connection_opt = DbFileBasedDaoManagerOptions {
-        file_path_and_name: DB_FILE_PATH_AND_NAME.to_string()
+        file_path_and_name: get_data_folder_file_path(&cli.data_dir, DB_FILE_PATH_AND_NAME)
     };
     let mut user_store = UserDataStore::new(db_connection_opt);
 
@@ -253,7 +261,7 @@ async fn main() -> Result<()> {
         run_explorer_api_server(
             user_store,
             ExplorerOptions {
-                iota_node_url: cli.node.to_string(),
+                iota_node: cli.node.to_string(),
                 wallet_filename: get_management_console_wallet_filename(&cli)?,
                 db_file_name: DB_FILE_PATH_AND_NAME.to_string(),
                 listener_ip_address_port: message_explorer_listener_address.to_string(),

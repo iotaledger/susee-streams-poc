@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use hyper::{
     Body,
     http::{
@@ -42,8 +44,10 @@ use super::{
     }
 };
 
-use crate::binary_persist::binary_persist_iota_bridge_req::IotaBridgeResponseParts;
-use std::rc::Rc;
+use crate::{
+    binary_persist::binary_persist_iota_bridge_req::IotaBridgeResponseParts,
+    println_esp_compat,
+};
 
 pub struct NormalDispatchCallbacks<'a, Scope, Streams, Command, Confirm, LorawanNode, Finally>
     where
@@ -118,7 +122,7 @@ async fn dispatch_lorawan_rest_request<'a, Scope, Streams, Command, Confirm, Lor
                     log::debug!("[dispatch_lorawan_rest_request] Processing DeserializedLorawanRest now");
                     let response = normal_callbacks.dispatch(&req_parts_inner).await?;
                     let response_parts = IotaBridgeResponseParts::from_hyper_response(response).await;
-                    println!("[dispatch_lorawan_rest_request] Returning response for dev_eui '{}'\n{}", req_parts_inner.dev_eui, response_parts);
+                    println_esp_compat!("[dispatch_lorawan_rest_request] Returning response for dev_eui '{}'\n{}", req_parts_inner.dev_eui, response_parts);
                     response_parts.persist_to_hyper_response_200()
                 }
                 DispatchedRequestStatus::LorawanRest404 => {

@@ -252,3 +252,49 @@ If you want to build the image for a specific application yourself, this can be 
 Please replace the --target and --tag value ('iota-bridge' in the example above) with the application name of your choice
 ('iota-bridge', 'sensor', 'management-console' or 'app-srv-connector-mock'). If no target is specified the default image 'iota-bridge'
 will be built.
+
+If you want to build images and provide them on [Docker Hub](https://hub.docker.com/) just follow these steps:
+```bash
+  # In the root folder of the repository:
+  > docker build --target iota-bridge --tag <docker-hub-account-name-goes-here>/iota-bridge -f docker/Dockerfile .
+  > docker login
+  > docker push <docker-hub-account-name-goes-here>/iota-bridge:latest
+```
+
+
+## Start IOTA Bridge and AppServer Connector Mockup Tool as public available service
+
+The following installation steps have been tested with Ubuntu 22.04.
+
+The docker-compose.yml file expects an iota node to be run on the same
+host system and to be available via a static ip address or domain name.
+
+Prepare the server host system:
+```bash
+  # In the home folder of a sudo privileged user on the server system 
+  > sudo ufw allow 50000,50001,50002/tcp
+  > mkdir susee-poc
+  > cd susee-poc
+```
+
+Upload some resources needed for the installation process to the server host system
+(please replace username `<USER>` and domain name `<SERVER_HOST>` with their actual values):
+```bash
+  # In the folder where this README.md is located (docker folder)
+  > scp server-install-resources/* <USER>@<SERVER_HOST>:~/susee-poc
+```
+
+On the server host system, please edit the file `~/susee-poc/env.example`
+using an editor of you choice and set the static ip address resp. domain name
+value for the `NODE_HOST` variable.
+```bash
+  # In the susee-poc folder we created above 
+  > nano env.example
+  
+  # After env.example has been stored
+  # Te .env file will be created by the following script execution
+  > sudo ./prepare_docker.sh
+  
+    # We are now ready to start the susee-poc services as in the background
+  > docker compose up -d
+```

@@ -54,7 +54,7 @@ use hyper::{
     http::Request,
 };
 
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 use rand::Rng;
 
@@ -64,6 +64,7 @@ fn get_wallet(cli: &SensorCli) -> Result<PlainTextWallet> {
     let wallet_filename = get_wallet_filename(
         &cli.matches,
         cli.arg_keys.base.wallet_file,
+        &cli.data_dir,
         "wallet-sensor.txt",
     )?;
 

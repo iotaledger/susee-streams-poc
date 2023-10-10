@@ -1,18 +1,3 @@
-use anyhow::Result;
-
-use crate::{
-    http::http_protocol_confirm::RequestBuilderConfirm,
-    binary_persist::{
-        Command,
-        SubscribeToAnnouncement,
-        BinaryPersist,
-        StartSendingMessages,
-        RegisterKeyloadMessage
-    }
-};
-
-use iota_streams::core::async_trait;
-
 use std::{
     time::Duration,
     thread,
@@ -27,6 +12,21 @@ use hyper::{
     http::Request
 };
 
+use anyhow::Result;
+
+use async_trait::async_trait;
+
+use crate::{
+    http::http_protocol_confirm::RequestBuilderConfirm,
+    binary_persist::{
+        Command,
+        SubscribeToAnnouncement,
+        BinaryPersist,
+        StartSendingMessages,
+        RegisterKeyloadMessage
+    },
+    println_esp_compat
+};
 
 pub struct CommandFetchLoopOptions {
     pub confirm_fetch_wait_sec: u32,
@@ -54,10 +54,10 @@ pub async fn run_command_fetch_loop(command_processor: impl CommandProcessor, op
         if let Ok((command, buffer)) = command_processor.fetch_next_command().await {
             match command {
                 Command::NO_COMMAND => {
-                    println!("Received Command::NO_COMMAND    ");
+                    println_esp_compat!("Received Command::NO_COMMAND    ");
                 },
                 Command::STOP_FETCHING_COMMANDS => {
-                    println!("Received Command::STOP_FETCHING_COMMANDS - Will exit command fetch loop.");
+                    println_esp_compat!("Received Command::STOP_FETCHING_COMMANDS - Will exit command fetch loop.");
                     return Ok(());
                 },
                 _ => {

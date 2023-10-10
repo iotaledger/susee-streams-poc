@@ -1,5 +1,71 @@
 # SUSEE Streams POC
 
+      ===========================================================================
+      ===                                                                     ===
+      ===                         IMPORTANT NOTE                              ===
+      ===                                                                     ===
+      === On 4th of October the IOTA mainnet has been updated to the Stardust ===
+      === version of the IOTA protocol. The applications and libraries        ===
+      === provided on the 'main' branch of this repository can not be used    ===
+      === after the Stardust update.                                          ===
+      ===                                                                     ===
+      === The 'stardust' branch of this repository includes all needed        ===
+      === resources to use the SUSEE POC applications and libraries together  ===
+      === with IOTA Stardust.                                                 ===
+      ===                                                                     ===
+      === This is the current status of IOTA Stardust integration for the     ===
+      === SUSEE POC applications:                                             ===
+      ===                                                                     ===
+      === * All resources can be used with Stardust. See folder               ===
+      ===   'inx-collector' for more details.                                 ===
+      === * A VPS for test purposes has been setup:                           ===
+      ===   - domain name: v86582.1blu.de                                     ===
+      ===   - services:                                                       ===
+      ===      - hornet                                                       ===
+      ===        - API: https://v86582.1blu.de/api/routes                     ===
+      ===        - Autopeering :14626/udp                                     ===
+      ===        - Gossip :15600/tcp                                          ===
+      ===      - hornet-dashboard (https://v86582.1blu.de/dashboard/)         ===
+      ===      - grafana (https://v86582.1blu.de/grafana)                     ===
+      ===      - inx-collector (:9030)                                        ===
+      ===      - iota-bridge (:50000)                                         ===
+      ===      - app-srv-connector-mock (:50001)                              ===
+      ===      - management-console, message explorer (:50002)                ===
+      ===                                                                     ===
+      === * TODO: Finish Documentation:                                       ===
+      ===   * Streams-collector section in main readme                        ===
+      ===   * Test/scripts folder: Update all scripts                         ===
+      ===   * Test folder: Update all command line expressions                ===
+      ===   * Test folder: Add a "Start your private tangle" hint to all      ===
+      ===                  test descriptions                                  === 
+      ===   * Test folder: Streams-collector section in main readme           ===
+      ===   * Sensor folder: Mention Streams-collector in readme              ===
+      ===   * streams-poc-lib folder: Mention Streams-collector in readme     ===
+      ===   * main-streams-poc-lib-pio folder:                                ===
+      ===     Mention Streams-collector in readme                             ===
+      ===   * Sensor folder: Mention Streams-collector in main readme         ===
+      === * Secure the inx-collector rest API (remove all put/insert          ===
+      ===   endpoints)                                                        ===
+      ===   * Option 1 (easy): Remove the routes by commenting out the code   ===
+      ===   * Option 2: https://www.nerdieworks.nl/posts/client-certificate-authentication-with-traefik/
+      === * Perform load test for IOTA Bridge simulating 250 Sensors          ===
+      ===   sending messages with 5 minute interval                           ===
+      === * IOTA Bridge log time stamps                                       ===
+      === * IOTA Bridge Multithread                                           ===
+      === * Message Explorer:                                                 ===
+      ===   * Fix bug on client syncing                                       ===
+      ===   * new function recover existing accounts: Preserve seed but       ===
+      ===     resync all messages. User::builder() instead of                 ===
+      ===     User::::restore()(Streams repository - basic.rs example,        ===
+      ===     line 390).                                                      ===
+      ===   * Use minio instead of SQLite because SQLite is not               ===
+      ===     usuable for mutithreading.                                      ===
+      ===========================================================================
+
+      References:
+      * https://blog.iota.org/iota-stardust-upgrade/
+      * https://blog.iota.org/stardust-upgrade-iota-tokenomics/
+
 ## About
 This project contains five test applications providing command line interfaces (CLI) to evaluate the *IOTA Streams*
 functionality that is used in the SUSEE project. Additionally, the static library *streams-poc-lib* provides C bindings
@@ -141,6 +207,17 @@ as these applications do not need a wallet:
               A new seed is created and written into a new file
               'wallet-<APPLICATION-NAME>.txt'.
 
+Additionally, *IOTA-Bridge* and *Management Console* provide an option to control
+the location of stored data:
+
+    -d, --data-dir <DATA_DIR>
+            The folder where all data files are stored.
+            This also applies for the location of the default wallet file
+            (if --wallet-file argument is not used).
+            Examples:
+                --data-dir="my_data/timestamp"
+                --data-dir="/home/admin/a_folder"
+             [default: ./data/management-console]
 
 #### Application specific CLIs
 

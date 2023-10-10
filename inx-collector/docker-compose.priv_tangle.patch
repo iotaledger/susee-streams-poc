@@ -1,0 +1,57 @@
+2,3d1
+< volumes:
+<   minio_storage:
+5,57d2
+<   minio:
+<     container_name: minio
+<     image: minio/minio
+<     stop_grace_period: 5m
+<     volumes:
+<       - minio_storage:/data
+<     networks:
+<       peering_net:
+<         ipv4_address: 172.18.211.41
+<     environment:
+<       MINIO_ROOT_USER: your_access_id
+<       MINIO_ROOT_PASSWORD: your_password
+<     command: server --console-address ":9001" /data
+<     ports:
+<       - 9001:9001/tcp
+<       - 9000:9000/tcp
+<     profiles:
+<       - 2-nodes
+<       - 3-nodes
+<       - 4-nodes
+<   inx-collector:
+<     container_name: inx-collector
+<     image: chrisgerritsma/streams-collector:latest
+<     stop_grace_period: 5m
+<     restart: unless-stopped
+<     ports:
+<       - 9030:9030/tcp
+<     depends_on:
+<       hornet-1:
+<         condition: service_healthy
+<       minio:
+<         condition: service_started
+<     networks:
+<       peering_net:
+<         ipv4_address: 172.18.211.40
+<     command:
+<       - "--inx.address=hornet-1:9029"
+<       - "--restAPI.bindAddress=inx-collector:9030"
+<       - "--storage.endpoint=${STORAGE_ENDPOINT:-minio:9000}"
+<       - "--storage.accessKeyID=${STORAGE_ACCESS_ID:-your_access_id}"
+<       - "--storage.secretAccessKey=${STORAGE_SECRET_KEY:-your_password}"
+<       - "--storage.region=${STORAGE_REGION:-eu-south-1}"
+<       - "--storage.objectExtension=${STORAGE_EXTENSION:-}"
+<       - "--storage.secure=${STORAGE_SECURE:-false}"
+<       - "--storage.defaultBucketName=${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default}"
+<       - "--storage.defaultBucketExpirationDays=${STORAGE_DEFAULT_EXPIRATION:-30}"
+<       - "--listener.filters={\"filters\": [{\"tag\":\"susee-\", \"tagIsPrefix\": true}]}"
+<       - "--POI.hostUrl=${POI_URL:-http://inx-poi:9687}"
+<       - "--POI.isPlugin=${POI_PLUGIN:-true}"
+<     profiles:
+<       - 2-nodes
+<       - 3-nodes
+<       - 4-nodes

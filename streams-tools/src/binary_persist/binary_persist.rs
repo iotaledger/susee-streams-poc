@@ -14,6 +14,8 @@ use anyhow::{
 };
 use std::fmt::Debug;
 
+pub type Bytes = Vec<u8>;
+
 pub trait RangeIterator<Idx> {
     fn new(first_length: Idx) -> Self;
     fn increment(&mut self, next_length: Idx);

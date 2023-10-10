@@ -1,0 +1,10 @@
+74,82d73
+< 
+< ##################################################################
+< #  Minio                                                         #
+< ##################################################################
+< 
+<   minio:
+<     labels:
+<       - "traefik.http.routers.minio.entrypoints=websecure"
+<       - "traefik.http.routers.minio.tls=true"

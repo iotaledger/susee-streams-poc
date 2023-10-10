@@ -1,0 +1,73 @@
+version: '3.4'
+services:
+
+##################################################################
+#  AppServer Connector Mockup Tool                               #
+##################################################################
+
+  # The app-srv-connector-mock can be accessed via
+  #  * localhost:50001
+  #  #  * port 50001 of the external ip address of the docker host
+  #  #  * app-srv-connector-mock:50001 from within other docker containers
+  app-srv-connector-mock:
+    image: chrisgerritsma/app-srv-connector-mock:latest
+    ports:
+      - "50001:50001"
+    restart: unless-stopped
+    depends_on:
+      iota-bridge:
+        condition: service_started
+    command:
+      - "--iota-bridge-url=http://iota-bridge:50000"
+      - "--listener-ip-address=0.0.0.0:50001"
+
+##################################################################
+#  Management Console                                            #
+##################################################################
+
+# Uncommenting the following lines will enable a management-console
+# message explorer service.
+# As the Sensor initialization is done using a local
+# management-console instance, the locally created SQlite DB
+# (user-states-management-console.sqlite3) needs to be
+# uploaded to the data folder of the NODE_HOST before the
+# following lines can be uncommented.
+
+# TODO: Implement a REST API to initialize sensors:
+#       * Authorized access and https
+#         * https://doc.traefik.io/traefik/migration/v1-to-v2/#strip-and-rewrite-path-prefixes
+#         * https://www.nerdieworks.nl/posts/client-certificate-authentication-with-traefik/
+#       * Rename "message-explorer" to "rest-api"
+#         and run message-explorer as a 'module'
+
+#  # The management-console is started to run message explorer.
+#  # See the README.md file for further details.
+#  management-console:
+#    image: chrisgerritsma/management-console:latest
+#    volumes:
+#      - ./data/management-console:/app/data/management-console
+#    ports:
+#      - "50002:50002"
+#    restart: unless-stopped
+#    command:
+#      - "--node=${NODE_HOST:-localhost}"
+#      - "--run-explorer-api-server=0.0.0.0:50002"
+
+##################################################################
+#  IOTA-Bridge                                                   #
+##################################################################
+
+  # The iota-bridge can be accessed via
+  #  * localhost:50000
+  #  * port 50000 of the external ip address of the docker host
+  #  * iota-bridge:50000 from within other docker containers
+  iota-bridge:
+    image: chrisgerritsma/iota-bridge:latest
+    volumes:
+      - ./data/iota-bridge:/app/data/iota-bridge
+    ports:
+      - "50000:50000"
+    restart: unless-stopped
+    command:
+      - "--node=${NODE_HOST:-localhost}"
+      - "--listener-ip-address=0.0.0.0:50000"

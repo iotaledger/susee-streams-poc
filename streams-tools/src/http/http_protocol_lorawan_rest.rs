@@ -14,7 +14,7 @@ use hyper::{
         Method,
     }
 };
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 pub struct EndpointUris {}
 

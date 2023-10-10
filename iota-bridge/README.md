@@ -30,20 +30,24 @@ the *IOTA-Bridge* offers the following CLI arguments.
     -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
             IP address and port to listen to.
             Example: listener-ip-address="192.168.47.11:50000"
-            
 
     -n, --node <NODE_URL>
-            The url of the iota node to connect to.
-            Use 'https://chrysalis-nodes.iota.org' for the mainnet.
+            The IP or domain name of the iota node to connect to.
+            As you need to provide also a streams inx-collector service instance,
+            set this value to the domain name or static ip address of the host system
+            that runs the inx-collector and the Hornet node.
+            See folder 'inx-collector' for more details.
             
-            As there are several testnets have a look at
-                https://wiki.iota.org/learn/networks/testnets
-            for alternative testnet urls.
+            The Hornet node and inx-collector API will be accessed using their
+            standard ports (14265 and 9030) automatically.
             
-            Example:
-                The iota chrysalis devnet:
-                https://api.lb-0.h.chrysalis-devnet.iota.cafe
-             [default: https://chrysalis-nodes.iota.org]
+            The default settings will connect to the private tangle that can be run
+            for development purposes (see folder 'inx-collector' for more details).
+            
+            Examples:
+                --node="195.90.200.153"
+                -n="example.com"
+             [default: 127.0.0.1]
             
 ## IOTA Bridge REST API
 

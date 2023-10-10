@@ -62,7 +62,7 @@ fn init_tracing() {
 }
 
 pub struct ExplorerOptions {
-    pub iota_node_url: String,
+    pub iota_node: String,
     pub wallet_filename: String,
     pub db_file_name: String,
     pub listener_ip_address_port: String,
@@ -72,7 +72,7 @@ pub struct ExplorerOptions {
 impl From<ExplorerOptions> for MessagesState {
     fn from(value: ExplorerOptions) -> Self {
         MessagesState{
-            iota_node_url: value.iota_node_url,
+            iota_node_url: value.iota_node,
             wallet_filename: value.wallet_filename,
             db_file_name: value.db_file_name,
             streams_user_serialization_password: value.streams_user_serialization_password,

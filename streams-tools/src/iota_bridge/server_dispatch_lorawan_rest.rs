@@ -28,7 +28,7 @@ use super::helpers::{
     write_to_scope,
 };
 
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 #[derive(Clone)]
 pub struct DispatchLorawanRest {

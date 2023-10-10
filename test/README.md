@@ -136,11 +136,11 @@ Please have a look at the `Test CONFIG` section of the
 [streams-poc-lib README](../sensor/streams-poc-lib/README.md) for more details.
 
 When the streams-poc-lib test application has been
-[build and flahed](../sensor/streams-poc-lib/README.md#build) and the
+[build and flashed](../sensor/streams-poc-lib/README.md#build) and the
 `idf.py` CLI is available, follow these steps to automatically initialize a
 *streams-poc-lib test application sensor*:
 
-* Depending on state of the *Sensor* one of the following steps is needed to 
+* Depending on the state of the *Sensor* one of the following steps is needed to 
   properly manage the initialization status:
   * If the device has never been initialized: Move on to "Start the *IOTA Bridge*",
     to do a *Sensor* initialization.

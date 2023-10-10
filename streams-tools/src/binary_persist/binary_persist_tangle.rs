@@ -1,21 +1,18 @@
-use iota_streams::app::{
-    transport::tangle::{
-        TangleMessage,
-        TangleAddress,
+use std::convert::{TryInto};
+
+use streams::{
+    Address,
+};
+
+use lets::{
+    message::TransportMessage,
+    address::{
         MsgId,
-        AppInst,
-        APPINST_SIZE,
-        MSGID_SIZE,
-    },
-    message::{
-        LinkedMessage,
-        HasLink,
-        BinaryBody
+        AppAddr,
     }
 };
 
 use std::{
-    convert::TryInto,
     ops::Range,
     str::{
         FromStr
@@ -26,12 +23,15 @@ use std::{
         Formatter
     }
 };
+use std::fmt::Display;
 
 use anyhow::{
     Result,
     Error,
     bail,
+    anyhow
 };
+
 use log;
 
 use crate::binary_persist::{
@@ -42,102 +42,179 @@ use crate::binary_persist::{
     deserialize_string,
 };
 
-pub static TANGLE_ADDRESS_BYTE_LEN: usize = APPINST_SIZE + MSGID_SIZE;
+pub const APPADDR_SIZE: usize = 40;
+pub const MSGID_SIZE: usize = 12;
+pub const TANGLE_ADDRESS_BYTE_LEN: usize = APPADDR_SIZE + MSGID_SIZE;
 
-impl BinaryPersist for TangleAddress {
-    fn needed_size(&self) -> usize { TANGLE_ADDRESS_BYTE_LEN }
+pub fn as_app_addr(buffer: &[u8]) -> AppAddr {
+    let bytes: [u8; APPADDR_SIZE] = buffer[0..APPADDR_SIZE].try_into().expect("slice with incorrect length for AppAddr");
+    AppAddr::from(bytes)
+}
 
-    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
-        let needed_size = HasLink::to_bytes(self).len();
-        buffer[0..needed_size].copy_from_slice(HasLink::to_bytes(self).as_slice());
-        Ok(needed_size)
+pub fn as_msg_id(buffer: &[u8]) -> MsgId {
+    let bytes: [u8; MSGID_SIZE] = buffer[0..MSGID_SIZE].try_into().expect("slice with incorrect length for MsgId");
+    MsgId::from(bytes)
+}
+
+impl BinaryPersist for AppAddr {
+    fn needed_size(&self) -> usize {
+        APPADDR_SIZE
     }
 
-    fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
-        <TangleAddress as HasLink>::try_from_bytes(
-            buffer[0..TANGLE_ADDRESS_BYTE_LEN].try_into().expect("slice with incorrect length")
-        )
+    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
+        if buffer.len() < self.needed_size() {
+            panic!("[BinarySerialize  for AppAddr] This AppAddr needs {} bytes but \
+                    the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
+        }
+        buffer[0..self.needed_size()].copy_from_slice(self.as_bytes());
+        Ok(self.needed_size())
+    }
+
+    fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized {
+        Ok(as_app_addr(buffer))
     }
 }
 
-impl BinaryPersist for BinaryBody {
+impl BinaryPersist for MsgId {
     fn needed_size(&self) -> usize {
-        USIZE_LEN + self.as_bytes().len() // 4 bytes for length + binary data of that length
+        MSGID_SIZE
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
-        let needed_size: u32 = self.as_bytes().len() as u32;
+        if buffer.len() < self.needed_size() {
+            panic!("[BinarySerialize  for MsgId] This MsgId needs {} bytes but \
+                    the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
+        }
+        buffer[0..self.needed_size()].copy_from_slice(self.as_bytes());
+        Ok(self.needed_size())
+    }
+
+    fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized {
+        Ok(as_msg_id(buffer))
+    }
+}
+
+impl BinaryPersist for Address {
+    fn needed_size(&self) -> usize { APPADDR_SIZE + MSGID_SIZE }
+
+    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
+        if buffer.len() < self.needed_size() {
+            panic!("[BinarySerialize  for Address] This Address needs {} bytes but \
+                    the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
+        }
+        let mut range: Range<usize> = RangeIterator::new(self.base().needed_size());
+        self.base().to_bytes(&mut buffer[range.clone()]).expect("Serializing appaddr failed");
+        range.increment(self.relative().needed_size());
+        self.relative().to_bytes(&mut buffer[range.clone()]).expect("Serializing msgid failed");
+
+        Ok(self.needed_size())
+    }
+
+    fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
+        let mut range: Range<usize> = RangeIterator::new(APPADDR_SIZE);
+        let appaddr = AppAddr::try_from_bytes(&buffer[range.clone()]).expect("deserialize appaddr failed");
+        range.increment(MSGID_SIZE);
+        let msgid = MsgId::try_from_bytes(&buffer[range.clone()]).expect("deserialize msgid failed");
+        Ok(Address::new(appaddr, msgid))
+    }
+}
+
+impl BinaryPersist for TransportMessage {
+    fn needed_size(&self) -> usize {
+        self.body().len() + USIZE_LEN
+    }
+
+    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
+        if buffer.len() < self.needed_size() {
+            panic!("[BinarySerialize  for TransportMessage] This TransportMessage needs {} bytes but \
+                    the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
+        }
+        // BODY LENGTH
+        let body_size = self.body().len() as u32;
         let mut range: Range<usize> = RangeIterator::new(USIZE_LEN);
-        BinaryPersist::to_bytes(&needed_size, &mut buffer[range.clone()]).expect("Serializing needed_size failed");
-        range.increment(self.as_bytes().len());
-        buffer[range.clone()].copy_from_slice(self.to_bytes().as_slice());
-        log::debug!("[BinaryPersist-BinaryBody.to_bytes] buffer: {:02X?}", buffer[range.clone()].to_vec());
+        u32::to_bytes(&body_size, &mut buffer[range.clone()]).expect(format!("Could not persist body size").as_str());
+        // BODY
+        if body_size > 0 {
+            range.increment(body_size as usize);
+            buffer[range.clone()].copy_from_slice(self.body());
+        }
         Ok(range.end)
     }
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
+        // BODY LENGTH
         let mut range: Range<usize> = RangeIterator::new(USIZE_LEN);
-
-        let body_len= u32::try_from_bytes(&buffer[range.clone()]).unwrap();
-        log::debug!("[BinaryPersist-BinaryBody.try_from_bytes] body_len: {}", body_len);
-        range.increment(body_len as usize);
-        log::debug!("[BinaryPersist-BinaryBody.try_from_bytes] Ok");
-        Ok(<BinaryBody as From<Vec<u8>>>::from(buffer[range].to_vec()))
+        let bytes_len = u32::try_from_bytes(&buffer[range.clone()]).unwrap();
+        range.increment(bytes_len as usize);
+        Ok(TransportMessage::new(buffer[range.clone()].to_vec()))
     }
 }
 
-impl BinaryPersist for TangleMessage {
+pub struct LinkedMessage<LinkT = Address> {
+    pub link: LinkT,
+    pub body: TransportMessage,
+}
+
+pub fn trans_msg_len(msg: &TransportMessage) -> usize {
+    msg.as_ref().len()
+}
+
+pub fn trans_msg_encode(msg: &TransportMessage) -> String {
+    hex::encode(msg.as_ref())
+}
+
+impl<LinkT> LinkedMessage<LinkT> {
+    pub fn body_len(&self) -> usize {
+        trans_msg_len(&self.body)
+    }
+
+    pub fn body_hex_encode(&self) -> String {
+        trans_msg_encode(&self.body)
+    }
+}
+
+impl<LinkT: BinaryPersist + Display> BinaryPersist for LinkedMessage<LinkT> {
     fn needed_size(&self) -> usize {
-        let link_bytes_len = self.link().needed_size();
-        let mut len_bytes = 2 * link_bytes_len;               // LINK + PREV_LINK
-        len_bytes += self.body.needed_size();                       // BINARY_BODY
+        let mut len_bytes= self.link.needed_size();     // LINK
+        len_bytes += self.body.needed_size();                 // BODY
         len_bytes
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
         if buffer.len() < self.needed_size() {
-            panic!("[BinarySerialize  for TangleMessage] This TangleMessage needs {} bytes but \
+            panic!("[BinarySerialize for LinkedMessage] This LinkedMessage needs {} bytes but \
                     the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
         }
         // LINK
-        let link_bytes_len = self.link().needed_size();
-        let mut range: Range<usize> = RangeIterator::new(link_bytes_len);
-        BinaryPersist::to_bytes(self.link(), &mut buffer[range.clone()]).expect("Could not persist message link");
-        log::debug!("[BinaryPersist-TangleMessage.to_bytes] buffer: {:02X?}", buffer[range.clone()].to_vec());
-        // PREV_LINK
-        range.increment(link_bytes_len);
-        BinaryPersist::to_bytes(self.prev_link(), &mut buffer[range.clone()]).expect("Could not persist message prev_link");
-        // BINARY_BODY
+        let mut range: Range<usize> = RangeIterator::new(self.link.needed_size());
+        self.link.to_bytes(&mut buffer[range.clone()]).expect("Could not persist message link");
+        log::debug!("[BinaryPersist-LinkedMessage.to_bytes] buffer: {:02X?}", buffer[range.clone()].to_vec());
+        // BODY
         range.increment(self.body.needed_size());
-        BinaryPersist::to_bytes(&self.body, &mut buffer[range.clone()]).expect("Could not persist message binary.body");
+        self.body.to_bytes(&mut buffer[range.clone()]).expect("Could not persist message binary.body");
         Ok(range.end)
     }
 
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
         // LINK
         let mut pos: usize = 0;
-        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] converting LINK");
-        let link = <TangleAddress as BinaryPersist>::try_from_bytes(&buffer[pos..]).unwrap();
-        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] LINK: {}", link.to_string());
+        log::debug!("[BinaryPersist-LinkedMessage.try_from_bytes] converting LINK");
+        let link = LinkT::try_from_bytes(&buffer[pos..]).unwrap();
+        log::debug!("[BinaryPersist-LinkedMessage.try_from_bytes] LINK: {}", link.to_string());
         pos += link.needed_size();
 
-        // PREV_LINK
-        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] converting PREV_LINK");
-        let prev_link = <TangleAddress as BinaryPersist>::try_from_bytes(&buffer[pos..]).unwrap();
-        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] PREV_LINK: {}", prev_link.to_string());
-        pos += link.needed_size();
-        // BINARY_BODY
-        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] converting BINARY_BODY");
-        let body = BinaryBody::try_from_bytes(&buffer[pos..]).unwrap();
-        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] length: {} BINARY_BODY: {}", body.to_bytes().len(), body);
+        // BODY
+        log::debug!("[BinaryPersist-LinkedMessage.try_from_bytes] converting BODY");
+        let body = <TransportMessage as BinaryPersist>::try_from_bytes(&buffer[pos..]).unwrap();
+        log::debug!("[BinaryPersist-LinkedMessage.try_from_bytes] length: {} BODY: {}", trans_msg_len(&body), trans_msg_encode(&body));
 
         // TangleMessage
-        log::debug!("[BinaryPersist-TangleMessage.try_from_bytes] Ok");
-        Ok(TangleMessage::new(link, prev_link, body))
+        log::debug!("[BinaryPersist-LinkedMessage.try_from_bytes] Ok");
+        Ok(LinkedMessage{ link, body })
     }
 }
 
-// Replaces TangleAddress in case LoraWAN DevEUI is used instead of streams channel ID
+// Replaces Address in case LoraWAN DevEUI is used instead of streams channel ID
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct TangleAddressCompressed {
     pub msgid: MsgId,
@@ -160,14 +237,14 @@ impl fmt::Display for TangleAddressCompressed {
 }
 
 impl TangleAddressCompressed {
-    pub fn from_tangle_address(address: &TangleAddress, initialization_cnt: u8) -> Self {
-        Self { msgid: address.msgid, initialization_cnt }
+    pub fn from_tangle_address(address: &Address, initialization_cnt: u8) -> Self {
+        Self { msgid: address.relative(), initialization_cnt }
     }
 
-    pub fn to_tangle_address(&self, streams_channel_id: &str) -> Result<TangleAddress> {
-        let app_inst = AppInst::from_str(streams_channel_id)
-            .expect("Error on parsing AppInst from streams_channel_id string");
-        Ok(TangleAddress::new(app_inst, self.msgid))
+    pub fn to_tangle_address(&self, streams_channel_id: &str) -> Result<Address> {
+        let app_adr = AppAddr::from_str(streams_channel_id)
+            .expect("Error on parsing AppAddr from streams_channel_id string");
+        Ok(Address::new(app_adr, self.msgid))
     }
 
     pub fn build_tangle_address_str(msg_id: &str, channel_id: &str) -> String {
@@ -198,7 +275,7 @@ impl FromStr for TangleAddressCompressed {
         let msgid_str = cmpr_addr_str[..msgid_end].to_string();
         let initialization_cnt_str = cmpr_addr_str[initialization_cnt_start..].to_string();
 
-        let msgid = MsgId::from_str(msgid_str.as_str())?;
+        let msgid = MsgId::from_str(msgid_str.as_str()).map_err(|e| anyhow!(e))?;
         let initialization_cnt = u8::from_str_radix(&initialization_cnt_str, 16)?;
 
         Ok(TangleAddressCompressed{msgid, initialization_cnt})
@@ -230,7 +307,7 @@ impl BinaryPersist for TangleAddressCompressed {
     fn try_from_bytes(buffer: &[u8]) -> Result<Self> {
         // MSGID
         let mut range: Range<usize> = RangeIterator::new(MSGID_SIZE);
-        let msgid = MsgId::from(&buffer[range.clone()]);
+        let msgid = MsgId::try_from_bytes(&buffer[range.clone()]).expect("");
         // INITIALIZATION_CNT
         range.increment(1);
         let initialization_cnt = u8::try_from_bytes(&buffer[range]).expect("Error on reading initialization_cnt");
@@ -239,17 +316,17 @@ impl BinaryPersist for TangleAddressCompressed {
     }
 }
 
-// Replaces TangleMessage in case LoraWAN DevEUI is used instead of streams channel ID
+// Replaces Message in case LoraWAN DevEUI is used instead of streams channel ID
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct TangleMessageCompressed {
     // Although dev_eui is specified to be a 64bit integer we use Vec<u8> here to be more flexible
     pub dev_eui: Vec<u8>,
     pub link: TangleAddressCompressed,
-    pub body: BinaryBody,
+    pub body: TransportMessage,
 }
 
 impl TangleMessageCompressed {
-    pub fn from_tangle_message(message: &TangleMessage, initialization_cnt: u8) -> Self {
+    pub fn from_tangle_message(message: &LinkedMessage, initialization_cnt: u8) -> Self {
         Self {
             // The usage of dev_eui in TangleMessageCompressed is optional.
             dev_eui: Vec::<u8>::new(),
@@ -258,12 +335,11 @@ impl TangleMessageCompressed {
         }
     }
 
-    pub fn to_tangle_message(&self, streams_channel_id: &str) -> Result<TangleMessage> {
-        Ok(TangleMessage::new(
-            self.link.to_tangle_address(streams_channel_id)?,
-            TangleAddress::default(),
-            self.body.clone()
-        ))
+    pub fn to_tangle_message(&self, streams_channel_id: &str) -> Result<LinkedMessage> {
+        Ok(LinkedMessage{
+            link: self.link.to_tangle_address(streams_channel_id)?,
+            body: self.body.clone(),
+        })
     }
 }
 
@@ -291,7 +367,7 @@ impl BinaryPersist for TangleMessageCompressed {
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
         if buffer.len() < self.needed_size() {
-            panic!("[BinarySerialize  for TangleMessageCompressed] This compressed TangleMessage needs {} bytes but \
+            panic!("[BinarySerialize  for TangleMessageCompressed] This compressed Message needs {} bytes but \
                     the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
         }
 
@@ -304,7 +380,7 @@ impl BinaryPersist for TangleMessageCompressed {
         let mut range: Range<usize> = RangeIterator::new(self.link.needed_size());
         BinaryPersist::to_bytes(&self.link, &mut buffer[range.clone()]).expect("Could not persist compresssed message link");
         log::debug!("[BinaryPersist-TangleMessageCompressed.to_bytes] buffer: {:02X?}", buffer[range.clone()].to_vec());
-        // BINARY_BODY
+        // BODY
         range.increment(self.body.needed_size());
         BinaryPersist::to_bytes(&self.body, &mut buffer[range.clone()]).expect("Could not persist message binary.body");
         Ok(range.end)
@@ -324,10 +400,10 @@ impl BinaryPersist for TangleMessageCompressed {
         log::debug!("[BinaryPersist-TangleMessageCompressed.try_from_bytes] LINK: {}", link.to_string());
         pos += link.needed_size();
 
-        // BINARY_BODY
-        log::debug!("[BinaryPersist-TangleMessageCompressed.try_from_bytes] converting BINARY_BODY");
-        let body = BinaryBody::try_from_bytes(&buffer[pos..]).unwrap();
-        log::debug!("[BinaryPersist-TangleMessageCompressed.try_from_bytes] length: {} BINARY_BODY: {}", body.to_bytes().len(), body);
+        // BODY
+        log::debug!("[BinaryPersist-TangleMessageCompressed.try_from_bytes] converting BODY");
+        let body = TransportMessage::try_from_bytes(&buffer[pos..]).unwrap();
+        log::debug!("[BinaryPersist-TangleMessageCompressed.try_from_bytes] length: {} BODY: {}", trans_msg_len(&body), trans_msg_encode(&body));
 
         // TangleMessageCompressed
         log::debug!("[BinaryPersist-TangleMessageCompressed.try_from_bytes] Ok");

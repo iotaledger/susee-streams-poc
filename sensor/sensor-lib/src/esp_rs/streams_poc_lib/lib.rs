@@ -1,3 +1,11 @@
+use anyhow::{
+    Result,
+};
+
+use streams_tools::{
+    PlainTextWallet,
+};
+
 use super::{
     super::{
         streams_transport_via_buffer_cb::{
@@ -9,26 +17,10 @@ use super::{
     },
 };
 
-use iota_streams::app_channels::{
-    api::{
-        tangle::{
-            Bytes,
-        }
-    }
-};
-
-use anyhow::{
-    Result,
-};
-
 use crate::{
     streams_poc_lib_api_types::send_request_via_lorawan_t,
     request_via_buffer_cb::RequestViaBufferCallbackOptions,
     esp_rs::esp32_subscriber_tools::setup_file_system,
-};
-
-use streams_tools::{
-    PlainTextWallet,
 };
 
 pub async fn send_message(
@@ -47,9 +39,9 @@ pub async fn send_message(
 
     log::info!("[fn - send_message()] Sending {} bytes payload\n", message_bytes.len());
     log::debug!("[fn - send_message()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
-    match subscriber.send_signed_packet(&Bytes(message_bytes.to_vec())).await {
+    match subscriber.send_signed_packet(&message_bytes.to_vec()).await {
         Ok(msg_link) => {
-            log::debug!("[fn - send_message()] Message sent: {}, tangle index: {:#}\n", msg_link, msg_link.to_msg_index());
+            log::debug!("[fn - send_message()] Message sent: {}, tangle index: {:#}\n", msg_link, hex::encode(msg_link.to_msg_index()));
         },
         Err(e) => {
             log::error!("[fn - send_message()] Error while sending Message: {}", e);

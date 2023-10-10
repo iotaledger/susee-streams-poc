@@ -38,7 +38,7 @@ use crate::{
 };
 
 use streams_tools::binary_persist::binary_persist_iota_bridge_req::{IotaBridgeResponseParts, IotaBridgeRequestParts, HttpMethod};
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 #[derive(Clone)]
 pub struct CommandFetcherBufferCbOptions {

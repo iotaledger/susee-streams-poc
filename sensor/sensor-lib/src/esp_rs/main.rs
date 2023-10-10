@@ -1,27 +1,30 @@
-use super::{
-    CommandFetcherSocket,
-    CommandFetcherSocketOptions,
-    CommandFetcherBufferCb,
-    CommandFetcherBufferCbOptions,
-    StreamsTransportSocketEspRs,
-    StreamsTransportSocketEspRsOptions,
-    streams_transport_via_buffer_cb::StreamsTransportViaBufferCallback,
-    esp32_subscriber_tools::{
-        create_subscriber,
-    },
-    wifi_utils::init_wifi,
+use core::str::FromStr;
+
+use anyhow::{
+    anyhow,
+    Result,
 };
 
-use crate::{
-    command_fetcher::CommandFetcher,
-    streams_poc_lib_api_types::send_request_via_lorawan_t,
-    request_via_buffer_cb::RequestViaBufferCallbackOptions,
-    esp_rs::esp32_subscriber_tools::setup_file_system,
+use hyper::{
+    Body,
+    http::{
+        Request,
+        status,
+    }
 };
 
-use payloads::{
-    Message,
-    get_message_bytes,
+use async_trait::async_trait;
+
+use esp_idf_svc::wifi::EspWifi;
+
+use lets::{
+    message::TransportMessage,
+    transport::Transport,
+};
+
+use streams::{
+    Address,
+    User,
 };
 
 use susee_tools::SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC;
@@ -46,33 +49,31 @@ use streams_tools::{
     SubscriberManager
 };
 
-use iota_streams::{
-    core::async_trait,
-    app_channels::api::{
-        tangle::{
-            Address,
-            Bytes,
-            Subscriber,
-        },
-    }
+use payloads::{
+    Message,
+    get_message_bytes,
 };
 
-use core::str::FromStr;
-
-use anyhow::{
-    anyhow,
-    Result,
+use super::{
+    CommandFetcherSocket,
+    CommandFetcherSocketOptions,
+    CommandFetcherBufferCb,
+    CommandFetcherBufferCbOptions,
+    StreamsTransportSocketEspRs,
+    StreamsTransportSocketEspRsOptions,
+    streams_transport_via_buffer_cb::StreamsTransportViaBufferCallback,
+    esp32_subscriber_tools::{
+        create_subscriber,
+    },
+    wifi_utils::init_wifi,
 };
 
-use hyper::{
-    Body,
-    http::{
-        Request,
-        status,
-    }
+use crate::{
+    command_fetcher::CommandFetcher,
+    streams_poc_lib_api_types::send_request_via_lorawan_t,
+    request_via_buffer_cb::RequestViaBufferCallbackOptions,
+    esp_rs::esp32_subscriber_tools::setup_file_system,
 };
-
-use esp_idf_svc::wifi::EspWifi;
 
 fn print_heap_info() {
     unsafe {
@@ -102,23 +103,23 @@ impl<CmdFetchT, StreamsTransportT> CmdProcessor<CmdFetchT, StreamsTransportT>
         StreamsTransportT::Options: Clone,
 {
     fn println_subscription_details(
-        subscriber: &Subscriber<StreamsTransportT>,
+        user: &User<StreamsTransportT>,
         subscription_link: &Address,
         comment: &str,
         key_name: &str,
         initialization_cnt: u8
     ) {
-        let public_key = get_public_key_str(subscriber);
-        println!(
+        let public_key = get_public_key_str(user);
+        log::info!(
             "[Sensor] {}:
          {} Link:     {}
               Tangle Index:     {:#}
-         Subscriber public key: {}
+         User public key: {}
          Initialization Count:  {}\n",
             comment,
             key_name,
             subscription_link.to_string(),
-            subscription_link.to_msg_index(),
+            hex::encode(subscription_link.to_msg_index()),
             public_key,
             initialization_cnt,
         );
@@ -126,10 +127,10 @@ impl<CmdFetchT, StreamsTransportT> CmdProcessor<CmdFetchT, StreamsTransportT>
 }
 
 #[async_trait(?Send)]
-impl<CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, StreamsTransportT>
+impl<TSR, CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, StreamsTransportT>
     where
         CmdFetchT: CommandFetcher,
-        StreamsTransportT: StreamsTransport,
+        StreamsTransportT: StreamsTransport + for <'a> Transport<'a, Msg = TransportMessage, SendResponse = TSR>,
         StreamsTransportT::Options: Clone,
 {
     type SubscriberManager = SubscriberManager<StreamsTransportT, PlainTextWallet>;
@@ -149,10 +150,10 @@ impl<CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, S
     ) -> hyper::http::Result<Request<Body>>
     {
         let mut ret_val: Option<Request<Body>> = None;
-        if let Some(subscriber) = &subscriber_manager.subscriber {
+        if let Some(user) = &subscriber_manager.user {
             if let Some(subscription_link) = subscriber_manager.subscription_link {
                 Self::println_subscription_details(
-                    &subscriber,
+                    &user,
                     &subscription_link,
                     "A subscription with the following details exists",
                     "Subscription",
@@ -169,25 +170,25 @@ impl<CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, S
                         previous_message_link,
                         Subscription {
                             subscription_link: subscription_link.to_string(),
-                            pup_key: get_public_key_str(subscriber),
+                            pup_key: get_public_key_str(user),
                             initialization_cnt: subscriber_manager.get_initialization_cnt()
                         })?
                 );
             }
         }
         if ret_val.is_none() {
-            println!("[Sensor] No subscription found.");
+            log::info!("[Sensor] No subscription found.");
             let to_send = SubscriberStatus::default();
             ret_val = Some( confirm_req_builder.subscriber_status(to_send.previous_message_link, to_send.subscription)?);
         }
 
         if let Some(prev_msg_link) = subscriber_manager.prev_msg_link {
-            println!(
+            log::info!(
                 "[Sensor] Previous message:
          Prev msg link:     {}
              Tangle Index:     {:#}",
                 prev_msg_link.to_string(),
-                prev_msg_link.to_msg_index()
+                hex::encode(prev_msg_link.to_msg_index())
             );
         }
 
@@ -214,14 +215,14 @@ impl<CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, S
     async fn send_content_as_msg(
         &self,
         message_key: String,
-        subscriber: &mut <Self as SensorFunctions>::SubscriberManager,
+        user: &mut <Self as SensorFunctions>::SubscriberManager,
         confirm_req_builder: &RequestBuilderConfirm
     ) -> hyper::http::Result<Request<Body>>
     {
         let message_bytes = get_message_bytes(Message::from(message_key.as_str()));
         log::info!("[fn send_content_as_msg] Sending {} bytes payload\n", message_bytes.len());
         log::debug!("[fn send_content_as_msg] - send_content_as_msg()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
-        let prev_message = subscriber.send_signed_packet(&Bytes(message_bytes.to_vec())).await.expect("subscriber.send_signed_packet() returned error");
+        let prev_message = user.send_signed_packet(&message_bytes.to_vec()).await.expect("user.send_signed_packet() returned error");
         confirm_req_builder.send_message(prev_message.to_string())
     }
 
@@ -233,12 +234,12 @@ impl<CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, S
     ) -> hyper::http::Result<Request<Body>>
     {
         let ann_address = Address::from_str(&announcement_link_str).expect("Address::from_str() returned error");
-        let sub_msg_link = subscriber_mngr.subscribe(&ann_address).await.expect("subscriber_mngr::subscribe() returned error");
+        let sub_msg_link = subscriber_mngr.subscribe(ann_address.clone()).await.expect("subscriber_mngr::subscribe() returned error");
 
-        let subscriber = subscriber_mngr.subscriber.as_ref().unwrap();
+        let user = subscriber_mngr.user.as_ref().unwrap();
 
         Self::println_subscription_details(
-            &subscriber,
+            &user,
             &sub_msg_link,
             "New subscription",
             "Subscription",
@@ -247,7 +248,7 @@ impl<CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, S
 
         confirm_req_builder.subscription(
             sub_msg_link.to_string(),
-            get_public_key_str(subscriber),
+            get_public_key_str(user),
             subscriber_mngr.get_initialization_cnt()
         )
     }
@@ -260,10 +261,10 @@ impl<CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetchT, S
     ) -> hyper::http::Result<Request<Body>>
     {
         let keyload_msg_link = Address::from_str(&keyload_msg_link_str).expect("Address::from_str() returned error");
-        subscriber_mngr.register_keyload_msg(&keyload_msg_link).expect("[fn register_keyload_msg] register_keyload_msg err");
+        subscriber_mngr.register_keyload_msg(&keyload_msg_link).await.expect("[fn register_keyload_msg] register_keyload_msg err");
 
         Self::println_subscription_details(
-            &subscriber_mngr.subscriber.as_ref().unwrap(),
+            &subscriber_mngr.user.as_ref().unwrap(),
             &keyload_msg_link,
             "Keyload Message",
             "Keyload  msg",
@@ -292,9 +293,9 @@ impl<CmdFetchT, StreamsTransportT> CmdProcessor<CmdFetchT, StreamsTransportT>
 }
 
 #[async_trait(?Send)]
-impl<CmdFetchT, StreamsTransportT> CommandProcessor for CmdProcessor<CmdFetchT, StreamsTransportT>where
+impl<TSR, CmdFetchT, StreamsTransportT> CommandProcessor for CmdProcessor<CmdFetchT, StreamsTransportT> where
     CmdFetchT: CommandFetcher,
-    StreamsTransportT: StreamsTransport,
+    StreamsTransportT: StreamsTransport + for <'a> Transport<'a, Msg = TransportMessage, SendResponse = TSR>,
     StreamsTransportT::Options: Clone,
 {
     async fn fetch_next_command(&self) -> Result<(Command, Vec<u8>)> {
@@ -308,7 +309,7 @@ impl<CmdFetchT, StreamsTransportT> CommandProcessor for CmdProcessor<CmdFetchT, 
     async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
         let mut vfs_fat_handle = setup_file_system(self.vfs_fat_path.clone()).await?;
 
-        let mut subscriber= create_subscriber::<StreamsTransportT, PlainTextWallet>(
+        let mut user= create_subscriber::<StreamsTransportT, PlainTextWallet>(
             Some(self.streams_transport_opt.clone()),
             &vfs_fat_handle
         ).await?;
@@ -316,11 +317,11 @@ impl<CmdFetchT, StreamsTransportT> CommandProcessor for CmdProcessor<CmdFetchT, 
         print_heap_info();
 
         let confirmation_request = process_sensor_commands(
-            self, &mut subscriber, command, buffer
+            self, &mut user, command, buffer
         ).await.expect("Error on processing sensor commands");
 
-        log::debug!("[fn process_command]  Safe subscriber client_status to disk");
-        subscriber.safe_client_status_to_disk().await?;
+        log::debug!("[fn process_command]  Safe user client_status to disk");
+        user.safe_client_status_to_disk().await?;
         log::debug!("[fn process_command]  vfs_fat_handle.drop_filesystem()");
         vfs_fat_handle.drop_filesystem()?;
 

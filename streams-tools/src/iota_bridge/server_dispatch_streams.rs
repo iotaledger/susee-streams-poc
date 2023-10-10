@@ -154,7 +154,7 @@ impl<TransportT> DispatchStreams<TransportT>
     }
 
     fn handle_lora_wan_node_not_known(&self, dev_eui: String, address: TangleAddressCompressed, streams_api_request: StreamsApiRequest) -> Result<Response<Body>> {
-        log::error!("[IOTA-Bridge - handle_lora_wan_node_not_known] \
+        log::error!("[fn handle_lora_wan_node_not_known()] \
             The lorawan_node with dev_eui {} and initialization_cnt {} is not known by this iota-bridge instance. \
             The current request will be stored by this IOTA-Bridge for later retransmit. \
             Please provide the missing streams channel ID using the '/streams/retransmit' api function.",
@@ -201,7 +201,7 @@ impl<TransportT> DispatchStreams<TransportT>
         let pending_request = match self.pending_requests.get_item(&request_key_i64) {
             Ok(req_and_cb) => req_and_cb.0,
             Err(err) => {
-                bail!("[IOTA-Bridge - get_pending_request] pending_requests.get_item returned an error for request_key_i64 {}. Error: {}", request_key_i64, err);
+                bail!("[fn  get_pending_request] pending_requests.get_item returned an error for request_key_i64 {}. Error: {}", request_key_i64, err);
             }
         };
         Ok(pending_request)
@@ -243,12 +243,12 @@ impl<TransportT> DispatchStreams<TransportT>
                 if node.initialization_cnt == link.initialization_cnt {
                     ret_val = Some(node)
                 } else {
-                    log::warn!("[IOTA-Bridge - get_lorawan_node] LoraWanNode found for dev_eui {} has initialization_cnt {} but message needs initialization_cnt {}",
+                    log::warn!("[fn get_lorawan_node()] LoraWanNode found for dev_eui {} has initialization_cnt {} but message needs initialization_cnt {}",
                                dev_eui_str, node.initialization_cnt, link.initialization_cnt);
                 }
             },
             Err(err) => {
-                log::warn!("[IOTA-Bridge - get_lorawan_node] lorawan_nodes.get_item returned an error for dev_eui {}. Error: {}", dev_eui_str, err);
+                log::warn!("[fn get_lorawan_node()] lorawan_nodes.get_item returned an error for dev_eui {}. Error: {}", dev_eui_str, err);
             }
         }
         ret_val
@@ -288,27 +288,21 @@ impl<TransportT> DispatchStreams<TransportT>
 static LINK_LENGTH: usize = TANGLE_ADDRESS_BYTE_LEN;
 
 fn println_send_message_for_incoming_message(message: &LinkedMessage) {
-    println!(
-        "-----------------------------------------------------------------\n\
-[IOTA-Bridge - DispatchStreams] send_message() - Incoming Message to attach to tangle with absolut length of {} bytes. Data:
-{}
-", trans_msg_len(&message.body) + LINK_LENGTH, trans_msg_encode(&message.body)
+    log::info!("[fn println_send_message_for_incoming_message()] Incoming Message to attach to tangle with absolut length of {} bytes. Data:
+{}", trans_msg_len(&message.body) + LINK_LENGTH, trans_msg_encode(&message.body)
     );
 }
 
 fn println_receive_message_from_address_for_received_message(message: &TransportMessage) {
-    println!(
-        "-----------------------------------------------------------------\n\
-[IOTA-Bridge - DispatchStreams] receive_message_from_address() - Received Message from tangle with absolut length of {} bytes. Data:
+    log::info!("[fn receive_message_from_address()] Received Message from tangle with absolut length of {} bytes. Data:
 {}
 ", trans_msg_len(&message) + LINK_LENGTH, trans_msg_encode(&message)
     );
 }
 
 fn println_retransmit_for_received_message(request_key: &String, channel_id: &AppAddr, initialization_cnt: u8, streams_req: &StreamsApiRequest) {
-    println!(
-        "-----------------------------------------------------------------\n\
-[IOTA-Bridge - DispatchStreams] retransmit() - Incoming request_key '{}' to retransmit cashed StreamsApiRequest for LorawanNode with channel_id {}.
+    log::info!(
+        "[fn retransmit()] Incoming request_key '{}' to retransmit cashed StreamsApiRequest for LorawanNode with channel_id {}.
 Initialization Count: {}
 Request key:
 {}
@@ -339,7 +333,7 @@ where
     }
 
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
-        log::debug!("[IOTA-Bridge - DispatchStreams] receive_message_from_address() - Incoming request for address: {}", address_str);
+        log::debug!("[fn receive_message_from_address()] Incoming request for address: {}", address_str);
         let address = Address::from_str(address_str).unwrap();
         let message = self.transport.recv_message(address).await;
         match message {
@@ -348,13 +342,13 @@ where
                 self.write_channel_id_to_scope(&address);
                 let mut buffer: Vec<u8> = vec![0;BinaryPersist::needed_size(&msg)];
                 let size = BinaryPersist::to_bytes(&msg, buffer.as_mut_slice());
-                log::debug!("[IOTA-Bridge - DispatchStreams] receive_message_from_address() - Returning binary data via socket connection. length: {} bytes, data:\n\
+                log::debug!("[fn receive_message_from_address()] Returning binary data via socket connection. length: {} bytes, data:\n\
 {:02X?}\n", size.unwrap_or_default(), buffer);
                 Response::builder().status(self.get_success_response_status_code())
                     .body(buffer.into())
             },
             Err(err) => {
-                println!("Address msg_index is: {}", hex::encode(address.to_msg_index()));
+                log::info!("Address msg_index is: {}", hex::encode(address.to_msg_index()));
                 log_lets_err_and_respond_mapped_status_code(err, "receive_message_from_address")
             }
         }

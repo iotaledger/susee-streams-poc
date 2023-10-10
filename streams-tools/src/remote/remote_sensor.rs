@@ -70,7 +70,7 @@ impl<'a> RemoteSensor<'a> {
 
     pub fn new(options: Option<RemoteSensorOptions<'a>>) -> Self {
         let options = options.unwrap_or_default();
-        log::debug!("[RemoteSensor.new()] Initializing instance with options:\n       {}\n", options);
+        log::debug!("[fn new()] Initializing instance with options:\n       {}\n", options);
         Self {
             options,
             http_client: HttpClient::new(),
@@ -103,7 +103,7 @@ impl<'a> RemoteSensor<'a> {
                 if confirmation != Confirmation::NO_CONFIRMATION {
                     return self.process_confirmation::<T>(confirmation, buffer).await;
                 } else {
-                    println!("Received Confirmation::NO_CONFIRMATION    ");
+                    log::info!("Received Confirmation::NO_CONFIRMATION    ");
                 }
             } else {
                 log::error!("[fn poll_confirmation] fn call fetch_next_confirmation() failed.");
@@ -117,7 +117,7 @@ impl<'a> RemoteSensor<'a> {
     {
         if &confirm == T::INSTANCE {
             let confirmation_args = <T as BinaryPersist>::try_from_bytes(buffer.as_slice())?;
-            log::info!("[fn process_confirmation] processing confirmation: {}", confirmation_args);
+            log::info!("[fn process_confirmation()] processing confirmation: {}", confirmation_args);
             Ok(confirmation_args)
         } else {
             bail!("Received confirmation does not match the expected confirmation type")
@@ -130,12 +130,12 @@ impl<'a> RemoteSensor<'a> {
         ).await?;
 
         if response.status().is_success() {
-            log::debug!("[RemoteSensor.fetch_next_confirmation] StatusCode is successful: {}", response.status());
+            log::debug!("[fn fetch_next_confirmation()] StatusCode is successful: {}", response.status());
             let bytes = body::to_bytes(response.into_body()).await?;
             let confirmation = <Confirmation as BinaryPersist>::try_from_bytes(&bytes)?;
             Ok((confirmation, bytes.to_vec()))
         } else {
-            log::error!("[RemoteSensor.fetch_next_confirmation] HTTP Error. Status: {}", response.status());
+            log::error!("[fn fetch_next_confirmation()] HTTP Error. Status: {}", response.status());
             Ok((Confirmation::NO_CONFIRMATION, Vec::<u8>::default()))
         }
     }

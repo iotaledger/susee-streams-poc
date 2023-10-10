@@ -29,7 +29,7 @@ pub async fn send_message(
     vfs_fat_path: Option<String>,
     p_caller_user_data: *mut cty::c_void
 ) -> Result<()>{
-    log::debug!("[fn - send_message()] Creating subscriber");
+    log::debug!("[fn send_message()] Creating subscriber");
     let mut vfs_fat_handle = setup_file_system(vfs_fat_path.clone()).await?;
 
     let mut subscriber = create_subscriber::<StreamsTransportViaBufferCallback, PlainTextWallet>(
@@ -37,26 +37,26 @@ pub async fn send_message(
         &vfs_fat_handle
     ).await?;
 
-    log::info!("[fn - send_message()] Sending {} bytes payload\n", message_bytes.len());
-    log::debug!("[fn - send_message()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
+    log::info!("[fn send_message()] Sending {} bytes payload\n", message_bytes.len());
+    log::debug!("[fn send_message()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
     match subscriber.send_signed_packet(&message_bytes.to_vec()).await {
         Ok(msg_link) => {
-            log::debug!("[fn - send_message()] Message sent: {}, tangle index: {:#}\n", msg_link, hex::encode(msg_link.to_msg_index()));
+            log::debug!("[fn send_message()] Message sent: {}, tangle index: {:#}\n", msg_link, hex::encode(msg_link.to_msg_index()));
         },
         Err(e) => {
-            log::error!("[fn - send_message()] Error while sending Message: {}", e);
+            log::error!("[fn send_message()] Error while sending Message: {}", e);
         }
     }
-    log::debug!("[fn - send_message()] Safe subscriber client_status to disk");
+    log::debug!("[fn send_message()] Safe subscriber client_status to disk");
     subscriber.safe_client_status_to_disk().await?;
-    log::debug!("[fn - send_message()] vfs_fat_handle.drop_filesystem()");
+    log::debug!("[fn send_message()] vfs_fat_handle.drop_filesystem()");
     vfs_fat_handle.drop_filesystem()?;
-    log::debug!("[fn - send_message()] Return OK");
+    log::debug!("[fn send_message()] Return OK");
     Ok(())
 }
 
 pub async fn is_streams_channel_initialized(vfs_fat_path: Option<String>) -> Result<bool> {
-    log::debug!("[fn - is_streams_channel_initialized()] Creating subscriber");
+    log::debug!("[fn is_streams_channel_initialized()] Creating subscriber");
     let mut vfs_fat_handle = setup_file_system(vfs_fat_path.clone()).await?;
 
     let subscriber = create_subscriber::<StreamsTransportViaBufferCallback, PlainTextWallet>(
@@ -66,7 +66,7 @@ pub async fn is_streams_channel_initialized(vfs_fat_path: Option<String>) -> Res
 
     let ret_val = subscriber.is_channel_initialized().await;
 
-    log::debug!("[fn - is_channel_initialized()] vfs_fat_handle.drop_filesystem()");
+    log::debug!("[fn is_channel_initialized()] vfs_fat_handle.drop_filesystem()");
     vfs_fat_handle.drop_filesystem()?;
 
     ret_val

@@ -120,7 +120,7 @@ fn create_seed_from_derivation_phrase(master_seed: &str, seed_derivation_phrase:
         })
         .collect::<String>();
 
-    log::debug!("[fn - create_seed_from_derivation_phrase()] seed_derivation_phrase: {}", derived_seed);
+    log::debug!("[fn create_seed_from_derivation_phrase()] seed_derivation_phrase: {}", derived_seed);
     String::from(derived_seed)
 }
 
@@ -131,7 +131,7 @@ fn create_persistence_file(file_name: &str) -> Result<PtwPersist>{
         misc_other_data: String::default(),
     };
     write_persistence_file(file_name, &persist)?;
-    log::debug!("[fn - create_persistence_file()] Wrote seed {} into persistence file '{}'", persist.seed, file_name);
+    log::debug!("[fn create_persistence_file()] Wrote seed {} into persistence file '{}'", persist.seed, file_name);
     Ok(persist)
 }
 
@@ -157,7 +157,7 @@ impl PlainTextWallet {
         let ptw_persist: PtwPersist;
         if Path::new(file_name).exists(){
             ptw_persist = read_persistence_file(file_name).expect(format!("Error while processing the persistence file '{}'", file_name).as_str());
-            log::debug!("[PlainTextWallet::new()] Read seed {} from persistence file '{}'", ptw_persist.seed, file_name);
+            log::debug!("[fn new()] Read seed {} from persistence file '{}'", ptw_persist.seed, file_name);
         } else {
             ptw_persist = create_persistence_file(file_name).expect(format!("Error on creating the persistence file '{}'", file_name).as_str());
         }

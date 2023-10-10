@@ -25,7 +25,6 @@ use crate::{
         StartSendingMessages,
         RegisterKeyloadMessage
     },
-    println_esp_compat
 };
 
 pub struct CommandFetchLoopOptions {
@@ -54,28 +53,28 @@ pub async fn run_command_fetch_loop(command_processor: impl CommandProcessor, op
         if let Ok((command, buffer)) = command_processor.fetch_next_command().await {
             match command {
                 Command::NO_COMMAND => {
-                    println_esp_compat!("Received Command::NO_COMMAND    ");
+                    log::info!("[fn run_command_fetch_loop()]Received Command::NO_COMMAND    ");
                 },
                 Command::STOP_FETCHING_COMMANDS => {
-                    println_esp_compat!("Received Command::STOP_FETCHING_COMMANDS - Will exit command fetch loop.");
+                    log::info!("[fn run_command_fetch_loop()]Received Command::STOP_FETCHING_COMMANDS - Will exit command fetch loop.");
                     return Ok(());
                 },
                 _ => {
-                    log::info!("[fn run_command_fetch_loop] Starting process_command for command: {}.", command);
+                    log::info!("[fn run_command_fetch_loop()] Starting process_command for command: {}.", command);
                     match command_processor.process_command(command, buffer).await {
                         Ok(confirmation_request) => {
                             // TODO: Retries in case of errors could be useful
-                            log::debug!("[fn process_main_esp_rs] Calling command_processor.send_confirmation for confirmation_request");
+                            log::debug!("[fn run_command_fetch_loop()] Calling command_processor.send_confirmation for confirmation_request");
                             command_processor.send_confirmation(confirmation_request).await?;
                         },
                         Err(err) => {
-                            log::error!("[fn run_command_fetch_loop] process_command() returned error: {}", err);
+                            log::error!("[fn run_command_fetch_loop()] process_command() returned error: {}", err);
                         }
                     };
                 }
             }
         } else {
-            log::error!("[fn run_command_fetch_loop] command_processor.fetch_next_command() failed.");
+            log::error!("[fn run_command_fetch_loop()] command_processor.fetch_next_command() failed.");
         }
 
         for s in 0..opt.confirm_fetch_wait_sec {
@@ -135,7 +134,7 @@ pub async fn process_sensor_commands<SensorT: SensorFunctions>(
 
     if command == Command::SUBSCRIBE_TO_ANNOUNCEMENT_LINK {
         let cmd_args = SubscribeToAnnouncement::try_from_bytes(buffer.as_slice())?;
-        log::info!("[fn process_command]  processing SUBSCRIBE_ANNOUNCEMENT_LINK: {}", cmd_args.announcement_link);
+        log::info!("[fn process_sensor_commands()] Processing SUBSCRIBE_ANNOUNCEMENT_LINK: {}", cmd_args.announcement_link);
         confirmation_request = Some(
             sensor.subscribe_to_channel(cmd_args.announcement_link.as_str(), subscriber, &confirm_req_builder).await?
         );
@@ -143,7 +142,7 @@ pub async fn process_sensor_commands<SensorT: SensorFunctions>(
 
     if command == Command::START_SENDING_MESSAGES {
         let cmd_args = StartSendingMessages::try_from_bytes(buffer.as_slice())?;
-        log::info!("[fn process_command]  processing START_SENDING_MESSAGES: {}", cmd_args.message_template_key);
+        log::info!("[fn process_sensor_commands()] Processing START_SENDING_MESSAGES: {}", cmd_args.message_template_key);
         confirmation_request = Some(
             sensor.send_content_as_msg(cmd_args.message_template_key, subscriber, &confirm_req_builder).await?
         );
@@ -151,21 +150,21 @@ pub async fn process_sensor_commands<SensorT: SensorFunctions>(
 
     if command == Command::REGISTER_KEYLOAD_MESSAGE {
         let cmd_args = RegisterKeyloadMessage::try_from_bytes(buffer.as_slice())?;
-        log::info!("[fn process_command]  processing REGISTER_KEYLOAD_MESSAGE: {}", cmd_args.keyload_msg_link);
+        log::info!("[fn process_sensor_commands()] Processing REGISTER_KEYLOAD_MESSAGE: {}", cmd_args.keyload_msg_link);
         confirmation_request = Some(
             sensor.register_keyload_msg(cmd_args.keyload_msg_link.as_str(), subscriber, &confirm_req_builder ).await?
         );
     }
 
     if command == Command::PRINTLN_SUBSCRIBER_STATUS {
-        log::info!("[fn process_command]  PRINTLN_SUBSCRIBER_STATUS");
+        log::info!("[fn process_sensor_commands()] PRINTLN_SUBSCRIBER_STATUS");
         confirmation_request = Some(
             sensor.println_subscriber_status(subscriber, &confirm_req_builder)?
         );
     }
 
     if command == Command::CLEAR_CLIENT_STATE {
-        log::info!("[fn process_command]  =========> processing CLEAR_CLIENT_STATE <=========");
+        log::info!("[fn process_sensor_commands()] =========> processing CLEAR_CLIENT_STATE <=========");
 
         confirmation_request = Some(
             sensor.clear_client_state(subscriber, &confirm_req_builder).await?

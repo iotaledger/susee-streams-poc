@@ -463,7 +463,7 @@ mod tests {
                                    QueryParameters::RETRANSMIT_REQUEST_KEY,
                                    QueryParameters::RETRANSMIT_INITIALIZATION_CNT
         );
-        println!("Expected URI is '{}'", expected_uri);
+        log::info!("Expected URI is '{}'", expected_uri);
 
         assert_eq!(body_bytes, channel_id_bytes);
         assert_eq!(parts.uri.to_string(), expected_uri);

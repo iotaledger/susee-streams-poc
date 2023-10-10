@@ -177,7 +177,7 @@ impl<TSR, CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetc
             }
         }
         if ret_val.is_none() {
-            log::info!("[Sensor] No subscription found.");
+            log::info!("No subscription found.");
             let to_send = SubscriberStatus::default();
             ret_val = Some( confirm_req_builder.subscriber_status(to_send.previous_message_link, to_send.subscription)?);
         }

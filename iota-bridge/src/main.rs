@@ -17,7 +17,10 @@ use hyper::{
 };
 
 use tokio::sync::oneshot;
+
 use anyhow::Result;
+
+use log;
 
 use streams_tools::{
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT,
@@ -32,6 +35,7 @@ use streams_tools::{
 use susee_tools::{
     assert_data_dir_existence,
     get_data_folder_file_path,
+    set_env_rust_log_variable_if_not_defined_by_env,
 };
 
 use cli::{
@@ -42,12 +46,19 @@ use cli::{
 
 mod cli;
 
-async fn handle_request(mut client: IotaBridge<'_>, request: Request<Body>)
+async fn handle_request(mut client: IotaBridge<'_>, request: Request<Body>, addr: SocketAddr)
                         -> Result<Response<Body>, hyper::http::Error>
 {
-    println!("-----------------------------------------------------------------\n\
-    [IOTA Bridge] Handling request {}\n", request.uri().to_string());
-    client.handle_request(request).await
+    let req_uri = request.uri().to_string();
+    log::info!("Handling request from client address {} - URI: {}", addr, req_uri);
+    let ret_val = client.handle_request(request).await;
+    if ret_val.is_ok() {
+        log::debug!("Sending response to address {} - URI: {}", addr, req_uri);
+    } else {
+        log::debug!("Sending erroneous response to address {} - URI: {}", addr, req_uri);
+    }
+
+    ret_val
 }
 
 fn main() {
@@ -62,12 +73,13 @@ fn main() {
 }
 
 async fn run() {
+    set_env_rust_log_variable_if_not_defined_by_env("info");
     env_logger::init();
     let matches_and_options = get_arg_matches();
     let cli = IotaBridgeCli::new(&matches_and_options, &ARG_KEYS) ;
     assert_data_dir_existence(&cli.data_dir).expect(
         format!("Could not create data_dir '{}'", cli.data_dir).as_str());
-    println!("[IOTA Bridge] Using node '{}' for tangle connection", cli.node);
+    log::info!("Using node '{}' for tangle connection", cli.node);
 
     let db_connection_opt = DbFileBasedDaoManagerOptions {
         file_path_and_name: get_data_folder_file_path(&cli.data_dir, "iota-bridge.sqlite3")
@@ -82,7 +94,7 @@ async fn run() {
         match addr_str.parse() {
             Ok(addr_from_cli) => addr = addr_from_cli,
             Err(e) => {
-                println!("[IOTA Bridge] Could not parse listener_ip_address_port. Error: {}", e);
+                log::info!("Could not parse listener_ip_address_port. Error: {}", e);
                 return;
             }
         };
@@ -90,16 +102,17 @@ async fn run() {
 
     // Template from https://docs.rs/hyper/0.14.15/hyper/server/index.html
     // A `MakeService` that produces a `Service` to handle each connection.
-    let make_service = make_service_fn(move |_conn: &AddrStream| {
+    let make_service = make_service_fn(move |conn: &AddrStream| {
         // We have to clone the client to share it with each invocation of
         // `make_service`. If your data doesn't implement `Clone` consider using
         // an `std::sync::Arc`.
         let client_per_connection = client.clone();
+        let addr = conn.remote_addr();
 
         // Create a `Service` for responding to the request.
         let service = service_fn(move |req| {
             let client_per_request = client_per_connection.clone();
-            handle_request(client_per_request, req)
+            handle_request(client_per_request, req, addr)
         });
 
         // Return the service to hyper.
@@ -115,10 +128,10 @@ async fn run() {
         rx.await.ok();
     });
 
-    println!("Listening on http://{}", addr);
+    log::info!("Listening on http://{}", addr);
 
     if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
+        log::error!("server error: {}", e);
     }
 }
 

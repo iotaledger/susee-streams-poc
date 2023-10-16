@@ -212,18 +212,20 @@ impl<TSR, CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetc
         confirm_req_builder.clear_client_state()
     }
 
-    async fn send_content_as_msg(
+    async fn send_content_as_msg_in_endless_loop(
         &self,
         message_key: String,
         user: &mut <Self as SensorFunctions>::SubscriberManager,
         confirm_req_builder: &RequestBuilderConfirm
     ) -> hyper::http::Result<Request<Body>>
     {
+        // TODO: We do only run one cycle here as this function is seldomly used for ESP32
+        //       remote control.
         let message_bytes = get_message_bytes(Message::from(message_key.as_str()));
         log::info!("[fn send_content_as_msg] Sending {} bytes payload\n", message_bytes.len());
         log::debug!("[fn send_content_as_msg] - send_content_as_msg()] Message text: {}", std::str::from_utf8(message_bytes).expect("Could not deserialize message bytes to utf8 str"));
-        let prev_message = user.send_signed_packet(&message_bytes.to_vec()).await.expect("user.send_signed_packet() returned error");
-        confirm_req_builder.send_message(prev_message.to_string())
+        user.send_signed_packet(&message_bytes.to_vec()).await.expect("user.send_signed_packet() returned error");
+        confirm_req_builder.send_messages_in_endless_loop()
     }
 
     async fn subscribe_to_channel(
@@ -272,6 +274,12 @@ impl<TSR, CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetc
         );
 
         confirm_req_builder.keyload_registration()
+    }
+
+    async fn send_random_msg_in_endless_loop(&self, _msg_size: usize, _subscriber: &mut Self::SubscriberManager, _confirm_req_builder: &RequestBuilderConfirm) -> hyper::http::Result<Request<Body>> {
+        // TODO: This is not implemented as this function is not used for ESP32
+        //       remote control.
+        todo!()
     }
 }
 

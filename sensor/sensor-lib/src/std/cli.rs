@@ -13,7 +13,12 @@ use streams_tools::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL;
 use susee_tools::cli_base::CliOptions;
 
 static FILE_TO_SEND_ABOUT: &str = "A message file that will be encrypted and send using the streams channel.
-The message will be resend every 10 Seconds in an endless loop.
+The message will be resend every 5 Seconds in an endless loop.
+Use CTRL-C to stop processing.";
+
+static RANDOM_MSG_OF_SIZE_ABOUT: &str = "A random message of the specified length in bytes will be created,
+encrypted and send using the streams channel.
+A new random message will be resend every 5 Seconds in an endless loop.
 Use CTRL-C to stop processing.";
 
 static SUBSCRIBE_ANNOUNCEMENT_LINK_ABOUT: &str = "Subscribe to the channel via the specified announcement link.
@@ -108,6 +113,7 @@ pub struct ArgKeys {
     pub base: &'static BaseArgKeys,
     pub dev_eui: &'static str,
     pub files_to_send: &'static str,
+    pub random_msg_of_size: &'static str,
     pub subscribe_announcement_link: &'static str,
     pub register_keyload_msg: &'static str,
     pub act_as_remote_control: &'static str,
@@ -125,6 +131,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     base: &BASE_ARG_KEYS,
     dev_eui: "dev-eui",
     files_to_send: "file-to-send",
+    random_msg_of_size: "random-msg-of-size",
     subscribe_announcement_link: "subscribe-announcement-link",
     register_keyload_msg: "register-keyload-msg",
     act_as_remote_control: "act-as-remote-control",
@@ -175,6 +182,16 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
                 .long_help(FILE_TO_SEND_ABOUT)
                 .multiple_occurrences(true)
                 .min_values(0)
+                .conflicts_with(ARG_KEYS.random_msg_of_size)
+                .conflicts_with(ARG_KEYS.subscribe_announcement_link)
+                .conflicts_with(ARG_KEYS.register_keyload_msg)
+            )
+            .arg(Arg::new(ARG_KEYS.random_msg_of_size)
+                .long(ARG_KEYS.random_msg_of_size)
+                .short('g')
+                .value_name("MSG_SIZE")
+                .long_help(RANDOM_MSG_OF_SIZE_ABOUT)
+                .conflicts_with(ARG_KEYS.files_to_send)
                 .conflicts_with(ARG_KEYS.subscribe_announcement_link)
                 .conflicts_with(ARG_KEYS.register_keyload_msg)
             )

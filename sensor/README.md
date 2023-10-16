@@ -45,6 +45,12 @@ all Sensor applications provide CLI commands to manage the Streams usage:
             A message file that will be encrypted and send using the streams channel.
             The message will be resend every 10 Seconds in an endless loop.
             Use CTRL-C to stop processing.
+
+    -g, --random-msg-of-size <MSG_SIZE>
+            A random message of the specified length in bytes will be created,
+            encrypted and send using the streams channel.
+            A new random message will be resend every 5 Seconds in an endless loop.
+            Use CTRL-C to stop processing.
             
     -p, --println-subscriber-status
             Print information about the current client status of the sensor.

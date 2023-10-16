@@ -12,3 +12,6 @@ Cargo.lock.bak-*
 /sensor/streams-poc-lib/components/streams-poc-lib/build/
 /inx-collector/priv_tangle/
 /test/scripts/workspace/
+/sensor/streams-poc-lib/components/streams-poc-lib/Cargo.lock
+/Cargo.lock
+/sensor/streams-poc-lib/sdkconfig

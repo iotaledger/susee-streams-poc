@@ -53,10 +53,10 @@ pub async fn run_command_fetch_loop(command_processor: impl CommandProcessor, op
         if let Ok((command, buffer)) = command_processor.fetch_next_command().await {
             match command {
                 Command::NO_COMMAND => {
-                    log::info!("[fn run_command_fetch_loop()]Received Command::NO_COMMAND    ");
+                    log::info!("[fn run_command_fetch_loop()] Received Command::NO_COMMAND    ");
                 },
                 Command::STOP_FETCHING_COMMANDS => {
-                    log::info!("[fn run_command_fetch_loop()]Received Command::STOP_FETCHING_COMMANDS - Will exit command fetch loop.");
+                    log::info!("[fn run_command_fetch_loop()] Received Command::STOP_FETCHING_COMMANDS - Will exit command fetch loop.");
                     return Ok(());
                 },
                 _ => {
@@ -98,11 +98,17 @@ pub trait SensorFunctions {
         confirm_req_builder: &RequestBuilderConfirm
     ) -> hyper::http::Result<Request<Body>>;
 
-    async fn send_content_as_msg(
+    async fn send_content_as_msg_in_endless_loop(
         &self,
         message_key: String,
         subscriber: &mut Self::SubscriberManager,
         confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>;
+    async fn send_random_msg_in_endless_loop(
+        &self,
+        msg_size: usize,
+        subscriber: &mut Self::SubscriberManager,
+        confirm_req_builder: &RequestBuilderConfirm,
     ) -> hyper::http::Result<Request<Body>>;
 
     async fn register_keyload_msg(
@@ -144,7 +150,7 @@ pub async fn process_sensor_commands<SensorT: SensorFunctions>(
         let cmd_args = StartSendingMessages::try_from_bytes(buffer.as_slice())?;
         log::info!("[fn process_sensor_commands()] Processing START_SENDING_MESSAGES: {}", cmd_args.message_template_key);
         confirmation_request = Some(
-            sensor.send_content_as_msg(cmd_args.message_template_key, subscriber, &confirm_req_builder).await?
+            sensor.send_content_as_msg_in_endless_loop(cmd_args.message_template_key, subscriber, &confirm_req_builder).await?
         );
     }
 

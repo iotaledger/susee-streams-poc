@@ -90,7 +90,7 @@ impl RequestBuilderCommand {
             .body(Body::empty())
     }
 
-    pub fn send_message(self: &Self, message_template_key: &str) -> Result<Request<Body>> {
+    pub fn send_message_in_endless_loop(self: &Self, message_template_key: &str) -> Result<Request<Body>> {
         self.tools.send_enumerated_persistable_args(
             StartSendingMessages{
                 wait_seconds_between_repeats: 30,

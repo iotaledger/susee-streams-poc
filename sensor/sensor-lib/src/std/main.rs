@@ -1,24 +1,20 @@
-use super::cli::{
-    SensorCli,
-    ARG_KEYS,
-    get_arg_matches,
+use std::cell::Cell;
+use std::str::FromStr;
+
+use rand::Rng;
+
+use log;
+
+use hyper::{
+    Body,
+    http::Request,
 };
+
+use async_trait::async_trait;
 
 use anyhow::{
     Result,
     anyhow,
-};
-
-use crate::{
-    std::{
-        ClientType,
-        SubscriberManagerPlainTextWalletHttpClient,
-        sensor_manager::SensorManager,
-        command_fetcher::{
-            CommandFetcher,
-            CommandFetcherOptions
-        }
-    }
 };
 
 use streams_tools::{
@@ -49,16 +45,25 @@ use susee_tools::{
     SUSEE_CONST_SECRET_PASSWORD,
 };
 
-use hyper::{
-    Body,
-    http::Request,
+use super::cli::{
+    SensorCli,
+    ARG_KEYS,
+    get_arg_matches,
 };
 
-use async_trait::async_trait;
+use crate::{
+    std::{
+        ClientType,
+        SubscriberManagerPlainTextWalletHttpClient,
+        sensor_manager::SensorManager,
+        command_fetcher::{
+            CommandFetcher,
+            CommandFetcherOptions
+        }
+    }
+};
 
-use rand::Rng;
-
-use std::cell::Cell;
+const MAX_SIZE_RANDOM_MESSAGE: usize = 4096;
 
 fn get_wallet(cli: &SensorCli) -> Result<PlainTextWallet> {
     let wallet_filename = get_wallet_filename(
@@ -139,7 +144,17 @@ pub async fn process_local_sensor<'a>(cli: SensorCli<'a>) -> Result<()> {
 
     if cli.matches.is_present(cli.arg_keys.files_to_send) {
         let files_to_send = cli.matches.values_of(cli.arg_keys.files_to_send).unwrap();
-        SensorManager::send_messages(files_to_send, &mut subscriber).await?
+        SensorManager::send_messages_in_endless_loop(files_to_send, &mut subscriber).await?
+    }
+
+    if cli.matches.is_present(cli.arg_keys.random_msg_of_size) {
+        if let Some(msg_size_str) = cli.matches.value_of(cli.arg_keys.random_msg_of_size) {
+            let msg_size = usize::from_str(msg_size_str)?;
+            if msg_size > MAX_SIZE_RANDOM_MESSAGE {
+                log::error!("The MSG_SIZE value needs to be a positive integer number smaller than {}", MAX_SIZE_RANDOM_MESSAGE)
+            }
+            SensorManager::send_random_message_in_endless_loop(msg_size, &mut subscriber).await?
+        }
     }
 
     if cli.matches.is_present(cli.arg_keys.register_keyload_msg) {
@@ -179,7 +194,7 @@ pub async fn process_act_as_remote_control<'a>(cli: SensorCli<'a>) -> Result<()>
 
     let remote_manager = RemoteSensor::new(remote_manager_options);
 
-    println!(
+    log::info!(
         "[Sensor] Acting as remote sensor using {} as iota-bridge url",
         remote_manager.get_proxy_url()
     );
@@ -193,25 +208,21 @@ pub async fn process_act_as_remote_control<'a>(cli: SensorCli<'a>) -> Result<()>
             .value_of(cli.arg_keys.subscribe_announcement_link)
             .unwrap()
             .trim();
-        println!("[Sensor] Sending subscribe_announcement_link command to remote sensor. announcement_link: {}", announcement_link_str);
+        log::info!("[Sensor] Sending subscribe_announcement_link command to remote sensor. announcement_link: {}", announcement_link_str);
         show_subscriber_state = false;
         let confirm = remote_manager
             .subscribe_to_channel(announcement_link_str)
             .await?;
-        println!("[Sensor] Remote sensor confirmed Subscription: {}", confirm);
+        log::info!("[Sensor] Remote sensor confirmed Subscription: {}", confirm);
     }
 
     if cli.matches.is_present(cli.arg_keys.files_to_send) {
         let mut files_to_send = cli.matches.values_of(cli.arg_keys.files_to_send).unwrap();
         if let Some(first_file) = files_to_send.nth(0) {
-            println!("[Sensor] Sending files_to_send command to remote sensor.");
-            let confirm = remote_manager.send_messages(first_file).await?;
-            println!(
-                "[Sensor] Remote sensor confirmed files_to_send: {}",
-                confirm
-            );
+            log::info!("[Sensor] Sending files_to_send command to remote sensor.");
+            remote_manager.send_messages_in_endless_loop(first_file).await?;
         } else {
-            println!("[Sensor] WARNING: Could not find any filename in files_to_send list.");
+            log::info!("[Sensor] WARNING: Could not find any filename in files_to_send list.");
         }
     }
 
@@ -221,7 +232,7 @@ pub async fn process_act_as_remote_control<'a>(cli: SensorCli<'a>) -> Result<()>
             .value_of(cli.arg_keys.register_keyload_msg)
             .unwrap()
             .trim();
-        println!(
+        log::info!(
             "[Sensor] Sending register_keyload_msg command to remote sensor. keyload_msg_link: {}",
             keyload_msg_link_str
         );
@@ -229,16 +240,16 @@ pub async fn process_act_as_remote_control<'a>(cli: SensorCli<'a>) -> Result<()>
         let confirm = remote_manager
             .register_keyload_msg(keyload_msg_link_str)
             .await?;
-        println!(
+        log::info!(
             "[Sensor] Remote sensor confirmed KeyloadRegistration: {}",
             confirm
         );
     }
 
     if cli.matches.is_present(cli.arg_keys.clear_client_state) {
-        println!("[Sensor] Sending clear_client_state command to remote sensor.");
+        log::info!("[Sensor] Sending clear_client_state command to remote sensor.");
         let confirm = remote_manager.clear_client_state().await?;
-        println!(
+        log::info!(
             "[Sensor] Remote sensor confirmed ClearClientState: {}",
             confirm
         );
@@ -246,7 +257,7 @@ pub async fn process_act_as_remote_control<'a>(cli: SensorCli<'a>) -> Result<()>
 
     if show_subscriber_state {
         let confirm = remote_manager.println_subscriber_status().await?;
-        println!("[Sensor] Remote sensor SubscriberStatus: {}", confirm);
+        log::info!("[Sensor] Remote sensor SubscriberStatus: {}", confirm);
     }
 
     Ok(())
@@ -293,17 +304,29 @@ impl<'a> SensorFunctions for CmdProcessor<'a> {
         confirm_req_builder.subscription(sub_msg_link, public_key_str, initialization_cnt)
     }
 
-    async fn send_content_as_msg(
+    async fn send_content_as_msg_in_endless_loop(
         &self,
         message_key: String,
         subscriber: &mut Self::SubscriberManager,
         confirm_req_builder: &RequestBuilderConfirm,
     ) -> hyper::http::Result<Request<Body>> {
-        let prev_message =
-            SensorManager::send_file_content_as_msg(message_key.as_str(), subscriber)
+        SensorManager::send_file_content_as_msg_in_endless_loop(message_key.as_str(), subscriber)
                 .await
-                .expect("Error on calling SensorManager::send_file_content_as_msg");
-        confirm_req_builder.send_message(prev_message.to_string())
+                .expect("Error on calling SensorManager::send_file_content_as_msg_in_endless_loop");
+        confirm_req_builder.send_messages_in_endless_loop()
+    }
+
+
+    async fn send_random_msg_in_endless_loop(
+        &self,
+        msg_size: usize,
+        subscriber: &mut Self::SubscriberManager,
+        confirm_req_builder: &RequestBuilderConfirm,
+    ) -> hyper::http::Result<Request<Body>> {
+        SensorManager::send_random_message_in_endless_loop(msg_size, subscriber)
+                .await
+                .expect("Error on calling SensorManager::send_random_message_in_endless_loop");
+        confirm_req_builder.send_messages_in_endless_loop()
     }
 
     async fn register_keyload_msg(
@@ -364,7 +387,7 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
     }
 
     async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
-        println!("Received Command::{}", command);
+        log::info!("Received Command::{}", command);
         let mut subscriber = create_subscriber_manager(&self.cli).await?;
 
         let confirmation_request = process_sensor_commands(self, &mut subscriber, command, buffer)

@@ -10,7 +10,6 @@ use crate::{
         SubscriberStatus,
         KeyloadRegistration,
         ClearClientState,
-        SendMessages
     }
 };
 
@@ -154,11 +153,11 @@ impl<'a> RemoteSensor<'a> {
         self.poll_confirmation::<KeyloadRegistration>().await
     }
 
-    pub async fn send_messages(&self, file_to_send: &str) -> Result<SendMessages> {
+    pub async fn send_messages_in_endless_loop(&self, file_to_send: &str) -> Result<()> {
         self.http_client.request(
-            self.get_request_builder_command().send_message(file_to_send)?
+            self.get_request_builder_command().send_message_in_endless_loop(file_to_send)?
         ).await?;
-        self.poll_confirmation::<SendMessages>().await
+        Ok(())
     }
 
     pub async fn println_subscriber_status(&self) -> Result<SubscriberStatus> {

@@ -95,9 +95,11 @@ impl RequestBuilderConfirm {
         )
     }
 
-    pub fn send_message(self: &Self, previous_message_link: String) -> Result<Request<Body>> {
+    pub fn send_messages_in_endless_loop(self: &Self) -> Result<Request<Body>> {
+        // As the triggered functions will run in an endless loop
+        // this confirmation will not really be sent and currently just exists to satisfy the compiler.
         self.tools.send_enumerated_persistable_args(
-            SendMessages{previous_message_link},
+            SendMessages{ previous_message_link: "No previous message link available".to_string() },
             EndpointUris::SEND_MESSAGES
         )
     }

@@ -11,7 +11,7 @@ The inx-collector maps Streams addresses to IOTA block-ids and additionally acts
 permanode for all indexed blocks. The inx-collector consists of the following web services that
 are run using docker virtualization and docker-compose:
 
-* A [Hornet](https://wiki.iota.org/hornet/2.0-rc.6/welcome/) node
+* A [Hornet](https://wiki.iota.org/hornet/welcome/) node
 * The [INX Collector](https://github.com/teleconsys/inx-collector) plugin itself
 * An [INX Proof of Inclusion](https://github.com/iotaledger/inx-poi) plugin
 
@@ -24,7 +24,7 @@ As the inx-collector system includes a Hornet Node which communicates with other
 the system needs a publicly available domain name or static ip.
 
 The minimum specs for the virtual or physical server are described on the Hornet
-[Getting Started](https://wiki.iota.org/hornet/2.0-rc.6/getting_started/) page.
+[Getting Started](https://wiki.iota.org/hornet/getting_started/) page.
 
 We recommend to use the **Ubuntu 22.04** operating system as the following installation
 steps have been tested with this OS version.
@@ -103,49 +103,42 @@ For example if your VPS can be accessed via the domain `example.com` the minio c
 shall be accessible via `minio.example.com` after the installation steps have been finished.
 
 Upload the content of the `inx-collector/hornet-install-resources` folder to your host system.
-Before uploading it you may want to edit the values for ACME_EMAIL, NODE_HOST,
-MINIO_ROOT_USER and MINIO_ROOT_PASSWORD values in the `env.hornet.example` file.
-Alternatively you can edit those values after file upload off course. 
-
 Please replace `<NODE_HOST>` with the domain name or static ip of your host system and enter the password for the
-admin user when scp is executed. 
+admin user when scp is executed.
 ```bash
   # In the folder where this README.md is located (inx-collector folder)
   > scp hornet-install-resources/* admin@<NODE_HOST>:~
 ```
-
-Please login again as admin user via ssh. We will now follow the steps described in the
-[Install HORNET using Docker](https://wiki.iota.org/hornet/2.0-rc.6/how_tos/using_docker/)
+Please login as admin user via ssh. The following steps are equivalent 
+to the steps described in the
+[Install HORNET using Docker](https://wiki.iota.org/hornet/how_tos/using_docker/)
 howto.
+
 ```bash
   # in the admin home folder of your host system, check the folder content
   > ls -l
   # Make sure the following files exist:
-  # * docker-compose.hornet.patch  
   # * docker-compose-https.patch
-  # * env.hornet.example  
+  # * docker-compose.hornet.patch   
   # * prepare_docker.sh.patch  
   # * setup-hornet-node.sh
   
   # Execute the setup-hornet-node.sh script
   > ./setup-hornet-node.sh
-  
-  # If not done before edit the ACME_EMAIL, NODE_HOST, MINIO_ROOT_USER
-  # and MINIO_ROOT_PASSWORD values in the env.hornet.example file using
-  # an editor of your choice.
-  # see https://wiki.iota.org/hornet/2.0-rc.6/how_tos/using_docker/#1-setup-environment
-  # for more details
-  > nano env.hornet.example
-  
-  # Copy the edited env.hornet.example into the hornet folder
-  > cp env.hornet.example hornet/.env
-  
-  # Execute the prepare_docker.sh script in the hornet folder
+```
+
+In the hornet folder created by `setup-hornet-node.sh`, create a password hash and salt for the hornet dashboard
+as been described in the
+[wiki](https://wiki.iota.org/hornet/how_tos/using_docker/#1-generate-dashboard-credentials).
+
+Copy the output of the hornet pwd-hash tool into a tempüoraty file or editor because
+it will be needed during our next steps.
+
+```bash
   > cd hornet
-  > sudo ./prepare_docker.sh
-  
+
   # generate a password hash and salt for the hornet dashboard
-  # see https://wiki.iota.org/hornet/2.0-rc.6/how_tos/using_docker/#5-set-dashboard-credentials  
+  # see https://wiki.iota.org/hornet/how_tos/using_docker/#5-set-dashboard-credentials  
   > docker compose run hornet tool pwd-hash
   
   # Enter a passwort and store it in your passwort safe (keepass or similar) for later use.
@@ -156,19 +149,64 @@ howto.
   # you may have problems because port 80 is already in use.
   # To disable and stop an already installed apache server:
   # > sudo systemctl disable apache2 && sudo systemctl stop apache2
+```
 
-  # Edit password hash and salt in the .env file using an editor of your choice.
-  > nano .env
-  
-  # Replace the 0000000... values with the previously created hash and salt for
-  # DASHBOARD_PASSWORD and DASHBOARD_SALT
-  
+Edit the following values in the
+`env_template` file, that has been previously downloaded by the bash script.
+You'll find more details about the edited variables in the `env_template` file.
+
+```bash
+  # Edit the env_template file using an editor of your choice
+  # and implement the changes described below
+  > nano env_template
+```
+Uncomment and edit the variables of the https section
+* `COMPOSE_FILE`=docker-compose.yml:docker-compose-https.yml
+* `ACME_EMAIL`
+* `NODE_HOST`
+
+Please also uncomment and edit the following variables:
+* `HORNET_CONFIG_FILE` - Choose the correct network by uncommenting one of the provided lines
+* `COMPOSE_PROFILES`- Search for the line defining the value `=${COMPOSE_PROFILES},monitoring` and uncomment it
+* `DASHBOARD_USERNAME` - Use "susee-admin" for example
+* `DASHBOARD_PASSWORD` - Enter the previously created hash value here
+* `DASHBOARD_SALT` - Enter the previously created salt value here
+
+You may also want to have a look into the
+[setup-your-environment](https://wiki.iota.org/hornet/how_tos/using_docker/#2-setup-your-environment)
+wiki page for Hornet to dive deeper into Hornet configuration.
+
+Before storing the `env_template` file please append the following lines and
+edit the values for `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`:
+
+```dotenv
+    ###############################
+    # INX Collector Minio section #
+    ###############################
+    
+    # Edit the storage credentials for the minio object storage used by the inx-collector
+    MINIO_ROOT_USER=minio-admin
+    MINIO_ROOT_PASSWORD=minio-password-goes-here
+```
+
+After having saved the `env_template` file in your editor
+create an `.env` file from it.
+```bash
+  > cp env_template .env
+```
+
+Now we are able to prepare the data folder and to start the docker compose system:
+```bash
+  # Execute the prepare_docker.sh script in the hornet folder
+  > sudo ./prepare_docker.sh
+   
   # We are now ready to start the services in the background
   > docker compose up -d
 ```
 
 **After starting your node for the first time, please change the default 
-grafana credentials User: admin Password: admin**
+grafana credentials.**<br>
+Use the initial credentials User: `admin` Password: `admin` for the first login.
 
 You should now be able to access the following endpoints:
 
@@ -187,6 +225,14 @@ Please note: For instructions on deploying the used
 to production environments as distributed system,
 see the [Deploy MinIO: Multi-Node Multi-Drive](https://min.io/docs/minio/linux/operations/install-deploy-manage/deploy-minio-multi-node-multi-drive.html#deploy-minio-distributed)
 documentation page.
+
+### Update Hornet Images
+
+```bash
+  # in the hornet folder in your host system
+  > docker compose pull
+  > docker compose up -d
+```
 
 ## Private tangle for development purposes
 

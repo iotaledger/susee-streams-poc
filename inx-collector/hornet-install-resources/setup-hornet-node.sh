@@ -1,13 +1,13 @@
 #!/bin/bash
+DIR_NAME="hornet"
 
-if [ -d "hornet" ]
+if [ -d $DIR_NAME ]
 then
-  echo "Directory 'hornet' already exists. Exiting process."
+  echo "Directory '"$DIR_NAME"' already exists. Exiting process."
 else
-  mkdir hornet
-  cd hornet
-  curl -L -O "https://github.com/iotaledger/node-docker-setup/releases/download/v1.0.0-rc.16/node-docker-setup_stardust-v1.0.0-rc.16.tar.gz"
-  tar -zxf node-docker-setup_stardust-v1.0.0-rc.16.tar.gz
+  mkdir $DIR_NAME
+  cd $DIR_NAME
+  curl -L https://node-docker-setup.iota.org/stardust | tar -zx
 
   patch -t docker-compose.yml ../docker-compose.hornet.patch
   patch -t docker-compose-https.yml ../docker-compose-https.patch
@@ -20,13 +20,4 @@ else
 
   sudo ufw allow 15600,80,443,4000,5550,9030/tcp
   sudo ufw allow 14626,4000/udp
-
-
-
-
-
-
-
-
-
 fi

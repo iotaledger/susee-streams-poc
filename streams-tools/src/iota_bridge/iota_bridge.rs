@@ -1,5 +1,7 @@
 use std::{
     clone::Clone,
+    cell::RefCell,
+    rc::Rc,
 };
 
 use async_trait::async_trait;
@@ -53,14 +55,14 @@ pub struct ClientFactory {
 impl  TransportFactory for ClientFactory {
     type Output = Client<MessageIndexer>;
 
-    async fn new_transport<'a>(&self) -> Box<Self::Output> {
+    async fn new_transport<'a>(&self) -> Rc<RefCell<Self::Output>> {
         let indexer = MessageIndexer::new(MessageIndexerOptions::new(self.iota_node.clone()));
-        Box::new(
+        Rc::new(RefCell::new(
             Client::for_node(
                 &get_iota_node_url(self.iota_node.as_str()),
                 indexer
             ).await.expect("Could not create client for tangle")
-        )
+        ))
     }
 }
 
@@ -69,7 +71,7 @@ impl  TransportFactory for ClientFactory {
 #[derive(Clone)]
 pub struct IotaBridge<'a> {
     scope_provide: ServerScopeProvide,
-    dispatch_streams: DispatchStreams<ClientFactory>,
+    dispatch_streams: DispatchStreams,
     dispatch_command: DispatchCommand<'a>,
     dispatch_confirm: DispatchConfirm<'a>,
     dispatch_lorawan_node: DispatchLoraWanNode,

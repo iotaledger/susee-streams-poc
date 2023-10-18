@@ -2,7 +2,9 @@ use std::{
     clone::Clone,
     str::FromStr,
     rc::Rc,
+    cell::RefCell,
     convert::TryInto,
+    borrow::BorrowMut,
 };
 
 use base64::engine::{
@@ -12,7 +14,7 @@ use base64::engine::{
 
 use log;
 
-use anyhow::{bail};
+use anyhow::{anyhow, bail};
 
 use async_trait::async_trait;
 
@@ -84,26 +86,47 @@ use super::{
         LoraWanNode,
         pending_request,
         PendingRequest,
+    },
+    streams_transport_pool::{
+        StreamsTransportPool,
+        StreamsTransportPoolImpl,
+        TransportHandle
     }
 };
 
 #[async_trait(?Send)]
 pub trait TransportFactory: Clone {
     type Output;
-    async fn new_transport<'a>(&self) -> Box<Self::Output>;
+    async fn new_transport<'a>(&self) -> Rc<RefCell<Self::Output>>;
 }
 
-pub struct DispatchStreams<TransportFactoryT: TransportFactory> {
-    transport_factory: TransportFactoryT,
+static mut STREAMS_TRANSPORT_POOL: Option<Box<dyn StreamsTransportPool>> = None;
+
+
+impl<'a> Drop for TransportHandle<'a> {
+    fn drop(&mut self) {
+        unsafe {
+            match STREAMS_TRANSPORT_POOL.borrow_mut() {
+                Some(pool) => {
+                    pool.release_transport(&self);
+                },
+                None => {
+                    log::error!("STREAMS_TRANSPORT_POOL.borrow_mut() failed")
+                }
+            }
+        }
+    }
+}
+
+pub struct DispatchStreams {
     lorawan_nodes: LoraWanNodeDataStore,
     pending_requests: PendingRequestDataStore,
     scope: Option<Rc<dyn DispatchScope>>,
 }
 
-impl<'a, TransportFactoryT: TransportFactory> Clone for DispatchStreams<TransportFactoryT> {
+impl Clone for DispatchStreams {
     fn clone(&self) -> Self {
         DispatchStreams {
-            transport_factory: self.transport_factory.clone(),
             lorawan_nodes: self.lorawan_nodes.clone(),
             pending_requests: self.pending_requests.clone(),
             scope: self.scope.clone(),
@@ -111,11 +134,23 @@ impl<'a, TransportFactoryT: TransportFactory> Clone for DispatchStreams<Transpor
     }
 }
 
-impl<TransportFactoryT: TransportFactory> DispatchStreams<TransportFactoryT>
-{
-    pub fn new(transport_factory: TransportFactoryT, lorawan_nodes: LoraWanNodeDataStore, pending_requests: PendingRequestDataStore) -> Self {
+impl DispatchStreams {
+    pub fn new<TransportFactoryT>(transport_factory: TransportFactoryT, lorawan_nodes: LoraWanNodeDataStore, pending_requests: PendingRequestDataStore) -> Self
+    where
+        TransportFactoryT: TransportFactory + 'static,
+        for<'a> <TransportFactoryT as TransportFactory>::Output: Transport<'a, Msg = TransportMessage, SendResponse = TransportMessage> + 'static
+    {
+        unsafe {
+            // TODO: This unsafe code needs to be replaced by a thread safe shared queue instance
+            //       based on Arc::new(Mutex::new(......)) as been described here
+            //       https://stackoverflow.com/questions/60996488/passing-additional-state-to-rust-hyperserviceservice-fn
+            if STREAMS_TRANSPORT_POOL.is_none() {
+                STREAMS_TRANSPORT_POOL = Some(Box::new(StreamsTransportPoolImpl::<TransportFactoryT>::new(
+                    transport_factory
+                )));
+            }
+        }
         Self {
-            transport_factory,
             lorawan_nodes,
             pending_requests,
             scope: None,
@@ -261,11 +296,7 @@ impl<TransportFactoryT: TransportFactory> DispatchStreams<TransportFactoryT>
 }
 
 
-impl<TransportFactoryT> DispatchStreams<TransportFactoryT>
-    where
-        TransportFactoryT: TransportFactory,
-        for <'a> TransportFactoryT::Output: Transport<'a, Msg = TransportMessage>
-{
+impl DispatchStreams {
     async fn retransmit_receive_compressed_message_from_address(self: &mut Self, pending_request: PendingRequest) -> Result<Response<Body>> {
         let cmpr_addr_str =
             TangleAddressCompressed {
@@ -317,47 +348,74 @@ Request key:
 }
 
 #[async_trait(?Send)]
-impl<TransportFactoryT> ServerDispatchStreams for DispatchStreams<TransportFactoryT>
-where
-    TransportFactoryT: TransportFactory,
-    for <'a> TransportFactoryT::Output: Transport<'a, Msg = TransportMessage>,
-{
+impl ServerDispatchStreams for DispatchStreams {
 
     fn get_uri_prefix(&self) -> &'static str { URI_PREFIX_STREAMS }
 
     async fn send_message(&mut self, message: &LinkedMessage) -> Result<Response<Body>> {
         println_send_message_for_incoming_message(message);
-        let mut transport = self.transport_factory.new_transport().await;
-        let res = transport.send_message(message.link, message.body.clone()).await;
-        match res {
-            Ok(_) => {
-                self.write_channel_id_to_scope(&message.link);
-                Response::builder().status(self.get_success_response_status_code())
-                    .body(Default::default())
-            },
-            Err(err) => log_lets_err_and_respond_mapped_status_code(err, "send_message")
+        unsafe {
+            match STREAMS_TRANSPORT_POOL.borrow_mut() {
+                Some(pool) => {
+                    if let Some(mut transport) = pool.get_transport().await {
+                        let res = transport.send_message(message.link, message.body.clone()).await;
+                        std::mem::drop(transport);
+                        match res {
+                            Ok(_) => {
+                                self.write_channel_id_to_scope(&message.link);
+                                Response::builder().status(self.get_success_response_status_code())
+                                    .body(Default::default())
+                            },
+                            Err(err) => log_lets_err_and_respond_mapped_status_code(err, "send_message")
+                        }
+                    } else {
+                        log_anyhow_err_and_respond_500(anyhow!("Could not get available streams transport client from pool"), "send_message")
+                    }
+                },
+                None => {
+                    log_anyhow_err_and_respond_500(anyhow!("Could not get transport pool"), "send_message")
+                }
+            }
         }
     }
 
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
         log::debug!("[fn receive_message_from_address()] Incoming request for address: {}", address_str);
         let address = Address::from_str(address_str).unwrap();
-        let mut transport = self.transport_factory.new_transport().await;
-        let message = transport.recv_message(address).await;
-        match message {
-            Ok(msg) => {
-                println_receive_message_from_address_for_received_message(&msg);
-                self.write_channel_id_to_scope(&address);
-                let mut buffer: Vec<u8> = vec![0;BinaryPersist::needed_size(&msg)];
-                let size = BinaryPersist::to_bytes(&msg, buffer.as_mut_slice());
-                log::debug!("[fn receive_message_from_address()] Returning binary data via socket connection. length: {} bytes, data:\n\
+        unsafe {
+            match STREAMS_TRANSPORT_POOL.borrow_mut() {
+                Some(pool) => {
+                    if let Some(mut transport) = pool.get_transport().await {
+                        let message = transport.recv_message(address).await;
+                        std::mem::drop(transport);
+                        match message {
+                            Ok(msg) => {
+                                println_receive_message_from_address_for_received_message(&msg);
+                                self.write_channel_id_to_scope(&address);
+                                let mut buffer: Vec<u8> = vec![0;BinaryPersist::needed_size(&msg)];
+                                let size = BinaryPersist::to_bytes(&msg, buffer.as_mut_slice());
+                                log::debug!("[fn receive_message_from_address()] Returning binary data via socket connection. length: {} bytes, data:\n\
 {:02X?}\n", size.unwrap_or_default(), buffer);
-                Response::builder().status(self.get_success_response_status_code())
-                    .body(buffer.into())
-            },
-            Err(err) => {
-                log::info!("Address msg_index is: {}", hex::encode(address.to_msg_index()));
-                log_lets_err_and_respond_mapped_status_code(err, "receive_message_from_address")
+                                Response::builder().status(self.get_success_response_status_code())
+                                    .body(buffer.into())
+                            },
+                            Err(err) => {
+                                log::info!("Address msg_index is: {}", hex::encode(address.to_msg_index()));
+                                log_lets_err_and_respond_mapped_status_code(err, "receive_message_from_address")
+                            }
+                        }
+                    } else {
+                        log_anyhow_err_and_respond_500(
+                            anyhow!("Could not get available streams transport client from pool"),
+                            "receive_message_from_address"
+                        )
+                    }
+                },
+                None => {
+                    log_anyhow_err_and_respond_500(
+                        anyhow!("Could not transport pool"),"receive_message_from_address"
+                    )
+                }
             }
         }
     }
@@ -443,7 +501,7 @@ where
 }
 
 #[async_trait(?Send)]
-impl<TransportFactoryT: TransportFactory> ScopeConsume for DispatchStreams<TransportFactoryT> {
+impl ScopeConsume for DispatchStreams {
     fn set_scope(&mut self, scope: Rc<dyn DispatchScope>) {
         self.scope = Some(scope);
     }

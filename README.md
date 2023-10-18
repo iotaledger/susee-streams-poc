@@ -50,8 +50,7 @@
       ===   * Option 2: https://www.nerdieworks.nl/posts/client-certificate-authentication-with-traefik/
       === * Perform load test for IOTA Bridge simulating 250 Sensors          ===
       ===   sending messages with 5 minute interval                           ===
-      === * IOTA Bridge log time stamps                                       ===
-      === * IOTA Bridge Multithread                                           ===
+      === * IOTA Bridge errors due to multiple used mut references            ===
       === * Message Explorer:                                                 ===
       ===   * Fix bug on client syncing                                       ===
       ===   * new function recover existing accounts: Preserve seed but       ===

@@ -3,7 +3,6 @@ use std::{
     str::FromStr,
     rc::Rc,
     convert::TryInto,
-    cell::RefCell,
 };
 
 use base64::engine::{
@@ -88,17 +87,23 @@ use super::{
     }
 };
 
-pub struct DispatchStreams<TransportT> {
-    transport: Rc<RefCell<TransportT>>,
+#[async_trait(?Send)]
+pub trait TransportFactory: Clone {
+    type Output;
+    async fn new_transport<'a>(&self) -> Box<Self::Output>;
+}
+
+pub struct DispatchStreams<TransportFactoryT: TransportFactory> {
+    transport_factory: TransportFactoryT,
     lorawan_nodes: LoraWanNodeDataStore,
     pending_requests: PendingRequestDataStore,
     scope: Option<Rc<dyn DispatchScope>>,
 }
 
-impl<TransportT> Clone for DispatchStreams<TransportT> {
+impl<'a, TransportFactoryT: TransportFactory> Clone for DispatchStreams<TransportFactoryT> {
     fn clone(&self) -> Self {
         DispatchStreams {
-            transport: self.transport.clone(),
+            transport_factory: self.transport_factory.clone(),
             lorawan_nodes: self.lorawan_nodes.clone(),
             pending_requests: self.pending_requests.clone(),
             scope: self.scope.clone(),
@@ -106,11 +111,11 @@ impl<TransportT> Clone for DispatchStreams<TransportT> {
     }
 }
 
-impl<TransportT> DispatchStreams<TransportT>
+impl<TransportFactoryT: TransportFactory> DispatchStreams<TransportFactoryT>
 {
-    pub fn new(transport: Rc<RefCell<TransportT>>, lorawan_nodes: LoraWanNodeDataStore, pending_requests: PendingRequestDataStore) -> Self {
+    pub fn new(transport_factory: TransportFactoryT, lorawan_nodes: LoraWanNodeDataStore, pending_requests: PendingRequestDataStore) -> Self {
         Self {
-            transport,
+            transport_factory,
             lorawan_nodes,
             pending_requests,
             scope: None,
@@ -256,9 +261,10 @@ impl<TransportT> DispatchStreams<TransportT>
 }
 
 
-impl<TransportT> DispatchStreams<TransportT>
+impl<TransportFactoryT> DispatchStreams<TransportFactoryT>
     where
-            for <'a> TransportT: Transport<'a, Msg = TransportMessage>
+        TransportFactoryT: TransportFactory,
+        for <'a> TransportFactoryT::Output: Transport<'a, Msg = TransportMessage>
 {
     async fn retransmit_receive_compressed_message_from_address(self: &mut Self, pending_request: PendingRequest) -> Result<Response<Body>> {
         let cmpr_addr_str =
@@ -311,16 +317,17 @@ Request key:
 }
 
 #[async_trait(?Send)]
-impl<TransportT> ServerDispatchStreams for DispatchStreams<TransportT>
+impl<TransportFactoryT> ServerDispatchStreams for DispatchStreams<TransportFactoryT>
 where
-    for <'a> TransportT: Transport<'a, Msg = TransportMessage>,
+    TransportFactoryT: TransportFactory,
+    for <'a> TransportFactoryT::Output: Transport<'a, Msg = TransportMessage>,
 {
 
     fn get_uri_prefix(&self) -> &'static str { URI_PREFIX_STREAMS }
 
     async fn send_message(&mut self, message: &LinkedMessage) -> Result<Response<Body>> {
         println_send_message_for_incoming_message(message);
-        let mut transport = self.transport.borrow_mut();
+        let mut transport = self.transport_factory.new_transport().await;
         let res = transport.send_message(message.link, message.body.clone()).await;
         match res {
             Ok(_) => {
@@ -335,7 +342,8 @@ where
     async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
         log::debug!("[fn receive_message_from_address()] Incoming request for address: {}", address_str);
         let address = Address::from_str(address_str).unwrap();
-        let message = self.transport.recv_message(address).await;
+        let mut transport = self.transport_factory.new_transport().await;
+        let message = transport.recv_message(address).await;
         match message {
             Ok(msg) => {
                 println_receive_message_from_address_for_received_message(&msg);
@@ -435,7 +443,7 @@ where
 }
 
 #[async_trait(?Send)]
-impl<TransportT> ScopeConsume for DispatchStreams<TransportT> {
+impl<TransportFactoryT: TransportFactory> ScopeConsume for DispatchStreams<TransportFactoryT> {
     fn set_scope(&mut self, scope: Rc<dyn DispatchScope>) {
         self.scope = Some(scope);
     }

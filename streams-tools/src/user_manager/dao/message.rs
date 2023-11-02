@@ -1,3 +1,4 @@
+use std::fmt;
 use anyhow::Result;
 
 use serde::{
@@ -32,10 +33,16 @@ pub struct Message {
     pub wrapped_binary: Vec<u8>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MessageDataStoreOptions {
     pub file_path_and_name: String,
     pub streams_channel_id: String,
+}
+
+impl fmt::Display for MessageDataStoreOptions {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "file_path_and_name: {}, streams_channel_id: {}", self.file_path_and_name, self.streams_channel_id)
+    }
 }
 
 impl DbFileBasedDaoManagerOpt for MessageDataStoreOptions {

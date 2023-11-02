@@ -19,17 +19,21 @@ use crate::{
 pub struct MessageManager<'a, TransT> {
     user: &'a mut User<TransT>,
     message_data_store: MessageDataStore,
+    streams_channel_id: String,
 }
 
 impl<'a, TransT> MessageManager<'a, TransT> {
     pub fn new(user: &'a mut User<TransT>, channel_id: String, db_file_name: String) -> Self {
-        let message_data_store = MessageDataStore::new(MessageDataStoreOptions {
+        let msg_data_store_opt = MessageDataStoreOptions {
             file_path_and_name: db_file_name,
             streams_channel_id: channel_id.clone()
-        });
+        };
+        log::debug!("[fn new()] Creating new MessageManager using MessageDataStoreOptions {}", msg_data_store_opt);
+        let message_data_store = MessageDataStore::new(msg_data_store_opt);
         MessageManager {
             user,
             message_data_store,
+            streams_channel_id: channel_id,
         }
     }
 
@@ -49,8 +53,10 @@ where
     pub async fn sync(&mut self) -> Result<u32> {
         let mut messages = self.user.messages();
         let mut num_messages_stored = 0;
+        log::debug!("[fn sync()] Starting to sync addresses for channel {}", self.streams_channel_id);
         while let Some(msg) = messages.try_next().await? {
             num_messages_stored += 1;
+            log::debug!("[fn sync()] Writing message {} to message_data_store", msg.address.relative().to_string());
             self.message_data_store.write_item_to_db(
                 &DaoMessage{
                     message_id: msg.address.relative().to_string(),

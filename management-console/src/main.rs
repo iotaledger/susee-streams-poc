@@ -266,7 +266,7 @@ async fn main() -> Result<()> {
             ExplorerOptions {
                 iota_node: cli.node.to_string(),
                 wallet_filename: get_management_console_wallet_filename(&cli)?,
-                db_file_name: DB_FILE_PATH_AND_NAME.to_string(),
+                db_file_name: get_data_folder_file_path(&cli.data_dir, DB_FILE_PATH_AND_NAME),
                 listener_ip_address_port: message_explorer_listener_address.to_string(),
                 streams_user_serialization_password: SUSEE_CONST_SECRET_PASSWORD.to_string()
             }

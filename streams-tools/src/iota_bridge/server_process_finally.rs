@@ -106,19 +106,18 @@ impl ServerProcessFinally for ProcessFinally {
 //
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-    use rusqlite::Connection;
-    use crate::http::ScopeProvide;
-    use crate::iota_bridge::ServerScopeProvide;
-    use super::*;
     use hyper::http::StatusCode;
+    use super::*;
+    use crate::{
+        http::ScopeProvide,
+        iota_bridge::ServerScopeProvide,
+        dao_helpers::DbFileBasedDaoManagerOptions
+    };
 
     #[test]
     fn test_handle_add_new_lorawan_node_to_db() {
-        let lorawan_nodes = LoraWanNodeDataStore::new_from_connection(
-            Rc::new(Connection::open_in_memory().unwrap()),
-            None,
-        );
+        let options = DbFileBasedDaoManagerOptions { file_path_and_name: "not used".to_string() };
+        let lorawan_nodes = LoraWanNodeDataStore::new(options);
         let process_finally = ProcessFinally::new(lorawan_nodes);
 
         let mut scope_provide = ServerScopeProvide::new();

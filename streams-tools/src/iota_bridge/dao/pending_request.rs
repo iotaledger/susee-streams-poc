@@ -190,8 +190,10 @@ pub type PendingRequestDataStore = DaoDataStore<PendingRequestDaoManager>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::helpers::SerializationCallbackRefToClosureI64;
-    use iota_streams::app::transport::tangle::MSGID_SIZE;
+    use crate::{
+        helpers::SerializationCallbackRefToClosureI64,
+        binary_persist::binary_persist_tangle::MSGID_SIZE,
+    };
 
     const DEV_EUI: &str = "12345678";
     const MSG_ID: [u8; MSGID_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -199,8 +201,8 @@ mod tests {
 
     #[test]
     fn test_pending_request_dao_manager() {
-        let connection = Rc::new(Connection::open_in_memory().unwrap());
-        let dao_manager = PendingRequestDaoManager::new(connection.clone());
+        let options = DbFileBasedDaoManagerOptions { file_path_and_name: "not used".to_string() };
+        let dao_manager = PendingRequestDaoManager::new(options);
         dao_manager.init_db_schema().unwrap();
 
         let mut pending_request = PendingRequest::new(
@@ -226,11 +228,7 @@ mod tests {
         }
     }
 
-    fn create_data_store_with_item_0() -> (PendingRequestDaoManager, PendingRequestDataStore, PendingRequest, SerializationCallbackRefToClosureI64) {
-        let connection = Rc::new(Connection::open_in_memory().unwrap());
-        let dao_manager = PendingRequestDaoManager::new(connection.clone());
-        dao_manager.init_db_schema().unwrap();
-
+    fn create_data_store_with_item_0() -> (PendingRequestDataStore, PendingRequest, SerializationCallbackRefToClosureI64) {
         let mut pending_request =  PendingRequest::new(
             DEV_EUI.to_string(),
             MSG_ID.to_vec(),
@@ -238,23 +236,19 @@ mod tests {
             vec![1, 2, 3]
         );
 
-        let request_id = dao_manager.write_item_to_db(&pending_request).unwrap();
+        let options = DbFileBasedDaoManagerOptions { file_path_and_name: "not used".to_string() };
+        let data_store = PendingRequestDataStore::new(options);
+        let request_id = data_store.write_item_to_db(&pending_request).unwrap();
         pending_request.request_key = Some(request_id);
-
-        let data_store = PendingRequestDataStore::new_from_connection(
-            dao_manager.connection.clone(),
-            None
-        );
 
         let (pending_request_from_db, serialization_callback) = data_store.get_item(&request_id).unwrap();
         assert_eq!(pending_request_from_db, pending_request);
-        (dao_manager, data_store, pending_request, serialization_callback)
+        (data_store, pending_request, serialization_callback)
     }
 
     #[test]
     fn test_pending_request_serialization_callback() {
-        let (pending_request_dao_manager,
-            _data_store,
+        let (data_store,
             mut pending_request_0,
             serialization_callback,
         ) = create_data_store_with_item_0();
@@ -268,7 +262,7 @@ mod tests {
         if let Some (request_key) = pending_request_0.request_key {
             serialization_callback(request_key, pending_request_0.streams_api_request.clone()).unwrap();
 
-            let item_from_db_0 = pending_request_dao_manager.get_item_from_db(&request_key).unwrap();
+            let (item_from_db_0, _) = data_store.get_item(&request_key).unwrap();
             assert_eq!(item_from_db_0, pending_request_0);
         } else {
             assert_ne!(pending_request_0.request_key, None);

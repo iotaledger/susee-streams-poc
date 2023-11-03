@@ -559,7 +559,7 @@ mod tests {
         let message = TangleMessageCompressed {
             dev_eui: vec![], // Currently the dev_eui is not persisted. See TangleMessageCompressed::to_bytes() for more info
             link: get_compressed_address(),
-            body: BinaryBody::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+            body: TransportMessage::new(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
         };
         let api_request = StreamsApiRequest {
             api_function: StreamsApiFunction::SendCompressedMessage,

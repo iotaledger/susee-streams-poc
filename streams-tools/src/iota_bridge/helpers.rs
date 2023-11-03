@@ -90,10 +90,10 @@ mod tests {
     }
 
     #[test]
-    fn test_log_err_and_respond_500() {
+    fn test_log_anyhow_err_and_respond_500() {
         let err = anyhow::anyhow!("test error");
         let fn_name = "test_fn_name";
-        let response = log_err_and_respond_500(err, fn_name).unwrap();
+        let response = log_anyhow_err_and_respond_500(err, fn_name).unwrap();
         // We expect a 510 because currently it is not possible to access the streams error value.
         // Instead we expect a MessageLinkNotFoundInTangle error to make the susee POC run at all.
         assert_eq!(response.status(), 510);

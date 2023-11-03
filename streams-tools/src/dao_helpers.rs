@@ -442,9 +442,19 @@ pub trait DbFileBasedDaoManagerOpt: Clone {
     }
 }
 
+#[cfg(not(test))]
 impl DbFileBasedDaoManagerOpt for DbFileBasedDaoManagerOptions {
     fn file_path_and_name(&self) -> String {
         self.file_path_and_name.clone()
+    }
+}
+
+#[cfg(test)]
+impl DbFileBasedDaoManagerOpt for DbFileBasedDaoManagerOptions {
+    fn file_path_and_name(&self) -> String { "NOT USED".to_string() }
+
+    fn get_new_connection(&self) -> Connection {
+        Connection::open_in_memory().unwrap()
     }
 }
 
@@ -453,6 +463,7 @@ impl DbFileBasedDaoManagerOpt for DbFileBasedDaoManagerOptions {
 //
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
     use rusqlite::params;
     use serde_rusqlite::to_params_named;
     use super::*;
@@ -470,12 +481,12 @@ mod tests {
 
     #[derive(Clone)]
     pub struct TestItemDaoManager {
-        connection: Rc<Connection>,
+        connection: Arc<Mutex<Connection>>,
     }
 
     #[derive(Clone)]
     pub struct TestItemDaoManagerOptions{
-        pub connection: Rc<Connection>
+        pub connection: Arc<Mutex<Connection>>
     }
 
     impl<'a> DaoManager for TestItemDaoManager {
@@ -496,7 +507,7 @@ mod tests {
         }
 
         fn get_connection(&self) -> &Connection {
-            &self.connection
+            unimplemented!()
         }
 
         fn get_table_name(&self) -> String { "test_item".to_string() }
@@ -506,7 +517,8 @@ mod tests {
         }
 
         fn init_db_schema(&self) -> Result<()> {
-            self.connection.execute(format!("CREATE TABLE IF NOT EXISTS {} (\
+            let connection = self.connection.lock().unwrap();
+            connection.execute(format!("CREATE TABLE IF NOT EXISTS {} (\
                 {} TEXT NOT NULL PRIMARY KEY,\
                 some_data BLOB NOT NULL\
             )
@@ -523,12 +535,13 @@ mod tests {
             get_item_from_db(self, &id_starts_with.to_string(),  MatchType::StartsWith)
         }
 
-        fn find_all(&self, key_starts_with: &str, limit: Option<Limit>) -> Result<(Vec<Self::ItemType, Global>, usize), Error> {
+        fn find_all(&self, _key_starts_with: &str, _limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {
             unimplemented!()
         }
 
         fn write_item_to_db(&self, item: &Self::ItemType) -> Result<Self::PrimaryKeyType> {
-            let _rows = self.connection.execute(
+            let connection = self.connection.lock().unwrap();
+            let _rows = connection.execute(
                 format!(
                     "INSERT OR REPLACE INTO {} ({}, some_data) VALUES (:id, :some_data)",
                     self.get_table_name(),
@@ -540,7 +553,8 @@ mod tests {
         }
 
         fn delete_item_in_db(&self, key: &Self::PrimaryKeyType) -> Result<()> {
-            let _rows = self.connection.execute(
+            let connection = self.connection.lock().unwrap();
+            let _rows = connection.execute(
                 format!(
                     "DELETE FROM {} WHERE {} = '{}'",
                     self.get_table_name(),
@@ -561,13 +575,22 @@ mod tests {
                 Ok(ret_val)
             })
         }
+
+        fn filter(&self, _conditions: Vec<Condition>, _limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {
+            todo!()
+        }
     }
 
     pub type TestItemDataStore = DaoDataStore<TestItemDaoManager>;
 
     #[test]
     fn test_item_dao_manager() {
-        let test_item_dao_manager = TestItemDaoManager::new(Rc::new(Connection::open_in_memory().unwrap()));
+        let options = TestItemDaoManagerOptions {
+            connection: Arc::new(Mutex::new(
+                Connection::open_in_memory().unwrap()
+            ))
+        };
+        let test_item_dao_manager = TestItemDaoManager::new(options);
         test_item_dao_manager.init_db_schema().unwrap();
 
         let test_item = TestItem { id: "test".to_string(), some_data: vec![1, 2, 3, 4] };
@@ -592,19 +615,19 @@ mod tests {
     }
 
     fn create_data_store_with_item_0() -> (TestItemDaoManager, DaoDataStore<TestItemDaoManager>, TestItem, SerializationCallbackRefToClosureString) {
-        let test_item_dao_manager = TestItemDaoManager::new(
-            Rc::new(Connection::open_in_memory().unwrap())
-        );
+        let options = TestItemDaoManagerOptions {
+            connection: Arc::new(Mutex::new(
+                Connection::open_in_memory().unwrap()
+            ))
+        };
+        let test_item_dao_manager = TestItemDaoManager::new(options.clone());
         test_item_dao_manager.init_db_schema().unwrap();
 
         let test_item_0 = TestItem { id: "item-0".to_string(), some_data: vec![1, 2, 3, 4] };
         let key = test_item_dao_manager.write_item_to_db(&test_item_0).unwrap();
         assert_eq!(key, test_item_0.id);
 
-        let test_item_data_store = TestItemDataStore::new_from_connection(
-            test_item_dao_manager.connection.clone(),
-            None
-        );
+        let test_item_data_store = TestItemDataStore::new(options);
         let (test_item_from_db_0, serialization_callback) = test_item_data_store.get_item(&"item-0".to_string()).unwrap();
         assert_eq!(test_item_from_db_0, test_item_0);
         (test_item_dao_manager, test_item_data_store, test_item_0, serialization_callback)

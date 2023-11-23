@@ -49,7 +49,8 @@
       ===   * Option 1 (easy): Remove the routes by commenting out the code   ===
       ===   * Option 2: https://www.nerdieworks.nl/posts/client-certificate-authentication-with-traefik/
       === * Perform load test for IOTA Bridge simulating 250 Sensors          ===
-      ===   sending messages with 10 minute interval                           ===
+      ===   sending messages with 10 minute interval                          ===
+      === * Version info endpoint for iota-bridge + log output                ===
       === * Message Explorer:                                                 ===
       ===   * Fix bug on client syncing                                       ===
       ===   * new function recover existing accounts: Preserve seed but       ===

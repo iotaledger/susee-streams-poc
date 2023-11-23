@@ -21,6 +21,9 @@ pub mod dao_helpers;
 #[cfg(feature = "explorer")]
 pub mod explorer;
 
+#[cfg(test)]
+pub (crate) mod test_helpers;
+
 pub use {
     wallet::{
         dummy_wallet::DummyWallet,

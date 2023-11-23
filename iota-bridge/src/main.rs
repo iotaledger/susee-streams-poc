@@ -16,7 +16,10 @@ use hyper::{
     }
 };
 
-use tokio::sync::oneshot;
+use tokio::{
+    sync::oneshot,
+    task::LocalSet,
+};
 
 use anyhow::Result;
 
@@ -27,6 +30,11 @@ use streams_tools::{
     iota_bridge::{
         LoraWanNodeDataStore,
         PendingRequestDataStore,
+        BufferedMessageDataStore,
+        buffered_message_loop::{
+            run_buffered_message_loop,
+            BufferedMessageLoopOptions,
+        },
     },
     dao_helpers::DbFileBasedDaoManagerOptions,
     IotaBridge,
@@ -69,24 +77,37 @@ fn main() {
 
     // Combine it with a `LocalSet,  which means it can spawn !Send futures...
     let local = tokio::task::LocalSet::new();
-    local.block_on(&rt, run());
-}
 
-async fn run() {
     set_env_rust_log_variable_if_not_defined_by_env("info");
     env_logger::init();
     let matches_and_options = get_arg_matches();
     let cli = IotaBridgeCli::new(&matches_and_options, &ARG_KEYS) ;
     assert_data_dir_existence(&cli.data_dir).expect(
         format!("Could not create data_dir '{}'", cli.data_dir).as_str());
-    log::info!("Using node '{}' for tangle connection", cli.node);
-
     let db_connection_opt = DbFileBasedDaoManagerOptions {
         file_path_and_name: get_data_folder_file_path(&cli.data_dir, "iota-bridge.sqlite3")
     };
+
+    run_buffered_message_loop_in_background(&local, cli.node, db_connection_opt.clone());
+    local.block_on(&rt, run(db_connection_opt.clone(), cli));
+}
+
+fn run_buffered_message_loop_in_background(local: &LocalSet, iota_node: &str, db_connection_opt: DbFileBasedDaoManagerOptions) {
+    local.spawn_local(
+        run_buffered_message_loop( BufferedMessageLoopOptions::new(
+            iota_node,
+            move || { BufferedMessageDataStore::new(db_connection_opt.clone()) }
+        ))
+    );
+}
+
+async fn run<'a>(db_connection_opt: DbFileBasedDaoManagerOptions, cli: IotaBridgeCli<'a>) {
+    log::info!("Using node '{}' for tangle connection", cli.node);
+
     let lora_wan_node_store = LoraWanNodeDataStore::new(db_connection_opt.clone());
-    let pending_request_store = PendingRequestDataStore::new(db_connection_opt);
-    let client = IotaBridge::new(cli.node, lora_wan_node_store, pending_request_store).await;
+    let pending_request_store = PendingRequestDataStore::new(db_connection_opt.clone());
+    let buffered_message_store = BufferedMessageDataStore::new(db_connection_opt);
+    let client = IotaBridge::new(cli.node, lora_wan_node_store, pending_request_store, buffered_message_store).await;
 
     let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT).into();
     if cli.matches.is_present(cli.arg_keys.listener_ip_address_port) {

@@ -10,12 +10,6 @@ use rusqlite::{
     params,
 };
 
-use serde_rusqlite::to_params_named;
-
-use streams::{
-    Address,
-};
-
 use crate::{
     helpers::SerializationCallbackRefToClosureI64,
     binary_persist::LinkedMessage,
@@ -30,12 +24,13 @@ use crate::{
         Condition,
         get_item_from_db,
         update_db_schema_to_current_version,
+        filter_items,
     }
 };
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default, Clone)]
 pub struct BufferedMessage {
-    pub id: i64,
+    pub id: Option<i64>,
     pub link: String,
     pub body: Vec<u8>,
 }
@@ -43,7 +38,7 @@ pub struct BufferedMessage {
 impl BufferedMessage {
     pub fn new(message: LinkedMessage) -> Self {
         BufferedMessage {
-            id: 0,
+            id: None,
             link: message.link.to_string(),
             body: message.body.into_body(),
         }
@@ -115,20 +110,31 @@ impl DaoManager for BufferedMessageDaoManager {
         unimplemented!()
     }
 
-    fn filter(&self, _conditions: Vec<Condition>, _limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {
-        unimplemented!()
+    fn filter(&self, conditions: Vec<Condition>, limit: Option<Limit>) -> Result<(Vec<Self::ItemType>, usize)> {
+        filter_items(self, &conditions, limit)
     }
 
     fn write_item_to_db(&self, item: &BufferedMessage) -> Result<Self::PrimaryKeyType> {
-        let _rows = self.connection.execute(format!(
-            "INSERT OR REPLACE INTO {} (id, link, body) VALUES (\
-                                :id,\
-                                :link,\
-                                :body\
-            )", self.get_table_name()).as_str(),
-                                            to_params_named(item).unwrap().to_slice().as_slice())
-            .expect("Error on executing 'INSERT INTO' for BufferedMessage");
-        Ok(item.id.clone())
+        let _rows = if let Some(id) = item.id {
+            self.connection.execute(format!(
+                "INSERT OR REPLACE INTO {} ({}, link, body) VALUES (?, ?, ?)",
+                self.get_table_name(), Self::PRIMARY_KEY_COLUMN_NAME).as_str(),
+                                    params![
+                    &id,
+                    &item.link,
+                    &item.body
+            ]).unwrap()
+        } else {
+            self.connection.execute(format!(
+                "INSERT OR REPLACE INTO {} (link, body) VALUES (?, ?)",
+                self.get_table_name()).as_str(),
+                                    params![
+                    &item.link,
+                    &item.body
+            ]).unwrap()
+        };
+
+        Ok(item.id.unwrap_or(self.connection.last_insert_rowid()))
     }
 
     fn get_serialization_callback(&self, item: &Self::ItemType) -> Self::SerializationCallbackType {
@@ -137,7 +143,7 @@ impl DaoManager for BufferedMessageDaoManager {
         Box::new( move |id: Self::PrimaryKeyType, body: Vec<u8>| -> Result<usize> {
             let ret_val = body.len();
             let new_msg = BufferedMessage {
-                id,
+                id: Some(id),
                 link,
                 body,
             };
@@ -168,24 +174,10 @@ pub type BufferedMessageDataStore = DaoDataStore<BufferedMessageDaoManager>;
 //
 #[cfg(test)]
 mod tests {
-    use lets::{
-        message::TransportMessage,
-        address::{AppAddr, MsgId},
-    };
     use super::*;
     use crate::{
-        binary_persist::BinaryPersist,
+        test_helpers::get_linked_message,
     };
-
-    const APP_ADDR: [u8; 40] = [170; 40];
-    const MSGID: [u8; 12] = [255; 12];
-    const BODY: [u8; 8] = [1,2,3,4,5,6,7,8];
-
-    fn get_link() -> Address {
-        let appaddr = AppAddr::try_from_bytes(APP_ADDR.as_slice()).expect("deserialize appaddr failed");
-        let msgid = MsgId::try_from_bytes(MSGID.as_slice()).expect("deserialize msgid failed");
-        Address::new(appaddr, msgid)
-    }
 
     #[test]
     fn test_buffered_message_dao_manager() {
@@ -193,10 +185,7 @@ mod tests {
         let dao_manager = BufferedMessageDaoManager::new(options);
         dao_manager.init_db_schema().unwrap();
 
-        let mut buffered_message = BufferedMessage::new(LinkedMessage{
-            link: get_link(),
-            body: TransportMessage::new(BODY.to_vec()),
-        });
+        let mut buffered_message = BufferedMessage::new(get_linked_message());
         let req_id = dao_manager.write_item_to_db(&buffered_message).unwrap();
         buffered_message.id = req_id;
 

@@ -40,6 +40,7 @@ use super::{
     DispatchLoraWanNode,
     DispatchLorawanRest,
     LoraWanNodeDataStore,
+    BufferedMessageDataStore,
     ProcessFinally,
     ServerScopeProvide,
     PendingRequestDataStore,
@@ -81,16 +82,20 @@ pub struct IotaBridge<'a> {
 
 impl<'a> IotaBridge<'a>
 {
-    pub async fn new(iota_node: &str, lora_wan_node_store: LoraWanNodeDataStore, pending_request_store: PendingRequestDataStore) -> IotaBridge<'a> {
+    pub async fn new(iota_node: &str, lora_wan_node_store: LoraWanNodeDataStore, pending_request_store: PendingRequestDataStore, buffered_message_store: BufferedMessageDataStore) -> IotaBridge<'a> {
         let client_factory = ClientFactory {iota_node: iota_node.to_string()};
         IotaBridge {
             scope_provide: ServerScopeProvide::new(),
-            dispatch_streams: DispatchStreams::new(client_factory.clone(), lora_wan_node_store.clone(), pending_request_store),
+            dispatch_streams: DispatchStreams::new(
+                client_factory.clone(),
+                lora_wan_node_store.clone(),
+                pending_request_store
+            ),
             dispatch_command: DispatchCommand::new(),
             dispatch_confirm: DispatchConfirm::new(),
             dispatch_lorawan_node: DispatchLoraWanNode::new(lora_wan_node_store.clone()),//, pending_request_store.clone()),
             dispatch_lorawan_rest: DispatchLorawanRest::new(),
-            process_finally: ProcessFinally::new(lora_wan_node_store),
+            process_finally: ProcessFinally::new(lora_wan_node_store, buffered_message_store),
         }
     }
 

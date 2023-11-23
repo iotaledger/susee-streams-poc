@@ -135,7 +135,11 @@ impl Clone for DispatchStreams {
 }
 
 impl DispatchStreams {
-    pub fn new<TransportFactoryT>(transport_factory: TransportFactoryT, lorawan_nodes: LoraWanNodeDataStore, pending_requests: PendingRequestDataStore) -> Self
+    pub fn new<TransportFactoryT>(
+        transport_factory: TransportFactoryT,
+        lorawan_nodes: LoraWanNodeDataStore,
+        pending_requests: PendingRequestDataStore,
+    ) -> Self
     where
         TransportFactoryT: TransportFactory + 'static,
         for<'a> <TransportFactoryT as TransportFactory>::Output: Transport<'a, Msg = TransportMessage, SendResponse = TransportMessage> + 'static
@@ -160,6 +164,12 @@ impl DispatchStreams {
     fn write_channel_id_to_scope(&self, link: &Address) {
         if let Some(scope) = &self.scope {
             write_to_scope(scope, DispatchScopeValue::StreamsChannelId(link.base().to_string()));
+        }
+    }
+
+    fn write_buffered_message_to_scope(&self, message_to_be_buffered_in_db: &LinkedMessage) {
+        if let Some(scope) = &self.scope {
+            write_to_scope(scope, DispatchScopeValue::AddBufferedMessageToDb((*message_to_be_buffered_in_db).clone()));
         }
     }
 
@@ -363,11 +373,15 @@ impl ServerDispatchStreams for DispatchStreams {
                         match res {
                             Ok(_) => {
                                 self.write_channel_id_to_scope(&message.link);
-                                Response::builder().status(self.get_success_response_status_code())
-                                    .body(Default::default())
                             },
-                            Err(err) => log_lets_err_and_respond_mapped_status_code(err, "send_message")
+                            Err(err) => {
+                                log::error!("[fn send_message] Received error: '{}'.\nAdding buffered_message to db: {}", err, message.link);
+                                self.write_buffered_message_to_scope(message);
+                            }
                         }
+                        Response::builder()
+                            .status(self.get_success_response_status_code())
+                            .body(Default::default())
                     } else {
                         log_anyhow_err_and_respond_500(anyhow!("Could not get available streams transport client from pool"), "send_message")
                     }

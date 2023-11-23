@@ -1,5 +1,6 @@
 pub mod iota_bridge;
 pub mod dao;
+pub mod buffered_message_loop;
 
 mod helpers;
 mod server_dispatch_command;
@@ -23,6 +24,9 @@ pub use {
         pending_request::{
             PendingRequestDataStore
         },
+        buffered_message::{
+            BufferedMessageDataStore
+        }
     },
     server_dispatch_streams::DispatchStreams,
     server_dispatch_command::DispatchCommand,

@@ -5,4 +5,5 @@ pub mod buffered_message;
 pub use {
     lora_wan_node::LoraWanNode,
     pending_request::PendingRequest,
+    buffered_message::BufferedMessage,
 };

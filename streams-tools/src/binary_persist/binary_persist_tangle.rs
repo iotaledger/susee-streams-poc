@@ -150,7 +150,8 @@ impl BinaryPersist for TransportMessage {
     }
 }
 
-pub struct LinkedMessage<LinkT = Address> {
+#[derive(Clone)]
+pub struct LinkedMessage<LinkT = Address> where LinkT: Clone {
     pub link: LinkT,
     pub body: TransportMessage,
 }
@@ -163,7 +164,7 @@ pub fn trans_msg_encode(msg: &TransportMessage) -> String {
     hex::encode(msg.as_ref())
 }
 
-impl<LinkT> LinkedMessage<LinkT> {
+impl<LinkT: Clone> LinkedMessage<LinkT> {
     pub fn body_len(&self) -> usize {
         trans_msg_len(&self.body)
     }
@@ -173,7 +174,7 @@ impl<LinkT> LinkedMessage<LinkT> {
     }
 }
 
-impl<LinkT: BinaryPersist + Display> BinaryPersist for LinkedMessage<LinkT> {
+impl<LinkT: BinaryPersist + Display + Clone> BinaryPersist for LinkedMessage<LinkT> {
     fn needed_size(&self) -> usize {
         let mut len_bytes= self.link.needed_size();     // LINK
         len_bytes += self.body.needed_size();                 // BODY

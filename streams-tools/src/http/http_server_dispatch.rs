@@ -166,13 +166,15 @@ impl<'a, Scope, Streams, Command, Confirm, LorawanNode, Finally> NormalDispatchC
         }
 
         log::debug!("[NormalDispatchCallbacks.dispatch] Exiting function");
+        if ret_val.is_none() {
+            log::debug!("[NormalDispatchCallbacks.dispatch] ret_val is None. Returning 404");
+            ret_val = Some( Response::builder()
+                .status(status::StatusCode::NOT_FOUND)
+                .body(Default::default())?
+            );
+        }
         ret_val.ok_or_else(|| {
-            if let Err(e) = status::StatusCode::from_u16(404) {
-                log::debug!("[NormalDispatchCallbacks.dispatch] ret_val is Err. Returning 404");
-                e.into()
-            } else {
-                panic!("Should never happen");
-            }
+            panic!("[NormalDispatchCallbacks.dispatch] Should never happen");
         })
     }
 

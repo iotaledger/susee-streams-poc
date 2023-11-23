@@ -68,21 +68,46 @@ ufw install and basic config steps can be found
 ```
 Now we can start to install docker. A more detailed description of the
 docker install and config steps can be found
-[in this docker install howto](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04)
-.
+[in this docker install howto for Ubuntu](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04).
+
+**IMPORTANT**: If you are **not using Ubuntu, do not proceed with the docker install steps
+described below**, but open the page linked above and use the OS switch to choose your OS.
+Follow the instructions described there.
+
+**IMPORTANT**: If your **host system is a VPS** please check the IPv4 network address
+of your system. If the **network address is** in the range **"172.16.0.1/16"** or **"172.17.0.1/16"**
+please follow the
+[instructions given in this proxmox help thread](https://forum.proxmox.com/threads/docker-under-lxc-change-default-network.122634/)
+and this
+[serverfault discussion](https://serverfault.com/questions/916941/configuring-docker-to-not-use-the-172-17-0-0-range)
+, to configure the **docker daemon to use an ip range of "172.30.0.1/16"**
+for the docker bridge. Make sure to create the needed config file `/etc/docker/daemon.json`
+before you execute `sudo apt-get install docker-ce`.
+Otherwise, your  might be faced with a disabled network device
+and your SSH connection will get lost. In this case you will need access to the 
+virtualization hypervisor to access your system again after docker has been installed
+or after docker compose up ha been used,
+to create the needed config file after the docker install.
+A `docker_daemon_example.json` file is located in the `hornet-install-resources` folder. 
 
 ```bash
+  # ---> ONLY FOR UBUNTU - See notes above <---
+  
   # in the admin home folder of your host system
   > sudo apt update
   > sudo apt-get install apt-transport-https ca-certificates curl software-properties-common
   > curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+  
   > echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
   > sudo apt update
   # Check which docker-ce install package candidate is selected by apt for an docker-ce install.
   # Please have a look into the docker install howto linked above for more details.
   > apt-cache policy docker-ce
+  
   # After having checked that the right candidate will be installed, we install docker here
+  # IMPORTANT: ---> See above notes, if your host system is a VPS <--
   > sudo apt-get install docker-ce
+  
   # Check the docker status after installation has been completed
   > sudo systemctl status docker
   # add the 'admin' user to the docker user group
@@ -119,7 +144,8 @@ howto.
   > ls -l
   # Make sure the following files exist:
   # * docker-compose-https.patch
-  # * docker-compose.hornet.patch   
+  # * docker-compose.hornet.patch
+  # * docker_daemon_example.json   
   # * prepare_docker.sh.patch  
   # * setup-hornet-node.sh
   
@@ -131,7 +157,7 @@ In the hornet folder created by `setup-hornet-node.sh`, create a password hash a
 as been described in the
 [wiki](https://wiki.iota.org/hornet/how_tos/using_docker/#1-generate-dashboard-credentials).
 
-Copy the output of the hornet pwd-hash tool into a tempüoraty file or editor because
+Copy the output of the hornet pwd-hash tool into a temporary file or editor because
 it will be needed during our next steps.
 
 ```bash

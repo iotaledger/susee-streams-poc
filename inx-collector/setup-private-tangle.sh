@@ -6,8 +6,9 @@ then
 else
   mkdir priv_tangle
   cd priv_tangle
-  curl -L -O "https://github.com/iotaledger/hornet/releases/download/v2.0.0-rc.8/HORNET-2.0.0-rc.8-private_tangle.tar.gz"
-  tar -zxf HORNET-2.0.0-rc.8-private_tangle.tar.gz
+  curl -L -O "https://github.com/iotaledger/hornet/releases/download/v2.0.1/HORNET-2.0.1-private_tangle.tar.gz"
+
+  tar -zxf HORNET-2.0.1-private_tangle.tar.gz
 
   patch -t docker-compose.yml ../docker-compose.priv_tangle.patch
 

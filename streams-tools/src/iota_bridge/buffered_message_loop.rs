@@ -4,7 +4,10 @@ use std::{
 };
 
 use tokio::{
-    time
+    time::{
+        Instant,
+        interval,
+    }
 };
 
 use log;
@@ -51,6 +54,7 @@ pub struct BufferedMessageLoopOptions {
     pub iota_node: String,
     pub send_messages_interval_in_secs: u64,
     pub max_send_messages_working_time_in_secs: u64,
+    pub idle_status_log_messages_interval_secs: u64,
 }
 
 impl BufferedMessageLoopOptions {
@@ -60,6 +64,7 @@ impl BufferedMessageLoopOptions {
             iota_node: iota_node.to_string(),
             send_messages_interval_in_secs: 5,
             max_send_messages_working_time_in_secs: 1,
+            idle_status_log_messages_interval_secs: 60,
         }
     }
 }
@@ -69,15 +74,24 @@ struct LoopStatus {
     pub remaining: usize,
     pub processed: usize,
     pub lets_err: Option<LetsError>,
+    pub log_has_been_written: bool,
 }
 
 impl LoopStatus {
-    pub fn log_status(&self) {
+    fn new(remaining: usize, processed: usize, lets_err: Option<LetsError>) -> Self {
+        LoopStatus { remaining, processed, lets_err, log_has_been_written: false }
+    }
+
+    pub fn log_status(&mut self, do_log_even_if_loop_is_in_idle_status: bool) {
+        self.log_has_been_written = false;
         if self.lets_err.is_none() {
-            log::info!("[fn run_buffered_message_loop] Finished sending all buffered messages(). {} messages processed. {} messages remaining.",
-                self.processed,
-                self.remaining
-            );
+            if !self.is_in_idle_status() || do_log_even_if_loop_is_in_idle_status {
+                self.log_has_been_written = true;
+                log::info!("[fn run_buffered_message_loop] Finished sending all buffered messages(). {} messages processed. {} messages remaining.",
+                    self.processed,
+                    self.remaining
+                );
+            }
         } else {
             log::error!("[fn run_buffered_message_loop] Got LetsError '{}'. {} messages processed. {} messages remaining.",
                 self.lets_err.as_ref().unwrap(),
@@ -90,16 +104,27 @@ impl LoopStatus {
     pub fn should_break_loop(&self) -> bool {
         self.remaining == 0 || self.lets_err.is_some()
     }
+
+    pub fn is_in_idle_status(&self) -> bool { self.processed == 0 && self.processed == 0 }
 }
 
 pub async fn run_buffered_message_loop(opt: BufferedMessageLoopOptions) {
-    let mut interval = time::interval(time::Duration::from_secs(opt.send_messages_interval_in_secs));
+    let mut interval = interval(Duration::from_secs(opt.send_messages_interval_in_secs));
+    let mut do_log_even_if_loop_is_in_idle_status;
+    let mut last_log_output_instant = Instant::now();
+    let idle_status_log_messages_duration = Duration::from_secs(opt.idle_status_log_messages_interval_secs);
+
     loop {
         interval.tick().await;
         log::debug!("[fn run_buffered_message_loop] {} Seconds passed - Starting send_all_buffered_messages()", opt.send_messages_interval_in_secs);
+        let now = Instant::now();
+        do_log_even_if_loop_is_in_idle_status = now.duration_since(last_log_output_instant) > idle_status_log_messages_duration;
         match send_all_buffered_messages(opt.clone()).await {
-            Ok(loop_status) => {
-                loop_status.log_status();
+            Ok(mut loop_status) => {
+                loop_status.log_status(do_log_even_if_loop_is_in_idle_status);
+                if loop_status.log_has_been_written {
+                    last_log_output_instant = Instant::now();
+                }
             }
             Err(err) => {
                 log::error!("[fn run_buffered_message_loop] Got error from send_all_buffered_messages(): {}", err);
@@ -109,15 +134,11 @@ pub async fn run_buffered_message_loop(opt: BufferedMessageLoopOptions) {
 }
 
 async fn send_all_buffered_messages(opt: BufferedMessageLoopOptions) -> Result<LoopStatus>{
-    let loop_start = time::Instant::now();
+    let loop_start = Instant::now();
     let max_duration_to_run_loop = Duration::from_secs(opt.max_send_messages_working_time_in_secs);
     let mut buffered_message_store = (opt.buffered_message_store_factory)();
     log::debug!("[fn send_all_buffered_messages] Starting iterate_messages loop");
-    let mut ret_val = LoopStatus {
-        remaining: 0,
-        processed: 0,
-        lets_err: None,
-    };
+    let mut ret_val = LoopStatus::new(0,0, None);
     'iterate_messages: loop {
         log::debug!("[fn send_all_buffered_messages] Calling check_buffered_message_existence_and_handle_it()");
         match check_buffered_message_existence_and_handle_it(opt.iota_node.as_str(), &mut buffered_message_store).await {
@@ -136,7 +157,7 @@ async fn send_all_buffered_messages(opt: BufferedMessageLoopOptions) -> Result<L
                 break 'iterate_messages;
             }
         }
-        let duration_since_loop_start = time::Instant::now().duration_since(loop_start);
+        let duration_since_loop_start = Instant::now().duration_since(loop_start);
         log::debug!("[fn send_all_buffered_messages] duration_since_loop_start: {} millis", duration_since_loop_start.as_millis());
         if duration_since_loop_start >= max_duration_to_run_loop {
             log::debug!("[fn send_all_buffered_messages] Breaking iterate_messages loop due to max_duration_to_run_loop exceeded");
@@ -155,9 +176,9 @@ async fn check_buffered_message_existence_and_handle_it(iota_node: &str, buffere
     log::debug!("[fn check_buffered_message_existence_and_handle_it] messages.len = {}, total_cnt: {}", messages.len(), total_cnt);
     let ret_val = if messages.len() > 0 {
         match handle_buffered_messages(iota_node, messages, buffered_message_store).await {
-            Ok(proc_msgs) => LoopStatus{ remaining: total_cnt - proc_msgs, processed: proc_msgs, lets_err: None },
+            Ok(proc_msgs) => LoopStatus::new( total_cnt - proc_msgs, proc_msgs, None),
             Err(err) => {
-                LoopStatus{ remaining: total_cnt, processed: 0, lets_err: Some(err)}
+                LoopStatus::new( total_cnt, 0, Some(err))
             },
         }
     } else {
@@ -165,7 +186,7 @@ async fn check_buffered_message_existence_and_handle_it(iota_node: &str, buffere
         if total_cnt > 0 {
             log::error!("[fn check_buffered_message_existence_and_handle_it] Buffered_messages list from store is empty although total_cnt in store is: {}", total_cnt);
         }
-        LoopStatus{ remaining: total_cnt, processed: 0, lets_err: None }
+        LoopStatus::new( total_cnt,  0, None )
     };
     Ok(ret_val)
 }

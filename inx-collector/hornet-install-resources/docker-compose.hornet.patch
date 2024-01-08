@@ -50,7 +50,7 @@
 <       - "--storage.secure=${STORAGE_SECURE:-false}"
 <       - "--storage.defaultBucketName=${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default}"
 <       - "--storage.defaultBucketExpirationDays=${STORAGE_DEFAULT_EXPIRATION:-30}"
-<       - "--listener.filters={\"filters\": [{\"tag\":\"susee-\", \"tagIsPrefix\": true}]}"
+<       - "--listener.filters={\"filters\": [{\"tag\":\"susee-\", \"tagIsPrefix\": true, \"withPOI\": true}]}"
 <       - "--POI.hostUrl=${POI_URL:-http://inx-poi:9687}"
 <       - "--POI.isPlugin=${POI_PLUGIN:-true}"
 < 

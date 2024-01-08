@@ -86,7 +86,7 @@ before you execute `sudo apt-get install docker-ce`.
 Otherwise, your  might be faced with a disabled network device
 and your SSH connection will get lost. In this case you will need access to the 
 virtualization hypervisor to access your system again after docker has been installed
-or after docker compose up ha been used,
+or after docker compose up has been used,
 to create the needed config file after the docker install.
 A `docker_daemon_example.json` file is located in the `hornet-install-resources` folder. 
 

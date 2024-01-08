@@ -19,20 +19,21 @@
       === * All resources can be used with Stardust. See folder               ===
       ===   'inx-collector' for more details.                                 ===
       === * A VPS for test purposes has been setup:                           ===
-      ===   - domain name: v86582.1blu.de                                     ===
+      ===   - domain name: iotabridge.peeros.de                               ===
       ===   - services:                                                       ===
       ===      - hornet                                                       ===
-      ===        - API: https://v86582.1blu.de/api/routes                     ===
+      ===        - API: https://iotabridge.peeros.de/api/routes               ===
       ===        - Autopeering :14626/udp                                     ===
       ===        - Gossip :15600/tcp                                          ===
-      ===      - hornet-dashboard (https://v86582.1blu.de/dashboard/)         ===
-      ===      - grafana (https://v86582.1blu.de/grafana)                     ===
+      ===      - hornet-dashboard (https://iotabridge.peeros.de/dashboard/)   ===
+      ===      - grafana (https://iotabridge.peeros.de/grafana)               ===
       ===      - inx-collector (:9030)                                        ===
       ===      - iota-bridge (:50000)                                         ===
       ===      - app-srv-connector-mock (:50001)                              ===
       ===      - management-console, message explorer (:50002)                ===
       ===                                                                     ===
       === * TODO: Finish Documentation:                                       ===
+      ===   * Update inx-collector README with learnings from iotabridge.peeros.de install
       ===   * Streams-collector section in main readme                        ===
       ===   * Test/scripts folder: Update all scripts                         ===
       ===   * Test folder: Update all command line expressions                ===
@@ -44,21 +45,14 @@
       ===   * main-streams-poc-lib-pio folder:                                ===
       ===     Mention Streams-collector in readme                             ===
       ===   * Sensor folder: Mention Streams-collector in main readme         ===
-      === * Secure the inx-collector rest API (remove all put/insert          ===
-      ===   endpoints)                                                        ===
-      ===   * Option 1 (easy): Remove the routes by commenting out the code   ===
-      ===   * Option 2: https://www.nerdieworks.nl/posts/client-certificate-authentication-with-traefik/
-      === * Perform load test for IOTA Bridge simulating 250 Sensors          ===
+      === * Remove inx-collector rest API (port 9030) from exposed ports      ===
+      ===   of the SUSEE-Node as it is only used in the docker vlan           ===
+      === * Perform load tests for IOTA Bridge simulating 250 Sensors         ===
       ===   sending messages with 10 minute interval                          ===
       === * Version info endpoint for iota-bridge + log output                ===
       === * Message Explorer:                                                 ===
-      ===   * Fix bug on client syncing                                       ===
-      ===   * new function recover existing accounts: Preserve seed but       ===
-      ===     resync all messages. User::builder() instead of                 ===
-      ===     User::::restore()(Streams repository - basic.rs example,        ===
-      ===     line 390).                                                      ===
-      ===   * Use minio instead of SQLite because SQLite is not               ===
-      ===     usuable for mutithreading.                                      ===
+      ===   * show blog tag used as minio key                                 ===
+      === * Implement redundant system setup for higher availability          ===
       ===========================================================================
 
       References:

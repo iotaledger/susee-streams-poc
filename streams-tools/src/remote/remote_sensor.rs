@@ -1,5 +1,6 @@
 use crate::{
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
+    STREAMS_TOOLS_CONST_ANY_DEV_EUI,
     http::http_protocol_command::RequestBuilderCommand,
     http::http_protocol_confirm::RequestBuilderConfirm,
     binary_persist::{
@@ -10,6 +11,7 @@ use crate::{
         SubscriberStatus,
         KeyloadRegistration,
         ClearClientState,
+        DevEuiHandshake
     }
 };
 
@@ -40,34 +42,36 @@ use log;
 
 type HttpClient = Client<HttpConnector, Body>;
 
-pub struct RemoteSensorOptions<'a> {
-    pub http_url: &'a str,
+pub struct RemoteSensorOptions {
+    pub http_url: String,
     pub confirm_fetch_wait_sec: u32,
+    pub dev_eui: String,
 }
 
-impl Default for RemoteSensorOptions<'_> {
+impl Default for RemoteSensorOptions {
     fn default() -> Self {
         Self {
-            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
+            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL.to_string(),
             confirm_fetch_wait_sec: 5,
+            dev_eui: STREAMS_TOOLS_CONST_ANY_DEV_EUI.to_string(),
         }
     }
 }
 
-impl fmt::Display for RemoteSensorOptions<'_> {
+impl fmt::Display for RemoteSensorOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RemoteSensorOptions: http_url: {}", self.http_url)
+        write!(f, "RemoteSensorOptions:\n   http_url: {}\n   DevEUI: {}", self.http_url, self.dev_eui)
     }
 }
 
-pub struct RemoteSensor<'a> {
-    options: RemoteSensorOptions<'a>,
+pub struct RemoteSensor {
+    options: RemoteSensorOptions,
     http_client: HttpClient,
 }
 
-impl<'a> RemoteSensor<'a> {
+impl RemoteSensor {
 
-    pub fn new(options: Option<RemoteSensorOptions<'a>>) -> Self {
+    pub fn new(options: Option<RemoteSensorOptions>) -> Self {
         let options = options.unwrap_or_default();
         log::debug!("[fn new()] Initializing instance with options:\n       {}\n", options);
         Self {
@@ -76,14 +80,15 @@ impl<'a> RemoteSensor<'a> {
         }
     }
 
-    pub fn get_proxy_url(&self) -> &'a str { self.options.http_url }
+    pub fn get_proxy_url(&self) -> &str { self.options.http_url.as_str() }
+    pub fn get_dev_eui(&self) -> &str { self.options.dev_eui.as_str() }
 
     fn get_request_builder_command(&self) -> RequestBuilderCommand {
-        RequestBuilderCommand::new(self.get_proxy_url())
+        RequestBuilderCommand::new(self.get_proxy_url(), self.options.dev_eui.as_str())
     }
 
     fn get_request_builder_confirm(&self) -> RequestBuilderConfirm {
-        RequestBuilderConfirm::new(self.get_proxy_url())
+        RequestBuilderConfirm::new(self.get_proxy_url(), self.options.dev_eui.as_str())
     }
 
     async fn poll_confirmation<T>(&self) -> Result<T>
@@ -102,7 +107,7 @@ impl<'a> RemoteSensor<'a> {
                 if confirmation != Confirmation::NO_CONFIRMATION {
                     return self.process_confirmation::<T>(confirmation, buffer).await;
                 } else {
-                    log::info!("Received Confirmation::NO_CONFIRMATION    ");
+                    log::info!("Received Confirmation::NO_CONFIRMATION for dev_eui: '{}'", self.options.dev_eui);
                 }
             } else {
                 log::error!("[fn poll_confirmation] fn call fetch_next_confirmation() failed.");
@@ -173,5 +178,12 @@ impl<'a> RemoteSensor<'a> {
             self.get_request_builder_command().clear_client_state()?
         ).await?;
         self.poll_confirmation::<ClearClientState>().await
+    }
+
+    pub async fn dev_eui_handshake(&self) -> Result<DevEuiHandshake> {
+        self.http_client.request(
+            self.get_request_builder_command().dev_eui_handshake()?
+        ).await?;
+        self.poll_confirmation::<DevEuiHandshake>().await
     }
 }

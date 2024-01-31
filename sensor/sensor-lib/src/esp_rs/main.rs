@@ -306,6 +306,10 @@ impl<TSR, CmdFetchT, StreamsTransportT> CommandProcessor for CmdProcessor<CmdFet
     StreamsTransportT: StreamsTransport + for <'a> Transport<'a, Msg = TransportMessage, SendResponse = TSR>,
     StreamsTransportT::Options: Clone,
 {
+    fn get_dev_eui(&self) -> String {
+        todo!()
+    }
+
     async fn fetch_next_command(&self) -> Result<(Command, Vec<u8>)> {
         self.command_fetcher.fetch_next_command().await
     }

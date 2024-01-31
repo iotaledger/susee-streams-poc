@@ -20,6 +20,7 @@ pub struct ArgKeys {
     pub create_channel: &'static str,
     pub init_sensor: &'static str,
     pub iota_bridge_url: &'static str,
+    pub dev_eui: &'static str,
     pub println_channel_status: &'static str,
     pub channel_starts_with: &'static str,
     pub run_explorer_api_server: &'static str,
@@ -32,6 +33,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     create_channel: "create-channel",
     init_sensor: "init-sensor",
     iota_bridge_url: "iota-bridge-url",
+    dev_eui: "dev-eui",
     println_channel_status: "println-channel-status",
     channel_starts_with: "channel-starts-with",
     run_explorer_api_server: "run-explorer-api-server"
@@ -159,6 +161,13 @@ to those channels. Management of multiple channels is possible. The user states 
 Streams channels are stored in a local SQLite3 database file.
 ";
 
+static DEV_EUI_ABOUT: &str = "The DevEUI of the sensor to act on.
+DevEUI means 'device extended unique identifier' and is a term
+from LoRaWAN communication. Any random value (number or string)
+uniquely identifying the sensor can be used as long as the sensor
+the same value.
+";
+
 pub type ManagementConsoleCli<'a> = Cli<'a, ArgKeys>;
 
 pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
@@ -174,6 +183,7 @@ pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
             .value_name("SUBSCRIPTION_LINK")
             .help(SUBSCRIPTION_LINK_ABOUT)
             .requires(ARG_KEYS.subscription_pub_key)
+            .requires(ARG_KEYS.dev_eui)
         )
         .arg(Arg::new(ARG_KEYS.subscription_pub_key)
             .long(ARG_KEYS.subscription_pub_key)
@@ -181,6 +191,7 @@ pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
             .value_name("SUBSCRIPTION_PUB_KEY")
             .help(SUBSCRIPTION_PUB_KEY_ABOUT)
             .requires(ARG_KEYS.subscription_link)
+            .requires(ARG_KEYS.dev_eui)
         )
         .arg(Arg::new(ARG_KEYS.create_channel)
             .long(ARG_KEYS.create_channel)
@@ -223,6 +234,12 @@ pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
             .value_name("IOTA_BRIDGE_URL")
             .help(iota_bridge_url_about.as_str())
             .requires(ARG_KEYS.init_sensor)
+        )
+        .arg(Arg::new(ARG_KEYS.dev_eui)
+            .long(ARG_KEYS.dev_eui)
+            .short('e')
+            .value_name("DEV_EUI")
+            .help(DEV_EUI_ABOUT)
         )
         .get_matches();
 

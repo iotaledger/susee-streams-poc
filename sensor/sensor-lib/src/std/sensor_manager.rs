@@ -34,7 +34,7 @@ use streams_tools::{
     subscriber_manager::get_public_key_str,
     binary_persist::{
         Subscription,
-    },
+    }
 };
 
 use susee_tools::SUSEE_CONST_SEND_MESSAGE_REPETITION_WAIT_SEC;
@@ -69,7 +69,7 @@ impl SensorManager {
         // as this loop runs until the user presses ctr-c we need this to
         // save the user state immediately.
         // A probably safer alternative would be a tokio::signal::ctrl_c() handler but for
-        // our test puposes this approach is sufficient and much simpler.
+        // our test purposes this approach is sufficient and much simpler.
         subscriber.save_user_state();
     }
 
@@ -114,7 +114,13 @@ impl SensorManager {
         }
     }
 
-    fn println_subscription_details(subscriber: &User<ClientType>, subscription_link: &Address, comment: &str, key_name: &str, init_cnt: u8) -> Result<Subscription> {
+    fn println_subscription_details(
+        subscriber: &User<ClientType>,
+        subscription_link: &Address,
+        comment: &str,
+        key_name: &str,
+        init_cnt: u8,
+    ) -> Result<Subscription> {
         let public_key = get_public_key_str(subscriber);
         log::info!(
             "[Sensor] {}:
@@ -143,8 +149,11 @@ impl SensorManager {
         if let Some(subscriber) = &subscriber_manager.user {
             if let Some(subscription_link) = subscriber_manager.subscription_link {
                 subscription = Some(
-                    Self::println_subscription_details(&subscriber, &subscription_link,
-                        "A subscription with the following details has already been created", "Subscription",
+                    Self::println_subscription_details(
+                        &subscriber,
+                        &subscription_link,
+                        "A subscription with the following details has already been created",
+                        "Subscription",
                         subscriber_manager.get_initialization_cnt()
                     ).expect("Error on println_subscription_details")
                 );
@@ -175,7 +184,7 @@ impl SensorManager {
             &sub_msg_link,
             "A subscription with the following details has been created",
             "Subscription",
-            initialization_cnt
+            initialization_cnt,
         )?;
         let public_key_str = get_public_key_str(&subscriber_mngr.user.as_ref().unwrap());
         Ok((sub_msg_link.to_string(), public_key_str, initialization_cnt))

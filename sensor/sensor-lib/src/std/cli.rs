@@ -56,6 +56,21 @@ This command is used to test the iota-bridge and the management-console applicat
 in case there are not enough ESP32 devices available. The sensor application will
 periodically fetch and process commands from the iota-bridge.
 
+The only usecase for this CLI argument currently is to initialize a sensor
+fully automatically using the --init-sensor argument of the management-console.
+Therefore the sensor will do a DevEUI-Handshake with the management-console
+via the iota-bridge at the beginning of the command fetch process.
+
+To perform the DevEUI-Handshake the sensor will use the dev_eui 'ANY'
+to fetch a DevEuiHandshake command from the iota-bridge.
+It will not accept any other type of command and will fetch commands
+until a DevEuiHandshake command has been received.
+After a DevEuiHandshake command has been received, the sensor
+will send its real dev_eui to the management-console with the
+DevEuiHandshake confirmation via the iota-bridge. This is followed by
+fetch command, process command and confirm sequences using the dev_eui
+of the sensor.
+
 If the iota-bridge runs on the same machine as this application, they can
 communicate over the loopback IP address (localhost). In case the sensor
 iota-bridge listens to the ip address of the network interface (the ip

@@ -25,6 +25,7 @@ use crate::{
         StartSendingMessages,
         RegisterKeyloadMessage
     },
+    STREAMS_TOOLS_CONST_ANY_DEV_EUI
 };
 
 pub struct CommandFetchLoopOptions {
@@ -42,30 +43,32 @@ impl Default for CommandFetchLoopOptions {
 
 #[async_trait(?Send)]
 pub trait CommandProcessor {
+    fn get_dev_eui(&self) -> String;
     async fn fetch_next_command(&self) -> Result<(Command, Vec<u8>)>;
     async fn send_confirmation(&self, confirmation_request: Request<Body>) -> Result<()>;
     async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>>;
 }
 
-pub async fn run_command_fetch_loop(command_processor: impl CommandProcessor, options: Option<CommandFetchLoopOptions>) -> Result<()> {
+pub async fn run_command_fetch_loop(cmd_prcssr: impl CommandProcessor, options: Option<CommandFetchLoopOptions>) -> Result<()> {
     let opt = options.unwrap_or_default();
     loop {
-        if let Ok((command, buffer)) = command_processor.fetch_next_command().await {
+        if let Ok((command, buffer)) = cmd_prcssr.fetch_next_command().await {
             match command {
                 Command::NO_COMMAND => {
-                    log::info!("[fn run_command_fetch_loop()] Received Command::NO_COMMAND    ");
+                    log::info!("[fn run_command_fetch_loop()] Received Command::NO_COMMAND for dev_eui '{}'", cmd_prcssr.get_dev_eui());
                 },
                 Command::STOP_FETCHING_COMMANDS => {
-                    log::info!("[fn run_command_fetch_loop()] Received Command::STOP_FETCHING_COMMANDS - Will exit command fetch loop.");
+                    log::info!("[fn run_command_fetch_loop()] Received Command::STOP_FETCHING_COMMANDS  for dev_eui '{}' - Will exit command fetch loop.",
+                        cmd_prcssr.get_dev_eui());
                     return Ok(());
                 },
                 _ => {
                     log::info!("[fn run_command_fetch_loop()] Starting process_command for command: {}.", command);
-                    match command_processor.process_command(command, buffer).await {
+                    match cmd_prcssr.process_command(command, buffer).await {
                         Ok(confirmation_request) => {
                             // TODO: Retries in case of errors could be useful
                             log::debug!("[fn run_command_fetch_loop()] Calling command_processor.send_confirmation for confirmation_request");
-                            command_processor.send_confirmation(confirmation_request).await?;
+                            cmd_prcssr.send_confirmation(confirmation_request).await?;
                         },
                         Err(err) => {
                             log::error!("[fn run_command_fetch_loop()] process_command() returned error: {}", err);
@@ -90,12 +93,18 @@ pub trait SensorFunctions {
     type SubscriberManager;
 
     fn get_iota_bridge_url(&self) -> String;
+    fn get_dev_eui(&self) -> String;
 
     async fn subscribe_to_channel(
         &self,
         announcement_link_str: &str,
         subscriber_mngr: &mut Self::SubscriberManager,
         confirm_req_builder: &RequestBuilderConfirm
+    ) -> hyper::http::Result<Request<Body>>;
+
+    async fn dev_eui_handshake(
+        &self,
+        confirm_req_builder: &RequestBuilderConfirm,
     ) -> hyper::http::Result<Request<Body>>;
 
     async fn send_content_as_msg_in_endless_loop(
@@ -135,7 +144,10 @@ pub async fn process_sensor_commands<SensorT: SensorFunctions>(
     sensor: &SensorT, subscriber: &mut SensorT::SubscriberManager, command: Command, buffer: Vec<u8>
 ) -> Result<Option<Request<Body>>>
 {
-    let confirm_req_builder = RequestBuilderConfirm::new(sensor.get_iota_bridge_url().as_str());
+    let confirm_req_builder = RequestBuilderConfirm::new(
+        sensor.get_iota_bridge_url().as_str(),
+        sensor.get_dev_eui().as_str(),
+    );
     let mut confirmation_request: Option<Request<Body>> = None;
 
     if command == Command::SUBSCRIBE_TO_ANNOUNCEMENT_LINK {
@@ -174,6 +186,18 @@ pub async fn process_sensor_commands<SensorT: SensorFunctions>(
 
         confirmation_request = Some(
             sensor.clear_client_state(subscriber, &confirm_req_builder).await?
+        );
+    }
+
+    if command == Command::DEV_EUI_HANDSHAKE {
+        log::info!("[fn process_sensor_commands()] Processing DEV_EUI_HANDSHAKE");
+        let req_builder_confirm_handshake = RequestBuilderConfirm::new(
+            sensor.get_iota_bridge_url().as_str(),
+            STREAMS_TOOLS_CONST_ANY_DEV_EUI,
+        );
+
+        confirmation_request = Some(
+            sensor.dev_eui_handshake(&req_builder_confirm_handshake).await?
         );
     }
 

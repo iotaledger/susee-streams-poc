@@ -45,6 +45,8 @@
       ===   * main-streams-poc-lib-pio folder:                                ===
       ===     Mention Streams-collector in readme                             ===
       ===   * Sensor folder: Mention Streams-collector in main readme         ===
+      ===   * Principles of how the DevEUI-Handshake at the beginning of      ===
+      ===     automatic sensor initialization is done                         ===
       === * Remove inx-collector rest API (port 9030) from exposed ports      ===
       ===   of the SUSEE-Node as it is only used in the docker vlan           ===
       === * Perform load tests for IOTA Bridge simulating 250 Sensors         ===

@@ -112,6 +112,7 @@ pub trait EnumeratedPersistable {
     const LENGTH_BYTES: usize;
 
     fn as_str(&self) -> &'static str;
+    fn needs_to_wait_for_tangle_milestone(&self) -> bool;
 
     fn as_u8(&self) -> u8;
 
@@ -120,6 +121,7 @@ pub trait EnumeratedPersistable {
 
 pub trait EnumeratedPersistableArgs<T: EnumeratedPersistable + 'static> {
     const INSTANCE: &'static T;
+    const NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE: bool;
 
     fn set_str_arg(&mut self, str_arg: String);
 }
@@ -164,7 +166,7 @@ impl Deref for EnumeratedPersistableInner {
     }
 }
 
-pub fn serialize_binary_persistable_and_streams_link<T: BinaryPersist>(binary_persistable: T, streams_link: &String, buffer: &mut [u8], range: &mut Range<usize>) -> Result<()> {
+pub fn serialize_binary_persistable_and_one_string<T: BinaryPersist>(binary_persistable: T, streams_link: &String, buffer: &mut [u8], range: &mut Range<usize>) -> Result<()> {
     // Serialize persistable_thing to buffer
     range.increment(binary_persistable.needed_size());
     binary_persistable.to_bytes(&mut buffer[range.clone()]).expect("Serializing 'persistable_thing' failed");

@@ -1,6 +1,5 @@
 use std::{
     fmt,
-    cell::Cell
 };
 
 use hyper::{
@@ -25,8 +24,6 @@ use streams_tools::{
     binary_persist::{
         BinaryPersist,
         Command,
-        EnumeratedPersistableArgs,
-        DevEuiHandshakeCmd,
     },
     http::{
         http_protocol_command::{
@@ -34,7 +31,6 @@ use streams_tools::{
         },
     },
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
-    STREAMS_TOOLS_CONST_ANY_DEV_EUI,
     STREAMS_TOOLS_CONST_DEV_EUI_NOT_DEFINED
 };
 
@@ -42,20 +38,11 @@ type HttpClient = Client<HttpConnector, Body>;
 
 pub struct CommandFetcherOptions {
     pub http_url: String,
-    // Controls if the CommandFetcher should do a DevEUI-Handshake
-    // with the management-console before any other commands are fetched:
-    // If true:
-    //      The CommandFetcher will use the dev_eui 'ANY'
-    //      (STREAMS_TOOLS_CONST_ANY_DEV_EUI) to fetch a DevEuiHandshake
-    //      command. It will not accept any other type of command and will fetch
-    //      commands until a DevEuiHandshake command has been received.
-    //      After a DevEuiHandshake command has been received,
-    //      the CommandFetcher will use the dev_eui defined by the
-    //      'dev_eui' field of this struct.
-    // If false (default):
-    //      Will use the dev_eui defined by the 'dev_eui' field of this struct.
+    // Controls if the CommandFetcher should do a DevEUI-Handshake first.
+    // See RequestBuilderCommand::dev_eui_handshake_first in streams-tools/src/http/http_protocol_command.rs
+    // for more details.
     pub dev_eui_handshake_first: bool,
-    pub(crate) dev_eui: String
+    pub(crate) dev_eui: String,
 }
 
 impl Default for CommandFetcherOptions {
@@ -79,8 +66,7 @@ impl fmt::Display for CommandFetcherOptions {
 }
 
 pub struct CommandFetcher {
-    options: CommandFetcherOptions,
-    dev_eui_handshake_first: Cell<bool>,
+    _options: CommandFetcherOptions,
     request_builder: RequestBuilderCommand,
 }
 
@@ -90,15 +76,13 @@ impl CommandFetcher {
         let options = options.unwrap_or_default();
         log::debug!("[fn new()] Creating new CommandFetcher using options: {}", options);
         let http_url = options.http_url.clone();
-        let dev_eui = if options.dev_eui_handshake_first {
-            STREAMS_TOOLS_CONST_ANY_DEV_EUI.to_string()
-        } else {
-            options.dev_eui.clone()
-        };
         Self {
-            dev_eui_handshake_first: Cell::new(options.dev_eui_handshake_first),
-            options,
-            request_builder: RequestBuilderCommand::new(http_url.as_str(), dev_eui.as_str())
+            request_builder: RequestBuilderCommand::new(
+                http_url.as_str(),
+                options.dev_eui.as_str(),
+                options.dev_eui_handshake_first
+            ),
+            _options: options,
         }
     }
 
@@ -115,26 +99,15 @@ impl CommandFetcher {
         if response.status().is_success() {
             log::debug!("[fn fetch_next_command()] StatusCode is successful: {}", response.status());
             let (cmd, bytes) = self.deserialize_command(response).await?;
-            if self.dev_eui_handshake_first.get() {
-                if cmd == *DevEuiHandshakeCmd::INSTANCE {
-                    log::info!("[fn fetch_next_command()] Received DevEuiHandshake command for dev_eui '{}'",
-                        self.request_builder.get_dev_eui()
+            match self.request_builder.manage_dev_eui_by_received_command(&cmd) {
+                Ok(_) => Ok((cmd, bytes)),
+                Err(e) => {
+                    log::error!("[fn fetch_next_command()] Received unexpected command: {} - will return Command::NO_COMMAND instead.",
+                        e
                     );
-                    self.request_builder.set_dev_eui(self.options.dev_eui.as_str());
-                    log::info!("[fn fetch_next_command()] dev_eui for next command fetches has been set to '{}'",
-                        self.request_builder.get_dev_eui()
-                    );
-                    self.dev_eui_handshake_first.set(false);
-                } else {
-                    log::info!("[fn fetch_next_command()] Received command {} instead of DevEuiHandshake for dev_eui '{}' - \
-                    will return Command::NO_COMMAND instead.",
-                        cmd,
-                        self.request_builder.get_dev_eui()
-                    );
-                    return Ok((Command::NO_COMMAND, Vec::<u8>::default()));
+                    Ok((Command::NO_COMMAND, Vec::<u8>::default()))
                 }
             }
-            Ok((cmd, bytes))
         } else {
             log::error!("[fn fetch_next_command()] HTTP Error. Status: {}", response.status());
             Ok((Command::NO_COMMAND, Vec::<u8>::default()))

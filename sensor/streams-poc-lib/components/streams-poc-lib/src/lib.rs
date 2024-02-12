@@ -146,6 +146,7 @@ pub extern "C" fn send_message(
 ///                                 requests via LoRaWAN, serial wired connections or other
 ///                                 connection types that are managed by the application.
 ///                                 See send_request_via_lorawan_t help above for more details.
+/// @param dev_eui                  DevEUI of the sensor.
 /// @param vfs_fat_path             Optional.
 ///                                 Path of the directory where the streams channel user state data and
 ///                                 other files shall be read/written by the Streams POC library.
@@ -158,12 +159,14 @@ pub extern "C" fn send_message(
 #[no_mangle]
 pub extern "C" fn start_sensor_manager(
     send_callback: send_request_via_lorawan_t,
+    dev_eui: *const c_char,
     vfs_fat_path: *const c_char,
     p_caller_user_data: *mut cty::c_void
 ) -> i32 {
     init_esp_idf_sys_and_logger();
     info!("[fn start_sensor_manager()] Starting");
 
+    let c_dev_eui: &CStr = unsafe { CStr::from_ptr(dev_eui) };
     let opt_vfs_fat_path = get_optional_string_from_c_char_ptr(vfs_fat_path, "vfs_fat_path")
         .expect("Error on converting null terminated C string into utf8 rust String");
 
@@ -171,6 +174,7 @@ pub extern "C" fn start_sensor_manager(
         debug!("[fn start_sensor_manager()] Start future::block_on");
         process_main_esp_rs(
             send_callback,
+            c_dev_eui.to_str().expect("dev_eui contains invalid utf8 code"),
             opt_vfs_fat_path,
             p_caller_user_data,
         ).await
@@ -181,7 +185,7 @@ pub extern "C" fn start_sensor_manager(
         }
     };
 
-    0
+    libc::EXIT_SUCCESS
 }
 
 /// Alternative variant of the start_sensor_manager() function using a streams-poc-lib controlled
@@ -194,6 +198,7 @@ pub extern "C" fn start_sensor_manager(
 /// @param iota_bridge_url  URL of the iota-bridge instance to connect to.
 ///                                 Example:
 ///                                    start_sensor_manager_wifi("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
+/// @param dev_eui          DevEUI of the sensor.
 /// @param vfs_fat_path     Optional.
 ///                         Same as start_sensor_manager() vfs_fat_path parameter.
 /// @param wifi_ssid        Optional.
@@ -206,6 +211,7 @@ pub extern "C" fn start_sensor_manager(
 #[no_mangle]
 pub extern "C" fn start_sensor_manager_lwip(
     iota_bridge_url: *const c_char,
+    dev_eui: *const c_char,
     vfs_fat_path: *const c_char,
     wifi_ssid: *const c_char,
     wifi_pass: *const c_char
@@ -214,6 +220,7 @@ pub extern "C" fn start_sensor_manager_lwip(
     info!("[fn start_sensor_manager()] Starting");
 
     let c_iota_bridge_url: &CStr = unsafe { CStr::from_ptr(iota_bridge_url) };
+    let c_dev_eui: &CStr = unsafe { CStr::from_ptr(dev_eui) };
     let opt_vfs_fat_path = get_optional_string_from_c_char_ptr(vfs_fat_path, "vfs_fat_path")
         .expect("Error on converting optional vfs_fat_path to rust String");
     let opt_wifi_ssid = get_optional_string_from_c_char_ptr(wifi_ssid, "wifi_ssid")
@@ -224,13 +231,14 @@ pub extern "C" fn start_sensor_manager_lwip(
     if opt_wifi_ssid.is_some() && opt_wifi_pass.is_none() {
         error!("[fn start_sensor_manager()] wifi_ssid is specified but no wifi_pass has been provided.\
          You always need to provide both wifi_ssid and wifi_pass or set wifi_ssid to NULL");
-        return -1;
+        return libc::EXIT_SUCCESS;
     }
 
     match future::block_on(async {
         debug!("[fn start_sensor_manager()] Start future::block_on");
         process_main_esp_rs_lwip(
             c_iota_bridge_url.to_str().expect("iota_bridge_url contains invalid utf8 code"),
+            c_dev_eui.to_str().expect("dev_eui contains invalid utf8 code"),
             opt_vfs_fat_path,
             opt_wifi_ssid,
             opt_wifi_pass,
@@ -242,7 +250,7 @@ pub extern "C" fn start_sensor_manager_lwip(
         }
     };
 
-    0
+    libc::EXIT_SUCCESS
 }
 
 /// Indicates if this sensor instance has already been initialized.

@@ -1,6 +1,17 @@
 #![allow(non_snake_case)]
 
-use std::cell::RefCell;
+use std::cell::{
+    Cell,
+    RefCell
+};
+
+use async_trait::async_trait;
+
+use anyhow::{
+    Result as AnyResult,
+    bail
+};
+
 use hyper::{
     Body,
     http::{
@@ -17,7 +28,11 @@ use crate::{
         SubscribeToAnnouncement,
         RegisterKeyloadMessage,
         StartSendingMessages,
+        DevEuiHandshakeCmd,
+        EnumeratedPersistable,
+        EnumeratedPersistableArgs,
     },
+    STREAMS_TOOLS_CONST_ANY_DEV_EUI
 };
 
 use super::{
@@ -30,8 +45,6 @@ use super::{
         PathSegments
     }
 };
-
-use async_trait::async_trait;
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -89,13 +102,31 @@ impl QueryParameters {
 pub struct RequestBuilderCommand {
     tools: RequestBuilderTools,
     dev_eui: RefCell<String>,
+    // Allows clients of this struct (usually CommandFetchers) to manage if they should do
+    // a DevEUI-Handshake first.
+    // If dev_eui_handshake_first is true a CommandFetcher should do a DevEUI-Handshake
+    // with the management-console before any other commands are fetched:
+    // If true:
+    //      RequestBuilderCommand::fetch_next_command() will use the dev_eui 'ANY'
+    //      (STREAMS_TOOLS_CONST_ANY_DEV_EUI) to fetch a DevEuiHandshake
+    //      command.
+    //      The CommandFetcher shall not accept any other type of command and shall fetch
+    //      commands until a DevEuiHandshake command has been received.
+    //      After a DevEuiHandshake command has been received,
+    //      RequestBuilderCommand::fetch_next_command() will use the dev_eui defined by the
+    //      'dev_eui' field of this struct.
+    // If false (default):
+    //      RequestBuilderCommand::fetch_next_command() will use the dev_eui defined by the
+    //      'dev_eui' field of this struct.
+    pub dev_eui_handshake_first: Cell<bool>,
 }
 
 impl RequestBuilderCommand {
-    pub fn new(uri_prefix: &str, dev_eui: &str) -> Self {
+    pub fn new(uri_prefix: &str, dev_eui: &str, dev_eui_handshake_first: bool) -> Self {
         Self {
             tools: RequestBuilderTools::new(uri_prefix),
             dev_eui: RefCell::new(dev_eui.to_string()),
+            dev_eui_handshake_first: Cell::new(dev_eui_handshake_first),
         }
     }
 
@@ -107,12 +138,42 @@ impl RequestBuilderCommand {
         self.dev_eui.borrow().clone()
     }
 
+    pub fn get_dev_eui_for_fetch_next_command_request(&self) -> String {
+        if self.dev_eui_handshake_first.get() {
+            STREAMS_TOOLS_CONST_ANY_DEV_EUI.to_string()
+        } else {
+            self.dev_eui.borrow().clone()
+        }
+    }
+
+    pub fn manage_dev_eui_by_received_command(&self, cmd: &Command) -> AnyResult<()> {
+        if cmd.as_u8() != Command::NO_COMMAND.as_u8() &&
+            self.dev_eui_handshake_first.get()
+        {
+            if cmd == DevEuiHandshakeCmd::INSTANCE {
+                log::info!("[fn manage_dev_eui_by_received_command()] Received DevEuiHandshake command for dev_eui '{}'.",
+                    self.get_dev_eui_for_fetch_next_command_request()
+                );
+                self.dev_eui_handshake_first.set(false);
+                log::info!("[fn manage_dev_eui_by_received_command()] dev_eui for next command fetches will be '{}'",
+                    self.get_dev_eui_for_fetch_next_command_request()
+                );
+            } else {
+                bail!("[fn manage_dev_eui_by_received_command()] Received command {} instead of DevEuiHandshake for dev_eui '{}'",
+                    cmd,
+                     self.get_dev_eui_for_fetch_next_command_request()
+                );
+            }
+        }
+        Ok(())
+    }
+
     pub fn fetch_next_command(self: &Self) -> Result<Request<Body>> {
         RequestBuilderTools::get_request_builder()
             .method("GET")
             .uri(self.tools.get_uri(
                 &EndpointUris::get_uri___fetch_next_command(
-                    self.dev_eui.borrow().as_str())
+                    self.get_dev_eui_for_fetch_next_command_request().as_str())
             ).as_str())
             .body(Body::empty())
     }

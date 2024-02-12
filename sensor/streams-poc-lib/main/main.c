@@ -59,10 +59,10 @@ static const sensor_manager_connection_type_t SENSOR_MANAGER_CONNECTION_TYPE = S
 #define STREAMS_POC_LIB_TEST_WIFI_SSID "Susee Demo"
 #define STREAMS_POC_LIB_TEST_WIFI_PASS "susee-rocks"
 // The url of the iota-bridge to connect to. Needed for Sensor initialization.
-#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://195.90.200.153:50000")
+#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.187.223:50000")
 // IP address and port of the LoRaWAN AppServer Connector Mockup Tool to connect to.
 // Needed for sending messages.
-#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("195.90.200.153:50001")
+#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.187.223:50001")
 
 #define SEND_MESSAGES_EVERY_X_SEC 5
 
@@ -302,6 +302,12 @@ uint64_t get_base_mac_48_as_mocked_u64_dev_eui() {
     return s_mac_id;
 }
 
+void get_base_mac_48_as_mocked_u64_dev_eui_string(char* p_buffer_len_128 ) {
+        uint64_t mocked_dev_eui = get_base_mac_48_as_mocked_u64_dev_eui();
+        sprintf(p_buffer_len_128, "%" PRIu64 "\0", mocked_dev_eui);
+        ESP_LOGD(TAG, "[fn get_base_mac_48_as_mocked_u64_dev_eui_string] returning dev_eui_string %s", p_buffer_len_128);
+}
+
 LoRaWanError cb_fun_send_request_via_app_srv_connector_mock(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void *p_caller_user_data) {
     ESP_LOGI(TAG, "[fn cb_fun_send_request_via_app_srv_connector_mock] is called with %d bytes of request_data", length);
 
@@ -491,8 +497,11 @@ void init_sensor_via_app_srv_connector_mock(dest_addr_t *p_dest_addr) {
     ESP_LOGI(TAG, "[fn init_sensor_via_app_srv_connector_mock] Starting sensor_manager using Application-Server-Connector-Mock: %s", STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS);
     s_socket_handle = get_handle_of_prepared_socket(p_dest_addr);
     if (s_socket_handle > -1) {
+        char dev_eui_buffer[128];
+        get_base_mac_48_as_mocked_u64_dev_eui_string(dev_eui_buffer);
         start_sensor_manager(
             cb_fun_send_request_via_app_srv_connector_mock,
+            dev_eui_buffer,
             STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
             NULL
         );
@@ -569,8 +578,11 @@ void init_sensor_via_callback_io(void) {
     switch (SENSOR_MANAGER_CONNECTION_TYPE) {
         case SMCT_CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS: {
             ESP_LOGI(TAG, "[fn init_sensor_via_callback_io] Starting sensor_manager using IOTA-Bridge: %s", STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL);
+            char dev_eui_buffer[128];
+            get_base_mac_48_as_mocked_u64_dev_eui_string(dev_eui_buffer);
             start_sensor_manager(
                 send_request_via_wifi,
+                dev_eui_buffer,
                 STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
                 NULL
             );
@@ -607,8 +619,11 @@ void prepare_lwip_socket_based_sensor_processing(bool do_sensor_initialization) 
             break;
             case SMCT_LWIP: {
                 ESP_LOGI(TAG, "[fn prepare_lwip_socket_based_sensor_processing] Calling start_sensor_manager_lwip() without WiFi credentials");
+                char dev_eui_buffer[128];
+                get_base_mac_48_as_mocked_u64_dev_eui_string(dev_eui_buffer);
                 start_sensor_manager_lwip(
                     STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,
+                    dev_eui_buffer,
                     STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
                     NULL,
                     NULL
@@ -643,8 +658,11 @@ void process_test() {
             break;
             case SMCT_STREAMS_POC_LIB_MANAGED_WIFI: {
                 ESP_LOGI(TAG, "[fn process_test] Calling start_sensor_manager_lwip() using WiFi managed by the streams-poc-lib.");
+                char dev_eui_buffer[128];
+                get_base_mac_48_as_mocked_u64_dev_eui_string(dev_eui_buffer);
                 start_sensor_manager_lwip(
                     STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,
+                    dev_eui_buffer,
                     STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
                     STREAMS_POC_LIB_TEST_WIFI_SSID,
                     STREAMS_POC_LIB_TEST_WIFI_PASS

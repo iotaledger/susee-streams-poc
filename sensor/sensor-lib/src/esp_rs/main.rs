@@ -46,7 +46,7 @@ use streams_tools::{
     },
     PlainTextWallet,
     StreamsTransport,
-    SubscriberManager
+    SubscriberManager,
 };
 
 use payloads::{
@@ -94,6 +94,7 @@ where
     command_fetcher: CmdFetchT,
     streams_transport_opt: StreamsTransportT::Options,
     vfs_fat_path: Option<String>,
+    dev_eui: String,
 }
 
 impl<CmdFetchT, StreamsTransportT> CmdProcessor<CmdFetchT, StreamsTransportT>
@@ -141,6 +142,10 @@ impl<TSR, CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetc
         } else {
             "".to_string()
         }
+    }
+
+    fn get_dev_eui(&self) -> String {
+        self.dev_eui.clone()
     }
 
     fn println_subscriber_status<'a> (
@@ -281,6 +286,12 @@ impl<TSR, CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetc
         //       remote control.
         todo!()
     }
+
+    async fn dev_eui_handshake(&self, confirm_req_builder: &RequestBuilderConfirm) -> hyper::http::Result<Request<Body>> {
+        confirm_req_builder.dev_eui_handshake(
+            self.dev_eui.clone()
+        )
+    }
 }
 
 impl<CmdFetchT, StreamsTransportT> CmdProcessor<CmdFetchT, StreamsTransportT>
@@ -289,13 +300,14 @@ impl<CmdFetchT, StreamsTransportT> CmdProcessor<CmdFetchT, StreamsTransportT>
         StreamsTransportT: StreamsTransport,
         StreamsTransportT::Options: Clone,
 {
-    pub fn new<>(vfs_fat_path: Option<String>, command_fetch_opt: CmdFetchT::Options, streams_transport_opt: StreamsTransportT::Options) -> CmdProcessor<CmdFetchT, StreamsTransportT> {
+    pub fn new<>(dev_eui: &str, vfs_fat_path: Option<String>, command_fetch_opt: CmdFetchT::Options, streams_transport_opt: StreamsTransportT::Options) -> CmdProcessor<CmdFetchT, StreamsTransportT> {
         CmdProcessor {
             command_fetcher: CmdFetchT::new(
                 Some(command_fetch_opt)
             ),
             streams_transport_opt,
             vfs_fat_path,
+            dev_eui: dev_eui.to_string(),
         }
     }
 }
@@ -307,7 +319,7 @@ impl<TSR, CmdFetchT, StreamsTransportT> CommandProcessor for CmdProcessor<CmdFet
     StreamsTransportT::Options: Clone,
 {
     fn get_dev_eui(&self) -> String {
-        todo!()
+        self.dev_eui.clone()
     }
 
     async fn fetch_next_command(&self) -> Result<(Command, Vec<u8>)> {
@@ -343,6 +355,7 @@ impl<TSR, CmdFetchT, StreamsTransportT> CommandProcessor for CmdProcessor<CmdFet
 
 pub async fn process_main_esp_rs(
     lorawan_send_callback: send_request_via_lorawan_t,
+    dev_eui: &str,
     vfs_fat_path: Option<String>,
     p_caller_user_data: *mut cty::c_void,
 ) -> Result<()>
@@ -358,8 +371,13 @@ pub async fn process_main_esp_rs(
     };
     let command_processor =
         CmdProcessor::<CommandFetcherBufferCb, StreamsTransportViaBufferCallback>::new(
+            dev_eui,
             vfs_fat_path,
-            CommandFetcherBufferCbOptions{ buffer_cb: request_via_callback_opt.clone()},
+            CommandFetcherBufferCbOptions{
+                buffer_cb: request_via_callback_opt.clone(),
+                dev_eui_handshake_first: true,
+                dev_eui: dev_eui.to_string(),
+            },
             request_via_callback_opt
     );
     run_command_fetch_loop(
@@ -373,6 +391,7 @@ pub async fn process_main_esp_rs(
 
 pub async fn process_main_esp_rs_lwip(
     iota_bridge_url: &str,
+    dev_eui: &str,
     vfs_fat_path: Option<String>,
     opt_wifi_ssid: Option<String>,
     opt_wifi_pass: Option<String>,
@@ -394,9 +413,12 @@ pub async fn process_main_esp_rs_lwip(
 
     let command_processor =
         CmdProcessor::<CommandFetcherSocket, StreamsTransportSocketEspRs>::new(
+            dev_eui,
             vfs_fat_path,
             CommandFetcherSocketOptions{
-                http_url: iota_bridge_url
+                http_url: iota_bridge_url.to_string(),
+                dev_eui_handshake_first: true,
+                dev_eui: dev_eui.to_string(),
             },
             StreamsTransportSocketEspRsOptions{
                 http_url: iota_bridge_url.to_string()

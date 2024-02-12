@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+use std::cell::RefCell;
+
 use async_trait::async_trait;
 
 use hyper::{
@@ -91,15 +93,23 @@ impl QueryParameters {
 #[derive(Clone)]
 pub struct RequestBuilderConfirm {
     tools: RequestBuilderTools,
-    dev_eui: String,
+    dev_eui: RefCell<String>,
 }
 
 impl RequestBuilderConfirm {
     pub fn new(uri_prefix: &str, dev_eui: &str) -> Self {
         Self {
             tools: RequestBuilderTools::new(uri_prefix),
-            dev_eui: dev_eui.to_string(),
+            dev_eui: RefCell::new(dev_eui.to_string()),
         }
+    }
+
+    pub fn set_dev_eui(&self, dev_eui: &str) {
+        *self.dev_eui.borrow_mut() = dev_eui.to_string();
+    }
+
+    pub fn get_dev_eui(&self) -> String {
+        self.dev_eui.borrow().clone()
     }
 
     pub fn fetch_next_confirmation(self: &Self) -> Result<Request<Body>> {
@@ -107,7 +117,7 @@ impl RequestBuilderConfirm {
             .method("GET")
             .uri(self.tools.get_uri(
                 &EndpointUris::get_uri___fetch_next_confirmation(
-                    self.dev_eui.as_str())
+                    self.dev_eui.borrow().as_str())
             ).as_str())
             .body(Body::empty())
     }
@@ -119,7 +129,7 @@ impl RequestBuilderConfirm {
                 pup_key,
                 initialization_cnt,
             },
-            &EndpointUris::get_uri___subscription(self.dev_eui.as_str())
+            &EndpointUris::get_uri___subscription(self.dev_eui.borrow().as_str())
         )
     }
 
@@ -129,7 +139,7 @@ impl RequestBuilderConfirm {
                 previous_message_link,
                 subscription,
             },
-            &EndpointUris::get_uri___subscriber_status(self.dev_eui.as_str())
+            &EndpointUris::get_uri___subscriber_status(self.dev_eui.borrow().as_str())
         )
     }
 
@@ -138,7 +148,7 @@ impl RequestBuilderConfirm {
         // this confirmation will not really be sent and currently just exists to satisfy the compiler.
         self.tools.send_enumerated_persistable_args(
             SendMessages{ previous_message_link: "No previous message link available".to_string() },
-            &EndpointUris::get_uri___send_messages(self.dev_eui.as_str())
+            &EndpointUris::get_uri___send_messages(self.dev_eui.borrow().as_str())
         )
     }
 
@@ -146,7 +156,7 @@ impl RequestBuilderConfirm {
         RequestBuilderTools::get_request_builder()
             .method("GET")
             .uri(self.tools.get_uri(
-                &EndpointUris::get_uri___keyload_registration(self.dev_eui.as_str())
+                &EndpointUris::get_uri___keyload_registration(self.dev_eui.borrow().as_str())
             ).as_str())
             .body(Body::empty())
     }
@@ -155,20 +165,23 @@ impl RequestBuilderConfirm {
         RequestBuilderTools::get_request_builder()
             .method("GET")
             .uri(self.tools.get_uri(
-                &EndpointUris::get_uri___clear_client_state(self.dev_eui.as_str())
+                &EndpointUris::get_uri___clear_client_state(self.dev_eui.borrow().as_str())
             ).as_str())
             .body(Body::empty())
     }
 
     /// @param dev_eui: The real dev_eui of the sensor which will be forwarded to the
     ///                 management-console.
-    ///                 The dev_eui of this RequestBuilderConfirm instance is used
-    ///                 as url-parameter for the iota-bridge request so it usually
-    ///                 usually should be set to 'ANY'.
+    ///                 Please note that there are two dev_eui values:
+    ///                 (1) this fn argument, which is used for the confirmation that is
+    ///                     send in the body of the request.
+    ///                 (2) the dev_eui field of this RequestBuilderConfirm instance,
+    ///                     which is used as url-parameter for the iota-bridge request
+    ///                     so it usually should be set to 'ANY'.
     pub fn dev_eui_handshake(self: &Self, dev_eui: String) -> Result<Request<Body>> {
         self.tools.send_enumerated_persistable_args(
             DevEuiHandshake{dev_eui},
-            &EndpointUris::get_uri___dev_eui_handshake(self.dev_eui.as_str())
+            &EndpointUris::get_uri___dev_eui_handshake(self.dev_eui.borrow().as_str())
         )
     }
 }

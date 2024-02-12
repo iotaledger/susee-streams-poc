@@ -1,3 +1,7 @@
+use std::fmt;
+
+use async_trait::async_trait;
+
 use hyper::{
     Body as HyperBody,
     http::{
@@ -10,6 +14,7 @@ use embedded_svc::{
     http::{
         Headers,
         client::{
+            Response,
             Client as HttpClient,
         }
     }
@@ -24,17 +29,14 @@ use anyhow::{
     bail,
 };
 
-use std::fmt;
-
 use log;
 
 use streams_tools::{
     binary_persist::{
         Command,
     },
-    http::{
-        http_protocol_command::EndpointUris as EndpointUrisCommand,
-    },
+    http::http_protocol_command::RequestBuilderCommand,
+    STREAMS_TOOLS_CONST_DEV_EUI_NOT_DEFINED,
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
 };
 
@@ -51,35 +53,44 @@ use crate::{
         }
     }
 };
-use async_trait::async_trait;
 
-pub struct CommandFetcherSocketOptions<'a> {
-    pub(crate) http_url: &'a str,
+const HEADERS: [(&'static str, &'static str); 1] = [("user-agent", "main-esp-rs/command-fetcher")];
+
+pub struct CommandFetcherSocketOptions {
+    pub(crate) http_url: String,
+    // Controls if the CommandFetcher should do a DevEUI-Handshake first.
+    // See RequestBuilderCommand::dev_eui_handshake_first in streams-tools/src/http/http_protocol_command.rs
+    // for more details.
+    pub dev_eui_handshake_first: bool,
+    pub dev_eui: String
 }
 
-impl Default for CommandFetcherSocketOptions<'_> {
+impl Default for CommandFetcherSocketOptions{
     fn default() -> Self {
         Self {
-            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL
+            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL.to_string(),
+            dev_eui_handshake_first: false,
+            dev_eui: STREAMS_TOOLS_CONST_DEV_EUI_NOT_DEFINED.to_string(),
         }
     }
 }
 
-impl fmt::Display for CommandFetcherSocketOptions<'_> {
+impl fmt::Display for CommandFetcherSocketOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CommandFetcherOptions: http_url: {}", self.http_url)
+        write!(f, "CommandFetcherOptions:\n   http_url: {}\n   dev_eui_handshake_first: {}\n   dev_eui: {}",
+                self.http_url,
+                self.dev_eui_handshake_first,
+                self.dev_eui
+        )
     }
 }
 
-pub struct CommandFetcherSocket<'a> {
-    options: CommandFetcherSocketOptions<'a>,
+pub struct CommandFetcherSocket {
+    options: CommandFetcherSocketOptions,
+    request_builder: RequestBuilderCommand,
 }
 
-impl<'a> CommandFetcherSocket<'a> {
-
-    fn get_iota_bridge_path(&self, endpoint_uri: &str) -> String {
-        format!("{}{}", self.options.http_url, endpoint_uri)
-    }
+impl CommandFetcherSocket {
 
     fn deserialize_command(& self, mut response: EspHttpResponse) -> Result<(Command, Vec<u8>)> {
         let mut ret_val = (Command::NO_COMMAND, Vec::<u8>::default());
@@ -96,16 +107,45 @@ impl<'a> CommandFetcherSocket<'a> {
         }
         Ok(ret_val)
     }
+
+    fn get_request_uri(&self) -> Result<String> {
+        let hyper_request = self.request_builder.fetch_next_command()?;
+        Ok(hyper_request.uri().to_string())
+    }
+
+    async fn handle_response(&self, response: Response<&mut EspHttpConnection>) -> Result<(Command, Vec<u8>)> {
+        if response.status() == HyperStatusCode::OK {
+            log::debug!("[fn handle_response()] StatusCode::OK - deserializing command");
+            let (cmd, bytes) = self.deserialize_command(response)?;
+            match self.request_builder.manage_dev_eui_by_received_command(&cmd) {
+                Ok(_) => Ok((cmd, bytes)),
+                Err(e) => {
+                    log::error!("[fn handle_response()] Received unexpected command: {} - will return Command::NO_COMMAND instead.",
+                        e
+                    );
+                    Ok((Command::NO_COMMAND, Vec::<u8>::default()))
+                }
+            }
+        } else {
+            log::error!("[fn handle_response()] HTTP Error. Status: {}", response.status());
+            Ok((Command::NO_COMMAND, Vec::<u8>::default()))
+        }
+    }
 }
 
 #[async_trait(?Send)]
-impl<'a> CommandFetcher for CommandFetcherSocket<'a> {
-    type Options = CommandFetcherSocketOptions<'a>;
+impl CommandFetcher for CommandFetcherSocket {
+    type Options = CommandFetcherSocketOptions;
 
-    fn new(options: Option<CommandFetcherSocketOptions<'a>>) -> Self {
+    fn new(options: Option<CommandFetcherSocketOptions>) -> Self {
         let options = options.unwrap_or_default();
         log::debug!("[fn new()] Creating new CommandFetcher using options: {}", options);
         Self {
+            request_builder: RequestBuilderCommand::new(
+                options.http_url.as_str(),
+                options.dev_eui.as_str(),
+                options.dev_eui_handshake_first,
+            ),
             options,
         }
     }
@@ -119,25 +159,17 @@ impl<'a> CommandFetcher for CommandFetcherSocket<'a> {
             EspHttpConnection::new(&Default::default())?
         );
 
-        let headers = [("user-agent", "main-esp-rs/command-fetcher")];
-        let url = self.get_iota_bridge_path(EndpointUrisCommand::FETCH_NEXT_COMMAND);
-
+        let uri = self.get_request_uri()?;
         let esp_http_req = http_client.request(
             embedded_svc::http::Method::Get,
-            url.as_str(),
-            &headers,
+            uri.as_str(),
+            &HEADERS,
         )?;
 
         match esp_http_req.submit() {
             Ok(response) => {
                 log::debug!("[fn fetch_next_command()] Received Response");
-                if response.status() == HyperStatusCode::OK {
-                    log::debug!("[fn fetch_next_command()] StatusCode::OK - deserializing command");
-                    self.deserialize_command(response)
-                } else {
-                    log::error!("[fn fetch_next_command()] HTTP Error. Status: {}", response.status());
-                    Ok((Command::NO_COMMAND, Vec::<u8>::default()))
-                }
+                self.handle_response(response).await
             },
             Err(e) => {
                 bail!("[fn fetch_next_command()] esp_http_req.submit failed: {}", e)

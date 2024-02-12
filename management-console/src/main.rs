@@ -43,7 +43,6 @@ use streams_tools::{
     },
     helpers::get_channel_id_from_link,
     dao_helpers::DbFileBasedDaoManagerOptions,
-    STREAMS_TOOLS_CONST_ANY_DEV_EUI
 };
 
 
@@ -162,38 +161,28 @@ async fn println_channel_status<'a> (channel_manager: &mut ChannelManagerPlainTe
 
 async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>) -> Result<()> {
     log::info!("Initializing remote sensor");
-    let dev_eui_handshake = perform_dev_eui_handshake(cli).await?;
+    let remote_sensor = RemoteSensor::new(Some(create_remote_sensor_options(cli)));
+    let dev_eui_handshake = perform_dev_eui_handshake(&remote_sensor).await?;
+    remote_sensor.set_dev_eui(dev_eui_handshake.dev_eui.as_str());
     let announcement_link = create_channel(channel_manager).await?;
-    let remote_sensor_options = create_remote_sensor_options(
-        cli, Some(dev_eui_handshake.dev_eui)
-    );
-    let remote_sensor = RemoteSensor::new(Some(remote_sensor_options));
-
     let subscription = subscribe_remote_sensor_to_channel(&remote_sensor, announcement_link).await?;
     let _keyload_registration = make_remote_sensor_register_keyload_msg(channel_manager, &remote_sensor, subscription).await?;
     Ok(())
 }
 
 
-async fn perform_dev_eui_handshake<'a>(cli: &ManagementConsoleCli<'a>) -> Result<DevEuiHandshake> {
-    let remote_sensor_options = create_remote_sensor_options(
-        cli, Some(STREAMS_TOOLS_CONST_ANY_DEV_EUI.to_string())
-    );
-    let remote_sensor = RemoteSensor::new(Some(remote_sensor_options));
+async fn perform_dev_eui_handshake<'a>(remote_sensor: &RemoteSensor) -> Result<DevEuiHandshake> {
     log::info!("Using {} as iota-bridge url", remote_sensor.get_proxy_url());
 
-    log::info!("Sending dev_eui_handshake command to remote sensor.\n");
+    log::info!("Sending dev_eui_handshake command to remote sensor {}.", remote_sensor.get_dev_eui_command());
     let dev_eui_handshake = remote_sensor.dev_eui_handshake().await?;
 
-    log::info!("
-Received dev_eui_handshake from remote sensor. DevEUI: '{}'",
-             dev_eui_handshake.dev_eui,
-    );
+    log::info!("Received dev_eui_handshake from remote sensor. DevEUI: '{}'", dev_eui_handshake.dev_eui);
     Ok(dev_eui_handshake)
 }
 
 async fn subscribe_remote_sensor_to_channel(remote_sensor: &RemoteSensor, announcement_link: Address) -> Result<Subscription> {
-    log::info!("Sending subscribe_announcement_link command to remote sensor.\n");
+    log::info!("Sending subscribe_announcement_link command to remote sensor {}.", remote_sensor.get_dev_eui_command());
     let subscription_confirm = remote_sensor.subscribe_to_channel(announcement_link.to_string().as_str()).await?;
 
     if subscription_confirm.initialization_cnt == INITIALIZATION_CNT_MAX_VALUE {
@@ -206,7 +195,7 @@ Received confirmation for successful Subscription from remote sensor with DevEUI
                      Creating keyload_message for
                             subscription: {}
                             public key: {}\n",
-             remote_sensor.get_dev_eui(),
+             remote_sensor.get_dev_eui_confirm(),
              subscription_confirm.initialization_cnt,
              subscription_confirm.subscription_link,
              subscription_confirm.pup_key,
@@ -225,17 +214,17 @@ async fn make_remote_sensor_register_keyload_msg(
         subscription.pup_key.as_str()
     ).await?;
 
-    log::info!("Sending register_keyload_msg command to remote sensor.\n");
+    log::info!("Sending register_keyload_msg command to remote sensor {}.", remote_sensor.get_dev_eui_command());
     let keyload_registration = remote_sensor.register_keyload_msg(keyload_msg_link.to_string().as_str()).await?;
     log::info!("
 Received confirmation for successful KeyloadRegistration from remote sensor with dev_eui '{}'.
                      =========> Sensor has been fully initialized <==========="
-        , remote_sensor.get_dev_eui()
+        , remote_sensor.get_dev_eui_confirm()
     );
     Ok(keyload_registration)
 }
 
-fn create_remote_sensor_options<'a>(cli: &ManagementConsoleCli<'a>, opt_dev_eu: Option<String>) -> RemoteSensorOptions {
+fn create_remote_sensor_options<'a>(cli: &ManagementConsoleCli<'a>) -> RemoteSensorOptions {
     let mut remote_options = RemoteSensorOptions::default();
     remote_options.confirm_fetch_wait_sec = SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC;
 
@@ -245,10 +234,6 @@ fn create_remote_sensor_options<'a>(cli: &ManagementConsoleCli<'a>, opt_dev_eu: 
 
     if let Some(dev_eui) = cli.matches.value_of(cli.arg_keys.dev_eui) {
         remote_options.dev_eui = dev_eui.to_string();
-    } else {
-        if let Some(dev_eui) = opt_dev_eu {
-            remote_options.dev_eui = dev_eui;
-        }
     }
     remote_options
 }

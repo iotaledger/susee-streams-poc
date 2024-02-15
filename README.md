@@ -1,5 +1,15 @@
 # SUSEE Streams POC
 
+    ===========================================================================
+    ===                                                                     ===
+    ===                         IMPORTANT NOTE                              ===
+    ===                                                                     ===
+    ===       THE MAIN BRANCH IS OUTDATED                                   ===
+    ===       PLEASE SEE STARDUST BRANCH FOR THE CURRENT VERSION            ===
+    ===       OF THE SUSEE STREAMS POC APPLICATIONS AND LIBRARY             ===
+    ===                                                                     ===
+    ===========================================================================
+
 ## About
 This project contains five test applications providing command line interfaces (CLI) to evaluate the *IOTA Streams*
 functionality that is used in the SUSEE project. Additionally, the static library *streams-poc-lib* provides C bindings

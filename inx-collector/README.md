@@ -290,6 +290,22 @@ The connectivity of most of the provided services is documented in the
 [privat tangle README file](./priv_tangle/README.md)
 which is located in the created `priv_tangle` folder.
 
+The SUSEE-POC applications *IOTA Bridge* and *Management Console* need to know the
+domain of the IOTA-Node which can be specified by the CLI `--node` argument. The domain
+name is needed to build the URL of the IOTA-Node-API.
+When the default value - '127.0.0.1' - for the `--node` argument is used, the
+standard port of the IOTA-Node-API 14265 is automatically used to build the
+URL of the IOTA-Node-API. This will work together with the private tangle for development
+purposes.
+
+If you are using the private tangle for development purposes and need to specify
+the `--node` argument for a SUSEE-POC application explicitly, please use the
+value `127.0.0.1`.
+
+Also use the value `http://127.0.0.1:50000` for the `--iota-bridge` argument
+of SUSEE-POC applications, in case it needs to be specified explicitly.
+This should occur seldom as this is the default value.
+
 The REST api of the inx collector is available via localhost:9030.
 For example, you can fetch a specific block using the api like this:
 http://localhost:9030/block/block/block-id-goes-here

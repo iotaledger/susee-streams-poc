@@ -42,6 +42,7 @@ use log;
 
 type HttpClient = Client<HttpConnector, Body>;
 
+#[derive(Clone)]
 pub struct RemoteSensorOptions {
     pub http_url: String,
     pub confirm_fetch_wait_sec: u32,
@@ -117,7 +118,7 @@ impl RemoteSensor {
                 if confirmation != Confirmation::NO_CONFIRMATION {
                     return self.process_confirmation::<T>(confirmation, buffer).await;
                 } else {
-                    log::info!("Received Confirmation::NO_CONFIRMATION for dev_eui: '{}'", self.request_builder_confirm.get_dev_eui());
+                    log::info!("DevEUI: {} - Received Confirmation::NO_CONFIRMATION", self.request_builder_confirm.get_dev_eui());
                 }
             } else {
                 log::error!("[fn poll_confirmation] fn call fetch_next_confirmation() failed.");

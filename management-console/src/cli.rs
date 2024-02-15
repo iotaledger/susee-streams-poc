@@ -2,13 +2,14 @@ use clap::{
     Arg
 };
 
+use streams_tools::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL;
+
 use susee_tools::{
     BaseArgKeys,
     BASE_ARG_KEYS,
     Cli,
     cli_base::ArgMatchesAndOptions,
 };
-use streams_tools::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL;
 
 // TODO: Implement new CLI commands "--list-channels", "--user-states-database-path"
 // Instead of "--user-states-database-path" a management-console.config file (toml) could be useful.
@@ -19,6 +20,7 @@ pub struct ArgKeys {
     pub subscription_pub_key: &'static str,
     pub create_channel: &'static str,
     pub init_sensor: &'static str,
+    pub init_multiple_sensors: &'static str,
     pub iota_bridge_url: &'static str,
     pub dev_eui: &'static str,
     pub println_channel_status: &'static str,
@@ -32,6 +34,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     subscription_pub_key: "subscription-pub-key",
     create_channel: "create-channel",
     init_sensor: "init-sensor",
+    init_multiple_sensors: "init-multiple-sensors",
     iota_bridge_url: "iota-bridge-url",
     dev_eui: "dev-eui",
     println_channel_status: "println-channel-status",
@@ -79,11 +82,38 @@ Example:
     >   ./management-console --channel-starts-with=6f5aa6cb --println-channel-status
 ";
 
+static INIT_MULTIPLE_SENSORS_ABOUT: &str = "Initialize the streams channel of multiple sensors in parallel.
+Initializes a Sensor like the --init-sensor argument does, but will do this for
+an arbitrary amount of Sensors in parallel while --init-sensor will only initialize
+one single Sensor.
+
+The initialization process allways starts with a DevEUI-Handshake. During this
+handshake the Management-Console asks any Sensor for its DevEUI. Any Sensor that
+responds to a DevEUI-Handshake will receive all needed Commands as been described
+for the --init-sensor argument where the Commands are addressed to the specific
+Sensor using its DevEUI.
+
+After a DevEUI-Handshake has been completed the initialization is processed in its
+own thread so that many Sensor initializations can be done in parallel.
+
+Meanwhile to the Sensor initializations, the Management Console will search for
+additional Sensors that reply to a DevEUI-Handshake in an endless loop. This means
+that you need to kill the Management Console process after your last Sensor has
+been successfully initialized. Otherwise the Management Console would run
+infinitely.
+
+Example:
+
+    >   ./management-console --init-multiple-sensors \\
+                             --iota-bridge-url=\"http://192.168.47.11:50000\"
+";
+
 static INIT_SENSOR_ABOUT: &str = "Initialize the streams channel of a remote sensor.
 The whole channel initialization is done automatically following the process described
 below. Management-console and remote sensor are communicating via the IOTA-Bridge.
-Therefore you also need to use the '--iota-bridge' option to connect the management-
-console to a running IOTA-Bridge.
+If your Sensor communicates with your IOTA-Bridge via an external domain or via an
+external port of your local system, you will need to use the '--iota-bridge' option
+to connect the Management-Console to the correct IOTA-Bridge.
 
 Example:
 
@@ -108,6 +138,11 @@ the CLI of the management-console and the sensor/ESP32-Sensor application:
         | sensor             | --register-keyload-msg        |
         ---------------------|--------------------------------
 
+As these CLI arguments require the --dev-eui argument the Management-Console
+performs a DevEUI-Handshake to determine the dev-eui of any suitable Sensor
+before the initialization process starts. Contrary to the --init-multiple-sensors
+argument the --init-sensor argument will only initialize one single sensor.
+
 In the automated initialization process all CLI commands and the data that are written
 to console log by the applications are transported using Command and Confirmation
 packages that are defined in the binary_persist module of the streams-tools library.
@@ -115,9 +150,18 @@ packages that are defined in the binary_persist module of the streams-tools libr
 Here is an overview which Command and Confirmation packages are used for communication
 with the remote sensor via the IOTA-Bridge:
 
+ * management-console: Search for a dev_eui to start an initialization process
+                                # Send to ANY sensor using the DevEuiHandshakeCmd
+                                # Command
+
+ * sensor: Provide a dev_eui for initialization
+   --> DevEUI                   # Send to management-console using the DevEuiHandshake
+                                # Confirmation
+
  * management-console: --create-channel
     --> Announcement Link       # Send to the sensor using the SubscribeToAnnouncement
                                 # Command
+
  * sensor: --subscribe-announcement-link
     --> Subscription Link       # Send to the management-console using
     --> Public Key              # the SubscribeToAnnouncement Confirmation
@@ -150,10 +194,21 @@ Example:
 
 
 static IOTA_BRIDGE_URL_ABOUT_FMT_STR: &str = "The url of the iota-bridge to connect to.
-See --init-sensor for further information.
+The default value will work together with the private tangle for development purposes
+and a local running iota-bridge using the default settings.
+See folder 'inx-collector' for more details.
+
+If your local iota-bridge listens to an external ip address, you need to specify this
+address using the --iota-bridge-url argument.
+
+If you are using an IOTA-Bridge provided by an external host, you need to specify the
+domain or address using the --iota-bridge-url argument. For example use
+\"http://iotabridge.peeros.de:50000\" for the SUSEE-Node provided by peerOS.
+
 Default value is {}
 
-Example: iota-bridge-url=\"http://192.168.47.11:50000\"";
+Example: --iota-bridge-url=\"http://192.168.47.11:50000\"
+";
 
 static MANAGEMENTCONSOLE_APPLICATION_ABOUT: &str = "Management console for streams channels used in the SUSEE project.
 Can be used to create new Streams channels and to add Sensors (a.k.a. Streams subscribers)
@@ -165,7 +220,7 @@ static DEV_EUI_ABOUT: &str = "The DevEUI of the sensor to act on.
 DevEUI means 'device extended unique identifier' and is a term
 from LoRaWAN communication. Any random value (number or string)
 uniquely identifying the sensor can be used as long as the sensor
-the same value.
+uses the same value.
 ";
 
 pub type ManagementConsoleCli<'a> = Cli<'a, ArgKeys>;
@@ -184,6 +239,7 @@ pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
             .help(SUBSCRIPTION_LINK_ABOUT)
             .requires(ARG_KEYS.subscription_pub_key)
             .requires(ARG_KEYS.dev_eui)
+            .conflicts_with_all(&[ARG_KEYS.init_sensor, ARG_KEYS.init_multiple_sensors, ARG_KEYS.create_channel, ARG_KEYS.run_explorer_api_server])
         )
         .arg(Arg::new(ARG_KEYS.subscription_pub_key)
             .long(ARG_KEYS.subscription_pub_key)
@@ -192,12 +248,15 @@ pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
             .help(SUBSCRIPTION_PUB_KEY_ABOUT)
             .requires(ARG_KEYS.subscription_link)
             .requires(ARG_KEYS.dev_eui)
+            .conflicts_with_all(&[ARG_KEYS.init_sensor, ARG_KEYS.init_multiple_sensors, ARG_KEYS.create_channel, ARG_KEYS.run_explorer_api_server])
         )
         .arg(Arg::new(ARG_KEYS.create_channel)
             .long(ARG_KEYS.create_channel)
             .short('c')
             .help(CREATE_CHANNEL_ABOUT)
             .takes_value(false)
+            .requires(ARG_KEYS.dev_eui)
+            .conflicts_with_all(&[ARG_KEYS.init_sensor, ARG_KEYS.init_multiple_sensors, ARG_KEYS.subscription_pub_key, ARG_KEYS.subscription_link, ARG_KEYS.run_explorer_api_server])
         )
         .arg(Arg::new(ARG_KEYS.println_channel_status)
             .long(ARG_KEYS.println_channel_status)
@@ -217,7 +276,14 @@ pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
             .long(ARG_KEYS.init_sensor)
             .short('i')
             .help(INIT_SENSOR_ABOUT)
-            .requires(ARG_KEYS.iota_bridge_url)
+            .conflicts_with_all(&[ARG_KEYS.init_multiple_sensors, ARG_KEYS.create_channel, ARG_KEYS.subscription_pub_key, ARG_KEYS.subscription_link, ARG_KEYS.run_explorer_api_server])
+            .takes_value(false)
+        )
+        .arg(Arg::new(ARG_KEYS.init_multiple_sensors)
+            .long(ARG_KEYS.init_multiple_sensors)
+            .short('m')
+            .help(INIT_MULTIPLE_SENSORS_ABOUT)
+            .conflicts_with_all(&[ARG_KEYS.init_sensor, ARG_KEYS.create_channel, ARG_KEYS.subscription_pub_key, ARG_KEYS.subscription_link, ARG_KEYS.run_explorer_api_server])
             .takes_value(false)
         )
         .arg(Arg::new(ARG_KEYS.run_explorer_api_server)
@@ -226,14 +292,13 @@ pub fn get_arg_matches<'a>() -> ArgMatchesAndOptions {
             .help(RUN_EXPLORER_API_SERVER_ABOUT)
             .value_name("LISTENER_ADDRESS")
             .default_missing_value("127.0.0.1:8080")
-            .conflicts_with_all(&[ARG_KEYS.init_sensor, ARG_KEYS.create_channel, ARG_KEYS.subscription_pub_key, ARG_KEYS.subscription_link])
+            .conflicts_with_all(&[ARG_KEYS.init_sensor, ARG_KEYS.init_multiple_sensors, ARG_KEYS.create_channel, ARG_KEYS.subscription_pub_key, ARG_KEYS.subscription_link])
         )
         .arg(Arg::new(ARG_KEYS.iota_bridge_url)
             .long(ARG_KEYS.iota_bridge_url)
             .short('b')
             .value_name("IOTA_BRIDGE_URL")
             .help(iota_bridge_url_about.as_str())
-            .requires(ARG_KEYS.init_sensor)
         )
         .arg(Arg::new(ARG_KEYS.dev_eui)
             .long(ARG_KEYS.dev_eui)

@@ -3,14 +3,14 @@ use async_trait::async_trait;
 use super::error::Result;
 
 #[async_trait(?Send)]
-pub (crate) trait Worker {
+pub trait Worker {
     type OptionsType: Send;
     type ResultType: Send;
 
     async fn run(opt: Self::OptionsType) -> Result<Self::ResultType>;
 }
 
-pub (crate) async fn run_worker_in_own_thread<W>(worker_opt: W::OptionsType) -> Result<W::ResultType>
+pub async fn run_worker_in_own_thread<W>(worker_opt: W::OptionsType) -> Result<W::ResultType>
     where
         W: Worker,
         <W as Worker>::OptionsType: 'static,

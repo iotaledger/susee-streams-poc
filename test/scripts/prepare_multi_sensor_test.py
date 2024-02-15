@@ -26,9 +26,10 @@ for indx in range(0, number_of_sensors):
     dst_path =  dst_folder + "/sensor"
     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
     shutil.copy(compiled_sensor_src_path, dst_path)
-    print('--- Copied sensor ' + str(indx) + '.\n--- Starting sensor initialization.')
+    print('--- Copied sensor ' + str(indx) + '.\n--- Starting sensor with act-as-remote-controlled-sensor argument.')
     print('-------------------------------------------------------------------------------------------------------')
-    subprocess.Popen("./management-console --init-sensor --iota-bridge-url " + iota_bridge_url + " --node " + node_host + " 2>>prepare_multi_sensor_test.log", cwd=workspace_folder, shell=True)
-    subprocess.run("./sensor --act-as-remote-controlled-sensor --exit-after-successful-initialization --iota-bridge-url " + iota_bridge_url + " 2>prepare_multi_sensor_test.log", cwd=dst_folder, shell=True)
-    print('--- Finished sensor initialization. Waiting 30 seconds for the last confirmation to be delivered by the iota-bridge')
-    time.sleep(30)
+    subprocess.Popen("./sensor --act-as-remote-controlled-sensor --exit-after-successful-initialization --iota-bridge-url " + iota_bridge_url + " 2>prepare_multi_sensor_test.log", cwd=dst_folder, shell=True)
+    print('--- Prepared sensor environment for initialization ' + str(indx))
+
+print('--- Starting ManagementConsole for a multi sensor initialization')
+subprocess.Popen("./management-console --init-multiple-sensors --iota-bridge-url " + iota_bridge_url + " --node " + node_host + " 2>>prepare_multi_sensor_test.log", cwd=workspace_folder, shell=True)

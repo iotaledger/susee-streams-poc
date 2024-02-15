@@ -55,10 +55,10 @@ pub async fn run_command_fetch_loop(cmd_prcssr: impl CommandProcessor, options: 
         if let Ok((command, buffer)) = cmd_prcssr.fetch_next_command().await {
             match command {
                 Command::NO_COMMAND => {
-                    log::info!("[fn run_command_fetch_loop()] Received Command::NO_COMMAND for dev_eui '{}'", cmd_prcssr.get_dev_eui());
+                    log::info!("[fn run_command_fetch_loop()] DevEUI: {} - Received Command::NO_COMMAND", cmd_prcssr.get_dev_eui());
                 },
                 Command::STOP_FETCHING_COMMANDS => {
-                    log::info!("[fn run_command_fetch_loop()] Received Command::STOP_FETCHING_COMMANDS  for dev_eui '{}' - Will exit command fetch loop.",
+                    log::info!("[fn run_command_fetch_loop()] DevEUI: {} - Received Command::STOP_FETCHING_COMMANDS - Will exit command fetch loop.",
                         cmd_prcssr.get_dev_eui());
                     return Ok(());
                 },

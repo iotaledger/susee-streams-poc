@@ -410,7 +410,7 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
     }
 
     async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
-        log::info!("Received Command::{} for dev_eui '{}'", command, self.dev_eui);
+        log::info!("DevEUI: {} - Received Command::{}", self.dev_eui, command);
         let mut subscriber = create_subscriber_manager(&self.cli).await?;
 
         let confirmation_request = process_sensor_commands(self, &mut subscriber, command, buffer)

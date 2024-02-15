@@ -57,7 +57,7 @@ impl ServerDispatchLorawanRest for DispatchLorawanRest {
     fn get_uri_prefix(&self) -> &'static str { URI_PREFIX_LORAWAN_REST }
 
     async fn post_binary_request(self: &mut Self, dev_eui: &str, request_bytes: &[u8]) -> anyhow::Result<DispatchedRequestParts> {
-        log::info!("[fn post_binary_request()] Incoming request for dev_eui '{}' with {} bytes length", dev_eui, request_bytes.len());
+        log::info!("[fn post_binary_request()] DevEUI: {} - Incoming request with {} bytes length", dev_eui, request_bytes.len());
         let iota_bridge_request_parts = IotaBridgeRequestParts::try_from_bytes(request_bytes)?;
         let needs_registerd_lorawan_node = iota_bridge_request_parts.needs_registerd_lorawan_node();
         log::info!("[fn post_binary_request()] Request is valid DispatchLorawanRest request\n{}", iota_bridge_request_parts);

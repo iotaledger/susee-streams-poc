@@ -121,7 +121,7 @@ async fn dispatch_lorawan_rest_request<'a, Scope, Streams, Command, Confirm, Lor
                     log::debug!("[fn dispatch_request_lorawan_rest()] Processing DeserializedLorawanRest now");
                     let response = normal_callbacks.dispatch(&req_parts_inner).await?;
                     let response_parts = IotaBridgeResponseParts::from_hyper_response(response).await;
-                    log::info!("[dispatch_request_lorawan_rest] Returning response 200 for lorawan_rest request for dev_eui '{}'\n{}", req_parts_inner.dev_eui, response_parts);
+                    log::info!("[dispatch_request_lorawan_rest] DevEUI: {} - Returning response 200 for lorawan_rest request:\n{}", req_parts_inner.dev_eui, response_parts);
                     response_parts.persist_to_hyper_response_200()
                 }
                 DispatchedRequestStatus::LorawanRest404 => {

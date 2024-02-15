@@ -151,7 +151,7 @@ impl RequestBuilderCommand {
             self.dev_eui_handshake_first.get()
         {
             if cmd == DevEuiHandshakeCmd::INSTANCE {
-                log::info!("[fn manage_dev_eui_by_received_command()] Received DevEuiHandshake command for dev_eui '{}'.",
+                log::info!("[fn manage_dev_eui_by_received_command()] DevEUI: {} - Received DevEuiHandshake command.",
                     self.get_dev_eui_for_fetch_next_command_request()
                 );
                 self.dev_eui_handshake_first.set(false);
@@ -159,9 +159,9 @@ impl RequestBuilderCommand {
                     self.get_dev_eui_for_fetch_next_command_request()
                 );
             } else {
-                bail!("[fn manage_dev_eui_by_received_command()] Received command {} instead of DevEuiHandshake for dev_eui '{}'",
+                bail!("[fn manage_dev_eui_by_received_command()] DevEUI: {} - Received command {} instead of DevEuiHandshake",
+                    self.get_dev_eui_for_fetch_next_command_request(),
                     cmd,
-                     self.get_dev_eui_for_fetch_next_command_request()
                 );
             }
         }

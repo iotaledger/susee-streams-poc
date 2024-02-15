@@ -90,8 +90,8 @@ impl<'a> ServerDispatchCommand for DispatchCommand<'a> {
 
     async fn fetch_next_command(self: &mut Self, dev_eui: &str) -> Result<Response<Body>> {
         if let Some(fifo) = self.fifos.get_mut(dev_eui).as_deref_mut() {
-            log::debug!("[fn fetch_next_command()] Found FifoQueue with length {} for dev_eui {}",
-                fifo.len(), dev_eui
+            log::debug!("[fn fetch_next_command()] DevEUI: {} - Found FifoQueue with length {}",
+                dev_eui, fifo.len()
             );
             if let Some(req_body_binary) = fifo_queue_pop_front(fifo ) {
                 let cmd = Command::try_from_bytes(req_body_binary.payload.as_slice()).expect("Could not deserialize command from outgoing binary http body.");
@@ -127,7 +127,7 @@ impl<'a> ServerDispatchCommand for DispatchCommand<'a> {
             );
             Ok(Response::new(Default::default()))
         } else {
-            log::error!("[fn register_remote_command()] Could not create FiFoQueue for DevEUI '{}' - Returning error 500", dev_eui);
+            log::error!("[fn register_remote_command()] DevEUI: {} - Could not create FiFoQueue - Returning error 500", dev_eui);
             Ok(Response::builder()
                 .status(500)
                 .body(Default::default())

@@ -293,12 +293,12 @@ impl DispatchStreams {
                 if node.initialization_cnt == link.initialization_cnt {
                     ret_val = Some(node)
                 } else {
-                    log::warn!("[fn get_lorawan_node()] LoraWanNode found for dev_eui {} has initialization_cnt {} but message needs initialization_cnt {}",
+                    log::warn!("[fn get_lorawan_node()] DevEUI: {} - LoraWanNode has initialization_cnt {} but message needs initialization_cnt {}",
                                dev_eui_str, node.initialization_cnt, link.initialization_cnt);
                 }
             },
             Err(err) => {
-                log::warn!("[fn get_lorawan_node()] lorawan_nodes.get_item returned an error for dev_eui {}. Error: {}", dev_eui_str, err);
+                log::warn!("[fn get_lorawan_node()] DevEUI: {} - lorawan_nodes.get_item returned an error: {}", dev_eui_str, err);
             }
         }
         ret_val

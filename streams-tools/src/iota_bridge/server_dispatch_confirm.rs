@@ -125,7 +125,7 @@ impl<'a> ServerDispatchConfirm for DispatchConfirm<'a> {
             );
             Ok(Response::new(Default::default()))
         } else {
-            log::error!("[fn register_confirmation()] Could not create FiFoQueue for DevEUI '{}' - Returning error 500", dev_eui);
+            log::error!("[fn register_confirmation()] DevEUI: {} - Could not create FiFoQueue - Returning error 500", dev_eui);
             Ok(Response::builder()
                 .status(500)
                 .body(Default::default())

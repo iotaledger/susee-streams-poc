@@ -41,6 +41,11 @@ of the specific *Sensor*.
    
 After the folders have been created and all application files have been copied into the right place
 each *Sensor* is initialized using a `management-console` instance that is started in the `workspace` folder.
+The *Sensor* instances are initialized concurrently using the `--init-multiple-sensors` argument of the
+*Management Console*. After all *Sensors* have been initialized the *Management Console* will search for
+further *Sensors* that are available for initialization in an endless loop. You need to close the terminal
+that has been used to start the python3 process to kill all spawned sub processes after all *Sensors* have
+been initialized.
 
 The output log of the *Sensors* are written into `prepare_multi_sensor_test.log` files located in each of the
 `sensor_#` folder.
@@ -48,6 +53,22 @@ The output log of the *Sensors* are written into `prepare_multi_sensor_test.log`
 The output log of the `management-console` is written into a `prepare_multi_sensor_test.log` file located in
 the `workspace` folder.
 
+To find out if all *Sensors* have been initialized, have a look into the
+`prepare_multi_sensor_test.log` in the `workspace` folder. This log file will contain many
+"DevEUI: ANY - Received Confirmation::NO_CONFIRMATION" entries like this:
+
+    [2024-02-14T14:27:17Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+    [2024-02-14T14:27:20Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+    [2024-02-14T14:27:23Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+    [2024-02-14T14:27:26Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+    [2024-02-14T14:27:29Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+    [2024-02-14T14:27:32Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+
+There will occur several "DevEUI: ANY - Received Confirmation::NO_CONFIRMATION" messages during the initialization
+process as the *Management Console* periodically tries to find new *Sensors* ready to be initialized. These
+"DevEUI: ANY - Received Confirmation::NO_CONFIRMATION" messages will be surrounded by other log messages that result from
+the initialization of other *Sensors*. If only "DevEUI: ANY - Received Confirmation::NO_CONFIRMATION" messages are logged
+(as shown above) the initialization of all other *Sensors* has been finished.
 
 #### Step 3
 In the same shell execute

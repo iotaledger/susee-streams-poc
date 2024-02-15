@@ -14,13 +14,24 @@ In addition to the common CLI options described in the
 [CLI API section of the main README file](../README.md#common-cli-options)
 the *Management Console* offers the following CLI arguments.
 
-#### Streams Channel Management
+#### Connections to SUSEE-Node Services
 
-    -c, --create-channel
-            Use this option to create (announce) a new Streams channel.
-            The announcement link will be logged to the console.
-            The ID and user_state of the new Streams channel will be stored in in the
-            user-states-database.
+    -b, --iota-bridge-url <IOTA_BRIDGE_URL>
+            The url of the iota-bridge to connect to.
+            The default value will work together with the private tangle for development purposes
+            and a local running iota-bridge using the default settings.
+            See folder 'inx-collector' for more details.
+            
+            If your local iota-bridge listens to an external ip address, you need to specify this
+            address using the --iota-bridge-url argument.
+            
+            If you are using an IOTA-Bridge provided by an external host, you need to specify the
+            domain or address using the --iota-bridge-url argument. For example use
+            "http://iotabridge.peeros.de:50000" for the SUSEE-Node provided by peerOS.
+            
+            Default value is http://127.0.0.1:50000
+            
+            Example: --iota-bridge-url="http://192.168.47.11:50000"
 
     -n, --node <NODE_URL>
             The IP or domain name of the iota node to connect to.
@@ -39,6 +50,21 @@ the *Management Console* offers the following CLI arguments.
                 --node="195.90.200.153"
                 -n="example.com"
              [default: 127.0.0.1]
+
+#### Streams Channel Management
+
+    -c, --create-channel
+            Use this option to create (announce) a new Streams channel.
+            The announcement link will be logged to the console.
+            The ID and user_state of the new Streams channel will be stored in in the
+            user-states-database.
+
+    -e, --dev-eui <DEV_EUI>
+            The DevEUI of the sensor to act on.
+            DevEUI means 'device extended unique identifier' and is a term
+            from LoRaWAN communication. Any random value (number or string)
+            uniquely identifying the sensor can be used as long as the sensor
+            uses the same value.
              
     -p, --println-channel-status
             Print information about currently existing channels.
@@ -60,6 +86,12 @@ the *Management Console* offers the following CLI arguments.
             Example:
             
                 >   ./management-console --channel-starts-with=6f5aa6cb --println-channel-status
+
+The argument `--dev-eui` is needed for the `--create-channel` and for for the
+[Subscribe *Sensors*](#subscribe-sensors)
+arguments also.
+
+The `--channel-starts-with` argument is only needed for the `--println-channel-status` argument.
 
 #### Subscribe *Sensors*
 Following CLI arguments are used to subscribe *Sensors* to an existing channel:
@@ -93,8 +125,9 @@ the whole process (called *Sensor* initialization) can be done automatically:
             Initialize the streams channel of a remote sensor.
             The whole channel initialization is done automatically following the process described
             below. Management-console and remote sensor are communicating via the IOTA-Bridge.
-            Therefore you also need to use the '--iota-bridge' option to connect the management-
-            console to a running IOTA-Bridge.
+            If your Sensor communicates with your IOTA-Bridge via an external domain or via an
+            external port of your local system, you will need to use the '--iota-bridge' option
+            to connect the Management-Console to the correct IOTA-Bridge.
             
             Example:
             
@@ -119,6 +152,11 @@ the whole process (called *Sensor* initialization) can be done automatically:
                     | sensor             | --register-keyload-msg        |
                     ---------------------|--------------------------------
             
+            As these CLI arguments require the --dev-eui argument the Management-Console
+            performs a DevEUI-Handshake to determine the dev-eui of any suitable Sensor
+            before the initialization process starts. Contrary to the --init-multiple-sensors
+            argument the --init-sensor argument will only initialize one single sensor.
+            
             In the automated initialization process all CLI commands and the data that are written
             to console log by the applications are transported using Command and Confirmation
             packages that are defined in the binary_persist module of the streams-tools library.
@@ -126,9 +164,18 @@ the whole process (called *Sensor* initialization) can be done automatically:
             Here is an overview which Command and Confirmation packages are used for communication
             with the remote sensor via the IOTA-Bridge:
             
+             * management-console: Search for a dev_eui to start an initialization process
+                                            # Send to ANY sensor using the DevEuiHandshakeCmd
+                                            # Command
+            
+             * sensor: Provide a dev_eui for initialization
+               --> DevEUI                   # Send to management-console using the DevEuiHandshake
+                                            # Confirmation
+            
              * management-console: --create-channel
                 --> Announcement Link       # Send to the sensor using the SubscribeToAnnouncement
                                             # Command
+            
              * sensor: --subscribe-announcement-link
                 --> Subscription Link       # Send to the management-console using
                 --> Public Key              # the SubscribeToAnnouncement Confirmation
@@ -141,12 +188,31 @@ the whole process (called *Sensor* initialization) can be done automatically:
                                             # Successful keyload registration is acknowledged with
                                             # a KEYLOAD_REGISTRATION Confirmation
 
-    -b, --iota-bridge-url <IOTA_BRIDGE_URL>
-            The url of the iota-bridge to connect to.
-            See --init-sensor for further information.
-            Default value is http://localhost:50000
+    -m, --init-multiple-sensors
+            Initialize the streams channel of multiple sensors in parallel.
+            Initializes a Sensor like the --init-sensor argument does, but will do this for
+            an arbitrary amount of Sensors in parallel while --init-sensor will only initialize
+            one single Sensor.
             
-            Example: iota-bridge-url="http://192.168.47.11:50000"
+            The initialization process allways starts with a DevEUI-Handshake. During this
+            handshake the Management-Console asks any Sensor for its DevEUI. Any Sensor that
+            responds to a DevEUI-Handshake will receive all needed Commands as been described
+            for the --init-sensor argument where the Commands are addressed to the specific
+            Sensor using its DevEUI.
+            
+            After a DevEUI-Handshake has been completed the initialization is processed in its
+            own thread so that many Sensor initializations can be done in parallel.
+            
+            Meanwhile to the Sensor initializations, the Management Console will search for
+            additional Sensors that reply to a DevEUI-Handshake in an endless loop. This means
+            that you need to kill the Management Console process after your last Sensor has
+            been successfully initialized. Otherwise the Management Console would run
+            infinitely.
+            
+            Example:
+            
+                >   ./management-console --init-multiple-sensors \
+                                         --iota-bridge-url="http://192.168.47.11:50000"
 
 To allow fully automated channel initializations the SUSEE Streams POC applications and the streams-poc-lib
 are using an own communication protocol consisting of `commands` and `confirmations` where a `confirmation`

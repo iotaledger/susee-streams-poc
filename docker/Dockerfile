@@ -16,8 +16,8 @@ COPY . .
 RUN cargo build --release
 
 # Create a new stage with a minimal image for the management-console
-FROM gcr.io/distroless/cc-debian11:nonroot as management-console
-# FROM debian:bullseye-slim as management-console
+FROM gcr.io/distroless/cc-debian12:nonroot as management-console
+# FROM debian:bookworm-slim as management-console
 
 # Install any necessary system dependencies
 # For example, if your Rust project requires OpenSSL, you can install it here
@@ -36,8 +36,8 @@ ENTRYPOINT ["/app/management-console"]
 CMD ["-r",  "0.0.0.0:8080"]
 
 # Create a new stage with a minimal image for the app-srv-connector-mock
-FROM gcr.io/distroless/cc-debian11:nonroot as app-srv-connector-mock
-# FROM debian:bullseye-slim as app-srv-connector-mock
+FROM gcr.io/distroless/cc-debian12:nonroot as app-srv-connector-mock
+# FROM debian:bookworm-slim as app-srv-connector-mock
 
 COPY --chown=nonroot:nonroot --from=builder /app/target/release/app-srv-connector-mock /app/app-srv-connector-mock
 EXPOSE 50001
@@ -47,8 +47,8 @@ ENTRYPOINT ["/app/app-srv-connector-mock"]
 CMD ["-l",  "0.0.0.0:50001", "-b", "http://iota-bridge:50000"]
 
 # Create a new stage with a minimal image for the sensor
-FROM gcr.io/distroless/cc-debian11:nonroot as sensor
-# FROM debian:bullseye-slim as sensor
+FROM gcr.io/distroless/cc-debian12:nonroot as sensor
+# FROM debian:bookworm-slim as sensor
 
 COPY --chown=nonroot:nonroot --from=builder /app/target/release/sensor /app/sensor
 COPY --chown=nonroot:nonroot --from=builder app/test/payloads/*.json    /app
@@ -58,8 +58,8 @@ ENTRYPOINT ["/app/sensor"]
 CMD ["-f", "meter_reading_1_compact.json", "-b", "http://iota-bridge:50000", "--use-lorawan-rest-api"]
 
 # Create a new stage with a minimal image for the iota-bridge
-FROM gcr.io/distroless/cc-debian11:nonroot as iota-bridge
-# FROM debian:bullseye-slim as iota-bridge
+FROM gcr.io/distroless/cc-debian12:nonroot as iota-bridge
+# FROM debian:bookworm-slim as iota-bridge
 
 COPY --chown=nonroot:nonroot --from=builder /app/target/release/iota-bridge /app/iota-bridge
 EXPOSE 50000

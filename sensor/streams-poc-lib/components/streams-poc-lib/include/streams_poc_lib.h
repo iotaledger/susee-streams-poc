@@ -175,6 +175,7 @@ enum StreamsError send_message(const uint8_t *message_data,
  *                                 requests via LoRaWAN, serial wired connections or other
  *                                 connection types that are managed by the application.
  *                                 See send_request_via_lorawan_t help above for more details.
+ * @param dev_eui                  DevEUI of the sensor.
  * @param vfs_fat_path             Optional.
  *                                 Path of the directory where the streams channel user state data and
  *                                 other files shall be read/written by the Streams POC library.
@@ -186,6 +187,7 @@ enum StreamsError send_message(const uint8_t *message_data,
  *                                 If no p_caller_user_data is provided set p_caller_user_data = NULL.
  */
 int32_t start_sensor_manager(send_request_via_lorawan_t send_callback,
+                             const char *dev_eui,
                              const char *vfs_fat_path,
                              void *p_caller_user_data);
 
@@ -200,6 +202,7 @@ int32_t start_sensor_manager(send_request_via_lorawan_t send_callback,
  * @param iota_bridge_url  URL of the iota-bridge instance to connect to.
  *                                 Example:
  *                                    start_sensor_manager_wifi("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
+ * @param dev_eui          DevEUI of the sensor.
  * @param vfs_fat_path     Optional.
  *                         Same as start_sensor_manager() vfs_fat_path parameter.
  * @param wifi_ssid        Optional.
@@ -211,6 +214,7 @@ int32_t start_sensor_manager(send_request_via_lorawan_t send_callback,
  *                         Needed if wifi_ssid != NULL otherwise set wifi_pass to NULL.
  */
 int32_t start_sensor_manager_lwip(const char *iota_bridge_url,
+                                  const char *dev_eui,
                                   const char *vfs_fat_path,
                                   const char *wifi_ssid,
                                   const char *wifi_pass);

@@ -3,8 +3,6 @@ use std::str::FromStr;
 
 use rand::Rng;
 
-use log;
-
 use hyper::{
     Body,
     http::Request,

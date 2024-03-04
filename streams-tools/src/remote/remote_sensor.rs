@@ -38,8 +38,6 @@ use std::{
     }
 };
 
-use log;
-
 type HttpClient = Client<HttpConnector, Body>;
 
 #[derive(Clone)]

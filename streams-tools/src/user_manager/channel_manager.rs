@@ -14,8 +14,6 @@ use anyhow::{
     Result
 };
 
-use log;
-
 use streams::{
     Address,
     User,

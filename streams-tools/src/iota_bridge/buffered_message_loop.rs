@@ -10,8 +10,6 @@ use tokio::{
     }
 };
 
-use log;
-
 use anyhow::{
     Result
 };

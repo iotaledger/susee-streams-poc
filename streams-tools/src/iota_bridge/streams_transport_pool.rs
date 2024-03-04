@@ -4,9 +4,6 @@ use std::{
     rc::Rc,
 };
 
-
-use log;
-
 use async_trait::async_trait;
 
 use lets::{

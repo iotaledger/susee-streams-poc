@@ -4,8 +4,6 @@ use std::{
     net::SocketAddr,
 };
 
-use log;
-
 use anyhow::{
     Result,
     bail

@@ -14,8 +14,6 @@ use streams::id::{
     Permissioned
 };
 
-use log;
-
 use streams_tools::{
     channel_manager::SubscriberData,
     subscriber_manager::println_maximum_initialization_cnt_reached_warning,

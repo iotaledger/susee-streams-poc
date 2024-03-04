@@ -1,7 +1,5 @@
 use async_trait::async_trait;
 
-use log;
-
 use anyhow::{
     anyhow,
     Result as AnyResult

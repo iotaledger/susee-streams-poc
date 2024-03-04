@@ -15,8 +15,6 @@ use std::{
     }
 };
 
-use log;
-
 use anyhow::{
     Result,
     bail,

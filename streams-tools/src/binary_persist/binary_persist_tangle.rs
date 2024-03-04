@@ -32,8 +32,6 @@ use anyhow::{
     anyhow
 };
 
-use log;
-
 use crate::binary_persist::{
     RangeIterator,
     BinaryPersist,

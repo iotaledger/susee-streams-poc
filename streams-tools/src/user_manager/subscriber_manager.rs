@@ -2,7 +2,6 @@ use std::{
     path::Path,
     ops::Range,
     rc::Rc,
-    option::Option::Some,
     str::FromStr,
     fs::{
         write,
@@ -16,8 +15,6 @@ use anyhow::{
     bail,
     anyhow
 };
-
-use log;
 
 use streams::{
     Address,

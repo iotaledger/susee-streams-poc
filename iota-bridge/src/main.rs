@@ -23,8 +23,6 @@ use tokio::{
 
 use anyhow::Result;
 
-use log;
-
 use streams_tools::{
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT,
     iota_bridge::{

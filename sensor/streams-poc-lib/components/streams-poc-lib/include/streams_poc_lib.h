@@ -101,7 +101,7 @@ typedef enum LoRaWanError (*send_request_via_lorawan_t)(const uint8_t *request_d
  *                                 Example: "http://192.168.0.100:50000"
  */
 typedef struct iota_bridge_tcpip_proxy_options_t {
-  uint64_t dev_eui;
+  const char *dev_eui;
   const char *iota_bridge_url;
 } iota_bridge_tcpip_proxy_options_t;
 

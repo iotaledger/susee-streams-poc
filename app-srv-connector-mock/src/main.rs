@@ -95,7 +95,8 @@ async fn handle_received_iota_bridge_request(stream: &mut TcpStream, dev_eui: u6
         )
     );
 
-    match lorawan_rest_client.post_binary_request_to_iota_bridge(buf.to_vec(), dev_eui.to_string().as_str()).await {
+    let dev_eui_hex_str = format!("{:X}", dev_eui);
+    match lorawan_rest_client.post_binary_request_to_iota_bridge(buf.to_vec(), dev_eui_hex_str.as_str()).await {
         Ok(response) => {
             println!("[LoraWanAppServerMock - fn handle_received_iota_bridge_request()] Received {} bytes from iota-bridge. Sending bytes via socket back to client",
                      response.len());

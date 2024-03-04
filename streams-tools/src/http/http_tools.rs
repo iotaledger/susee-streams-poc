@@ -25,7 +25,6 @@ use url::{
 use std::{
     fmt,
     fmt::Formatter,
-    str::FromStr,
     result::Result as StdResult,
 };
 
@@ -235,15 +234,8 @@ impl<'a> DispatchedRequestParts {
     }
 }
 
-pub fn get_dev_eui_from_str(dev_eui_str: &str, api_endpoint_name: &str, query_param_name: &str) -> Result<Vec<u8>, Error>{
-    let dev_eui_u64 = u64::from_str(dev_eui_str).expect(format!(
-        "[http_protocoll - {}] Query parameter {} could not be parsed into a u64 value.\
-                                                                     Make sure to use only positiv numbers.\n Value is '{}'",
-        api_endpoint_name,
-        query_param_name,
-        dev_eui_str,
-    ).as_str());
-    Ok(dev_eui_u64.to_le_bytes().to_vec())
+pub fn get_dev_eui_from_str(dev_eui_str: &str) -> Result<Vec<u8>, Error>{
+    Ok(dev_eui_str.as_bytes().to_vec())
 }
 
 #[derive(Clone)]

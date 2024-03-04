@@ -1,5 +1,4 @@
 use std::{
-    clone::Clone,
     str::FromStr,
     rc::Rc,
     cell::RefCell,
@@ -11,8 +10,6 @@ use base64::engine::{
     general_purpose::STANDARD,
     Engine,
 };
-
-use log;
 
 use anyhow::{anyhow, bail};
 
@@ -324,9 +321,7 @@ impl DispatchStreams {
             let err = anyhow::anyhow!("Received pending_request without request_key");
             return Ok(log_anyhow_err_and_respond_500(err, "retransmit_send_compressed_message").unwrap());
         };
-        message.dev_eui = get_dev_eui_from_str(pending_request.dev_eui.as_str(), "RETRANSMIT",
-                                               "pending_request.dev_eui. request_id = '{pending_request.id}'. dev_eui = '{request_key}' ")?;
-
+        message.dev_eui = get_dev_eui_from_str(pending_request.dev_eui.as_str())?;
         self.set_request_needs_registered_lorawan_node_on_scope_to_true();
         self.send_compressed_message(&message).await
     }
@@ -441,14 +436,13 @@ impl ServerDispatchStreams for DispatchStreams {
     async fn send_compressed_message(
         self: &mut Self, message: &TangleMessageCompressed) -> Result<Response<Body>>
     {
-        let dev_eui: u64 = match <u64 as BinaryPersist>::try_from_bytes(message.dev_eui.as_slice()) {
-            Ok(eui_num) => eui_num,
+        let dev_eui = match String::from_utf8(message.dev_eui.clone()) {
+            Ok(eui_str) => eui_str,
             Err(err) => return get_response_400(format!(
-                "Binary data provided for dev_eui could not be converted into an u64 number. Error: {}", err).as_str())
+                "Binary data provided for dev_eui could not be converted into an utf8 string. Error: {}", err).as_str())
         };
 
-        let dev_eui_str = dev_eui.to_string();
-        if let Some(lora_wan_node) = self.get_lorawan_node(&dev_eui_str, &message.link).await {
+        if let Some(lora_wan_node) = self.get_lorawan_node(&dev_eui, &message.link).await {
             let uncompressed_message = match message.to_tangle_message(lora_wan_node.streams_channel_id.as_str()) {
                 Ok(msg) => msg,
                 Err(err) => return get_response_500(format!("Error: {}", err).as_str())
@@ -461,7 +455,7 @@ impl ServerDispatchStreams for DispatchStreams {
                 cmpr_address: "".to_string(), // address is not needed for send_message
                 cmpr_message: message.clone(),
             };
-            return self.handle_lora_wan_node_not_known(dev_eui_str, message.link.clone(), streams_api_request)
+            return self.handle_lora_wan_node_not_known(dev_eui, message.link.clone(), streams_api_request)
         }
     }
 

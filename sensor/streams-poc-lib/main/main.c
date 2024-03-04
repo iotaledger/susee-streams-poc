@@ -304,7 +304,7 @@ uint64_t get_base_mac_48_as_mocked_u64_dev_eui() {
 
 void get_base_mac_48_as_mocked_u64_dev_eui_string(char* p_buffer_len_128 ) {
         uint64_t mocked_dev_eui = get_base_mac_48_as_mocked_u64_dev_eui();
-        sprintf(p_buffer_len_128, "%" PRIu64 "\0", mocked_dev_eui);
+        sprintf(p_buffer_len_128, "%" PRIX64 "\0", mocked_dev_eui);
         ESP_LOGD(TAG, "[fn get_base_mac_48_as_mocked_u64_dev_eui_string] returning dev_eui_string %s", p_buffer_len_128);
 }
 

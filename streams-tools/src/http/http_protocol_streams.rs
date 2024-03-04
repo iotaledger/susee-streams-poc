@@ -282,8 +282,7 @@ pub async fn dispatch_request_streams(req_parts: &DispatchedRequestParts, callba
             } else {
                 ok_or_bail_http_response!(get_query_param_send_compressed_message_dev_eui(req_parts))
             };
-            compressed_tangle_msg.dev_eui = get_dev_eui_from_str(dev_eui_str.as_str(), "RECEIVE_MESSAGE_FROM_ADDRESS",
-                                                                 QueryParameters::SEND_COMPRESSED_MESSAGE_DEV_EUI)?;
+            compressed_tangle_msg.dev_eui = get_dev_eui_from_str(dev_eui_str.as_str())?;
             callbacks.send_compressed_message(&compressed_tangle_msg).await
         },
 

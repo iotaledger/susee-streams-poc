@@ -15,8 +15,8 @@ use crate::explorer::{
 };
 
 use super::{
-    decode_service as service,
-    decode_dto::DecodeQueryParams,
+    payload_service as service,
+    payload_dto::DecodeQueryParams,
 };
 
 /// Decode a payload
@@ -26,7 +26,7 @@ use super::{
 #[utoipa::path(
     post,
     operation_id = "decode_post",
-    path = "/decode",
+    path = "/payload/decode",
     request_body = [u8],
     responses(
         (status = 200, description = "Successfully decoded uploaded payload", body = Vec<u8>),

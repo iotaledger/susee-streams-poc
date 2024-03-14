@@ -1,3 +1,16 @@
+use std::{
+    fmt,
+    fmt::Formatter,
+    result::Result as StdResult,
+};
+
+use url::Url;
+
+use anyhow::{
+    Result as AnyhowResult,
+    bail,
+};
+
 use hyper::{
     Body,
     body,
@@ -17,20 +30,6 @@ use hyper::{
 use crate::binary_persist::{
     BinaryPersist,
     EnumeratedPersistable,
-};
-
-use url::{
-    Url,
-};
-use std::{
-    fmt,
-    fmt::Formatter,
-    result::Result as StdResult,
-};
-
-use anyhow::{
-    Result as AnyhowResult,
-    bail,
 };
 
 #[derive(Clone)]
@@ -231,6 +230,30 @@ impl<'a> DispatchedRequestParts {
             String::from(description)
         };
         get_response_404(descr.as_str())
+    }
+}
+
+impl fmt::Display for DispatchedRequestParts {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let query_params = match Url::parse(self.req_url.as_str()){
+            Ok(url) => {
+                if let Some(qry) = url.query(){
+                    qry.to_string()
+                } else {
+                    "".to_string()
+                }
+            },
+            Err(_) => "".to_string()
+        };
+
+        write!(f, "{{ dev_eui: {}, status: {}, method: {}, path: {}, query: {}, body-length: {} }}",
+            self.dev_eui,
+            self.status,
+            self.method,
+            self.path,
+            query_params,
+            self.binary_body.len(),
+        )
     }
 }
 

@@ -59,10 +59,10 @@ static const sensor_manager_connection_type_t SENSOR_MANAGER_CONNECTION_TYPE = S
 #define STREAMS_POC_LIB_TEST_WIFI_SSID "Susee Demo"
 #define STREAMS_POC_LIB_TEST_WIFI_PASS "susee-rocks"
 // The url of the iota-bridge to connect to. Needed for Sensor initialization.
-#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.66.223:50000")
+#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.189.223:50000")
 // IP address and port of the LoRaWAN AppServer Connector Mockup Tool to connect to.
 // Needed for sending messages.
-#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.66.223:50001")
+#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.189.223:50001")
 
 #define SEND_MESSAGES_EVERY_X_SEC 5
 
@@ -559,8 +559,11 @@ void receive_http_response(uint16_t status, const uint8_t *body_bytes, size_t bo
 }
 
 LoRaWanError send_request_via_wifi(const uint8_t *request_data, size_t length, resolve_request_response_t response_callback, void *p_caller_user_data) {
+    char dev_eui_buffer[128];
+    get_base_mac_48_as_mocked_u64_dev_eui_string(dev_eui_buffer);
+
     iota_bridge_tcpip_proxy_options_t iota_bridge_proxy_opt = {
-        .dev_eui = get_base_mac_48_as_mocked_u64_dev_eui(),
+        .dev_eui = dev_eui_buffer,
         .iota_bridge_url = STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL
     };
 

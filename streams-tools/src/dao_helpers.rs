@@ -1,5 +1,10 @@
 use std::fmt;
 
+use anyhow::{
+    Result,
+    bail
+};
+
 use rusqlite::{
     Connection,
     Rows,
@@ -7,13 +12,9 @@ use rusqlite::{
 };
 
 use serde_rusqlite::from_rows_ref;
+
 use serde::de::{
     DeserializeOwned,
-};
-
-use anyhow::{
-    Result,
-    bail,
 };
 
 use fallible_streaming_iterator::FallibleStreamingIterator;
@@ -403,6 +404,29 @@ impl<DaoManagerT: DaoManager + Clone> DaoDataStore<DaoManagerT> {
 
     pub fn filter(&self, conditions: Vec<Condition>, limit: Option<Limit>) -> Result<(Vec<DaoManagerT::ItemType>, usize)> {
         self.items.filter(conditions, limit)
+    }
+
+    pub fn get_first_filtered_item(&self, conditions: Vec<Condition>) -> Option<DaoManagerT::ItemType> {
+        let mut ret_val = None;
+        match self.items.filter(
+            conditions,
+            Some(Limit{ limit: 1, offset: 0 })
+        ) {
+            Ok((mut items, _items_cnt_total)) => {
+                if items.len() > 0 {
+                    if items.len() > 1 {
+                        log::error!("[fn get_first_filtered_item] self.items.filter returned {} items although limit was 1", items.len());
+                    }
+                    while items.len() > 0 {
+                        ret_val = items.pop();
+                    };
+                }
+            },
+            Err(e) => {
+                log::warn!("[fn get_first_filtered_item] self.items.filter returned error {}. Will return None.", e);
+            }
+        }
+        ret_val
     }
 
     pub fn get_item(&self, key: &DaoManagerT::PrimaryKeyType) -> Result<(DaoManagerT::ItemType, DaoManagerT::SerializationCallbackType)>{

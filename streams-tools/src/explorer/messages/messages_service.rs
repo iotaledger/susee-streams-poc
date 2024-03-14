@@ -1,12 +1,13 @@
 use std::str::FromStr;
 
+use async_trait::async_trait;
+
 use hyper::http::StatusCode;
 
 use streams::{
     Address,
 };
 
-use async_trait::async_trait;
 use lets::transport::tangle::Client;
 
 use crate::{
@@ -46,7 +47,7 @@ use super::{
 };
 
 impl MessagesState {
-    fn as_multi_channel_manager_options(&self) -> MultiChannelManagerOptions {
+    pub(crate) fn as_multi_channel_manager_options(&self) -> MultiChannelManagerOptions {
         MultiChannelManagerOptions{
             iota_node: self.iota_node_url.clone(),
             wallet_filename: self.wallet_filename.clone(),
@@ -119,11 +120,11 @@ impl Worker for IndexWorker {
                     if let Ok(lets_msg) = user.receive_message(address).await{
                         ret_val.push(lets_msg.into());
                     } else {
-                        ret_val.push(Message {
-                            id: address.to_string(),
-                            public_text: "Error could not receive message from tangle".to_string(),
-                            private_text_decrypted: "".to_string()
-                        });
+                        ret_val.push(Message::new_from_id(
+                            address.to_string(),
+                            "Error could not receive message from tangle".to_string(),
+                            "".to_string()
+                        ).expect(format!("Error on creating Message::new_from_id with id {}", opt.channel_id).as_str()));
                     }
                 }
                 Ok((ret_val, items_count_total))

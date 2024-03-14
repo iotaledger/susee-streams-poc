@@ -46,6 +46,15 @@ use cli::{
     get_arg_matches,
 };
 
+#[cfg(feature = "dump_payload")]
+use std::{
+    fs::File,
+    io::{
+        BufWriter,
+        Write
+    }
+};
+
 const RECEIVE_IOTA_BRIDGE_REQUEST_BUFFER_SIZE: usize = 2048;
 
 type HttpClient = Client<HttpConnector, Body>;
@@ -85,8 +94,36 @@ impl<'a> LoraWanRestClient {
     }
 }
 
+#[cfg(feature = "dump_payload")]
+static mut MSG_COUNTER: u32 = 0;
+
+#[cfg(feature = "dump_payload")]
+async fn dump_received_iota_bridge_request_to_file(dev_eui: u64, buf: &[u8]) {
+    let file_path_and_name;
+
+    unsafe {
+        file_path_and_name = String::from(format!("./msg_{}-{}.bin",
+              dev_eui,
+              MSG_COUNTER,
+        ));
+        MSG_COUNTER += 1;
+    }
+
+
+    let out_file = File::create(file_path_and_name.as_str())
+        .expect(format!("Create output file '{}' failed", file_path_and_name).as_str());
+    let mut writer = BufWriter::new(out_file);
+    writer.write_all(buf)
+        .expect(format!("Could not write into file '{}'", file_path_and_name).as_str());
+    println!("[LoraWanAppServerMock - fn dump_received_iota_bridge_request_to_file()] Dumped payload to file {}", file_path_and_name);
+}
+
+#[cfg(not(feature = "dump_payload"))]
+async fn dump_received_iota_bridge_request_to_file(_dev_eui: u64, _buf: &[u8]) {}
+
 async fn handle_received_iota_bridge_request(stream: &mut TcpStream, dev_eui: u64, buf: &[u8], iota_bridge_url: &str) {
     println!("[LoraWanAppServerMock - fn handle_received_iota_bridge_request()] Received {} bytes to be send to iota-bridge {}", buf.len(), iota_bridge_url);
+    dump_received_iota_bridge_request_to_file(dev_eui, buf).await;
     let lorawan_rest_client = LoraWanRestClient::new(
         Some(
             LoraWanRestClientOptions{iota_bridge_url}

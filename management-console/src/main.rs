@@ -64,30 +64,6 @@ use crate::multiple_sensor_init::init_sensor_in_own_thread;
 mod cli;
 mod multiple_sensor_init;
 
-pub async fn create_channel_manager<'a>(user_store: &mut UserDataStore, cli: &ManagementConsoleCli<'a>) -> Option<ChannelManagerPlainTextWallet> {
-    let mut ret_val = None;
-    let options = get_multi_channel_manager_options(cli).ok()?;
-    if cli.matches.is_present(cli.arg_keys.create_channel)
-        || cli.matches.is_present(cli.arg_keys.init_sensor) {
-        ret_val = Some(get_initial_channel_manager(user_store, &options).await.unwrap());
-    }
-    else if cli.matches.is_present(cli.arg_keys.subscription_link) {
-        let sub_msg_link_str = cli.matches.value_of(cli.arg_keys.subscription_link).unwrap();
-        if let Some(channel_id ) = get_channel_id_from_link(sub_msg_link_str) {
-            ret_val = Some(get_channel_manager_for_channel_id(channel_id.as_str(), user_store, &options).await.unwrap());
-        } else {
-            log::error!("[fn create_channel_manager()] Could not parse channel_id from CLI argument '--{}'. Argument value is {}",
-                     cli.arg_keys.subscription_link,
-                     sub_msg_link_str,
-            )
-        }
-    } else if cli.matches.is_present(cli.arg_keys.println_channel_status) {
-        ret_val = Some(get_channel_manager_for_cli_arg_channel_starts_with(user_store, &options, cli, false).await.unwrap());
-    }
-
-    ret_val
-}
-
 fn get_management_console_wallet_filename<'a>(cli: &ManagementConsoleCli<'a>) -> Result<String> {
     get_wallet_filename(
         &cli.matches,
@@ -160,14 +136,19 @@ async fn println_channel_status<'a> (channel_manager: &mut ChannelManagerPlainTe
 }
 
 
-async fn init_sensor<'a> (channel_manager: &mut ChannelManagerPlainTextWallet, cli: &ManagementConsoleCli<'a>) -> Result<()> {
+async fn init_sensor<'a> (user_store: &UserDataStore, cli: &ManagementConsoleCli<'a>, options: &MultiChannelManagerOptions) -> Result<()> {
     log::info!("Initializing remote sensor");
     let remote_sensor = RemoteSensor::new(Some(create_remote_sensor_options(cli, None)));
     let dev_eui_handshake = perform_dev_eui_handshake(&remote_sensor).await?;
     remote_sensor.set_dev_eui(dev_eui_handshake.dev_eui.as_str());
-    let announcement_link = create_channel(channel_manager).await?;
+    let mut channel_manager  = get_initial_channel_manager(
+        user_store,
+        &options,
+        Some(dev_eui_handshake.dev_eui.clone())
+    ).await?;
+    let announcement_link = create_channel(&mut channel_manager).await?;
     let subscription = subscribe_remote_sensor_to_channel(&remote_sensor, announcement_link).await?;
-    let _keyload_registration = make_remote_sensor_register_keyload_msg(channel_manager, &remote_sensor, subscription).await?;
+    let _keyload_registration = make_remote_sensor_register_keyload_msg(&mut channel_manager, &remote_sensor, subscription).await?;
     Ok(())
 }
 
@@ -308,19 +289,36 @@ async fn main() -> Result<()> {
     let mut user_store = UserDataStore::new(db_connection_opt);
 
     let mut print_usage_help = false;
-    if let Some(mut channel_manager) = create_channel_manager(&mut user_store, &cli).await {
-        if cli.matches.is_present(cli.arg_keys.create_channel) {
-            create_channel(&mut channel_manager).await?;
-        } else if cli.matches.is_present(cli.arg_keys.subscription_link) {
+
+    let options = get_multi_channel_manager_options(&cli)
+        .expect("Could not create multi_channel_manager_options");
+
+    if cli.matches.is_present(cli.arg_keys.create_channel) {
+        let mut channel_manager = get_initial_channel_manager(&user_store, &options, None).await.unwrap();
+        create_channel(&mut channel_manager).await?;
+    }
+    else if cli.matches.is_present(cli.arg_keys.subscription_link) {
+        let sub_msg_link_str = cli.matches.value_of(cli.arg_keys.subscription_link).unwrap();
+        if let Some(channel_id ) = get_channel_id_from_link(sub_msg_link_str) {
+            let mut channel_manager = get_channel_manager_for_channel_id(channel_id.as_str(), &user_store, &options).await.unwrap();
             send_keyload_message_cli(&mut channel_manager, &cli).await?;
-        } else if cli.matches.is_present(cli.arg_keys.init_sensor) {
-            init_sensor(&mut channel_manager, &cli).await?;
-        } else if cli.matches.is_present(cli.arg_keys.println_channel_status) {
-            println_channel_status(&mut channel_manager, &cli ).await;
         } else {
-            print_usage_help = true;
+            log::error!("Could not parse channel_id from CLI argument '--{}'. Argument value is {}",
+                        cli.arg_keys.subscription_link,
+                        sub_msg_link_str,
+            )
         }
-    } else if cli.matches.is_present(cli.arg_keys.run_explorer_api_server) {
+    } else if cli.matches.is_present(cli.arg_keys.println_channel_status) {
+        let mut channel_manager = get_channel_manager_for_cli_arg_channel_starts_with(&mut user_store, &options, &cli, false).await.unwrap();
+        println_channel_status(&mut channel_manager, &cli ).await;
+    }
+    else if cli.matches.is_present(cli.arg_keys.init_sensor) {
+        init_sensor(&user_store, &cli, &options).await?;
+    }
+    else if cli.matches.is_present(cli.arg_keys.init_multiple_sensors) {
+        init_multiple_sensors(&mut user_store, &cli).await?;
+    }
+    else if cli.matches.is_present(cli.arg_keys.run_explorer_api_server) {
         let message_explorer_listener_address = cli.matches.value_of(cli.arg_keys.run_explorer_api_server).unwrap();
         run_explorer_api_server(
             user_store,
@@ -332,18 +330,17 @@ async fn main() -> Result<()> {
                 streams_user_serialization_password: SUSEE_CONST_SECRET_PASSWORD.to_string()
             }
         ).await?;
-    } else if cli.matches.is_present(cli.arg_keys.init_multiple_sensors) {
-        init_multiple_sensors(&mut user_store, &cli).await?;
     } else {
-        log::error!("[fn main()] Error: Could not create channel_manager");
+        log::error!("Error: None of expected CLI Arguments founds");
         print_usage_help = true;
     }
 
     if print_usage_help {
-        println!("[Management Console] You need to specify one of these options: --{}, --{}, --{}, --{} or --{}\n",
+        println!("[Management Console] You need to specify one of these options: --{}, --{}, --{}, --{}, --{} or --{}\n",
                  cli.arg_keys.create_channel,
                  cli.arg_keys.subscription_link,
                  cli.arg_keys.init_sensor,
+                 cli.arg_keys.init_multiple_sensors,
                  cli.arg_keys.run_explorer_api_server,
                  cli.arg_keys.println_channel_status,
         );

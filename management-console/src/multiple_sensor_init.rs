@@ -79,7 +79,8 @@ impl Worker for InitSensor {
         log::info!("DevEUI: {} - Starting initialization thread", opt.dev_eui);
         let mut channel_manager  = get_initial_channel_manager(
             &opt.user_store,
-            &opt.mult_chan_mngr_opt
+            &opt.mult_chan_mngr_opt,
+            Some(opt.dev_eui.clone())
         ).await?;
 
         log::debug!("DevEUI: {} - channel_manager is ready - calling create_channel()", opt.dev_eui);

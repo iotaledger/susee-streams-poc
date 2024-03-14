@@ -14,6 +14,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use super::{
     nodes,
     messages,
+    decode,
     error::AppError,
     shared::page_dto,
 };
@@ -26,6 +27,7 @@ pub async fn route_info() -> axum::Json<serde_json::Value> {
             "/swagger-ui": "OpenAPI documentation",
             "/nodes": nodes::INFO,
             "/messages": messages::INFO,
+            "/decode": decode::INFO,
         }
     }))
 }
@@ -36,6 +38,7 @@ pub fn router() -> Router {
         .route("/", get(route_info))
         .nest("/nodes", nodes::routes())
         .nest("/messages", messages::routes())
+        .nest("/decode", decode::routes())
 }
 
 #[derive(OpenApi)]
@@ -48,6 +51,7 @@ pub fn router() -> Router {
         nodes::put,
         messages::index,
         messages::get,
+        decode::decode,
     ),
     components(
         schemas(

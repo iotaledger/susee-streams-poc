@@ -22,7 +22,12 @@ use crate::{
     },
     PlainTextWallet,
     UserDataStore,
-    user_manager::dao::User
+    user_manager::dao::User,
+    dao_helpers::{
+        Condition,
+        Conditions,
+        MatchType
+    }
 };
 
 #[derive(Clone)]
@@ -33,10 +38,13 @@ pub struct MultiChannelManagerOptions {
     pub streams_user_serialization_password: String,
 }
 
-pub async fn get_initial_channel_manager<'a>(user_store: &UserDataStore, options: &MultiChannelManagerOptions) -> Result<ChannelManager<PlainTextWallet>> {
+pub async fn get_initial_channel_manager<'a>(user_store: &UserDataStore, options: &MultiChannelManagerOptions, external_user_id: Option<String>) -> Result<ChannelManager<PlainTextWallet>> {
     let mut new_opt = ChannelManagerOptions::default();
     let wallet = get_wallet(options, None)?;
     let mut initial_user_having_seed_derivation_phrase = User::default();
+    if let Some(external_id) = external_user_id {
+        initial_user_having_seed_derivation_phrase.external_id = external_id;
+    }
     initial_user_having_seed_derivation_phrase.seed_derivation_phrase = wallet.seed_derivation_phrase.as_ref().unwrap().clone();
     new_opt.serialize_user_state_callback = Some(
         user_store.get_serialization_callback(&initial_user_having_seed_derivation_phrase)
@@ -77,6 +85,17 @@ pub async fn get_channel_manager_for_channel_id<'a>(channel_id: &str, user_store
         wallet,
         options.iota_node.as_str(),
     ).await
+}
+
+pub async fn get_channel_manager_for_external_id<'a>(external_id: &str, user_store: &UserDataStore, options: &MultiChannelManagerOptions) -> Result<ChannelManager<PlainTextWallet>> {
+    let mut conditions_buffer = Vec::<Condition>::new();
+    let mut conditions = Conditions(&mut conditions_buffer);
+    conditions.add(Some(external_id.to_string()), "external_id", MatchType::ExactMatch);
+    if let Some(user) = user_store.get_first_filtered_item(conditions_buffer) {
+        get_channel_manager_for_channel_id(user.streams_channel_id.as_str(), user_store, options).await
+    } else {
+        bail!("[fn get_channel_manager_for_external_id()] No User found for external_id '{}'", external_id)
+    }
 }
 
 async fn get_channel_manager_by_user_dao(user_dao: User, serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>, wallet: PlainTextWallet, node: &str) -> Result<ChannelManager<PlainTextWallet>>{

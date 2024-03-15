@@ -40,7 +40,7 @@
               "type": "integer",
               "format": "int32",
               "default": 0,
-              "minimum": 0.0
+              "minimum": 0
             },
             "style": "form"
           },
@@ -53,7 +53,7 @@
               "type": "integer",
               "format": "int32",
               "default": 10,
-              "minimum": 0.0
+              "minimum": 0
             },
             "style": "form"
           }
@@ -164,7 +164,7 @@
               "type": "integer",
               "format": "int32",
               "default": 0,
-              "minimum": 0.0
+              "minimum": 0
             },
             "style": "form"
           },
@@ -177,7 +177,7 @@
               "type": "integer",
               "format": "int32",
               "default": 10,
-              "minimum": 0.0
+              "minimum": 0
             },
             "style": "form"
           }
@@ -280,6 +280,60 @@
           }
         }
       }
+    },
+    "/payload/decode": {
+      "post": {
+        "tags": [
+          "payload"
+        ],
+        "summary": "Decode a payload",
+        "description": "Decode a payload\n\nDecode a payload that has been send by a Node that is identified by its 'external_id'.\nThe payload needs to be provided in the request body.",
+        "operationId": "decode_post",
+        "parameters": [
+          {
+            "name": "external_id",
+            "in": "query",
+            "description": "External ID (in example a LoRaWAN DevEUI). Find  external ids of existing Nodes using the '/node' endpoint",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 1023,
+              "minLength": 1
+            },
+            "example": "504F53E833055C50"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully decoded uploaded payload",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The uploaded payload could not be parsed because it is syntactically not correct"
+          },
+          "404": {
+            "description": "A Node with the specified external_id does not exist"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -333,6 +387,7 @@
                 "items": {
                   "type": "object"
                 },
+                "description": "A generic error occurred, see http status code and message for more details",
                 "maxItems": 2,
                 "minItems": 2
               }
@@ -349,16 +404,24 @@
         "required": [
           "id",
           "public_text",
-          "private_text_decrypted"
+          "private_text_decrypted",
+          "msg_index",
+          "streams_content"
         ],
         "properties": {
           "id": {
+            "type": "string"
+          },
+          "msg_index": {
             "type": "string"
           },
           "private_text_decrypted": {
             "type": "string"
           },
           "public_text": {
+            "type": "string"
+          },
+          "streams_content": {
             "type": "string"
           }
         }
@@ -421,27 +484,27 @@
           "items_count": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0.0
+            "minimum": 0
           },
           "items_count_total": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0.0
+            "minimum": 0
           },
           "items_limit": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0.0
+            "minimum": 0
           },
           "page_count_total": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0.0
+            "minimum": 0
           },
           "page_indx": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0.0
+            "minimum": 0
           }
         }
       }

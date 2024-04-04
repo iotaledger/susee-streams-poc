@@ -32,13 +32,13 @@ use super::{
 
 /// List messages of a node
 ///
-/// List messages of a Streams channel of a specific node.
+/// List messages of a Streams channel of a specific node. Binary data are provided as hex encoded strings.
 #[utoipa::path(
     get,
     operation_id = "messages_index",
     path = "/messages",
     responses(
-        (status = 200, description = "Successfully responded with list of Messages"),
+        (status = 200, description = "Successfully responded with list of Messages. Binary data are provided as hex encoded strings."),
         (status = 400, description = "Channel with specified channel-id does not exist"),
     ),
     params(
@@ -61,12 +61,14 @@ pub (crate) async fn index(
 }
 
 /// Get a specific message
+///
+/// Get a specific message. Binary data are provided as hex encoded strings.
 #[utoipa::path(
     get,
     operation_id = "messages_get",
     path = "/messages/{message_id}",
     responses(
-        (status = 200, description = "Successfully responded requested message", body = [Message]),
+        (status = 200, description = "Successfully responded requested message. Binary data are provided as hex encoded strings.", body = [Message]),
         (status = 404, description = "Message with specified msg_id does not exist")
     ),
     params(

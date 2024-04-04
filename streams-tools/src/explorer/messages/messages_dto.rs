@@ -28,6 +28,10 @@ pub struct Message {
     pub id: String,
     pub public_text: String,
     pub private_text_decrypted: String,
+    #[serde(with = "hex::serde")]
+    pub public_data: Vec<u8>,
+    #[serde(with = "hex::serde")]
+    pub private_data_decrypted: Vec<u8>,
     pub msg_index: String,
     pub streams_content: String,
 }
@@ -35,18 +39,25 @@ pub struct Message {
 impl From<StreamsMessage> for Message {
     fn from(streams_msg: StreamsMessage) -> Self {
         let streams_content = format!("{:?}", streams_msg.content());
+        let public_data = streams_msg
+            .public_payload()
+            .unwrap_or(&[])
+        ;
+        let private_data_decrypted = streams_msg
+            .masked_payload()
+            .unwrap_or(&[])
+        ;
+
         Message {
             id: streams_msg.address.to_string(),
-            public_text: from_utf8(streams_msg
-                .public_payload()
-                .unwrap_or(&[]))
+            public_text: from_utf8(public_data)
                 .unwrap_or("")
                 .to_string(),
-            private_text_decrypted: from_utf8(streams_msg
-                .masked_payload()
-                .unwrap_or(&[]))
+            private_text_decrypted: from_utf8(private_data_decrypted)
                 .unwrap_or("")
                 .to_string(),
+            public_data: public_data.to_vec(),
+            private_data_decrypted: private_data_decrypted.to_vec(),
             msg_index: hex::encode(streams_msg.address.to_msg_index()),
             streams_content,
         }
@@ -61,6 +72,8 @@ impl Message {
             public_text: pub_text,
             private_text_decrypted: priv_text_decrypted,
             msg_index: hex::encode(address.to_msg_index()),
+            public_data: [].to_vec(),
+            private_data_decrypted: [].to_vec(),
             streams_content: "".to_string(),
         })
     }

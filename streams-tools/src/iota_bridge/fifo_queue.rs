@@ -12,6 +12,10 @@ use dashmap::{
 // before it is processed by the streams-collector.
 pub static FIFO_MIN_WAIT_TIME_SECS: f32 = 25.0;
 
+// Lifetime of a FifoQueueElement. If the FIFO_ELEMENT_LIFETIME_SECS has expired, the FifoQueueElement
+// will not be delivered. Instead it is popped of the queue and dropped.
+pub static FIFO_ELEMENT_LIFETIME_SECS: f32 = 600.0;
+
 // This is used to store Commands and Confirmations in the FifoQueue
 pub struct FifoQueueElement {
     pub payload: Vec<u8>,
@@ -47,20 +51,26 @@ pub fn fifo_queue_pop_front(queue: &mut FifoQueue) -> Option<FifoQueueElement> {
     let mut ret_val: Option<FifoQueueElement> = None;
     if !queue.is_empty() {
         if let Some(element) = queue.get(0) {
-            if !element.needs_to_wait_for_tangle_milestone {
-                ret_val = queue.pop_front();
-            } else {
-                match element.received.elapsed() {
-                    Ok(duration) => {
-                        if duration.as_secs_f32() > FIFO_MIN_WAIT_TIME_SECS {
+            match element.received.elapsed() {
+                Ok(duration) => {
+                    if duration.as_secs_f32() < FIFO_ELEMENT_LIFETIME_SECS {
+                        if !element.needs_to_wait_for_tangle_milestone {
                             ret_val = queue.pop_front();
                         } else {
-                            let time_to_wait = duration.as_secs_f32() - FIFO_MIN_WAIT_TIME_SECS;
-                            log::info!("[fn fifo_queue_pop_front()] - Minimum wait time has not been reached. time_to_wait: {}", time_to_wait)
+                            if duration.as_secs_f32() > FIFO_MIN_WAIT_TIME_SECS {
+                                ret_val = queue.pop_front();
+                            } else {
+                                let time_to_wait = duration.as_secs_f32() - FIFO_MIN_WAIT_TIME_SECS;
+                                log::info!("[fn fifo_queue_pop_front()] - Minimum wait time has not been reached. time_to_wait: {}", time_to_wait)
+                            }
                         }
+                    } else {
+                        let lifetime_secs = duration.as_secs_f32();
+                        log::info!("[fn fifo_queue_pop_front()] - The maximum lifetime of {} secs has been exceeded by a FifoQueueElement. The element has been dropped. Lifetime has been: {} secs", FIFO_ELEMENT_LIFETIME_SECS, lifetime_secs);
+                        let _ = queue.pop_front();
                     }
-                    _ => {}
                 }
+                _ => {}
             }
         }
     }

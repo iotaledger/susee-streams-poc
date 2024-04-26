@@ -9,6 +9,7 @@ use url::Url;
 use anyhow::{
     Result as AnyhowResult,
     bail,
+    anyhow,
 };
 
 use hyper::{
@@ -259,6 +260,13 @@ impl fmt::Display for DispatchedRequestParts {
 
 pub fn get_dev_eui_from_str(dev_eui_str: &str) -> Result<Vec<u8>, Error>{
     Ok(dev_eui_str.as_bytes().to_vec())
+}
+
+pub async fn get_string_from_response_body(mut response: Response<Body>) -> AnyhowResult<String> {
+    let body_bytes = body::to_bytes(response.body_mut()).await?;
+    String::from_utf8(body_bytes.to_vec()).map_err(|e|
+        anyhow!("Error on parsing bytes into utf8 string. Error: {}", e)
+    )
 }
 
 #[derive(Clone)]

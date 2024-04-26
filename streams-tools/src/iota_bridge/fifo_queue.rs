@@ -7,10 +7,25 @@ use dashmap::{
     DashMap,
 };
 
-// Time to wait before a FifoQueueElement can be fetched from the fifo queue (using fifo_queue_pop_front()).
-// The time is set to 10 secs because we need to wait for the block being referenced by a milestone
-// before it is processed by the streams-collector.
-pub static FIFO_MIN_WAIT_TIME_SECS: f32 = 25.0;
+use crate::streams_transport::streams_transport::STREAMS_TOOLS_CONST_TRANSPORT_PROCESSING_TIME_SECS;
+
+// Time to wait before a FifoQueueElement can be fetched from the fifo queue (using fifo_queue_pop_front())
+// in case FifoQueueElement::needs_to_wait_for_tangle_milestone is true.
+// -------------------------------------------------------------------------------------------
+// -----------------------------     IMPORTANT      ------------------------------------------
+// -------------------------------------------------------------------------------------------
+//      If DispatchStreams::send_message() calls transport.send_message()
+//      and awaits the response, we do not to wait in fifo_queue_pop_front()
+//      because new commands/confirmations will always been posted after
+//      blocks have been fully processed by the transport services.
+//      Otherwise: If DispatchStreams::send_message() calls transport.send_message()
+//      in a sub-task and returns early without waiting for the response,
+//      we would need to set FIFO_MIN_WAIT_TIME_SECS to
+//      STREAMS_TOOLS_CONST_TRANSPORT_PROCESSING_TIME_SECS.
+//      This option is currently not implemented so that we set FIFO_MIN_WAIT_TIME_SECS
+//      to 0.1 seconds here.
+// -------------------------------------------------------------------------------------------
+pub static FIFO_MIN_WAIT_TIME_SECS: f32 = 0.1;
 
 // Lifetime of a FifoQueueElement. If the FIFO_ELEMENT_LIFETIME_SECS has expired, the FifoQueueElement
 // will not be delivered. Instead it is popped of the queue and dropped.

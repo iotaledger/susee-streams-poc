@@ -4,6 +4,11 @@ use std::fmt;
 
 use async_trait::async_trait;
 
+use tokio::time::{
+    sleep,
+    Duration
+};
+
 use anyhow::anyhow;
 
 use hyper::{
@@ -31,8 +36,14 @@ use lets::{
 };
 
 use crate::{
-    http::http_tools::RequestBuilderTools,
-    streams_transport::streams_transport::STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT,
+    http::http_tools::{
+        RequestBuilderTools,
+        get_string_from_response_body,
+    },
+    streams_transport::streams_transport::{
+        STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT,
+        STREAMS_TOOLS_CONST_TRANSPORT_PROCESSING_TIME_SECS,
+    },
 };
 
 #[derive(Clone)]
@@ -81,8 +92,12 @@ struct EndpointUris {}
 impl EndpointUris {
     pub const GET_BLOCK: &'static str = "/block";
 
-    pub fn get_uri___get_block(tag_hex_str: &str) -> String {
-        format!("{}/{}", Self::GET_BLOCK, tag_hex_str)
+    pub fn get_uri___get_block(tag_hex_str: &str, only_check_existence: bool) -> String {
+        let mut ret_val = format!("{}/{}", Self::GET_BLOCK, tag_hex_str);
+        if only_check_existence {
+            ret_val += "?checkExistence=true";
+        }
+        ret_val
     }
 }
 
@@ -129,14 +144,14 @@ impl MessageIndexer {
         Ok(vec![transport_msg])
     }
 
-    fn get_streams_collector_request(&self, msg_index: [u8; 32]) -> LetsResult<(Request<Body>, String, String)> {
+    fn get_streams_collector_request(&self, msg_index: [u8; 32], only_check_existence: bool) -> LetsResult<(Request<Body>, String, String)> {
         let msg_index_hex_str = hex::encode(msg_index);
         let tag = self.get_tag_value(msg_index).map_err(|e| LetsError::External(
             anyhow!("Error on converting msg_index '{}' into tag. Error: {}", msg_index_hex_str, e)
         ))?;
         let tag_hex_str = hex::encode(tag);
         log::debug!("[fn get_streams_collector_request()] Request for msg_index {}", msg_index_hex_str);
-        let url = self.get_url(&EndpointUris::get_uri___get_block(&tag_hex_str));
+        let url = self.get_url(&EndpointUris::get_uri___get_block(&tag_hex_str, only_check_existence));
         log::debug!("[fn get_streams_collector_request()] posting get request: {}", url);
         let request = RequestBuilderTools::get_request_builder()
             .method("GET")
@@ -152,7 +167,7 @@ impl MessageIndexer {
 #[async_trait(?Send)]
 impl MessageIndex for MessageIndexer {
     async fn get_messages_by_msg_index(&self, msg_index: [u8; 32]) -> LetsResult<Vec<TransportMessage>> {
-        let (request, url, msg_index_hex_str) = self.get_streams_collector_request(msg_index)?;
+        let (request, url, msg_index_hex_str) = self.get_streams_collector_request(msg_index, false)?;
         let response = self.hyper_client.request(request)
             .await
             .map_err(|e| LetsError::External(
@@ -184,5 +199,24 @@ impl MessageIndex for MessageIndexer {
         ret_val.extend_from_slice(&MessageIndexer::TAG_PREFIX);
         ret_val.extend_from_slice(&msg_index);
         Ok(ret_val)
+    }
+
+    async fn validate_successful_message_send(&self, msg_index: [u8; 32]) -> LetsResult<bool> {
+        sleep(Duration::from_secs_f32(STREAMS_TOOLS_CONST_TRANSPORT_PROCESSING_TIME_SECS)).await;
+        let (request, _, msg_index_hex_str) = self.get_streams_collector_request(msg_index, true)?;
+        let response = self.hyper_client.request(request)
+            .await
+            .map_err(|e| LetsError::External(
+                anyhow!("Error on validate_successful_message_send for msg_index '{}'. Error: {}", msg_index_hex_str, e)
+            ))?;
+
+        if response.status().is_success() {
+            let response_str = get_string_from_response_body(response).await.map_err(|e| LetsError::External(
+                anyhow!("Error on get_string_from_response_body of streams_collector response for msg_index '{}'. Error: {}", msg_index_hex_str, e)
+            ))?;
+            Ok(response_str.to_lowercase().trim() == "true")
+        } else {
+            Ok(false)
+        }
     }
 }

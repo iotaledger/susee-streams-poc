@@ -48,7 +48,46 @@ the *IOTA-Bridge* offers the following CLI arguments.
                 --node="195.90.200.153"
                 -n="example.com"
              [default: 127.0.0.1]
+
+The `--error-handling` argument can be used to control the handling of SUSEE-Node service
+errors. For more details please see the
+[IOTA Bridge Error Handling](#iota-bridge-error-handling-for-lorawan-node-endpoints)
+section below.
+             
+    -e, --error-handling <ERROR_HANDLING>
+            Defines how errors occurring during 'lorawan-rest/binary_request'
+            endpoint processing are handled.
             
+            Existing values are:
+                always-return-errors,
+                    All internal errors are immediately returned to the client.
+                    The client is responsible to handle the error for example
+                    by doing a failover to another iota-bridge instance or
+                    by buffering the payload and later retrial.
+                    Use this option if there are multiple redundant iota-bridge
+                    instances run.
+                buffer-messages-on-validation-errors
+                    In case the validation of a send message fails, the
+                    iota-bridge will buffer the message and will later retry
+                    to send the message via the tangle.
+                    This option is only suitable if only one iota-bridge
+                    instance is run.
+            
+            
+            Internal errors of the iota-bridge are provided via http error status codes:
+            
+                | ------------------------------ | --------------------------- |
+                | Error Type                     | HTTP Error Status           |
+                | ------------------------------ | --------------------------- |
+                | *SUSEE Node* health error      | 503 - Service Unavailable   |
+                | Message send validation error  | 507 - Insufficient Storage  |
+                | Other error                    | 500 - Internal Server Error |
+                | ------------------------------ | --------------------------- |
+            
+            For more details regarding the different error types please see the
+            iota-bridge Readme.md file.
+             [default: always-return-errors]         
+                      
 ## IOTA Bridge REST API
 
 Most of the REST API is used internally by the accompanying susee-streams-poc applications.
@@ -95,6 +134,76 @@ The *AppServer Connector Mockup Tool* implements this process but uses a WIFI
 socket connection instead of a LoRaWAN connection. For further details please
 have a look into the
 [*AppServer Connector Mockup Tool* README](../app-srv-connector-mock/README.md).
+
+### IOTA Bridge Error Handling for lorawan-node Endpoints
+
+The `--error-handling` argument described above can be used to specify
+how internal errors of the *SUSEE Node* are handled when
+the `lorawan-rest/binary_request` endpoint is used.
+
+There are three
+types of errors which are indicated with specific http
+error status values:
+
+| Error Type                     | HTTP Error Status           |
+| ------------------------------ | --------------------------- |
+| *SUSEE Node* health error      | 503 - Service Unavailable   |
+| Message send validation error  | 507 - Insufficient Storage  |
+| Other error                    | 500 - Internal Server Error |
+
+
+More details regarding these errors can be found in the following sections.
+
+#### SUSEE-Node health error
+
+Before any access to the IOTA Tangle is processed the *IOTA Bridge*
+performs a service health check for the following services:
+* *IOTA Node*
+* *INX Collector*
+* *MINIO* Object Database.
+
+If any of these services is not healthy the
+*IOTA Bridge* will return a `503 - Service Unavailable` http error
+for a `/lorawan-rest` request.
+
+#### Message send validation error
+
+After a *Sensor* message has been send via the *IOTA Tangle*
+the resulting block and it's POI must be archived by the *INX Collector*
+in the *MINIO* object database. In case of errors the block might not
+have been stored in the *MINIO* database.
+
+To make sure that the *Sensor* message has been successfully send and the
+resulting block exists in the *MINIO* database, the *IOTA Bridge* will validate
+the block existence after each message send process.
+
+In case this validation fails the behavior of the *IOTA Bridge* depends on
+the `--error-handling` argument:
+
+**--error-handling = always-return-errors**
+
+The *IOTA Bridge* will return a
+`507 - Insufficient Storage` http error
+for a `/lorawan-rest` request.
+
+Use this option if there are multiple redundant iota-bridge
+instances run.
+
+For production environments we recommend to run at least two *SUSEE Nodes*,
+each providing an independently working *IOTA Bridge* instance.
+The available instances can be run behind a load balancer or the
+*Application Server Connector* can do a simple failover.
+
+**--error-handling = buffer-messages-on-validation-errors**
+
+The *IOTA Bridge* will buffer the *Sensor* message in its local SQLite database
+and will try to send the message in the future.
+
+The *IOTA Bridge* then will respond with a
+`200 - OK` http status to the `/lorawan-rest` request.
+
+This option is only suitable if only one iota-bridge
+instance is run for test purposes.
 
 ### lorawan-node Endpoints
 To allow [compressed Streams message](../sensor/README.md#deveuis-and-compressed-streams-messages)

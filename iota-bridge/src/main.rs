@@ -1,5 +1,6 @@
 use std::{
     net::SocketAddr,
+    str::FromStr,
 };
 
 use hyper::{
@@ -33,6 +34,8 @@ use streams_tools::{
             run_buffered_message_loop,
             BufferedMessageLoopOptions,
         },
+        IotaBridgeOptions,
+        ErrorHandlingStrategy,
     },
     dao_helpers::DbFileBasedDaoManagerOptions,
     IotaBridge,
@@ -100,12 +103,25 @@ fn run_buffered_message_loop_in_background(local: &LocalSet, iota_node: &str, db
 }
 
 async fn run<'a>(db_connection_opt: DbFileBasedDaoManagerOptions, cli: IotaBridgeCli<'a>) {
-    log::info!("Using node '{}' for tangle connection", cli.node);
-
     let lora_wan_node_store = LoraWanNodeDataStore::new(db_connection_opt.clone());
     let pending_request_store = PendingRequestDataStore::new(db_connection_opt.clone());
     let buffered_message_store = BufferedMessageDataStore::new(db_connection_opt);
-    let client = IotaBridge::new(cli.node, lora_wan_node_store, pending_request_store, buffered_message_store).await;
+    let error_handling = if let Some(error_handling) = cli.matches.value_of(cli.arg_keys.error_handling) {
+        ErrorHandlingStrategy::from_str(error_handling)
+            .expect(format!("The --{} value '{}' is not a valid error handling strategy. {}\n\n",
+                            cli.arg_keys.error_handling,
+                            error_handling,
+                            ErrorHandlingStrategy::DESCRIPTION
+            ).as_str())
+    } else {
+        ErrorHandlingStrategy::default()
+    };
+    let options = IotaBridgeOptions::new(
+        cli.node,
+        error_handling,
+    );
+    log::info!("Using {}", options);
+    let client = IotaBridge::new(options, lora_wan_node_store, pending_request_store, buffered_message_store).await;
 
     let mut addr: SocketAddr = ([127, 0, 0, 1], STREAMS_TOOLS_CONST_IOTA_BRIDGE_PORT).into();
     if cli.matches.is_present(cli.arg_keys.listener_ip_address_port) {

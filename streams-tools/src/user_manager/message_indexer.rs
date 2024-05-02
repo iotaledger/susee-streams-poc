@@ -49,7 +49,7 @@ use crate::{
 #[derive(Clone)]
 pub struct MessageIndexerOptions {
     pub iota_node: String,
-    pub port: u16,
+    pub inx_collector_port: u16,
 }
 
 impl MessageIndexerOptions {
@@ -60,7 +60,7 @@ impl MessageIndexerOptions {
     }
 
     pub fn get_inx_collector_url(&self) -> String {
-        format!("http://{}:{}", self.iota_node, self.port)
+        format!("http://{}:{}", self.iota_node, self.inx_collector_port)
     }
 }
 
@@ -68,7 +68,7 @@ impl Default for MessageIndexerOptions {
     fn default() -> Self {
         Self {
             iota_node: "127.0.0.1".to_string(),
-            port: STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT
+            inx_collector_port: STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT
         }
     }
 }
@@ -76,7 +76,7 @@ impl Default for MessageIndexerOptions {
 impl fmt::Display for MessageIndexerOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "MessageIndexerOptions:\n     iota_node: {}\n     port: {}",
-               self.iota_node, self.port
+               self.iota_node, self.inx_collector_port
         )
     }
 }

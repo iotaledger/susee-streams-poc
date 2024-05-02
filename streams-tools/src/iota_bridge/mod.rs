@@ -1,6 +1,7 @@
 pub mod iota_bridge;
 pub mod dao;
 pub mod buffered_message_loop;
+pub mod error_handling_strategy;
 
 mod helpers;
 mod server_dispatch_command;
@@ -12,6 +13,7 @@ mod server_process_finally;
 mod dispatch_scope;
 mod fifo_queue;
 mod streams_transport_pool;
+mod streams_node_health;
 
 pub use {
     iota_bridge::{

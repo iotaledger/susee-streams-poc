@@ -238,8 +238,7 @@ impl StreamsTransportSocket
                 bail!("Received 0 bytes response from server.")
             }
         } else {
-            log::error!("[fn handle_lorawan_rest_response()] Received HTTP Error from Iota-Bridge. Status: {}", ret_val.status());
-            log::error!("[fn handle_lorawan_rest_response()] Returning original lorawan-rest response");
+            bail!("Iota-Bridge responded with http error status on lorawan-rest request. Status: {}", ret_val.status())
         }
         Ok(ret_val)
     }

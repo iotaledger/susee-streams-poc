@@ -57,6 +57,8 @@ use crate::{
         http_tools::{
             get_response_400,
             get_response_500,
+            get_response_503,
+            get_response_507,
             get_dev_eui_from_str,
         },
         http_protocol_streams::{
@@ -88,7 +90,9 @@ use super::{
         StreamsTransportPool,
         StreamsTransportPoolImpl,
         TransportHandle
-    }
+    },
+    streams_node_health::HealthChecker,
+    error_handling_strategy::ErrorHandlingStrategy,
 };
 
 #[async_trait(?Send)]
@@ -115,27 +119,22 @@ impl<'a> Drop for TransportHandle<'a> {
     }
 }
 
+#[derive(Clone)]
 pub struct DispatchStreams {
+    error_handling: ErrorHandlingStrategy,
     lorawan_nodes: LoraWanNodeDataStore,
     pending_requests: PendingRequestDataStore,
     scope: Option<Rc<dyn DispatchScope>>,
-}
-
-impl Clone for DispatchStreams {
-    fn clone(&self) -> Self {
-        DispatchStreams {
-            lorawan_nodes: self.lorawan_nodes.clone(),
-            pending_requests: self.pending_requests.clone(),
-            scope: self.scope.clone(),
-        }
-    }
+    health_checker: HealthChecker,
 }
 
 impl DispatchStreams {
     pub fn new<TransportFactoryT>(
+        error_handling: ErrorHandlingStrategy,
         transport_factory: TransportFactoryT,
         lorawan_nodes: LoraWanNodeDataStore,
         pending_requests: PendingRequestDataStore,
+        health_checker: HealthChecker,
     ) -> Self
     where
         TransportFactoryT: TransportFactory + 'static,
@@ -152,9 +151,11 @@ impl DispatchStreams {
             }
         }
         Self {
+            error_handling,
             lorawan_nodes,
             pending_requests,
             scope: None,
+            health_checker,
         }
     }
 
@@ -300,65 +301,8 @@ impl DispatchStreams {
         }
         ret_val
     }
-}
 
-
-impl DispatchStreams {
-    async fn retransmit_receive_compressed_message_from_address(self: &mut Self, pending_request: PendingRequest) -> Result<Response<Body>> {
-        let cmpr_addr_str =
-            TangleAddressCompressed {
-                msgid: as_msg_id(pending_request.msg_id.as_slice()),
-                initialization_cnt: pending_request.initialization_cnt,
-            }
-                .to_string();
-
-        self.set_request_needs_registered_lorawan_node_on_scope_to_true();
-        self.receive_compressed_message_from_address(cmpr_addr_str.as_str(), pending_request.dev_eui.as_str()).await
-    }
-
-    async fn retransmit_send_compressed_message(self: &mut Self, pending_request: PendingRequest, mut message: TangleMessageCompressed) -> Result<Response<Body>> {
-        if pending_request.request_key.is_none() {
-            let err = anyhow::anyhow!("Received pending_request without request_key");
-            return Ok(log_anyhow_err_and_respond_500(err, "retransmit_send_compressed_message").unwrap());
-        };
-        message.dev_eui = get_dev_eui_from_str(pending_request.dev_eui.as_str())?;
-        self.set_request_needs_registered_lorawan_node_on_scope_to_true();
-        self.send_compressed_message(&message).await
-    }
-}
-
-static LINK_LENGTH: usize = TANGLE_ADDRESS_BYTE_LEN;
-
-fn println_send_message_for_incoming_message(message: &LinkedMessage) {
-    log::info!("[fn println_send_message_for_incoming_message()] Incoming Message to attach to tangle with absolut length of {} bytes. Data:
-{}", trans_msg_len(&message.body) + LINK_LENGTH, trans_msg_encode(&message.body)
-    );
-}
-
-fn println_receive_message_from_address_for_received_message(message: &TransportMessage) {
-    log::info!("[fn receive_message_from_address()] Received Message from tangle with absolut length of {} bytes. Data:
-{}
-", trans_msg_len(&message) + LINK_LENGTH, trans_msg_encode(&message)
-    );
-}
-
-fn println_retransmit_for_received_message(request_key: &String, channel_id: &AppAddr, initialization_cnt: u8, streams_req: &StreamsApiRequest) {
-    log::info!(
-        "[fn retransmit()] Incoming request_key '{}' to retransmit cashed StreamsApiRequest for LorawanNode with channel_id {}.
-Initialization Count: {}
-Request key:
-{}
-", request_key, channel_id.to_string(), initialization_cnt, streams_req
-    );
-}
-
-#[async_trait(?Send)]
-impl ServerDispatchStreams for DispatchStreams {
-
-    fn get_uri_prefix(&self) -> &'static str { URI_PREFIX_STREAMS }
-
-    async fn send_message(&mut self, message: &LinkedMessage) -> Result<Response<Body>> {
-        println_send_message_for_incoming_message(message);
+    async fn send_message_when_streams_node_is_healthy(&mut self, message: &LinkedMessage) -> Result<Response<Body>> {
         unsafe {
             match STREAMS_TRANSPORT_POOL.borrow_mut() {
                 Some(pool) => {
@@ -370,8 +314,13 @@ impl ServerDispatchStreams for DispatchStreams {
                                 self.write_channel_id_to_scope(&message.link);
                             },
                             Err(err) => {
-                                log::error!("[fn send_message] Received error: '{}'.\nAdding buffered_message to db: {}", err, message.link);
-                                self.write_buffered_message_to_scope(message);
+                                if self.error_handling == ErrorHandlingStrategy::BufferMessagesOnValidationErrors {
+                                    log::error!("[fn send_message] Received error: '{}'.\nAdding buffered_message to db: {}", err, message.link);
+                                    self.write_buffered_message_to_scope(message);
+                                } else {
+                                    log::error!("[fn send_message] Received error: '{}'.\nReturning HTTP error 507 - Insufficient Storage for message: {}", err, message.link);
+                                    return get_response_507("Validation of the stored message failed");
+                                }
                             }
                         }
                         Response::builder()
@@ -388,8 +337,7 @@ impl ServerDispatchStreams for DispatchStreams {
         }
     }
 
-    async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
-        log::debug!("[fn receive_message_from_address()] Incoming request for address: {}", address_str);
+    async fn receive_message_from_address_when_streams_node_is_healthy(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
         let address = Address::from_str(address_str).unwrap();
         unsafe {
             match STREAMS_TRANSPORT_POOL.borrow_mut() {
@@ -427,6 +375,92 @@ impl ServerDispatchStreams for DispatchStreams {
                 }
             }
         }
+    }
+}
+
+impl DispatchStreams {
+    async fn retransmit_receive_compressed_message_from_address(self: &mut Self, pending_request: PendingRequest) -> Result<Response<Body>> {
+        let cmpr_addr_str =
+            TangleAddressCompressed {
+                msgid: as_msg_id(pending_request.msg_id.as_slice()),
+                initialization_cnt: pending_request.initialization_cnt,
+            }
+                .to_string();
+
+        self.set_request_needs_registered_lorawan_node_on_scope_to_true();
+        self.receive_compressed_message_from_address(cmpr_addr_str.as_str(), pending_request.dev_eui.as_str()).await
+    }
+
+    async fn retransmit_send_compressed_message(self: &mut Self, pending_request: PendingRequest, mut message: TangleMessageCompressed) -> Result<Response<Body>> {
+        if pending_request.request_key.is_none() {
+            let err = anyhow::anyhow!("Received pending_request without request_key");
+            return Ok(log_anyhow_err_and_respond_500(err, "retransmit_send_compressed_message").unwrap());
+        };
+        message.dev_eui = get_dev_eui_from_str(pending_request.dev_eui.as_str())?;
+        self.set_request_needs_registered_lorawan_node_on_scope_to_true();
+        self.send_compressed_message(&message).await
+    }
+
+    async fn check_health(&self) -> Option<Result<Response<Body>>>{
+        match self.health_checker.is_healthy().await {
+            Ok(healthy) => {
+                if healthy {
+                    None
+                } else {
+                    Some(get_response_503("Streams Node is currently not healthy"))
+                }
+            },
+            Err(e) => {
+                Some(get_response_503(format!("Checking Streams Node health returned an error: {}", e).as_str()))
+            }
+        }
+    }
+}
+
+static LINK_LENGTH: usize = TANGLE_ADDRESS_BYTE_LEN;
+
+fn println_send_message_for_incoming_message(message: &LinkedMessage) {
+    log::info!("[fn println_send_message_for_incoming_message()] Incoming Message to attach to tangle with absolut length of {} bytes. Data:
+{}", trans_msg_len(&message.body) + LINK_LENGTH, trans_msg_encode(&message.body)
+    );
+}
+
+fn println_receive_message_from_address_for_received_message(message: &TransportMessage) {
+    log::info!("[fn receive_message_from_address()] Received Message from tangle with absolut length of {} bytes. Data:
+{}
+", trans_msg_len(&message) + LINK_LENGTH, trans_msg_encode(&message)
+    );
+}
+
+fn println_retransmit_for_received_message(request_key: &String, channel_id: &AppAddr, initialization_cnt: u8, streams_req: &StreamsApiRequest) {
+    log::info!(
+        "[fn retransmit()] Incoming request_key '{}' to retransmit cashed StreamsApiRequest for LorawanNode with channel_id {}.
+Initialization Count: {}
+Request key:
+{}
+", request_key, channel_id.to_string(), initialization_cnt, streams_req
+    );
+}
+
+#[async_trait(?Send)]
+impl ServerDispatchStreams for DispatchStreams {
+
+    fn get_uri_prefix(&self) -> &'static str { URI_PREFIX_STREAMS }
+
+    async fn send_message(&mut self, message: &LinkedMessage) -> Result<Response<Body>> {
+        println_send_message_for_incoming_message(message);
+        if let Some(err_response) = self.check_health().await {
+            return err_response
+        }
+        self.send_message_when_streams_node_is_healthy(message).await
+    }
+
+    async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>> {
+        log::debug!("[fn receive_message_from_address()] Incoming request for address: {}", address_str);
+        if let Some(err_response) = self.check_health().await {
+            return err_response
+        }
+        self.receive_message_from_address_when_streams_node_is_healthy(address_str).await
     }
 
     async fn receive_messages_from_address(self: &mut Self, _address_str: &str) -> Result<Response<Body>> {

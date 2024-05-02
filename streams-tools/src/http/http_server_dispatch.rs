@@ -7,7 +7,12 @@ use hyper::{
         Response,
         Result,
         status,
+        StatusCode,
     }
+};
+
+use crate::{
+    binary_persist::binary_persist_iota_bridge_req::IotaBridgeResponseParts,
 };
 
 use super::{
@@ -42,10 +47,6 @@ use super::{
         DispatchScope,
         ScopeProvide
     }
-};
-
-use crate::{
-    binary_persist::binary_persist_iota_bridge_req::IotaBridgeResponseParts,
 };
 
 pub struct NormalDispatchCallbacks<'a, Scope, Streams, Command, Confirm, LorawanNode, Finally>
@@ -120,9 +121,15 @@ async fn dispatch_lorawan_rest_request<'a, Scope, Streams, Command, Confirm, Lor
                 DispatchedRequestStatus::DeserializedLorawanRest => {
                     log::debug!("[fn dispatch_request_lorawan_rest()] Processing DeserializedLorawanRest now");
                     let response = normal_callbacks.dispatch(&req_parts_inner).await?;
+                    let response_is_success = response.status().is_success();
+                    let response_status = if response_is_success {StatusCode::OK} else {response.status()};
                     let response_parts = IotaBridgeResponseParts::from_hyper_response(response).await;
-                    log::info!("[dispatch_request_lorawan_rest] DevEUI: {} - Returning response 200 for lorawan_rest request:\n{}", req_parts_inner.dev_eui, response_parts);
-                    response_parts.persist_to_hyper_response_200()
+                    log::info!("[dispatch_request_lorawan_rest] DevEUI: {} - Returning response {} for lorawan_rest request:\n{}",
+                               req_parts_inner.dev_eui,
+                               response_status,
+                               response_parts
+                    );
+                    response_parts.persist_to_hyper_response(response_status)
                 }
                 DispatchedRequestStatus::LorawanRest404 => {
                     get_response_404("The lorawan-rest API function addressed by the requested URL does not exist")

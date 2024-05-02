@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     clone::Clone,
     cell::RefCell,
     rc::Rc,
@@ -44,7 +45,12 @@ use super::{
     ProcessFinally,
     ServerScopeProvide,
     PendingRequestDataStore,
-    server_dispatch_streams::TransportFactory
+    server_dispatch_streams::TransportFactory,
+    error_handling_strategy::ErrorHandlingStrategy,
+    streams_node_health::{
+        HealthChecker,
+        HealthCheckerOptions
+    },
 };
 
 #[derive(Clone)]
@@ -67,7 +73,29 @@ impl  TransportFactory for ClientFactory {
     }
 }
 
+#[derive(Clone)]
+pub struct IotaBridgeOptions {
+    iota_node: String,
+    error_handling: ErrorHandlingStrategy,
+}
 
+impl IotaBridgeOptions {
+    pub fn new(iota_node: &str, error_handling: ErrorHandlingStrategy) -> Self {
+        Self {
+            iota_node: iota_node.to_string(),
+            error_handling
+        }
+    }
+}
+
+impl fmt::Display for IotaBridgeOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "IotaBridgeOptions:\n   iota_node: {}\n   error_handling: {}",
+               self.iota_node,
+               self.error_handling,
+        )
+    }
+}
 
 #[derive(Clone)]
 pub struct IotaBridge<'a> {
@@ -82,14 +110,17 @@ pub struct IotaBridge<'a> {
 
 impl<'a> IotaBridge<'a>
 {
-    pub async fn new(iota_node: &str, lora_wan_node_store: LoraWanNodeDataStore, pending_request_store: PendingRequestDataStore, buffered_message_store: BufferedMessageDataStore) -> IotaBridge<'a> {
-        let client_factory = ClientFactory {iota_node: iota_node.to_string()};
+    pub async fn new(options: IotaBridgeOptions, lora_wan_node_store: LoraWanNodeDataStore, pending_request_store: PendingRequestDataStore, buffered_message_store: BufferedMessageDataStore) -> IotaBridge<'a> {
+        let client_factory = ClientFactory {iota_node: options.iota_node.clone()};
+        let health_checker = HealthChecker::new(HealthCheckerOptions::new(options.iota_node.clone()));
         IotaBridge {
             scope_provide: ServerScopeProvide::new(),
             dispatch_streams: DispatchStreams::new(
+                options.error_handling.clone(),
                 client_factory.clone(),
                 lora_wan_node_store.clone(),
-                pending_request_store
+                pending_request_store,
+                health_checker,
             ),
             dispatch_command: DispatchCommand::new(),
             dispatch_confirm: DispatchConfirm::new(),

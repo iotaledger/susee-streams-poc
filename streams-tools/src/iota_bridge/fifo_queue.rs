@@ -7,7 +7,8 @@ use dashmap::{
     DashMap,
 };
 
-use crate::streams_transport::streams_transport::STREAMS_TOOLS_CONST_TRANSPORT_PROCESSING_TIME_SECS;
+// Might be used in future versions of the iota-bridge. See FIFO_MIN_WAIT_TIME_SECS comment below.
+// use crate::streams_transport::streams_transport::STREAMS_TOOLS_CONST_TRANSPORT_PROCESSING_TIME_SECS;
 
 // Time to wait before a FifoQueueElement can be fetched from the fifo queue (using fifo_queue_pop_front())
 // in case FifoQueueElement::needs_to_wait_for_tangle_milestone is true.

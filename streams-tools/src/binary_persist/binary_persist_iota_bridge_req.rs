@@ -270,13 +270,13 @@ impl IotaBridgeResponseParts {
         }
     }
 
-    pub fn persist_to_hyper_response_200(self: Self) -> Result<HyperResponse<Body>> {
+    pub fn persist_to_hyper_response(self: Self, response_status: StatusCode) -> Result<HyperResponse<Body>> {
         let mut buffer: Vec<u8> = vec![0; self.needed_size()];
         self.to_bytes(buffer.as_mut_slice()).expect("Could not serialize IotaBridgeResponseParts into buffer");
         log::debug!("[persist_to_hyper_response_200()] Serialized this IotaBridgeResponseParts to binary data:\
         \n    length:{}\n    bytes:{:02X?}", buffer.len(), buffer.as_slice());
         HyperResponse::builder()
-            .status(StatusCode::from_u16(200u16)?)
+            .status(response_status)
             .body(Body::from(buffer))
     }
 }

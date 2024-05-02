@@ -76,6 +76,14 @@ pub(crate) fn get_response_500(description: &str) -> Result<Response<Body>,Error
     get_response_with_status_code(StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error", description)
 }
 
+pub(crate) fn get_response_503(description: &str) -> Result<Response<Body>,Error> {
+    get_response_with_status_code(StatusCode::SERVICE_UNAVAILABLE, "Service Unavailable", description)
+}
+
+pub(crate) fn get_response_507(description: &str) -> Result<Response<Body>,Error> {
+    get_response_with_status_code(StatusCode::INSUFFICIENT_STORAGE, "Insufficient Storage", description)
+}
+
 pub(crate) fn get_response_with_status_code(status_code: StatusCode, body_text: &str, description: &str) -> Result<Response<Body>,Error> {
     let cloned_body_text = String::from(body_text) + if description.len() > 0 {
         String::from("\nDescription: ") + description

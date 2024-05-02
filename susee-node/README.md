@@ -1,22 +1,40 @@
-# INX Collector Resources
+# *SUSEE Node* Resources
 
-This folder contains resources to run an
-[inx-collector](https://github.com/teleconsys/inx-collector)
-which is needed to use the susee-streams-poc applications with the
+This folder contains resources to run a *SUSEE Node*.
+A *SUSEE Node* provides several services that are needed to 
+use the susee-streams-poc applications with the
 [Stardust update](https://wiki.iota.org/learn/protocols/stardust/introduction/) of the IOTA protocol
 ([IOTA mainnet](https://wiki.iota.org/get-started/introduction/iota/introduction/)
 or [Shimmer Network](https://wiki.iota.org/get-started/introduction/shimmer/introduction/)).
 
-The inx-collector maps Streams addresses to IOTA block-ids and additionally acts as a selective
-permanode for all indexed blocks. The inx-collector consists of the following web services that
+The *SUSEE Node* provides the following web services that
 are run using docker virtualization and docker-compose:
 
 * A [Hornet](https://wiki.iota.org/hornet/welcome/) node
-* The [INX Collector](https://github.com/teleconsys/inx-collector) plugin itself
+* An [INX Collector](https://github.com/teleconsys/inx-collector) plugin
 * An [INX Proof of Inclusion](https://github.com/iotaledger/inx-poi) plugin
 
+One of the main purposes of the *SUSEE Node* is to provide a fully functional
+[inx-collector](https://github.com/teleconsys/inx-collector)
+service. The inx-collector maps Streams addresses to IOTA block-ids and additionally acts as a selective
+permanode for all indexed blocks.
+
+Additionally the following web services, implemented by susee-streams-poc applications,
+are run using the docker-compose setup described in the
+[docker](../docker/README.md) section of this repository:
+
+* [*IOTA Bridge* REST API](../iota-bridge/README.md#iota-bridge-rest-api)
+* [*Message Explorer* REST API](../management-console/README.md#run-message-explorer)
+  implemented by the *Management Console* 
+  
+<img src="SUSEE-Node-Services.png" alt="SUSEE-Node-Services" width="800"/>
+
 We cover two different usage scenarios, production and development.
-This is described in the following sections in more detail.
+This is described in the sections 
+[Use in production](#use-in-production)
+and
+[Private tangle for development purposes](private-tangle-for-development-purposes)
+in more detail.
 
 ## Use in production
 
@@ -259,6 +277,12 @@ documentation page.
   > docker compose pull
   > docker compose up -d
 ```
+
+### Deploy *IOTA Bridge* and *Message Explorer*
+
+Please follow the instructions described in the section
+[Start IOTA Bridge and Message Explorer as public available service](../docker/README.md#start-iota-bridge-and-message-explorer-as-public-available-service)
+of the [docker folder](../docker/README.md).
 
 ## Private tangle for development purposes
 

@@ -196,7 +196,7 @@ Example:
 static IOTA_BRIDGE_URL_ABOUT_FMT_STR: &str = "The url of the iota-bridge to connect to.
 The default value will work together with the private tangle for development purposes
 and a local running iota-bridge using the default settings.
-See folder 'inx-collector' for more details.
+See folder 'susee-node' for more details.
 
 If your local iota-bridge listens to an external ip address, you need to specify this
 address using the --iota-bridge-url argument.

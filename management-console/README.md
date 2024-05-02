@@ -20,7 +20,7 @@ the *Management Console* offers the following CLI arguments.
             The url of the iota-bridge to connect to.
             The default value will work together with the private tangle for development purposes
             and a local running iota-bridge using the default settings.
-            See folder 'inx-collector' for more details.
+            See folder 'susee-node' for more details.
             
             If your local iota-bridge listens to an external ip address, you need to specify this
             address using the --iota-bridge-url argument.
@@ -38,13 +38,13 @@ the *Management Console* offers the following CLI arguments.
             As you need to provide also a streams inx-collector service instance,
             set this value to the domain name or static ip address of the host system
             that runs the inx-collector and the Hornet node.
-            See folder 'inx-collector' for more details.
+            See folder 'susee-node' for more details.
             
             The Hornet node and inx-collector API will be accessed using their
             standard ports (14265 and 9030) automatically.
             
             The default settings will connect to the private tangle that can be run
-            for development purposes (see folder 'inx-collector' for more details).
+            for development purposes (see folder 'susee-node' for more details).
             
             Examples:
                 --node="195.90.200.153"

@@ -4,17 +4,16 @@ use clap::{
     Arg
 };
 
-pub static NODE_ABOUT: &str = "The IP or domain name of the node to connect to.
-As you need to provide also a streams inx-collector service instance,
-set this value to the domain name or static ip address of the host system
-that runs the inx-collector and the IOTA-Hornet node.
-See folder 'inx-collector' for more details.
+pub static NODE_ABOUT: &str = "The IP or domain name of the SUSEE Node to connect to.
+Set this value to the domain name or static ip address of the SUSEE Node
+which provides the IOTA Node, inx-collector and inx-poi web services.
+See folder 'susee-node' for more details.
 
-The Hornet node and inx-collector API will be accessed using their
+The IOTA Node and inx-collector API will be accessed using their
 standard ports (14265 and 9030) automatically.
 
 The default settings will connect to the private tangle that can be run
-for development purposes (see folder 'inx-collector' for more details).
+for development purposes (see folder 'susee-node' for more details).
 
 Examples:
     --node=\"195.90.200.153\"

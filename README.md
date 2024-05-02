@@ -17,7 +17,7 @@
       === SUSEE POC applications:                                             ===
       ===                                                                     ===
       === * All resources can be used with Stardust. See folder               ===
-      ===   'inx-collector' for more details.                                 ===
+      ===   'susee-node' for more details.                                 ===
       === * A VPS for test purposes has been setup:                           ===
       ===   - domain name: iotabridge.peeros.de                               ===
       ===   - services:                                                       ===
@@ -33,7 +33,7 @@
       ===      - management-console, message explorer (:50002)                ===
       ===                                                                     ===
       === * TODO: Finish Documentation:                                       ===
-      ===   * Update inx-collector README with learnings from iotabridge.peeros.de install
+      ===   * Update susee-node README with learnings from iotabridge.peeros.de install
       ===   * Streams-collector section in main readme                        ===
       ===   * Test/scripts folder: Update all scripts                         ===
       ===   * Test folder: Update all command line expressions                ===

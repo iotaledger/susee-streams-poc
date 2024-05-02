@@ -10,7 +10,7 @@ Cargo.lock.bak-*
 /sensor/streams-poc-lib/build/
 /sensor/streams-poc-lib/components/streams-poc-lib/target/
 /sensor/streams-poc-lib/components/streams-poc-lib/build/
-/inx-collector/priv_tangle/
+/susee-node/priv_tangle/
 /test/scripts/workspace/
 /sensor/streams-poc-lib/components/streams-poc-lib/Cargo.lock
 /Cargo.lock

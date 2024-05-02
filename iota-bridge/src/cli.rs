@@ -2,7 +2,7 @@ use clap::{
     Arg
 };
 
-use streams_tools::iota_bridge::iota_bridge::ErrorHandlingStrategy;
+use streams_tools::iota_bridge::ErrorHandlingStrategy;
 
 use susee_tools::{
     BaseArgKeys,

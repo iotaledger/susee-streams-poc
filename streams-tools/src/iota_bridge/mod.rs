@@ -18,6 +18,7 @@ mod streams_node_health;
 pub use {
     iota_bridge::{
         IotaBridge,
+        IotaBridgeOptions,
     },
     dao::{
         lora_wan_node::{
@@ -37,4 +38,5 @@ pub use {
     server_dispatch_lorawan_node::DispatchLoraWanNode,
     server_process_finally::ProcessFinally,
     dispatch_scope::ServerScopeProvide,
+    error_handling_strategy::ErrorHandlingStrategy,
 };

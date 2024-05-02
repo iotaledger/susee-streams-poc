@@ -5,23 +5,23 @@ services:
 #  AppServer Connector Mockup Tool                               #
 ##################################################################
 
-  # The app-srv-connector-mock can be accessed via
-  #  * localhost:50001
-  #  #  * port 50001 of the external ip address of the docker host
-  #  #  * app-srv-connector-mock:50001 from within other docker containers
-  app-srv-connector-mock:
-    image: chrisgerritsma/app-srv-connector-mock:latest
-    ports:
-      - "50001:50001"
-    restart: unless-stopped
-    environment:
-      - RUST_LOG=${RUST_LOG:-INFO}
-    depends_on:
-      iota-bridge:
-        condition: service_started
-    command:
-      - "--iota-bridge-url=http://iota-bridge:50000"
-      - "--listener-ip-address=0.0.0.0:50001"
+#  # The app-srv-connector-mock can be accessed via
+#  #  * localhost:50001
+#  #  #  * port 50001 of the external ip address of the docker host
+#  #  #  * app-srv-connector-mock:50001 from within other docker containers
+#  app-srv-connector-mock:
+#    image: chrisgerritsma/app-srv-connector-mock:latest
+#    ports:
+#      - "50001:50001"
+#    restart: unless-stopped
+#    environment:
+#      - RUST_LOG=${RUST_LOG:-INFO}
+#    depends_on:
+#      iota-bridge:
+#        condition: service_started
+#    command:
+#      - "--iota-bridge-url=http://iota-bridge:50000"
+#      - "--listener-ip-address=0.0.0.0:50001"
 
 ##################################################################
 #  Management Console                                            #

@@ -262,7 +262,7 @@ If you want to build images and provide them on [Docker Hub](https://hub.docker.
 ```
 
 
-## Start IOTA Bridge and AppServer Connector Mockup Tool as public available service
+## Start IOTA Bridge and Message Explorer as public available service
 
 The following installation steps have been tested with Ubuntu 22.04.
 
@@ -284,15 +284,27 @@ Upload some resources needed for the installation process to the server host sys
   > scp server-install-resources/* <USER>@<SERVER_HOST>:~/susee-poc
 ```
 
-On the server host system, please edit the file `~/susee-poc/env.example`
-using an editor of you choice and set the static ip address resp. domain name
+On the server host system, 
+please also edit the `docker-compose.yml` file
+using an editor of you choice and, if neeed,
+uncomment the `management-console` section of the file. 
+
+Please also edit the file `~/susee-poc/env.example`
+and set the static ip address resp. domain name
 value for the `NODE_HOST` variable.
+
 ```bash
   # In the susee-poc folder we created above 
+  > nano docker-compose.yml
+
+  # After docker-compose.yml has been edited and stored
   > nano env.example
-  
-  # After env.example has been stored
-  # Te .env file will be created by the following script execution
+```
+
+Finally, follow the steps described below:
+```bash
+  # After env.example has been edited and stored,
+  # the .env file will be created by the following script execution
   > sudo ./prepare_docker.sh
   
     # We are now ready to start the susee-poc services as in the background

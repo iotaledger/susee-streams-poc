@@ -71,8 +71,8 @@ struct EndpointUris {}
 
 impl EndpointUris {
     pub const INX_COLLECTOR_BLOCK: &'static str = "/block";
-    pub const MINIO_HEALTH_BLOCK: &'static str = "/minio/health/live";
-    pub const IOTA_NODE_HEALTH_BLOCK: &'static str = "/health";
+    pub const MINIO_HEALTH: &'static str = "/minio/health/live";
+    pub const IOTA_NODE_HEALTH: &'static str = "/health";
 
 
     pub fn get_uri___inx_collector___get_not_existing_block_tag() -> String {
@@ -80,11 +80,11 @@ impl EndpointUris {
     }
 
     pub fn get_uri___minio_db___health() -> String {
-        Self::MINIO_HEALTH_BLOCK.to_string()
+        Self::MINIO_HEALTH.to_string()
     }
 
     pub fn get_uri___iota_node___health() -> String {
-        Self::IOTA_NODE_HEALTH_BLOCK.to_string()
+        Self::IOTA_NODE_HEALTH.to_string()
     }
 }
 
@@ -102,7 +102,7 @@ impl HealthChecker {
             EndpointUris::get_uri___iota_node___health()
         );
         log::debug!("[fn is_healthy()] iota_node_url: {}", iota_node_url);
-        if !self.is_request_successful(iota_node_url, None).await? {
+        if !self.is_request_successful(iota_node_url, "IOTA Node", None).await? {
             return Ok(false);
         }
 
@@ -111,7 +111,7 @@ impl HealthChecker {
             EndpointUris::get_uri___inx_collector___get_not_existing_block_tag()
         );
         log::debug!("[fn is_healthy()] inx_collector_url: {}", inx_collector_url);
-        if !self.is_request_successful(inx_collector_url, Some(StatusCode::BAD_REQUEST)).await? {
+        if !self.is_request_successful(inx_collector_url, "INX Collector",Some(StatusCode::BAD_REQUEST)).await? {
             return Ok(false);
         }
 
@@ -120,14 +120,14 @@ impl HealthChecker {
                                         EndpointUris::get_uri___minio_db___health()
         );
         log::debug!("[fn is_healthy()] minio_url: {}", minio_url);
-        if !self.is_request_successful(minio_url, None).await? {
+        if !self.is_request_successful(minio_url, "Minio", None).await? {
             return Ok(false);
         }
 
         Ok(true)
     }
 
-    async fn is_request_successful(&self, uri: String, additional_allowed_status: Option<StatusCode>) -> Result<bool> {
+    async fn is_request_successful(&self, uri: String, tested_service: &str, additional_allowed_status: Option<StatusCode>) -> Result<bool> {
         let request = self.get_request(uri)?;
         match self.hyper_client.request(request).await {
             Ok(resp) => {
@@ -142,7 +142,7 @@ impl HealthChecker {
                 }
             },
             Err(e) => {
-                log::error!("[fn is_request_successful()] hyper_client returned error: {}", e);
+                log::error!("[fn is_request_successful()] hyper_client returned error for {} service: {}", tested_service, e);
                 Ok(false)
             }
         }

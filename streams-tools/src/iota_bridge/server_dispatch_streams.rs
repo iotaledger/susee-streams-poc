@@ -57,14 +57,13 @@ use crate::{
         http_tools::{
             get_response_400,
             get_response_500,
-            get_response_503,
-            get_response_507,
             get_dev_eui_from_str,
         },
         http_protocol_streams::{
             ServerDispatchStreams,
             URI_PREFIX_STREAMS,
         },
+        iota_bridge_error::IotaBridgeError,
         get_final_http_status,
     },
     dao_helpers,
@@ -318,8 +317,10 @@ impl DispatchStreams {
                                     log::error!("[fn send_message] Received error: '{}'.\nAdding buffered_message to db: {}", err, message.link);
                                     self.write_buffered_message_to_scope(message);
                                 } else {
-                                    log::error!("[fn send_message] Received error: '{}'.\nReturning HTTP error 507 - Insufficient Storage for message: {}", err, message.link);
-                                    return get_response_507("Validation of the stored message failed");
+                                    log::error!("[fn send_message] Received error: '{}'.\nReturning HTTP error {} for message: {}",
+                                                err, IotaBridgeError::http_error_description(IotaBridgeError::ValidationFailed), message.link);
+                                    return IotaBridgeError::get_response(IotaBridgeError::ValidationFailed,
+                                                                         "Validation of the correct storage of the message failed");
                                 }
                             }
                         }
@@ -407,11 +408,13 @@ impl DispatchStreams {
                 if healthy {
                     None
                 } else {
-                    Some(get_response_503("Streams Node is currently not healthy"))
+                    Some(IotaBridgeError::get_response(IotaBridgeError::NotHealthy,
+                                                       "Streams Node is currently not healthy"))
                 }
             },
             Err(e) => {
-                Some(get_response_503(format!("Checking Streams Node health returned an error: {}", e).as_str()))
+                Some(IotaBridgeError::get_response(IotaBridgeError::NotHealthy,
+                                                   format!("Checking Streams Node health returned an error: {}", e).as_str()))
             }
         }
     }

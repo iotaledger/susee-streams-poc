@@ -1,10 +1,4 @@
-use super::{
-    ScopeConsume,
-    http_tools::{
-        RequestBuilderTools,
-        DispatchedRequestParts,
-    }
-};
+use async_trait::async_trait;
 
 use hyper::{
     Body,
@@ -12,9 +6,18 @@ use hyper::{
         Request,
         Result,
         Method,
+        StatusCode,
     }
 };
-use async_trait::async_trait;
+
+use super::{
+    ScopeConsume,
+    http_tools::{
+        RequestBuilderTools,
+        DispatchedRequestParts,
+    },
+    iota_bridge_error::IotaBridgeError
+};
 
 pub struct EndpointUris {}
 
@@ -59,6 +62,15 @@ impl RequestBuilderLorawanRest {
 pub trait ServerDispatchLorawanRest: ScopeConsume {
     fn get_uri_prefix(&self) -> &'static str;
     async fn post_binary_request(self: &mut Self, dev_eui: &str, request_bytes: &[u8] ) -> anyhow::Result<DispatchedRequestParts>;
+}
+
+pub fn translate_lorawan_rest_error(inner_status: StatusCode) -> StatusCode {
+    let response_is_success = inner_status.is_success();
+    if response_is_success || !IotaBridgeError::is_iota_bridge_error(inner_status) {
+        StatusCode::OK
+    } else {
+        inner_status
+    }
 }
 
 pub async fn dispatch_request_lorawan_rest<'a>(req_parts: &DispatchedRequestParts, callbacks: &'a mut impl ServerDispatchLorawanRest ) -> anyhow::Result<DispatchedRequestParts> {

@@ -7,7 +7,6 @@ use hyper::{
         Response,
         Result,
         status,
-        StatusCode,
     }
 };
 
@@ -31,7 +30,8 @@ use super::{
     },
     http_protocol_lorawan_rest::{
         ServerDispatchLorawanRest,
-        dispatch_request_lorawan_rest
+        dispatch_request_lorawan_rest,
+        translate_lorawan_rest_error,
     },
     http_protocol_lorawan_node::{
         ServerDispatchLoraWanNode,
@@ -46,7 +46,7 @@ use super::{
     http_dispatch_scope::{
         DispatchScope,
         ScopeProvide
-    }
+    },
 };
 
 pub struct NormalDispatchCallbacks<'a, Scope, Streams, Command, Confirm, LorawanNode, Finally>
@@ -121,8 +121,7 @@ async fn dispatch_lorawan_rest_request<'a, Scope, Streams, Command, Confirm, Lor
                 DispatchedRequestStatus::DeserializedLorawanRest => {
                     log::debug!("[fn dispatch_request_lorawan_rest()] Processing DeserializedLorawanRest now");
                     let response = normal_callbacks.dispatch(&req_parts_inner).await?;
-                    let response_is_success = response.status().is_success();
-                    let response_status = if response_is_success {StatusCode::OK} else {response.status()};
+                    let response_status = translate_lorawan_rest_error(response.status());
                     let response_parts = IotaBridgeResponseParts::from_hyper_response(response).await;
                     log::info!("[dispatch_request_lorawan_rest] DevEUI: {} - Returning response {} for lorawan_rest request:\n{}",
                                req_parts_inner.dev_eui,

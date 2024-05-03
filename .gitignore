@@ -1,4 +1,4 @@
-/target
+/target/
 /streams-tools/Cargo.lock
 /**/@rust_panic
 /**/wallet-*.txt
@@ -11,7 +11,7 @@ Cargo.lock.bak-*
 /sensor/streams-poc-lib/components/streams-poc-lib/target/
 /sensor/streams-poc-lib/components/streams-poc-lib/build/
 /susee-node/priv_tangle/
-/test/scripts/workspace/
+/test/scripts/workspace*/
 /sensor/streams-poc-lib/components/streams-poc-lib/Cargo.lock
 /Cargo.lock
 /sensor/streams-poc-lib/sdkconfig

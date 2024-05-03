@@ -1,3 +1,4 @@
+pub mod iota_bridge_error;
 pub mod http_tools;
 pub mod http_dispatch_scope;
 pub mod http_protocol_streams;

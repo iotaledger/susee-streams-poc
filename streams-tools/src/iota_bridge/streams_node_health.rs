@@ -1,13 +1,22 @@
 #![allow(non_snake_case)]
 
-use hyper::{
-    Client as HyperClient,
-    Body,
-    client::HttpConnector,
-    http::{
-        Request,
-        StatusCode,
-    }
+use http::{
+    Request,
+    StatusCode
+};
+
+use bytes::Bytes;
+
+use http_body_util::Empty;
+
+use hyper_tls::HttpsConnector;
+
+use hyper_util::{
+    client::legacy::{
+        Client as HyperClient,
+        connect::HttpConnector,
+    },
+    rt::TokioExecutor
 };
 
 use anyhow::{
@@ -17,7 +26,6 @@ use anyhow::{
 
 use crate::{
     helpers::get_iota_node_url,
-    http::http_tools::RequestBuilderTools,
     streams_transport::streams_transport::{
         STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT,
         STREAMS_TOOLS_CONST_MINIO_DB_PORT
@@ -63,7 +71,7 @@ impl Default for HealthCheckerOptions {
 
 #[derive(Clone)]
 pub struct HealthChecker {
-    hyper_client: HyperClient<HttpConnector, Body>,
+    hyper_client: HyperClient<HttpsConnector<HttpConnector>, Empty<bytes::Bytes>>,
     options: HealthCheckerOptions,
 }
 
@@ -90,8 +98,11 @@ impl EndpointUris {
 
 impl HealthChecker {
     pub fn new(options: HealthCheckerOptions) -> HealthChecker {
+        let https = HttpsConnector::new();
+        let hyper_client = HyperClient::builder(TokioExecutor::new())
+            .build::<_, Empty<Bytes>>(https);
         HealthChecker {
-            hyper_client: HyperClient::new(),
+            hyper_client,
             options,
         }
     }
@@ -129,6 +140,7 @@ impl HealthChecker {
 
     async fn is_request_successful(&self, uri: String, tested_service: &str, additional_allowed_status: Option<StatusCode>) -> Result<bool> {
         let request = self.get_request(uri)?;
+
         match self.hyper_client.request(request).await {
             Ok(resp) => {
                 if let Some(allowed_status) = additional_allowed_status {
@@ -148,11 +160,11 @@ impl HealthChecker {
         }
     }
 
-    fn get_request(&self, uri: String) -> Result<Request<Body>> {
-        RequestBuilderTools::get_request_builder()
+    fn get_request(&self, uri: String) -> Result<Request<Empty::<bytes::Bytes>>> {
+        Request::builder().header("User-Agent", "iota-bridge/1.0")
             .method("GET")
             .uri(uri)
-            .body(Body::empty())
+            .body(Empty::<bytes::Bytes>::new())
             .map_err(|e| anyhow!(e))
     }
 }

@@ -3,6 +3,7 @@
 /**/@rust_panic
 /**/wallet-*.txt
 /**/user-state-*.bin
+/**/*.sqlite3
 /.embuild/espressif/
 Cargo.lock.bak-*
 /temp-apps/

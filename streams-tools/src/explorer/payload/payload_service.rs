@@ -11,11 +11,11 @@ use lets::address::{
 };
 
 use crate::{
+    threading_helpers::{
+        run_worker_in_own_thread,
+        Worker
+    },
     explorer::{
-        threading_helpers::{
-            run_worker_in_own_thread,
-            Worker
-        },
         error::{
             Result,
             AppError,
@@ -82,6 +82,7 @@ struct DecodeWorker;
 impl Worker for DecodeWorker {
     type OptionsType = DecodeWorkerOptions;
     type ResultType = Message;
+    type ErrorType = AppError;
 
     async fn run(opt: DecodeWorkerOptions) -> Result<Message> {
         let request_parts = match IotaBridgeRequestParts::try_from_bytes(opt.payload.as_slice()) {

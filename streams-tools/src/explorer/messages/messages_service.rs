@@ -11,6 +11,10 @@ use streams::{
 use lets::transport::tangle::Client;
 
 use crate::{
+    threading_helpers::{
+        Worker,
+        run_worker_in_own_thread,
+    },
     explorer::{
         app_state::{
             AppState,
@@ -19,10 +23,6 @@ use crate::{
         error::{
             Result,
             AppError,
-        },
-        threading_helpers::{
-            Worker,
-            run_worker_in_own_thread,
         },
         shared::PagingOptions,
     },
@@ -92,6 +92,7 @@ struct IndexWorker;
 impl Worker for IndexWorker {
     type OptionsType = IndexWorkerOptions;
     type ResultType = (MessageList, usize);
+    type ErrorType = AppError;
 
     async fn run(opt: IndexWorkerOptions) -> Result<(MessageList, usize)> {
         let mut channel_manager = match get_channel_manager_for_channel_id(
@@ -177,6 +178,7 @@ struct GetWorker;
 impl Worker for GetWorker {
     type OptionsType = GetWorkerOptions;
     type ResultType = Message;
+    type ErrorType = AppError;
 
     async fn run(opt: GetWorkerOptions) -> Result<Message> {
         let mut channel_manager = get_channel_manager_for_channel_id(

@@ -1,20 +1,20 @@
 use async_trait::async_trait;
 
-use super::error::Result;
-
 #[async_trait(?Send)]
 pub trait Worker {
     type OptionsType: Send;
     type ResultType: Send;
+    type ErrorType: Send;
 
-    async fn run(opt: Self::OptionsType) -> Result<Self::ResultType>;
+    async fn run(opt: Self::OptionsType) -> Result<Self::ResultType, Self::ErrorType>;
 }
 
-pub async fn run_worker_in_own_thread<W>(worker_opt: W::OptionsType) -> Result<W::ResultType>
+pub async fn run_worker_in_own_thread<W>(worker_opt: W::OptionsType) -> Result<W::ResultType, W::ErrorType>
     where
         W: Worker,
         <W as Worker>::OptionsType: 'static,
-        <W as Worker>::ResultType: 'static
+        <W as Worker>::ResultType: 'static,
+        <W as Worker>::ErrorType: 'static,
 {
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()

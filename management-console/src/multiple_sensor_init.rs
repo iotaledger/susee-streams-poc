@@ -1,17 +1,14 @@
 use async_trait::async_trait;
 
 use anyhow::{
-    anyhow,
-    Result as AnyResult
+    Result,
+    Error as AnyError
 };
 
 use streams_tools::{
-    explorer::{
-        error::AppError,
-        threading_helpers::{
-            Worker,
-            run_worker_in_own_thread,
-        }
+    threading_helpers::{
+        Worker,
+        run_worker_in_own_thread,
     },
     multi_channel_management::{
         get_initial_channel_manager,
@@ -33,7 +30,7 @@ use crate::{
     subscribe_remote_sensor_to_channel
 };
 
-pub(crate) async fn init_sensor_in_own_thread<'a>(user_store: &UserDataStore, cli: &ManagementConsoleCli<'a>, dev_eui: String) -> AnyResult<()> {
+pub(crate) async fn init_sensor_in_own_thread<'a>(user_store: &UserDataStore, cli: &ManagementConsoleCli<'a>, dev_eui: String) -> Result<()> {
     let init_sensor_opt = InitSensorOptions::new(
         user_store,
         cli,
@@ -41,7 +38,7 @@ pub(crate) async fn init_sensor_in_own_thread<'a>(user_store: &UserDataStore, cl
     )?;
 
     tokio::spawn(async move {
-        run_worker_in_own_thread::<InitSensor>(init_sensor_opt).await.map_err(|app_err| anyhow!("{:?}", app_err))
+        run_worker_in_own_thread::<InitSensor>(init_sensor_opt).await
     });
 
     Ok(())
@@ -56,7 +53,7 @@ struct InitSensorOptions {
 }
 
 impl InitSensorOptions {
-    pub fn new<'a>(user_store: &UserDataStore, cli: &ManagementConsoleCli<'a>, dev_eui: String) -> AnyResult<InitSensorOptions> {
+    pub fn new<'a>(user_store: &UserDataStore, cli: &ManagementConsoleCli<'a>, dev_eui: String) -> Result<InitSensorOptions> {
         let mult_chan_mngr_opt = get_multi_channel_manager_options(cli)?;
         let remote_sensor_options = create_remote_sensor_options(cli, Some(dev_eui.clone()));
         Ok(InitSensorOptions{
@@ -74,8 +71,9 @@ struct InitSensor;
 impl Worker for InitSensor {
     type OptionsType = InitSensorOptions;
     type ResultType = ();
+    type ErrorType = AnyError;
 
-    async fn run(opt: InitSensorOptions) -> Result<(), AppError> {
+    async fn run(opt: InitSensorOptions) -> Result<()> {
         log::info!("DevEUI: {} - Starting initialization thread", opt.dev_eui);
         let mut channel_manager  = get_initial_channel_manager(
             &opt.user_store,

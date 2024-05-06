@@ -1,22 +1,13 @@
 #![allow(non_snake_case)]
 
-use http::{
-    Request,
-    StatusCode
-};
-
-use bytes::Bytes;
-
-use http_body_util::Empty;
-
-use hyper_tls::HttpsConnector;
-
-use hyper_util::{
-    client::legacy::{
-        Client as HyperClient,
-        connect::HttpConnector,
-    },
-    rt::TokioExecutor
+use hyper::{
+    Client as HyperClient,
+    Body,
+    client::HttpConnector,
+    http::{
+        Request,
+        StatusCode,
+    }
 };
 
 use anyhow::{
@@ -26,11 +17,16 @@ use anyhow::{
 
 use crate::{
     helpers::get_iota_node_url,
+    http::http_tools::RequestBuilderTools,
     streams_transport::streams_transport::{
         STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT,
         STREAMS_TOOLS_CONST_MINIO_DB_PORT
     }
 };
+
+#[cfg(feature = "http_client_tls")]
+use crate::iota_bridge::streams_node_health_https_client::HttpsClient;
+
 
 #[derive(Clone)]
 pub struct HealthCheckerOptions {
@@ -71,7 +67,9 @@ impl Default for HealthCheckerOptions {
 
 #[derive(Clone)]
 pub struct HealthChecker {
-    hyper_client: HyperClient<HttpsConnector<HttpConnector>, Empty<bytes::Bytes>>,
+    hyper_client: HyperClient<HttpConnector, Body>,
+    #[cfg(feature = "http_client_tls")]
+    https_client: HttpsClient,
     options: HealthCheckerOptions,
 }
 
@@ -98,23 +96,25 @@ impl EndpointUris {
 
 impl HealthChecker {
     pub fn new(options: HealthCheckerOptions) -> HealthChecker {
-        let https = HttpsConnector::new();
-        let hyper_client = HyperClient::builder(TokioExecutor::new())
-            .build::<_, Empty<Bytes>>(https);
         HealthChecker {
-            hyper_client,
+            hyper_client: HyperClient::new(),
+            #[cfg(feature = "http_client_tls")]
+            https_client: HttpsClient::new(),
             options,
         }
     }
 
     pub async fn is_healthy(&self) -> Result<bool> {
-        let iota_node_url = format!("{}{}",
-            self.options.get_iota_node_url(),
-            EndpointUris::get_uri___iota_node___health()
-        );
-        log::debug!("[fn is_healthy()] iota_node_url: {}", iota_node_url);
-        if !self.is_request_successful(iota_node_url, "IOTA Node", None).await? {
-            return Ok(false);
+        #[cfg(feature = "http_client_tls")]
+        {
+            let iota_node_url = format!("{}{}",
+                                        self.options.get_iota_node_url(),
+                                        EndpointUris::get_uri___iota_node___health()
+            );
+            log::debug!("[fn is_healthy()] iota_node_url: {}", iota_node_url);
+            if !self.https_client.is_request_successful(iota_node_url, "IOTA Node", None).await? {
+                return Ok(false);
+            }
         }
 
         let inx_collector_url = format!("{}{}",
@@ -126,21 +126,26 @@ impl HealthChecker {
             return Ok(false);
         }
 
-        let minio_url = format!("{}{}",
-                                        self.options.get_minio_db_url(),
-                                        EndpointUris::get_uri___minio_db___health()
-        );
-        log::debug!("[fn is_healthy()] minio_url: {}", minio_url);
-        if !self.is_request_successful(minio_url, "Minio", None).await? {
-            return Ok(false);
-        }
+        // The current version of minio health check below results in a dead lock
+        // if the code is run on the currently used SUSEE-Node (KVM VPS + docker).
+        // Therefore the minio health check is commented out.
+        // TODO: Analyze and fix the minio health check using a different host system
+        //       (secondary SUSEE-Node)
+        //
+        // let minio_url = format!("{}{}",
+        //                                 self.options.get_minio_db_url(),
+        //                                 EndpointUris::get_uri___minio_db___health()
+        // );
+        // log::debug!("[fn is_healthy()] minio_url: {}", minio_url);
+        // if !self.is_request_successful(minio_url, "Minio", None).await? {
+        //     return Ok(false);
+        // }
 
         Ok(true)
     }
 
     async fn is_request_successful(&self, uri: String, tested_service: &str, additional_allowed_status: Option<StatusCode>) -> Result<bool> {
         let request = self.get_request(uri)?;
-
         match self.hyper_client.request(request).await {
             Ok(resp) => {
                 if let Some(allowed_status) = additional_allowed_status {
@@ -160,11 +165,11 @@ impl HealthChecker {
         }
     }
 
-    fn get_request(&self, uri: String) -> Result<Request<Empty::<bytes::Bytes>>> {
-        Request::builder().header("User-Agent", "iota-bridge/1.0")
+    fn get_request(&self, uri: String) -> Result<Request<Body>> {
+        RequestBuilderTools::get_request_builder()
             .method("GET")
             .uri(uri)
-            .body(Empty::<bytes::Bytes>::new())
+            .body(Body::empty())
             .map_err(|e| anyhow!(e))
     }
 }

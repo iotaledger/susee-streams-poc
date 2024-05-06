@@ -15,6 +15,9 @@ mod fifo_queue;
 mod streams_transport_pool;
 mod streams_node_health;
 
+#[cfg(feature = "http_client_tls")]
+mod streams_node_health_https_client;
+
 pub use {
     iota_bridge::{
         IotaBridge,

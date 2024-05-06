@@ -6,6 +6,9 @@ readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+iota_node_health_check = ["streams-tools/http_client_tls"]
+default = ["iota_node_health_check"]
 
 [dependencies]
 streams-tools = { version = "0.1.2", path = "../streams-tools", features = ["iota_bridge"] }

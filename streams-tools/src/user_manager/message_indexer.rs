@@ -1,6 +1,10 @@
 #![allow(non_snake_case)]
 
-use std::fmt;
+use std::{
+    fmt,
+    collections::HashSet,
+    cell::RefCell,
+};
 
 use async_trait::async_trait;
 
@@ -25,6 +29,7 @@ use hyper::{
 
 use lets::{
     transport::MessageIndex,
+    address::Address,
     message::{
         PreparsedMessage,
         TransportMessage
@@ -46,10 +51,17 @@ use crate::{
     },
 };
 
+use super::dao::message::{
+    MessageDataStore,
+    MessageDataStoreOptions,
+    Message as DaoMessage
+};
+
 #[derive(Clone)]
 pub struct MessageIndexerOptions {
     pub iota_node: String,
     pub inx_collector_port: u16,
+    pub message_data_store: Option<MessageDataStoreOptions>,
 }
 
 impl MessageIndexerOptions {
@@ -68,7 +80,8 @@ impl Default for MessageIndexerOptions {
     fn default() -> Self {
         Self {
             iota_node: "127.0.0.1".to_string(),
-            inx_collector_port: STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT
+            inx_collector_port: STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT,
+            message_data_store: None,
         }
     }
 }
@@ -85,6 +98,8 @@ impl fmt::Display for MessageIndexerOptions {
 pub struct MessageIndexer {
     hyper_client: HyperClient<HttpConnector, Body>,
     options: MessageIndexerOptions,
+    local_message_data_store: Option<MessageDataStore>,
+    not_existing_messages: RefCell<HashSet<String>>,
 }
 
 struct EndpointUris {}
@@ -106,9 +121,15 @@ impl MessageIndexer {
     const TAG_PREFIX: [u8; 6] = [115, 117, 115, 101, 101, 45];
 
     pub fn new(options: MessageIndexerOptions) -> MessageIndexer {
+        let mut local_message_data_store: Option<MessageDataStore> = None;
+        if let Some(msg_data_store_opt) = options.message_data_store.as_ref() {
+            local_message_data_store = Some(MessageDataStore::new(msg_data_store_opt.clone()));
+        }
         MessageIndexer {
             hyper_client: HyperClient::new(),
             options,
+            local_message_data_store,
+            not_existing_messages: RefCell::new(HashSet::new()),
         }
     }
 
@@ -162,11 +183,8 @@ impl MessageIndexer {
             ))?;
         Ok((request, url, msg_index_hex_str))
     }
-}
 
-#[async_trait(?Send)]
-impl MessageIndex for MessageIndexer {
-    async fn get_messages_by_msg_index(&self, msg_index: [u8; 32]) -> LetsResult<Vec<TransportMessage>> {
+    async fn get_messages_by_msg_index_via_inx_collector(&self, msg_index: [u8; 32]) -> LetsResult<Vec<TransportMessage>> {
         let (request, url, msg_index_hex_str) = self.get_streams_collector_request(msg_index, false)?;
         let response = self.hyper_client.request(request)
             .await
@@ -192,6 +210,57 @@ impl MessageIndex for MessageIndexer {
                 }
             }
         }
+    }
+}
+
+#[async_trait(?Send)]
+impl MessageIndex for MessageIndexer {
+    async fn get_messages_by_msg_index(&self, msg_index: [u8; 32], address: &Address) -> LetsResult<Vec<TransportMessage>> {
+        let mut ret_val = Vec::<TransportMessage>::new();
+        let msg_id_hex_str = hex::encode(address.relative());
+        if let Some(local_data_store) = self.local_message_data_store.as_ref() {
+            if let Ok((message, _)) = local_data_store.get_item(&msg_id_hex_str) {
+                let transport_msg = TransportMessage::new(message.wrapped_binary);
+                log::debug!("[fn get_messages_by_msg_index()] Returning message '{}' from local_data_store", msg_id_hex_str);
+                ret_val.push(transport_msg);
+            }
+        }
+
+        if self.not_existing_messages.borrow().contains(msg_id_hex_str.as_str()) {
+            return Err(LetsError::External(
+                anyhow!("Message '{}' does not exist", msg_id_hex_str)
+            ))
+        }
+
+        if ret_val.is_empty() {
+            match self.get_messages_by_msg_index_via_inx_collector(msg_index).await {
+                Ok(messages) => {
+                    if let Some(message) = messages.first() {
+                        if let Some(local_data_store) = self.local_message_data_store.as_ref() {
+                            local_data_store.write_item_to_db(
+                                &DaoMessage{
+                                    message_id: msg_id_hex_str.clone(),
+                                    wrapped_binary: message.body().clone()
+                                })
+                                .map_err(|e| LetsError::External(e))?;
+                        }
+
+                        log::debug!("[fn get_messages_by_msg_index()] Returning message '{}' from inx-collector", msg_id_hex_str);
+                        ret_val.push(message.clone())
+                    } else {
+                        let _has_been_inserted = self.not_existing_messages
+                            .borrow_mut()
+                            .insert(msg_id_hex_str.clone());
+                        return Err(LetsError::External(
+                            anyhow!("Messages Vec received for msg_index '{}' is empty", msg_id_hex_str)
+                        ))
+                    }
+                }
+                Err(e) => return Err(e)
+            }
+        };
+
+        Ok(ret_val)
     }
 
     fn get_tag_value(&self, msg_index: [u8; 32]) -> LetsResult<Vec<u8>> {

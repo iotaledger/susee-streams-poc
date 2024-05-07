@@ -9,11 +9,12 @@ use streams::{
 
 use crate::{
     dao_helpers::Limit,
-    dao::message::{
-        MessageDataStore,
-        MessageDataStoreOptions,
-        Message as DaoMessage
-    }
+};
+
+use super::dao::message::{
+    MessageDataStore,
+    MessageDataStoreOptions,
+    Message as DaoMessage
 };
 
 pub struct MessageManager<'a, TransT> {
@@ -52,17 +53,14 @@ where
 {
     pub async fn sync(&mut self) -> Result<u32> {
         let mut messages = self.user.messages();
+
         let mut num_messages_stored = 0;
         log::debug!("[fn sync()] Starting to sync addresses for channel {}", self.streams_channel_id);
         while let Some(msg) = messages.try_next().await? {
             num_messages_stored += 1;
-            log::debug!("[fn sync()] Writing message {} to message_data_store", msg.address.relative().to_string());
-            self.message_data_store.write_item_to_db(
-                &DaoMessage{
-                    message_id: msg.address.relative().to_string(),
-                    wrapped_binary: vec![]
-            })?;
+            log::debug!("[fn sync()] Fetched message {} to trigger MessageIndexer message caching", msg.address.relative().to_string());
         }
+        log::info!("[fn sync()] Fetched {} messages to trigger MessageIndexer message caching", num_messages_stored);
         Ok(num_messages_stored)
     }
 }

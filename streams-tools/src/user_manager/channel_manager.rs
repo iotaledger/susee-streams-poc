@@ -37,10 +37,6 @@ use crypto::{
 use crate::{
     binary_persist::Bytes,
     wallet::plain_text_wallet::PlainTextWallet,
-    user_manager::message_indexer::{
-        MessageIndexer,
-        MessageIndexerOptions,
-    },
     SimpleWallet,
     helpers::{
         get_channel_id_from_link,
@@ -50,9 +46,26 @@ use crate::{
     STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC,
 };
 
+use super::{
+    message_indexer::{
+        MessageIndexer,
+        MessageIndexerOptions,
+    },
+    dao::message::MessageDataStoreOptions
+};
+
 pub struct SubscriberData<'a> {
     pub subscription_link: &'a Address,
     pub permissioned_public_key: Permissioned<&'a [u8]>,
+}
+
+#[derive(Default, Clone)]
+pub struct ChannelManagerOptions {
+    pub serialization_file: Option<String>,
+    pub user_state: Option<Vec<u8>>,
+    // If specified, will be called on drop to serialize the user state
+    pub serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
+    pub message_data_store_for_msg_caching: Option<MessageDataStoreOptions>,
 }
 
 pub struct ChannelManager<WalletT: SimpleWallet> {
@@ -60,6 +73,7 @@ pub struct ChannelManager<WalletT: SimpleWallet> {
     serialization_file: Option<String>,
     serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
     base_branch_topic: String,
+    options: ChannelManagerOptions,
     pub iota_node: String,
     pub user: Option<User<Client<MessageIndexer>>>,
     pub announcement_link: Option<Address>,
@@ -67,13 +81,15 @@ pub struct ChannelManager<WalletT: SimpleWallet> {
     pub prev_msg_link:  Option<Address>,
 }
 
-async fn import_from_serialization_file<WalletT: SimpleWallet>(file_name: &str, ret_val: &mut ChannelManager<WalletT>) -> Result<()> {
+async fn import_from_serialization_file<WalletT: SimpleWallet>(file_name: &str, ret_val: &mut ChannelManager<WalletT>, opt: &ChannelManagerOptions) -> Result<()> {
     let buffer = read(file_name).expect(format!("Try to open channel state file '{}'", file_name).as_str());
-    import_from_buffer(&buffer, ret_val).await
+    import_from_buffer(&buffer, ret_val, opt).await
 }
 
-async fn import_from_buffer<WalletT: SimpleWallet>(buffer: &Vec<u8>, ret_val: &mut ChannelManager<WalletT>) -> Result<()> {
-    let indexer = MessageIndexer::new(MessageIndexerOptions::new(ret_val.iota_node.clone()));
+async fn import_from_buffer<WalletT: SimpleWallet>(buffer: &Vec<u8>, ret_val: &mut ChannelManager<WalletT>, opt: &ChannelManagerOptions) -> Result<()> {
+    let mut indexer_options = MessageIndexerOptions::new(ret_val.iota_node.clone());
+    indexer_options.message_data_store = opt.message_data_store_for_msg_caching.clone();
+    let indexer = MessageIndexer::new(indexer_options);
     let user = User::<Client<MessageIndexer>>::restore(
         &buffer,
         ret_val.wallet.get_serialization_password(),
@@ -94,38 +110,31 @@ fn ed25519_from_bytes(key_data: &[u8]) -> ed25519::PublicKey {
     ed25519::PublicKey::try_from_bytes(<[u8; 32]>::try_from(key_data).unwrap()).unwrap()
 }
 
-#[derive(Default)]
-pub struct ChannelManagerOptions {
-    pub serialization_file: Option<String>,
-    pub user_state: Option<Vec<u8>>,
-    // If specified will be called on drop to serialize the user state
-    pub serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
-}
-
 impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
     // TOGO CGE: This async new fn should be rewritten as synchronous normal new function.
     //           Problem: Usage of block_on() here results in panic because of the usage of tokio.
     pub async fn new(node_url: &str, wallet: WalletT, options: Option<ChannelManagerOptions>) -> Self {
         let opt = options.unwrap_or_default();
         let mut ret_val = Self {
+            options: opt.clone(),
             iota_node: node_url.to_string(),
             wallet,
             base_branch_topic: STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC.to_string(),
             serialization_file: opt.serialization_file.clone(),
-            serialize_user_state_callback: opt.serialize_user_state_callback,
+            serialize_user_state_callback: opt.serialize_user_state_callback.clone(),
             user: None,
             announcement_link: None,
             keyload_link: None,
             prev_msg_link: None,
         };
 
-        if let Some(serial_file_name) = opt.serialization_file {
+        if let Some(serial_file_name) = &opt.serialization_file {
             if Path::new(serial_file_name.as_str()).exists(){
-                import_from_serialization_file(serial_file_name.as_str(), &mut ret_val).await
+                import_from_serialization_file(serial_file_name.as_str(), &mut ret_val, &opt).await
                     .expect("Error on importing User state from serialization file");
             }
-        } else if let Some(user_state) = opt.user_state {
-            import_from_buffer(&user_state, &mut ret_val).await
+        } else if let Some(user_state) = &opt.user_state {
+            import_from_buffer(&user_state, &mut ret_val, &opt).await
                 .expect("Error on importing User state from binary user_state buffer");
         } else {
             log::warn!("No binary user_state or serial_file_name for the user state provided.\n\
@@ -139,7 +148,9 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
         if self.user.is_some() {
             panic!("This channel already has been announced")
         }
-        let indexer = MessageIndexer::new(MessageIndexerOptions::new(self.iota_node.clone()));
+        let mut indexer_options = MessageIndexerOptions::new(self.iota_node.clone());
+        indexer_options.message_data_store = self.options.message_data_store_for_msg_caching.clone();
+        let indexer = MessageIndexer::new(indexer_options);
         let mut user= User::builder()
             .with_identity(Ed25519::from_seed(self.wallet.get_seed()))
             .with_transport(

@@ -27,6 +27,7 @@ use crate::{
         shared::PagingOptions,
     },
     user_manager::{
+        dao::message::MessageDataStoreOptions,
         message_indexer::MessageIndexer,
         multi_channel_management::{
             MultiChannelManagerOptions,
@@ -51,7 +52,8 @@ impl MessagesState {
         MultiChannelManagerOptions{
             iota_node: self.iota_node_url.clone(),
             wallet_filename: self.wallet_filename.clone(),
-            streams_user_serialization_password: self.streams_user_serialization_password.clone()
+            streams_user_serialization_password: self.streams_user_serialization_password.clone(),
+            message_data_store_for_msg_caching: None
         }
     }
 }
@@ -76,10 +78,15 @@ struct IndexWorkerOptions {
 
 impl IndexWorkerOptions {
     pub fn new(messages: &MessagesState, user_store: &UserDataStore, channel_id: &str, paging_opt: Option<PagingOptions>) -> IndexWorkerOptions {
+        let mut multi_channel_mngr_opt = messages.as_multi_channel_manager_options();
+        multi_channel_mngr_opt.message_data_store_for_msg_caching = Some(MessageDataStoreOptions {
+            file_path_and_name: messages.db_file_name.clone(),
+            streams_channel_id: channel_id.to_string()
+        });
         IndexWorkerOptions{
             channel_id: channel_id.to_string(),
             u_store: user_store.clone(),
-            multi_channel_mngr_opt: messages.as_multi_channel_manager_options(),
+            multi_channel_mngr_opt,
             db_file_name: messages.db_file_name.clone(),
             paging_opt,
         }
@@ -164,10 +171,15 @@ struct GetWorkerOptions {
 
 impl GetWorkerOptions {
     pub fn new(tangle_address: Address, messages: &MessagesState, user_store: &UserDataStore) -> GetWorkerOptions {
+        let mut multi_channel_mngr_opt = messages.as_multi_channel_manager_options();
+        multi_channel_mngr_opt.message_data_store_for_msg_caching = Some(MessageDataStoreOptions {
+            file_path_and_name: messages.db_file_name.clone(),
+            streams_channel_id: tangle_address.base().to_string(),
+        });
         GetWorkerOptions{
             tangle_address,
             u_store: user_store.clone(),
-            multi_channel_mngr_opt: messages.as_multi_channel_manager_options(),
+            multi_channel_mngr_opt,
         }
     }
 }

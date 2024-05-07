@@ -78,7 +78,8 @@ fn get_multi_channel_manager_options<'a>(cli: &ManagementConsoleCli<'a>) -> Resu
     Ok(MultiChannelManagerOptions{
         iota_node: cli.node.to_string(),
         wallet_filename,
-        streams_user_serialization_password: SUSEE_CONST_SECRET_PASSWORD.to_string()
+        streams_user_serialization_password: SUSEE_CONST_SECRET_PASSWORD.to_string(),
+        message_data_store_for_msg_caching: None
     })
 }
 

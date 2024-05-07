@@ -22,7 +22,10 @@ use crate::{
     },
     PlainTextWallet,
     UserDataStore,
-    user_manager::dao::User,
+    user_manager::dao::{
+        User,
+        message::MessageDataStoreOptions,
+    },
     dao_helpers::{
         Condition,
         Conditions,
@@ -36,6 +39,7 @@ pub struct MultiChannelManagerOptions {
     pub wallet_filename: String,
     //TODO: Needs to be managed by stronghold
     pub streams_user_serialization_password: String,
+    pub message_data_store_for_msg_caching: Option<MessageDataStoreOptions>,
 }
 
 // To avoid multiple users with conflicting external_ids a name disambiguation mechanism
@@ -116,9 +120,10 @@ pub async fn get_channel_manager_for_channel_starts_with(channel_starts_with: &s
         };
         get_channel_manager_by_user_dao(
             user_dao,
-            user_state_callback,
             wallet,
             options.iota_node.as_str(),
+            user_state_callback,
+            options.message_data_store_for_msg_caching.clone(),
         ).await
     } else {
         bail!("Could not find matching Streams channel for ID starting with '{}'", channel_starts_with)
@@ -130,9 +135,10 @@ pub async fn get_channel_manager_for_channel_id<'a>(channel_id: &str, user_store
     let wallet = get_wallet(options, Some(&user_dao))?;
     get_channel_manager_by_user_dao(
         user_dao,
-        Some(serialize_user_state_callback),
         wallet,
         options.iota_node.as_str(),
+        Some(serialize_user_state_callback),
+        options.message_data_store_for_msg_caching.clone()
     ).await
 }
 
@@ -152,10 +158,17 @@ fn create_conditions_for_external_id_filter(external_id: &str, match_type: Match
     conditions_buffer
 }
 
-async fn get_channel_manager_by_user_dao(user_dao: User, serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>, wallet: PlainTextWallet, node: &str) -> Result<ChannelManager<PlainTextWallet>>{
+async fn get_channel_manager_by_user_dao(
+    user_dao: User,
+    wallet: PlainTextWallet,
+    node: &str,
+    serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
+    message_data_store_for_msg_caching: Option<MessageDataStoreOptions>
+) -> Result<ChannelManager<PlainTextWallet>>{
     let mut new_opt = ChannelManagerOptions::default();
     new_opt.user_state = Some(user_dao.streams_user_state.clone());
     new_opt.serialize_user_state_callback = serialize_user_state_callback;
+    new_opt.message_data_store_for_msg_caching = message_data_store_for_msg_caching;
     Ok( ChannelManager::new(
         node,
         wallet,

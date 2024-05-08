@@ -62,6 +62,7 @@ pub struct MessageIndexerOptions {
     pub iota_node: String,
     pub inx_collector_port: u16,
     pub message_data_store: Option<MessageDataStoreOptions>,
+    pub throttle_sleep_time_millisecs: Option<u64>,
 }
 
 impl MessageIndexerOptions {
@@ -82,6 +83,7 @@ impl Default for MessageIndexerOptions {
             iota_node: "127.0.0.1".to_string(),
             inx_collector_port: STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT,
             message_data_store: None,
+            throttle_sleep_time_millisecs: None,
         }
     }
 }
@@ -233,6 +235,9 @@ impl MessageIndex for MessageIndexer {
         }
 
         if ret_val.is_empty() {
+            if let Some(throttle_sleep_millisecs) = self.options.throttle_sleep_time_millisecs {
+                tokio::time::sleep(tokio::time::Duration::from_millis(throttle_sleep_millisecs)).await;
+            }
             match self.get_messages_by_msg_index_via_inx_collector(msg_index).await {
                 Ok(messages) => {
                     if let Some(message) = messages.first() {

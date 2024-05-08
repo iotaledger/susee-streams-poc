@@ -66,6 +66,7 @@ pub struct ChannelManagerOptions {
     // If specified, will be called on drop to serialize the user state
     pub serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
     pub message_data_store_for_msg_caching: Option<MessageDataStoreOptions>,
+    pub throttle_sleep_time_millisecs: Option<u64>,
 }
 
 pub struct ChannelManager<WalletT: SimpleWallet> {
@@ -87,8 +88,7 @@ async fn import_from_serialization_file<WalletT: SimpleWallet>(file_name: &str, 
 }
 
 async fn import_from_buffer<WalletT: SimpleWallet>(buffer: &Vec<u8>, ret_val: &mut ChannelManager<WalletT>, opt: &ChannelManagerOptions) -> Result<()> {
-    let mut indexer_options = MessageIndexerOptions::new(ret_val.iota_node.clone());
-    indexer_options.message_data_store = opt.message_data_store_for_msg_caching.clone();
+    let indexer_options = create_indexer_options(ret_val, opt);
     let indexer = MessageIndexer::new(indexer_options);
     let user = User::<Client<MessageIndexer>>::restore(
         &buffer,
@@ -104,6 +104,13 @@ async fn import_from_buffer<WalletT: SimpleWallet>(buffer: &Vec<u8>, ret_val: &m
     ret_val.user = Some(user);
 
     Ok(())
+}
+
+fn create_indexer_options<WalletT: SimpleWallet>(channel_mngr: &ChannelManager<WalletT>, opt: &ChannelManagerOptions) -> MessageIndexerOptions {
+    let mut indexer_options = MessageIndexerOptions::new(channel_mngr.iota_node.clone());
+    indexer_options.message_data_store = opt.message_data_store_for_msg_caching.clone();
+    indexer_options.throttle_sleep_time_millisecs = opt.throttle_sleep_time_millisecs.clone();
+    indexer_options
 }
 
 fn ed25519_from_bytes(key_data: &[u8]) -> ed25519::PublicKey {
@@ -148,8 +155,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
         if self.user.is_some() {
             panic!("This channel already has been announced")
         }
-        let mut indexer_options = MessageIndexerOptions::new(self.iota_node.clone());
-        indexer_options.message_data_store = self.options.message_data_store_for_msg_caching.clone();
+        let indexer_options = create_indexer_options(self, &self.options);
         let indexer = MessageIndexer::new(indexer_options);
         let mut user= User::builder()
             .with_identity(Ed25519::from_seed(self.wallet.get_seed()))

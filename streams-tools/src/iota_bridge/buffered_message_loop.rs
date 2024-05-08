@@ -103,7 +103,7 @@ impl LoopStatus {
         self.remaining == 0 || self.lets_err.is_some()
     }
 
-    pub fn is_in_idle_status(&self) -> bool { self.processed == 0 && self.processed == 0 }
+    pub fn is_in_idle_status(&self) -> bool { self.processed == 0 }
 }
 
 pub async fn run_buffered_message_loop(opt: BufferedMessageLoopOptions) {

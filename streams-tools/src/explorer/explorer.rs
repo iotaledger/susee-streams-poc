@@ -33,7 +33,9 @@ use axum::{
 };
 
 use crate::{
-    UserDataStore
+    UserDataStore,
+    user_manager::multi_channel_management::MultiChannelManagerOptions,
+    threading_helpers::run_background_worker_in_own_thread
 };
 
 use super::{
@@ -42,6 +44,10 @@ use super::{
         MessagesState,
     },
     router::router,
+    sync_channels_loop::{
+        SyncChannelsLoopOptions,
+        SyncChannelsWorker
+    }
 };
 
 pub fn cors() -> CorsLayer {
@@ -61,6 +67,7 @@ fn init_tracing() {
     tracing::subscriber::set_global_default(subscriber).expect("Failed set_global_default");
 }
 
+#[derive(Clone)]
 pub struct ExplorerOptions {
     pub iota_node: String,
     pub wallet_filename: String,
@@ -80,16 +87,33 @@ impl From<ExplorerOptions> for MessagesState {
     }
 }
 
+async fn run_sync_channels_loop_in_background(user_store: UserDataStore, options: ExplorerOptions) {
+    let sync_channels_loop_options = SyncChannelsLoopOptions::new(
+        user_store,
+        MultiChannelManagerOptions {
+            iota_node: options.iota_node,
+            wallet_filename: options.wallet_filename,
+            streams_user_serialization_password: options.streams_user_serialization_password,
+            message_data_store_for_msg_caching: None,
+            inx_collector_access_throttle_sleep_time_millisecs: Some(100),
+        },
+        options.db_file_name
+    );
+
+    let _join = run_background_worker_in_own_thread::<SyncChannelsWorker>(sync_channels_loop_options);
+}
+
 pub async fn run_explorer_api_server(user_store: UserDataStore, options: ExplorerOptions) -> Result<()> {
     init_tracing();
 
     let addr: SocketAddr = options.listener_ip_address_port.parse()?;
-    tracing::info!("listening on {}", addr);
 
     let app_state = AppState::new(
-        options.into(),
-        user_store,
+        options.clone().into(),
+        user_store.clone(),
     );
+
+    run_sync_channels_loop_in_background(user_store.clone(), options.clone()).await;
 
     let app = router()
         .layer(TraceLayer::new_for_http()
@@ -113,6 +137,7 @@ pub async fn run_explorer_api_server(user_store: UserDataStore, options: Explore
         .layer(cors())
         .layer(Extension(app_state));
 
+    tracing::info!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await

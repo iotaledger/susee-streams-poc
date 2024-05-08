@@ -60,7 +60,10 @@ where
             num_messages_stored += 1;
             log::debug!("[fn sync()] Fetched message {} to trigger MessageIndexer message caching", msg.address.relative().to_string());
         }
-        log::info!("[fn sync()] Fetched {} messages to trigger MessageIndexer message caching", num_messages_stored);
+        log::info!("[fn sync()] Fetched {} messages to trigger MessageIndexer message caching in channel: {}",
+            num_messages_stored,
+            self.streams_channel_id
+        );
         Ok(num_messages_stored)
     }
 }

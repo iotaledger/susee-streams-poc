@@ -40,6 +40,7 @@ pub struct MultiChannelManagerOptions {
     //TODO: Needs to be managed by stronghold
     pub streams_user_serialization_password: String,
     pub message_data_store_for_msg_caching: Option<MessageDataStoreOptions>,
+    pub inx_collector_access_throttle_sleep_time_millisecs: Option<u64>,
 }
 
 // To avoid multiple users with conflicting external_ids a name disambiguation mechanism
@@ -92,6 +93,7 @@ async fn manage_existing_users_with_conflicting_external_id(user_store: &UserDat
 
 pub async fn get_initial_channel_manager<'a>(user_store: &UserDataStore, options: &MultiChannelManagerOptions, external_user_id: Option<String>) -> Result<ChannelManager<PlainTextWallet>> {
     let mut new_opt = ChannelManagerOptions::default();
+    new_opt.throttle_sleep_time_millisecs = options.inx_collector_access_throttle_sleep_time_millisecs;
     let wallet = get_wallet(options, None)?;
     let mut initial_user_having_seed_derivation_phrase = User::default();
     if let Some(external_id) = external_user_id {
@@ -124,6 +126,7 @@ pub async fn get_channel_manager_for_channel_starts_with(channel_starts_with: &s
             options.iota_node.as_str(),
             user_state_callback,
             options.message_data_store_for_msg_caching.clone(),
+            options.inx_collector_access_throttle_sleep_time_millisecs,
         ).await
     } else {
         bail!("Could not find matching Streams channel for ID starting with '{}'", channel_starts_with)
@@ -138,7 +141,8 @@ pub async fn get_channel_manager_for_channel_id<'a>(channel_id: &str, user_store
         wallet,
         options.iota_node.as_str(),
         Some(serialize_user_state_callback),
-        options.message_data_store_for_msg_caching.clone()
+        options.message_data_store_for_msg_caching.clone(),
+        options.inx_collector_access_throttle_sleep_time_millisecs,
     ).await
 }
 
@@ -163,9 +167,11 @@ async fn get_channel_manager_by_user_dao(
     wallet: PlainTextWallet,
     node: &str,
     serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
-    message_data_store_for_msg_caching: Option<MessageDataStoreOptions>
+    message_data_store_for_msg_caching: Option<MessageDataStoreOptions>,
+    throttle_sleep_time_millisecs: Option<u64>
 ) -> Result<ChannelManager<PlainTextWallet>>{
     let mut new_opt = ChannelManagerOptions::default();
+    new_opt.throttle_sleep_time_millisecs = throttle_sleep_time_millisecs;
     new_opt.user_state = Some(user_dao.streams_user_state.clone());
     new_opt.serialize_user_state_callback = serialize_user_state_callback;
     new_opt.message_data_store_for_msg_caching = message_data_store_for_msg_caching;

@@ -53,7 +53,8 @@ impl MessagesState {
             iota_node: self.iota_node_url.clone(),
             wallet_filename: self.wallet_filename.clone(),
             streams_user_serialization_password: self.streams_user_serialization_password.clone(),
-            message_data_store_for_msg_caching: None
+            message_data_store_for_msg_caching: None,
+            inx_collector_access_throttle_sleep_time_millisecs: None
         }
     }
 }

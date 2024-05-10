@@ -27,7 +27,7 @@ are run using the docker-compose setup described in the
 * [*Message Explorer* REST API](../management-console/README.md#run-message-explorer)
   implemented by the *Management Console* 
   
-<img src="SUSEE-Node-Services.png" alt="SUSEE-Node-Services" width="800"/>
+<img src="SUSEE-Node-Services.png" alt="SUSEE-Node-Services" width="500" style="margin: 50px"/>
 
 We cover two different usage scenarios, production and development.
 This is described in the sections 

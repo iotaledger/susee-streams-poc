@@ -206,6 +206,7 @@ script:
   > ls -l
   # Make sure the following files exist:
   # * docker-compose-https.patch
+  # * docker-compose-minio-client.yml
   # * docker-compose.hornet.patch
   # * docker_daemon_example.json   
   # * prepare_docker.sh.patch  

@@ -17,8 +17,8 @@
       === SUSEE POC applications:                                             ===
       ===                                                                     ===
       === * All resources can be used with Stardust. See folder               ===
-      ===   'susee-node' for more details.                                 ===
-      === * A VPS for test purposes has been setup:                           ===
+      ===   'susee-node' for more details.                                    ===
+      === * A SUSEE-Node has been setup for the field-test:                   ===
       ===   - domain name: iotabridge.peeros.de                               ===
       ===   - services:                                                       ===
       ===      - hornet                                                       ===
@@ -33,27 +33,32 @@
       ===      - management-console, message explorer (:50002)                ===
       ===                                                                     ===
       === * TODO: Finish Documentation:                                       ===
-      ===   * Update susee-node README with learnings from iotabridge.peeros.de install
-      ===   * Streams-collector section in main readme                        ===
+      ===   * SUSEE-Node section in main readme                               ===
       ===   * Test/scripts folder: Update all scripts                         ===
       ===   * Test folder: Update all command line expressions                ===
       ===   * Test folder: Add a "Start your private tangle" hint to all      ===
       ===                  test descriptions                                  === 
       ===   * Test folder: Streams-collector section in main readme           ===
-      ===   * Sensor folder: Mention Streams-collector in readme              ===
-      ===   * streams-poc-lib folder: Mention Streams-collector in readme     ===
+      ===   * Sensor folder: Mention SUSEE-Node in readme                     ===
+      ===   * streams-poc-lib folder: Mention SUSEE-Node in readme            ===
       ===   * main-streams-poc-lib-pio folder:                                ===
-      ===     Mention Streams-collector in readme                             ===
-      ===   * Sensor folder: Mention Streams-collector in main readme         ===
+      ===     Mention SUSEE-Node in readme                                    ===
+      ===   * Sensor folder: Mention SUSEE-Node in main readme                ===
       ===   * Principles of how the DevEUI-Handshake at the beginning of      ===
       ===     automatic sensor initialization is done                         ===
-      === * Remove inx-collector rest API (port 9030) from exposed ports      ===
-      ===   of the SUSEE-Node as it is only used in the docker vlan           ===
+      ===   * Write 'Using different Management Console instances for         ===
+      ===     initialization and Message Explorer' section in Management      ===
+      ===     Console README                                                  ===
+      === * Add a 'collector' subdomain, traefik certresolver etc. for the    ===
+      ===   inx-collector rest API (port 9030)                                ===
+      ===   * Remove inx-collector rest API (port 9030) from exposed ports    ===
+      ===     of the SUSEE-Node therafter                                     ===
+      === * Remove minio http ports (9000 + 9001) from exposed ports          ===
+      ===   of the SUSEE-Node as it can be accessed via https (minio and      ===
+      ===   minioui subdomains)                                               ===
       === * Perform load tests for IOTA Bridge simulating 250 Sensors         ===
       ===   sending messages with 10 minute interval                          ===
       === * Version info endpoint for iota-bridge + log output                ===
-      === * Message Explorer:                                                 ===
-      ===   * show blog tag used as minio key                                 ===
       === * Implement redundant system setup for higher availability          ===
       ===========================================================================
 

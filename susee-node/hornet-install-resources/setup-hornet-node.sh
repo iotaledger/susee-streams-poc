@@ -7,11 +7,12 @@ then
 else
   mkdir $DIR_NAME
   cd $DIR_NAME
-  curl -L https://node-docker-setup.iota.org/stardust | tar -zx
+  curl -L https://node-docker-setup.iota.org/iota | tar -zx
 
   patch -t docker-compose.yml ../docker-compose.hornet.patch
   patch -t docker-compose-https.yml ../docker-compose-https.patch
   patch -t prepare_docker.sh ../prepare_docker.sh.patch
+  patch -t config.json ../config.json.patch
 
   echo "======================================================================="
   echo "=== Bootstrapping the Hornet Node environment needs sudo privileges ==="

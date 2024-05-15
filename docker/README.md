@@ -264,10 +264,17 @@ If you want to build images and provide them on [Docker Hub](https://hub.docker.
 
 ## Start IOTA Bridge and Message Explorer as public available service
 
+As part of the installation of a [SUSEE Node](../susee-node) the docker
+compose environment described above must be deployed to the *SUSEE Node*.
+The service of the *IOTA Bridge* is mandatory, but the activation of
+the *Message Explorer* is optional.
+
 The following installation steps have been tested with Ubuntu 22.04.
 
-The docker-compose.yml file expects an iota node to be run on the same
-host system and to be available via a static ip address or domain name.
+To run the *IOTA Bridge* an *IOTA Node*, *INX Collector*
+an *MINIO DB* need to be run on the same
+host system. Please follow the steps described in the
+[SUSEE Node README](../susee-node) to provide these services.
 
 Prepare the server host system:
 ```bash
@@ -285,8 +292,8 @@ Upload some resources needed for the installation process to the server host sys
 ```
 
 On the server host system, 
-please also edit the `docker-compose.yml` file
-using an editor of you choice and, if neeed,
+please edit the `docker-compose.yml` file
+using an editor of you choice and, if needed,
 uncomment the `management-console` section of the file. 
 
 Please also edit the file `~/susee-poc/env.example`

@@ -258,3 +258,6 @@ The file needs to be located on your local machine to open it.
 Have a look into the [test documentation](../test#view-sensor-messages-using-the-message-explorer)
 to find out more about how to use the swagger-ui to list messages of a specific sensor.
 
+#### Using different *Management Console* instances for initialization and *Message Explorer*
+
+TO BE DONE

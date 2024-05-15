@@ -31,9 +31,12 @@ services:
 # message explorer service.
 # As the Sensor initialization is done using a local
 # management-console instance, the locally created SQlite DB
-# (user-states-management-console.sqlite3) needs to be
+# (user-states-management-console.sqlite3) and wallet file
+# (wallet-management-console.txt) need to be
 # uploaded to the data folder of the NODE_HOST before the
 # following lines can be uncommented.
+# Have a look into the management-console README
+# 'Run Message Explorer' section for more details.
 
 # TODO: Implement a REST API to initialize sensors:
 #       * Authorized access and https

@@ -27,11 +27,11 @@ are run using the docker-compose setup described in the
 * [*Message Explorer* REST API](../management-console/README.md#run-message-explorer)
   implemented by the *Management Console* 
   
-<br/>
+<br/><br/>
 
 <img src="SUSEE-Node-Services.png" alt="SUSEE-Node-Services" width="500"/>
 
-<br/><br/>
+<br/>
 
 We cover two different usage scenarios, production and development.
 This is described in the sections 
@@ -42,14 +42,23 @@ in more detail.
 
 ## Use in production
 
-As the inx-collector system includes a Hornet Node which communicates with other Nodes in the IOTA- or Shimmer-network
-the system needs a publicly available domain name or static ip.
+As the inx-collector system includes a Hornet Node which communicates with other Nodes in
+the IOTA- or Shimmer-network,
+the system needs a publicly available domain name.
+All test systems have been run using an IPv4 address, so we recommend using an
+IPv4 address, although it could be possible to use a IPv6 address.
 
-The minimum specs for the virtual or physical server are described on the Hornet
-[Getting Started](https://wiki.iota.org/hornet/getting_started/) page.
+The minimum specs for the virtual or physical server are:
+* Virtual appliance (VPS) or physical server
+* 4 virtual or phisical CPU Cores
+* 16 GB RAM
+* 50 GB SSD Diskspace
+* accessible via a domain name
 
 We recommend to use the **Ubuntu 22.04** operating system as the following installation
 steps have been tested with this OS version.
+
+#### Initial Server Setup
 
 As your host system will be part of a permissionless peer to peer network its ip address
 can be easily found. Therefore, please take special care on securing your host system
@@ -88,6 +97,9 @@ ufw install and basic config steps can be found
   OpenSSH                    ALLOW       Anywhere                  
   OpenSSH (v6)               ALLOW       Anywhere (v6)
 ```
+
+#### Docker install
+
 Now we can start to install docker. A more detailed description of the
 docker install and config steps can be found
 [in this docker install howto for Ubuntu](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04).
@@ -137,17 +149,34 @@ A `docker_daemon_example.json` file is located in the `hornet-install-resources`
   > exit
 ```
 
+#### Prepare subdomains for Minio
+
 The inx collector uses [minio](https://min.io) as object database. To access the
 [minio console](https://min.io/docs/minio/linux/administration/minio-console.html)
-via the host domain you need to configure a subdomain in the DNS system of your
+via the host domain you need to configure a subdomain `minioui` in the DNS system of your
 [VPS](https://en.wikipedia.org/wiki/Virtual_private_server) (or physical server)
-hoster. You need to add an 
+hoster. To access the minio API from external devices, for example to synchronize
+multiple *SUSEE-Node* instances by mirroring,
+you also need a second subdomain `minio`.
+
+To configure the subdomains you need to add an 
 [A record](https://en.wikipedia.org/wiki/List_of_DNS_record_types) or 
 [CNAME record](https://en.wikipedia.org/wiki/CNAME_record)
-for the subdomain "minio" that points to the ip-address resp. domainname of your host system.
+for each subdomain that points to the ip-address resp. domainname of your host system.
 Most VPS hoster provide a web-ui for DNS settings.
-For example if your VPS can be accessed via the domain `example.com` the minio console
-shall be accessible via `minio.example.com` after the installation steps have been finished.
+For example if your VPS can be accessed via the domain `example.com` the minio services
+shall be accessible via the following subdomains after the installation steps have been
+finished:
+
+* `minioui.example.com`<br>
+   Provides the [Minio Admin WebUI Console](https://min.io/docs/minio/linux/administration/minio-console.html)
+
+* `minio.example.com`<br>
+  Provides the Minio API that can be used with the
+  [Minio MC](https://min.io/docs/minio/linux/reference/minio-mc.html#create-an-alias-for-the-s3-compatible-service)
+  or other Minio Clients.
+
+#### Install the Hornet docker environment 
 
 Upload the content of the `inx-collector/hornet-install-resources` folder to your host system.
 Please replace `<NODE_HOST>` with the domain name or static ip of your host system and enter the password for the
@@ -161,6 +190,17 @@ to the steps described in the
 [Install HORNET using Docker](https://wiki.iota.org/hornet/how_tos/using_docker/)
 howto.
 
+**Important Note**: The setup-hornet-node.sh script that needs to be executed now will download all
+needed resources to use the IOTA mainnet. If you want to use a different network
+(for example Shimmernet) please edit the setup-hornet-node.sh file using an editor of
+your choice and follow these steps:
+* Search for the line `curl -L https://node-docker-setup.iota.org/iota | tar -zx`
+* Replace the term `iota` in the path of the download url with one of the following
+  network identifiers: `shimmer`,`testnet`, `iota-testnet`
+
+After you have eventually edited the setup-hornet-node.sh script we are ready to run the
+script:
+
 ```bash
   # in the admin home folder of your host system, check the folder content
   > ls -l
@@ -170,6 +210,11 @@ howto.
   # * docker_daemon_example.json   
   # * prepare_docker.sh.patch  
   # * setup-hornet-node.sh
+
+  # If you want to use the Shimmer network instead of the IOTA Mainnet
+  # Please edit the setup-hornet-node.sh as described above
+  #  
+  #    > nano setup-hornet-node.sh
   
   # Execute the setup-hornet-node.sh script
   > ./setup-hornet-node.sh
@@ -186,7 +231,7 @@ it will be needed during our next steps.
   > cd hornet
 
   # generate a password hash and salt for the hornet dashboard
-  # see https://wiki.iota.org/hornet/how_tos/using_docker/#5-set-dashboard-credentials  
+  # see https://wiki.iota.org/hornet/how_tos/using_docker/#1-generate-dashboard-credentials  
   > docker compose run hornet tool pwd-hash
   
   # Enter a passwort and store it in your passwort safe (keepass or similar) for later use.
@@ -200,7 +245,7 @@ it will be needed during our next steps.
 ```
 
 Edit the following values in the
-`env_template` file, that has been previously downloaded by the bash script.
+`hornet/env_template` file, that has been previously downloaded by the bash script.
 You'll find more details about the edited variables in the `env_template` file.
 
 ```bash
@@ -208,14 +253,16 @@ You'll find more details about the edited variables in the `env_template` file.
   # and implement the changes described below
   > nano env_template
 ```
-Uncomment and edit the variables of the https section
+If you are using https, uncomment and edit the variables of the https section.
+If you are not using https, make sure the first line below is commented out.
 * `COMPOSE_FILE`=docker-compose.yml:docker-compose-https.yml
 * `ACME_EMAIL`
 * `NODE_HOST`
 
 Please also uncomment and edit the following variables:
-* `HORNET_CONFIG_FILE` - Choose the correct network by uncommenting one of the provided lines
+* `HORNET_CONFIG_FILE=config.json` - Nothing to edit here, just uncomment
 * `COMPOSE_PROFILES`- Search for the line defining the value `=${COMPOSE_PROFILES},monitoring` and uncomment it
+   if you want to use grafana monitoring
 * `DASHBOARD_USERNAME` - Use "susee-admin" for example
 * `DASHBOARD_PASSWORD` - Enter the previously created hash value here
 * `DASHBOARD_SALT` - Enter the previously created salt value here
@@ -274,19 +321,19 @@ to production environments as distributed system,
 see the [Deploy MinIO: Multi-Node Multi-Drive](https://min.io/docs/minio/linux/operations/install-deploy-manage/deploy-minio-multi-node-multi-drive.html#deploy-minio-distributed)
 documentation page.
 
-### Update Hornet Images
-
-```bash
-  # in the hornet folder in your host system
-  > docker compose pull
-  > docker compose up -d
-```
-
 ### Deploy *IOTA Bridge* and *Message Explorer*
 
 Please follow the instructions described in the section
 [Start IOTA Bridge and Message Explorer as public available service](../docker/README.md#start-iota-bridge-and-message-explorer-as-public-available-service)
 of the [docker folder](../docker/README.md).
+
+### Update Docker Images
+
+```bash
+  # in the `hornet` or `susee-poc` folder of your *SUSEE Node*
+  > docker compose pull
+  > docker compose up -d
+```
 
 ## Private tangle for development purposes
 

@@ -1,0 +1,85 @@
+# =====================================================================
+#   IMPORTANT: Don't follow the instructions below using a production
+#              System. If you do it anyway be sure you'll know what
+#              you are doing.
+# =====================================================================
+#
+# This file contains a service definition for a minio Client
+# service that can be copied into the docker-compose.yml file in
+# the hornet folder of your SUSEE-Node to run MINIO MC executions
+# in the docker compose environment.
+#
+# To enable the minio-client:
+# * Copy the minio-client service definition into the docker-compose.yml
+#   file in the hornet folder of your SUSEE-Node.
+#
+# * In the hornet folder of your SUSEE-Node:
+#   > docker compose up minio-client
+#
+#   Output will be:
+#      [+] Running 3/3
+#      Container traefik       Running                                                                                                                     0.0s
+#      Container minio         Running                                                                                                                     0.0s
+#      Container minio-client  Created                                                                                                                     0.2s
+#      Attaching to minio-client
+#      minio-client  | Added `localdb` successfully.
+#      minio-client  | [2024-05-12 15:44:14 UTC]     0B shimmer-mainnet-default/
+#      minio-client exited with code 0
+#
+# * Replace the statement '/usr/bin/mc ls localdb;'
+#   in the entrypoint definition of the minio-client service definition
+#   with a statement of your choice. Several examples can be found at the
+#   back of this comment block.
+#
+# * In the hornet folder of your SUSEE-Node:
+#   > docker compose start minio-client
+#
+# * After finishing work with the minio-client remove the service
+#   from the environment:
+#   > docker compose down minio-client
+#
+# * Delete the service definition from the
+
+# Examples for mc executions:
+#
+#   --------------------------------------
+# * Copy data from other minio/S3 sources.
+#   --------------------------------------
+#   Precondition: The environment variables MINIO_MIRROR_SOURCE_API_URL,
+#   MINIO_MIRROR_SOURCE_USER and MINIO_MIRROR_SOURCE_PASSWORD need to be
+#   defined in the .env file like this:
+#     ###########################
+#     # Minio Mirroring section #
+#     ###########################
+#     MINIO_MIRROR_SOURCE_USER=mirror-service-user
+#     MINIO_MIRROR_SOURCE_PASSWORD=SecretPasswordGoesHere
+#     MINIO_MIRROR_SOURCE_API_URL=https://minio.iotabridge.peeros.de
+#
+#   Execution statement:
+#      /usr/bin/mc alias set sourcedb ${MINIO_MIRROR_SOURCE_API_URL:-https://minio-api-url-must-be-defined-in-env.com} ${MINIO_MIRROR_SOURCE_USER:-susee-minio-source-admin} ${MINIO_MIRROR_SOURCE_PASSWORD:-susee-secret-source-password};
+#      /usr/bin/mc mirror sourcedb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default} localdb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default};
+#
+#   Alternative mirror statements:
+#      /usr/bin/mc mirror --newer-than 300s --older-than 25s --summary sourcedb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default} localdb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default};
+
+
+services:
+
+  ##################################################################
+  #  MINIO Client service                                          #
+  ##################################################################
+
+  minio-client:
+    container_name: minio-client
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    profiles:
+      - minio-client
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias --quiet set localdb http://minio:9000 ${MINIO_ROOT_USER:-susee-minio-admin} ${MINIO_ROOT_PASSWORD:-susee-secret-password};
+      /usr/bin/mc ls localdb;
+      exit 0;
+      "

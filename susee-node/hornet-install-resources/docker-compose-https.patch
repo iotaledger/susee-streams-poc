@@ -1,4 +1,11 @@
-74,82d73
+35,40d34
+<       - "--certificatesresolvers.miniouiresolver.acme.tlschallenge=true"
+<       - "--certificatesresolvers.miniouiresolver.acme.email=${ACME_EMAIL}"
+<       - "--certificatesresolvers.miniouiresolver.acme.storage=/letsencrypt/minio-ui-acme.json"
+<       - "--certificatesresolvers.minioapiresolver.acme.tlschallenge=true"
+<       - "--certificatesresolvers.minioapiresolver.acme.email=${ACME_EMAIL}"
+<       - "--certificatesresolvers.minioapiresolver.acme.storage=/letsencrypt/minio-api-acme.json"
+80,92d73
 < 
 < ##################################################################
 < #  Minio                                                         #
@@ -6,5 +13,9 @@
 < 
 <   minio:
 <     labels:
-<       - "traefik.http.routers.minio.entrypoints=websecure"
-<       - "traefik.http.routers.minio.tls=true"
+<       - "traefik.http.routers.minioui.entrypoints=websecure"
+<       - "traefik.http.routers.minioui.tls=true"
+<       - "traefik.http.routers.minioui.tls.certresolver=miniouiresolver"
+<       - "traefik.http.routers.minioapi.entrypoints=websecure"
+<       - "traefik.http.routers.minioapi.tls=true"
+<       - "traefik.http.routers.minioapi.tls.certresolver=minioapiresolver"

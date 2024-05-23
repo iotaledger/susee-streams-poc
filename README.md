@@ -1,66 +1,74 @@
 # SUSEE Streams POC
 
-      ===========================================================================
-      ===                                                                     ===
-      ===                         IMPORTANT NOTE                              ===
-      ===                                                                     ===
-      === On 4th of October the IOTA mainnet has been updated to the Stardust ===
-      === version of the IOTA protocol. The applications and libraries        ===
-      === provided on the 'main' branch of this repository can not be used    ===
-      === after the Stardust update.                                          ===
-      ===                                                                     ===
-      === The 'stardust' branch of this repository includes all needed        ===
-      === resources to use the SUSEE POC applications and libraries together  ===
-      === with IOTA Stardust.                                                 ===
-      ===                                                                     ===
-      === This is the current status of IOTA Stardust integration for the     ===
-      === SUSEE POC applications:                                             ===
-      ===                                                                     ===
-      === * All resources can be used with Stardust. See folder               ===
-      ===   'susee-node' for more details.                                    ===
-      === * A SUSEE-Node has been setup for the field-test:                   ===
-      ===   - domain name: iotabridge.peeros.de                               ===
-      ===   - services:                                                       ===
-      ===      - hornet                                                       ===
-      ===        - API: https://iotabridge.peeros.de/api/routes               ===
-      ===        - Autopeering :14626/udp                                     ===
-      ===        - Gossip :15600/tcp                                          ===
-      ===      - hornet-dashboard (https://iotabridge.peeros.de/dashboard/)   ===
-      ===      - grafana (https://iotabridge.peeros.de/grafana)               ===
-      ===      - inx-collector (:9030)                                        ===
-      ===      - iota-bridge (:50000)                                         ===
-      ===      - app-srv-connector-mock (:50001)                              ===
-      ===      - management-console, message explorer (:50002)                ===
-      ===                                                                     ===
-      === * TODO: Finish Documentation:                                       ===
-      ===   * SUSEE-Node section in main readme                               ===
-      ===   * Test/scripts folder: Update all scripts                         ===
-      ===   * Test folder: Update all command line expressions                ===
-      ===   * Test folder: Add a "Start your private tangle" hint to all      ===
-      ===                  test descriptions                                  === 
-      ===   * Test folder: Streams-collector section in main readme           ===
-      ===   * Sensor folder: Mention SUSEE-Node in readme                     ===
-      ===   * streams-poc-lib folder: Mention SUSEE-Node in readme            ===
-      ===   * main-streams-poc-lib-pio folder:                                ===
-      ===     Mention SUSEE-Node in readme                                    ===
-      ===   * Sensor folder: Mention SUSEE-Node in main readme                ===
-      ===   * Principles of how the DevEUI-Handshake at the beginning of      ===
-      ===     automatic sensor initialization is done                         ===
-      ===   * Write 'Using different Management Console instances for         ===
-      ===     initialization and Message Explorer' section in Management      ===
-      ===     Console README                                                  ===
-      === * Add a 'collector' subdomain, traefik certresolver etc. for the    ===
-      ===   inx-collector rest API (port 9030)                                ===
-      ===   * Remove inx-collector rest API (port 9030) from exposed ports    ===
-      ===     of the SUSEE-Node therafter                                     ===
-      === * Remove minio http ports (9000 + 9001) from exposed ports          ===
-      ===   of the SUSEE-Node as it can be accessed via https (minio and      ===
-      ===   minioui subdomains)                                               ===
-      === * Perform load tests for IOTA Bridge simulating 250 Sensors         ===
-      ===   sending messages with 10 minute interval                          ===
-      === * Version info endpoint for iota-bridge + log output                ===
-      === * Implement redundant system setup for higher availability          ===
-      ===========================================================================
+      =============================================================================
+      ===                                                                       ===
+      ===                         IMPORTANT NOTE                                ===
+      ===                                                                       ===
+      === On 4th of October the IOTA mainnet has been updated to the Stardust   ===
+      === version of the IOTA protocol. The applications and libraries          ===
+      === provided on the 'main' branch of this repository can not be used      ===
+      === after the Stardust update.                                            ===
+      ===                                                                       ===
+      === The 'stardust' branch of this repository includes all needed          ===
+      === resources to use the SUSEE POC applications and libraries together    ===
+      === with IOTA Stardust.                                                   ===
+      ===                                                                       ===
+      === This is the current status of IOTA Stardust integration for the       ===
+      === SUSEE POC applications:                                               ===
+      ===                                                                       ===
+      === * All resources can be used with Stardust. See folder                 ===
+      ===   'susee-node' for more details.                                      ===
+      === * A SUSEE-Node has been setup for the field-test:                     ===
+      ===   - domain name: iotabridge.peeros.de                                 ===
+      ===   - services:                                                         ===
+      ===      - hornet                                                         ===
+      ===        - API: https://iotabridge.peeros.de/api/routes                 ===
+      ===        - Autopeering :14626/udp                                       ===
+      ===        - Gossip :15600/tcp                                            ===
+      ===      - hornet-dashboard (https://iotabridge.peeros.de/dashboard/)     ===
+      ===      - grafana (https://iotabridge.peeros.de/grafana)                 ===
+      ===      - inx-collector (:9030)                                          ===
+      ===      - iota-bridge (:50000)                                           ===
+      ===      - app-srv-connector-mock (:50001)                                ===
+      ===      - management-console, message explorer (:50002)                  ===
+      ===                                                                       ===
+      === * TODO: Finish Documentation:                                         ===
+      ===   * SUSEE-Node section in main readme                                 ===
+      ===   * Test/scripts folder: Update all scripts                           ===
+      ===   * Test folder: Update all command line expressions                  ===
+      ===   * Test folder: Add a "Start your private tangle" hint to all        ===
+      ===                  test descriptions                                    === 
+      ===   * Test folder: Streams-collector section in main readme             ===
+      ===   * Sensor folder: Mention SUSEE-Node in readme                       ===
+      ===   * streams-poc-lib folder: Mention SUSEE-Node in readme              ===
+      ===   * main-streams-poc-lib-pio folder:                                  ===
+      ===     Mention SUSEE-Node in readme                                      ===
+      ===   * Sensor folder: Mention SUSEE-Node in main readme                  ===
+      ===   * Principles of how the DevEUI-Handshake at the beginning of        ===
+      ===     automatic sensor initialization is done                           ===
+      ===   * Write 'Using different Management Console instances for           ===
+      ===     initialization and Message Explorer' section in Management        ===
+      ===     Console README                                                    ===
+      ===   * New SUSEE-Node Readme section "Check Health Manually"             ===
+      === * Define STORAGE_DEFAULT_BUCKET 'iota-mainnet' in hornet .env file    ===
+      ==  * ESP-32-Sensor: Support F-Ram to store STREAMS User State            ===
+      === * SUSEE-Node Hardening:                                               ===
+      ===   * Remove inx-collector rest API (port 9030) from exposed ports      ===
+      ===     of the SUSEE-Node therafter                                       ===
+      ===   * Remove minio http ports (9000 + 9001) from exposed ports          ===
+      ===     of the SUSEE-Node as it can be accessed via https (minio and      ===
+      ===     minioui subdomains)                                               ===
+      ===   * Restrict access to inx-collector rest API (collector.iotabridge..)===
+      ===     to specific IPs or implement an API-Key authentication via        ===
+      ===     query param 'api-key', query param 'api-key-salt', a preshared    ===
+      ===     key used by poth inx-collectors, where the 'api-key' is derived   ===
+      ===     from the preshared key, the salt and the 'synchronised-block'     ===
+      ===     blockKey                                                          ===
+      ===   * Restrict system access as far as possible                         ===
+      === * Perform load tests for IOTA Bridge simulating 250 Sensors           ===
+      ===   sending messages with 10 minute interval                            ===
+      === * Version info endpoint for iota-bridge + log output                  ===
+      =============================================================================
 
       References:
       * https://blog.iota.org/iota-stardust-upgrade/

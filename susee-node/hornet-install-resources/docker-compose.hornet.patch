@@ -1,4 +1,4 @@
-8,68d7
+8,75d7
 < 
 <   ##################################################################
 <   #  MINIO data storage for inx-collector                          #
@@ -59,4 +59,11 @@
 <       - "--listener.filters={\"filters\": [{\"tag\":\"susee-\", \"tagIsPrefix\": true, \"withPOI\": true}]}"
 <       - "--POI.hostUrl=${POI_URL:-http://inx-poi:9687}"
 <       - "--POI.isPlugin=${POI_PLUGIN:-true}"
+<       - "--peercollector.hostUrl=${PEERCOLLECTOR_URL:-}"
+<     labels:
+<       - "traefik.enable=true"
+<       - "traefik.http.routers.collector.service=collector"
+<       - "traefik.http.routers.collector.rule=Host(`collector.${NODE_HOST:-localhost}`)"
+<       - "traefik.http.routers.collector.entrypoints=web"
+<       - "traefik.http.services.collector.loadbalancer.server.port=9030"
 < 

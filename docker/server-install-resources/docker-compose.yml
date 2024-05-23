@@ -1,4 +1,3 @@
-version: '3.4'
 services:
 
 ##################################################################
@@ -80,3 +79,4 @@ services:
     command:
       - "--node=${NODE_HOST:-localhost}"
       - "--listener-ip-address=0.0.0.0:50000"
+      - "--error-handling=${IOTA_BRIDGE_ERROR_HANDLING:-}"

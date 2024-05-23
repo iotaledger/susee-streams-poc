@@ -149,15 +149,15 @@ A `docker_daemon_example.json` file is located in the `hornet-install-resources`
   > exit
 ```
 
-#### Prepare subdomains for Minio
+#### Prepare subdomains for Minio and *INX Collector*
 
-The inx collector uses [minio](https://min.io) as object database. To access the
-[minio console](https://min.io/docs/minio/linux/administration/minio-console.html)
-via the host domain you need to configure a subdomain `minioui` in the DNS system of your
-[VPS](https://en.wikipedia.org/wiki/Virtual_private_server) (or physical server)
-hoster. To access the minio API from external devices, for example to synchronize
-multiple *SUSEE-Node* instances by mirroring,
-you also need a second subdomain `minio`.
+To run the *SUSEE Node* the following subdomains are needed to access specific services via https:
+
+| Subdomain | Purpose |
+|-----------|---------|
+| minio | Minio API that can be used with the [Minio MC](https://min.io/docs/minio/linux/reference/minio-mc.html#create-an-alias-for-the-s3-compatible-service) or other Minio Clients. |
+| minioui | [Minio Admin WebUI Console](https://min.io/docs/minio/linux/administration/minio-console.html) |
+| collector | API of the *INX Collector* |
 
 To configure the subdomains you need to add an 
 [A record](https://en.wikipedia.org/wiki/List_of_DNS_record_types) or 
@@ -169,12 +169,8 @@ shall be accessible via the following subdomains after the installation steps ha
 finished:
 
 * `minioui.example.com`<br>
-   Provides the [Minio Admin WebUI Console](https://min.io/docs/minio/linux/administration/minio-console.html)
-
 * `minio.example.com`<br>
-  Provides the Minio API that can be used with the
-  [Minio MC](https://min.io/docs/minio/linux/reference/minio-mc.html#create-an-alias-for-the-s3-compatible-service)
-  or other Minio Clients.
+* `collector.example.com`<br>
 
 #### Install the Hornet docker environment 
 
@@ -273,16 +269,26 @@ You may also want to have a look into the
 wiki page for Hornet to dive deeper into Hornet configuration.
 
 Before storing the `env_template` file please append the following lines and
-edit the values for `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`:
+edit the values for `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` and `PEERCOLLECTOR_URL`
+(more details regarding the `PEERCOLLECTOR_URL` can be found in the 
+[Primary+Secondary *SUSEE-Node* Setup](#primary+secondary-susee-node-setup)
+section below):
 
 ```dotenv
-    ###############################
-    # INX Collector Minio section #
-    ###############################
+   ###################################
+    # INX Collector and Minio section #
+    ###################################
     
     # Edit the storage credentials for the minio object storage used by the inx-collector
     MINIO_ROOT_USER=minio-admin
     MINIO_ROOT_PASSWORD=minio-password-goes-here
+
+    # Uncomment and edit the following line, if you are using a *Primary+Secondary SUSEE-Node* setup.
+    # The URL must include the "http" or "https" scheme.
+    # Examples:
+    #        PEERCOLLECTOR_URL=https://my-other-susse-node.org
+    #        PEERCOLLECTOR_URL=http://127.0.0.1:9030
+    #PEERCOLLECTOR_URL=https://my-other-susse-node.org
 ```
 
 After having saved the `env_template` file in your editor
@@ -336,6 +342,16 @@ of the [docker folder](../docker/README.md).
   > docker compose up -d
 ```
 
+## Primary+Secondary *SUSEE-Node* Setup
+
+TODO: Add Description here
+
+<br/><br/>
+
+<img src="SUSEE-Node-Primary-Secondary-Setup.png" alt="Primary+Secondary Setup with two SUSEE-Nodes" width="800"/>
+
+<br/>
+
 ## Private tangle for development purposes
 
 As a production system will be too expensive for development purposes we use a private tangle
@@ -388,3 +404,34 @@ http://localhost:9030/block/block/block-id-goes-here
 
 The [minio object database](https://min.io) can be accessed via http://127.0.0.1:9001
 with username `your_access_id` and password `your_password`.
+
+To shut down the docker compose environment open a a second shell in the priv_tangle
+folder and type:
+```bash
+  # in the 'priv_tangle' subfolder:
+  > docker compose --profile "2-nodes" down
+```
+
+#### Profile using two minio instances
+
+To test [Primary+Secondary *SUSEE-Node* Setup](#primary+secondary-susee-node-setup)
+scenarios, two separated minio instances are needed. The docker-compose.yml
+file provides a profile for this, called `2-minio`.
+
+To start the private tangle using the `2-minio` profile:
+```bash
+  # in the 'priv_tangle' subfolder:
+  > docker compose --profile "2-minio" up
+```
+
+The service 'minio-1' can be accessed as usual via http://127.0.0.1:9000 (API)
+and http://127.0.0.1:9001 (Console).
+
+The service 'minio-2' can be accessed as usual via http://127.0.0.1:9002 (API)
+and http://127.0.0.1:9003 (Console).
+
+To stop the private tangle using the `2-minio` profile:
+```bash
+  # in the 'priv_tangle' subfolder:
+  > docker compose --profile "2-minio" down
+```

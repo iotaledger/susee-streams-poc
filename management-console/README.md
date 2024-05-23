@@ -260,4 +260,28 @@ to find out more about how to use the swagger-ui to list messages of a specific 
 
 #### Using different *Management Console* instances for initialization and *Message Explorer*
 
-TO BE DONE
+If you are using a different *Management Console* instance to initialize the *Sensor*
+and to run the *Message Explorer* you need to copy
+two files from the initialization system to the *Message Explorer* system.
+
+For example expect the initialization of the *Sensors* has been done on your local
+development system and the *Message Explorer* runs on a *SUSEE Node*. To upload the
+files from the initialization system to the *SUSEE Node* follow these steps:
+
+* Create a folder `management-console-data` In the home folder of the
+  *SUSEE Node* admin user.
+* The folder where the *Management Console* has been run to initialize
+  the *Sensors* contains a subfolder `data/management-console`.<br>
+  Upload following files from `data/management-console` to the  
+  previously created `management-console-data` folder on the *SUSEE Node*:
+  * user-states-management-console.sqlite3
+  * wallet-management-console.txt
+* In the admin home folder of the *SUSEE Node*:<br>
+  `$ sudo chown 65532:65532 management-console-data/*`<br>
+  `$ sudo cp management-console-data/* suse-poc/data/management-console/`<br>
+  We expect here, that the docker compose environment runs in the subfolder
+  `suse-poc` in the admin home folder as been described
+  [here](../docker#start-iota-bridge-and-message-explorer-as-public-available-service)
+* In the `suse-poc` subfolder of the admin home folder:<br>
+  `docker compose restart management-console`
+  

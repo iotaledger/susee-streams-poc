@@ -46,9 +46,6 @@
       ===   * Sensor folder: Mention SUSEE-Node in main readme                  ===
       ===   * Principles of how the DevEUI-Handshake at the beginning of        ===
       ===     automatic sensor initialization is done                           ===
-      ===   * Write 'Using different Management Console instances for           ===
-      ===     initialization and Message Explorer' section in Management        ===
-      ===     Console README                                                    ===
       ===   * New SUSEE-Node Readme section "Check Health Manually"             ===
       ===   * New section "SUSEE-Node for Message Explorer" in management-      ===
       ===     console and SUSEE-Node Readmes                                    ===

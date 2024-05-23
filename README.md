@@ -50,6 +50,9 @@
       ===     initialization and Message Explorer' section in Management        ===
       ===     Console README                                                    ===
       ===   * New SUSEE-Node Readme section "Check Health Manually"             ===
+      ===   * New section "SUSEE-Node for Message Explorer" in management-      ===
+      ===     console and SUSEE-Node Readmes                                    ===
+      ===   * New SUSEE-Node Readme section for docker-compose-minio-client.yml ===
       === * Define STORAGE_DEFAULT_BUCKET 'iota-mainnet' in hornet .env file    ===
       ==  * ESP-32-Sensor: Support F-Ram to store STREAMS User State            ===
       === * SUSEE-Node Hardening:                                               ===

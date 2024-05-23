@@ -271,7 +271,7 @@ wiki page for Hornet to dive deeper into Hornet configuration.
 Before storing the `env_template` file please append the following lines and
 edit the values for `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` and `PEERCOLLECTOR_URL`
 (more details regarding the `PEERCOLLECTOR_URL` can be found in the 
-[Primary+Secondary *SUSEE-Node* Setup](#primary+secondary-susee-node-setup)
+[Primary+Secondary *SUSEE-Node* Setup](#primarysecondary-susee-node-setup)
 section below):
 
 ```dotenv
@@ -414,7 +414,7 @@ folder and type:
 
 #### Profile using two minio instances
 
-To test [Primary+Secondary *SUSEE-Node* Setup](#primary+secondary-susee-node-setup)
+To test [Primary+Secondary *SUSEE-Node* Setup](#primarysecondary-susee-node-setup)
 scenarios, two separated minio instances are needed. The docker-compose.yml
 file provides a profile for this, called `2-minio`.
 
@@ -427,7 +427,7 @@ To start the private tangle using the `2-minio` profile:
 The service 'minio-1' can be accessed as usual via http://127.0.0.1:9000 (API)
 and http://127.0.0.1:9001 (Console).
 
-The service 'minio-2' can be accessed as usual via http://127.0.0.1:9002 (API)
+The service 'minio-2' can be accessed via http://127.0.0.1:9002 (API)
 and http://127.0.0.1:9003 (Console).
 
 To stop the private tangle using the `2-minio` profile:

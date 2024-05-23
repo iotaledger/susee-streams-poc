@@ -14,7 +14,7 @@ services:
 #      - "50001:50001"
 #    restart: unless-stopped
 #    environment:
-#      - RUST_LOG=${RUST_LOG:-INFO}
+#      - RUST_LOG=${RUST_LOG:-info}
 #    depends_on:
 #      iota-bridge:
 #        condition: service_started
@@ -54,7 +54,7 @@ services:
 #      - "50002:50002"
 #    restart: unless-stopped
 #    environment:
-#      - RUST_LOG=${RUST_LOG:-INFO}"
+#      - RUST_LOG=${RUST_LOG:-info}
 #    command:
 #      - "--node=${NODE_HOST:-localhost}"
 #      - "--run-explorer-api-server=0.0.0.0:50002"
@@ -75,7 +75,7 @@ services:
       - "50000:50000"
     restart: unless-stopped
     environment:
-      - RUST_LOG=${RUST_LOG:-INFO}"
+      - RUST_LOG=${RUST_LOG:-info}
     command:
       - "--node=${NODE_HOST:-localhost}"
       - "--listener-ip-address=0.0.0.0:50000"

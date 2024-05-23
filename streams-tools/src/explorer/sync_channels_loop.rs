@@ -117,7 +117,7 @@ async fn sync_each_channel_in_user_store(opt: SyncChannelsLoopOptions) -> Result
     let (mut users, items_cnt_total) = opt.user_store.find_all("", None)?;
     let mut ret_val = UserLoopStatus::new(items_cnt_total, 0);
     for user in users.iter_mut() {
-        log::info!("[fn sync_each_channel_in_user_store] Starting syncing channel {}", user.streams_channel_id);
+        log::info!("[fn sync_each_channel_in_user_store] Start syncing channel {}", user.streams_channel_id);
         match sync_channel(user, &opt).await {
             Ok(num_channels_processed) => {
                 ret_val.processed += num_channels_processed;

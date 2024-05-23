@@ -222,9 +222,11 @@ impl MessageIndex for MessageIndexer {
         let msg_id_hex_str = hex::encode(address.relative());
         if let Some(local_data_store) = self.local_message_data_store.as_ref() {
             if let Ok((message, _)) = local_data_store.get_item(&msg_id_hex_str) {
-                let transport_msg = TransportMessage::new(message.wrapped_binary);
-                log::debug!("[fn get_messages_by_msg_index()] Returning message '{}' from local_data_store", msg_id_hex_str);
-                ret_val.push(transport_msg);
+                if message.wrapped_binary.len() > 0 {
+                    let transport_msg = TransportMessage::new(message.wrapped_binary);
+                    log::debug!("[fn get_messages_by_msg_index()] Returning message '{}' from local_data_store", msg_id_hex_str);
+                    ret_val.push(transport_msg);
+                }
             }
         }
 

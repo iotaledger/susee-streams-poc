@@ -283,7 +283,7 @@ section below):
     MINIO_ROOT_USER=minio-admin
     MINIO_ROOT_PASSWORD=minio-password-goes-here
 
-    # Uncomment and edit the following line, if you are using a *Primary+Secondary SUSEE-Node* setup.
+    # Uncomment and edit the following line, if you are using a 'Primary+Secondary SUSEE-Node' setup.
     # The URL must include the "http" or "https" scheme.
     # Examples:
     #        PEERCOLLECTOR_URL=https://my-other-susse-node.org

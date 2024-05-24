@@ -408,11 +408,13 @@ impl DispatchStreams {
                 if healthy {
                     None
                 } else {
+                    log::error!("[fn check_health] Streams Node is currently not healthy. Returning 503 http response.");
                     Some(IotaBridgeError::get_response(IotaBridgeError::NotHealthy,
                                                        "Streams Node is currently not healthy"))
                 }
             },
             Err(e) => {
+                log::error!("[fn check_health] Checking Streams Node health returned an error. Returning 503 http response. Error: {}", e);
                 Some(IotaBridgeError::get_response(IotaBridgeError::NotHealthy,
                                                    format!("Checking Streams Node health returned an error: {}", e).as_str()))
             }

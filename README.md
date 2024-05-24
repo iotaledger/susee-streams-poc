@@ -53,6 +53,10 @@
       === * Define STORAGE_DEFAULT_BUCKET 'iota-mainnet' in hornet .env file    ===
       ==  * ESP-32-Sensor: Support F-Ram to store STREAMS User State            ===
       === * SUSEE-Node Hardening:                                               ===
+      ===   * message-explorer                                                  ===
+      ===     * https for message-explorer -> subdomain: explorer.iotabridge... ===
+      ===     * Remove message-explorer rest API (port 50002) from exposed      ===
+      ===       ports of the SUSEE-Node therafter                               ===
       ===   * Remove inx-collector rest API (port 9030) from exposed ports      ===
       ===     of the SUSEE-Node therafter                                       ===
       ===   * Remove minio http ports (9000 + 9001) from exposed ports          ===

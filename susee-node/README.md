@@ -283,6 +283,13 @@ section below):
     MINIO_ROOT_USER=minio-admin
     MINIO_ROOT_PASSWORD=minio-password-goes-here
 
+    # Bucket name used to store streams messages by the inx-collector
+    # Use a meaningfull name like one of these:
+    #   * iota-mainnet
+    #   * shimmernet-mainnet
+    #   * acme-corp-private-testnet
+    STORAGE_DEFAULT_BUCKET=iota-mainnet
+
     # Uncomment and edit the following line, if you are using a 'Primary+Secondary SUSEE-Node' setup.
     # The URL must include the "http" or "https" scheme.
     # Examples:

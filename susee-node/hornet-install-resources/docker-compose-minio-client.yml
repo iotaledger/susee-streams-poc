@@ -72,11 +72,11 @@ services:
   minio-client:
     container_name: minio-client
     image: minio/mc:latest
+    stop_grace_period: 5m
+    restart: unless-stopped
     depends_on:
       minio:
         condition: service_started
-    profiles:
-      - minio-client
     entrypoint: >
       /bin/sh -c "
       /usr/bin/mc alias --quiet set localdb http://minio:9000 ${MINIO_ROOT_USER:-susee-minio-admin} ${MINIO_ROOT_PASSWORD:-susee-secret-password};

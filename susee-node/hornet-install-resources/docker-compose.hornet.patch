@@ -1,4 +1,6 @@
-8,75d7
+5a6
+> version: "3"
+7,75d7
 < 
 <   ##################################################################
 <   #  MINIO data storage for inx-collector                          #
@@ -7,6 +9,7 @@
 <     container_name: minio
 <     image: minio/minio
 <     stop_grace_period: 5m
+<     restart: unless-stopped
 <     volumes:
 <       - ./data/minio:/data
 <     environment:
@@ -55,7 +58,7 @@
 <       - "--storage.objectExtension=${STORAGE_EXTENSION:-}"
 <       - "--storage.secure=${STORAGE_SECURE:-false}"
 <       - "--storage.defaultBucketName=${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default}"
-<       - "--storage.defaultBucketExpirationDays=${STORAGE_DEFAULT_EXPIRATION:-30}"
+<       - "--storage.defaultBucketExpirationDays=${STORAGE_DEFAULT_EXPIRATION:-0}"
 <       - "--listener.filters={\"filters\": [{\"tag\":\"susee-\", \"tagIsPrefix\": true, \"withPOI\": true}]}"
 <       - "--POI.hostUrl=${POI_URL:-http://inx-poi:9687}"
 <       - "--POI.isPlugin=${POI_PLUGIN:-true}"

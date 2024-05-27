@@ -109,6 +109,9 @@ pub async fn create_subscriber_manager<'a>(
     if let Some(iota_bridge_url) = cli.matches.value_of(cli.arg_keys.iota_bridge_url) {
         streams_transport_options.http_url = iota_bridge_url.to_string();
     }
+    if let Some(failover_iota_bridge_url) = cli.matches.value_of(cli.arg_keys.failover_iota_bridge_url) {
+        streams_transport_options.failover_secondary_http_url = Some(failover_iota_bridge_url.to_string());
+    }
     streams_transport_options.dev_eui = Some(manage_mocked_lorawan_dev_eui(&cli, &mut wallet));
     if cli.matches.is_present(cli.arg_keys.use_lorawan_rest_api) {
         streams_transport_options.use_lorawan_rest = true;

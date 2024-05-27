@@ -113,6 +113,7 @@ impl From<HttpMethod> for HeaderFlags {
     }
 }
 
+#[derive(Clone)]
 pub struct IotaBridgeRequestParts {
     pub method: HttpMethod,
     pub uri: String,
@@ -125,7 +126,13 @@ impl IotaBridgeRequestParts {
     pub fn new(header_flags: HeaderFlags, uri: String, body_bytes: Vec<u8>) -> Self {
         let method = HttpMethod::from(header_flags);
         let uri_bytes = uri.clone().into_bytes();
-        Self {method, uri, body_bytes, uri_bytes, header_flags}
+        Self {
+            method,
+            uri,
+            body_bytes,
+            uri_bytes,
+            header_flags
+        }
     }
 
     pub async fn from_request(request: Request<Body>, needs_registered_lorawan_node: bool) -> Self {
@@ -135,7 +142,13 @@ impl IotaBridgeRequestParts {
         let uri_bytes = uri.clone().into_bytes();
         let mut header_flags = HeaderFlags::from(method.clone());
         header_flags.set(HeaderFlags::NEEDS_REGISTERED_LORAWAN_NODE, needs_registered_lorawan_node);
-        Self {method, uri, body_bytes, uri_bytes, header_flags}
+        Self {
+            method,
+            uri,
+            body_bytes,
+            uri_bytes,
+            header_flags
+        }
     }
 
     pub fn into_request(self: Self, request_builder: Builder) -> Result<Request<Body>> {

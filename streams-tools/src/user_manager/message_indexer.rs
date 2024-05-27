@@ -231,9 +231,7 @@ impl MessageIndex for MessageIndexer {
         }
 
         if self.not_existing_messages.borrow().contains(msg_id_hex_str.as_str()) {
-            return Err(LetsError::External(
-                anyhow!("Message '{}' does not exist", msg_id_hex_str)
-            ))
+            return Ok(Vec::<TransportMessage>::new())
         }
 
         if ret_val.is_empty() {
@@ -258,9 +256,7 @@ impl MessageIndex for MessageIndexer {
                         let _has_been_inserted = self.not_existing_messages
                             .borrow_mut()
                             .insert(msg_id_hex_str.clone());
-                        return Err(LetsError::External(
-                            anyhow!("Messages Vec received for msg_index '{}' is empty", msg_id_hex_str)
-                        ))
+                        return Ok(messages)
                     }
                 }
                 Err(e) => return Err(e)

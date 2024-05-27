@@ -31,6 +31,8 @@ use hyper::{
 use crate::binary_persist::{
     BinaryPersist,
     EnumeratedPersistable,
+    HeaderFlags,
+    binary_persist_iota_bridge_req::HttpMethod
 };
 
 #[derive(Clone)]
@@ -47,6 +49,14 @@ impl RequestBuilderTools {
 
     pub fn get_request_builder() -> Builder {
         Request::builder().header("User-Agent", "streams-client/1.0")
+    }
+
+    pub fn get_header_flags(is_compressed: bool, method: HttpMethod) -> HeaderFlags {
+        let mut header_flags = HeaderFlags::from(method);
+        if is_compressed {
+            header_flags.insert(HeaderFlags::NEEDS_REGISTERED_LORAWAN_NODE);
+        }
+        header_flags
     }
 
     pub fn get_uri(self: &Self, path: &str) -> String {

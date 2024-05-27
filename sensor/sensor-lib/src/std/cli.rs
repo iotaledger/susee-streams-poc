@@ -100,6 +100,18 @@ Default value is {}
 
 Example: --iota-bridge-url=\"http://192.168.47.11:50000\"";
 
+static FAILOVER_IOTA_BRIDGE_URL_ABOUT: &str = "\
+Specifies a secondary iota-bridge used for failover.
+In case the primary iota-bridge (specified by the CLI argument '--iota-bridge-url')
+returns an erroneous http response, the sensor will try to use a secondary
+iota-bridge instance specified by this argument.
+The implemented failover handling is very simple: The secondary iota-bridge is only
+called in case of errors and only once (per error). If this argument is not provided,
+no failover is done.
+
+Example: --failover-iota-bridge-url=\"http://192.168.47.11:50000\"
+";
+
 static PRINTLN_SUBSCRIBER_STATUS_ABOUT: &str = "Print information about the current client status of the sensor.
 In streams the sensor is a subscriber so that this client status is called subscriber status.
 ";
@@ -137,6 +149,7 @@ pub struct ArgKeys {
     pub clear_client_state: &'static str,
     pub iota_bridge_url: &'static str,
     pub use_lorawan_rest_api: &'static str,
+    pub failover_iota_bridge_url: &'static str,
     pub exit_after_successful_initialization: &'static str,
 }
 
@@ -152,6 +165,7 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     act_as_remote_control: "act-as-remote-control",
     act_as_remote_controlled_sensor: "act-as-remote-controlled-sensor",
     iota_bridge_url: "iota-bridge-url",
+    failover_iota_bridge_url: "failover-iota-bridge-url",
     clear_client_state: "clear-client-state",
     println_subscriber_status: "println-subscriber-status",
     use_lorawan_rest_api: "use-lorawan-rest-api",
@@ -229,6 +243,12 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
                 .short('b')
                 .value_name("IOTA_BRIDGE_URL")
                 .help(iota_bridge_url_about.as_str())
+            )
+            .arg(Arg::new(ARG_KEYS.failover_iota_bridge_url)
+                .long(ARG_KEYS.failover_iota_bridge_url)
+                .short('o')
+                .value_name("FAILOVER_IOTA_BRIDGE_URL")
+                .help(FAILOVER_IOTA_BRIDGE_URL_ABOUT)
             )
             .arg(Arg::new(ARG_KEYS.dev_eui)
                 .long(ARG_KEYS.dev_eui)

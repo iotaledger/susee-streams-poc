@@ -10,6 +10,11 @@ use hyper::{
     }
 };
 
+use crate::binary_persist::binary_persist_iota_bridge_req::{
+    HttpMethod,
+    IotaBridgeRequestParts
+};
+
 use super::{
     ScopeConsume,
     http_tools::{
@@ -45,16 +50,26 @@ impl RequestBuilderLorawanRest {
         }
     }
 
-    pub fn post_binary_request(self: &Self, request_bytes: Vec<u8>, dev_eui: &str) -> Result<Request<Body>> {
+    pub fn get_post_binary_request_parts(self: &Self, request_bytes: Vec<u8>, dev_eui: &str) -> Result<IotaBridgeRequestParts> {
         let uri = format!("{}?{}={}",
                           self.tools.get_uri(EndpointUris::BINARY_REQUEST).as_str(),
                           QueryParameters::BINARY_REQUEST,
                           dev_eui
         );
-        RequestBuilderTools::get_request_builder()
-            .method("POST")
-            .uri(uri)
-            .body(Body::from(request_bytes.as_slice().to_owned()))
+        let header_flags = RequestBuilderTools::get_header_flags(false, HttpMethod::POST);
+        Ok(IotaBridgeRequestParts::new(
+            header_flags,
+            uri,
+            request_bytes
+        ))
+    }
+
+    pub fn post_binary_request(self: &Self, request_bytes: Vec<u8>, dev_eui: &str) -> Result<Request<Body>> {
+        self.get_post_binary_request_parts(
+                request_bytes,
+                dev_eui
+            )?
+            .into_request(RequestBuilderTools::get_request_builder())
     }
 }
 

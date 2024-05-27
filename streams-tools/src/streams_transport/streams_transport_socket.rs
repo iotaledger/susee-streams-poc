@@ -21,12 +21,12 @@ use hyper::{
     Client as HyperClient,
     body as hyper_body,
     Body,
-    client::HttpConnector, http::{
+    client::HttpConnector,
+    http::{
         StatusCode,
-        Request,
         Response,
     },
-    body
+    body,
 };
 
 use streams::{
@@ -77,8 +77,10 @@ use crate::{
     StreamsTransport
 };
 
+#[derive(Clone)]
 pub struct StreamsTransportSocketOptions {
     pub http_url: String,
+    pub failover_secondary_http_url: Option<String>,
     pub dev_eui: Option<String>,
     pub use_lorawan_rest: bool,
 }
@@ -95,6 +97,7 @@ impl Default for StreamsTransportSocketOptions {
     fn default() -> Self {
         Self {
             http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL.to_string(),
+            failover_secondary_http_url: None,
             dev_eui: None,
             use_lorawan_rest: false,
         }
@@ -103,8 +106,13 @@ impl Default for StreamsTransportSocketOptions {
 
 impl fmt::Display for StreamsTransportSocketOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "StreamsTransportSocketOptions:\n     http_url: {},\n     dev_eui:  {},\n     use_lorawan_rest:  {}",
+        write!(f, "StreamsTransportSocketOptions:
+              http_url:          {},
+              failover_http_url: {:?},
+              dev_eui:           {},
+              use_lorawan_rest:  {}",
             self.http_url,
+            self.failover_secondary_http_url,
             if let Some(eui) = &self.dev_eui {eui.as_str()} else {""},
             self.use_lorawan_rest
         )
@@ -117,9 +125,8 @@ pub struct StreamsTransportSocket {
     request_builder_streams: RequestBuilderStreams,
     request_builder_lorawan_rest: RequestBuilderLorawanRest,
     compressed: CompressedStateManager,
-    dev_eui: Option<String>,
-    use_lorawan_rest: bool,
     initialization_cnt: u8,
+    opt: StreamsTransportSocketOptions,
 }
 
 impl StreamsTransport for StreamsTransportSocket {
@@ -133,9 +140,8 @@ impl StreamsTransport for StreamsTransportSocket {
             request_builder_streams: RequestBuilderStreams::new(options.http_url.as_str()),
             request_builder_lorawan_rest: RequestBuilderLorawanRest::new(options.http_url.as_str()),
             compressed: CompressedStateManager::new(),
-            dev_eui: options.dev_eui,
-            use_lorawan_rest: options.use_lorawan_rest,
             initialization_cnt: 0,
+            opt: options,
         }
     }
 
@@ -146,26 +152,20 @@ impl StreamsTransport for StreamsTransportSocket {
 
 impl StreamsTransportSocket
 {
-    fn get_lorawan_rest_request(&self, req_parts: IotaBridgeRequestParts) -> Result<Request<Body>>{
+    fn get_lorawan_rest_request_parts(&self, req_parts: IotaBridgeRequestParts) -> Result<IotaBridgeRequestParts>{
         let mut buffer: Vec<u8> = vec![0; req_parts.needed_size()];
         req_parts.to_bytes(buffer.as_mut_slice())?;
-        if let Some(dev_eui) = self.dev_eui.as_ref() {
-            Ok(self.request_builder_lorawan_rest.post_binary_request(buffer, dev_eui.as_str())
-                .expect("Error on creating hyper request for lorawan-rest/post_binary_request call")
-            )
+        if let Some(dev_eui) = self.opt.dev_eui.as_ref() {
+            let lorawan_rest_req_parts = self.request_builder_lorawan_rest
+                .get_post_binary_request_parts(buffer, dev_eui.as_str())?;
+            Ok(lorawan_rest_req_parts)
         } else {
             bail!("You need to specify a dev_eui in the StreamsTransportSocketOptions to use the lorawan-rest API with this StreamsTransportSocket" )
         }
     }
 
     async fn request(&mut self, req_parts: IotaBridgeRequestParts, channel_id: AppAddr) -> Result<Response<Body>> {
-        let request = if self.use_lorawan_rest {
-            self.get_lorawan_rest_request(req_parts)?
-        } else {
-            req_parts.into_request(RequestBuilderTools::get_request_builder())?
-        };
-
-        let mut response = self.get_request_response(request).await?;
+        let mut response = self.get_request_response(req_parts).await?;
 
         // We send uncompressed messages until we receive a 208 - ALREADY_REPORTED
         // http status which indicates that the iota-bridge has stored all needed
@@ -179,29 +179,73 @@ impl StreamsTransportSocket
         Ok(response)
     }
 
-    async fn get_request_response(&mut self, request: Request<Body>) -> Result<Response<Body>> {
-        let mut response = self.hyper_client.request(request).await?;
+    async fn get_request_response(&mut self, req_parts: IotaBridgeRequestParts) -> Result<Response<Body>> {
+        let req_parts_primary_iota_bridge= if self.opt.use_lorawan_rest {
+            self.get_lorawan_rest_request_parts(req_parts)?
+        } else {
+                req_parts.clone()
+        };
 
-        if self.use_lorawan_rest {
+        let mut do_try_failover_iota_bridge = true;
+        let request_primary_iota_bridge = req_parts_primary_iota_bridge.clone()
+            .into_request(RequestBuilderTools::get_request_builder())?;
+        log::debug!("[fn get_request_response] Sending request to primary iota-bridge: URI: {}", request_primary_iota_bridge.uri());
+        let mut response = match self.hyper_client.request(request_primary_iota_bridge).await {
+            Ok(resp) => resp,
+            Err(err) => {
+                log::debug!("[fn get_request_response] Accessing iota-bridge responded in error: {}", err);
+                if let Some(failover_http_url) = &self.opt.failover_secondary_http_url {
+                    do_try_failover_iota_bridge = false;
+                    self.send_request_to_secondary_iota_bridge(
+                        req_parts_primary_iota_bridge.clone(),
+                        failover_http_url,
+                        format!("Accessing iota-bridge responded in error: {}", err),
+                    ).await?
+                } else {
+                    return Err(anyhow!(err))
+                }
+            }
+        };
+
+        if do_try_failover_iota_bridge && !response.status().is_success() {
+            log::debug!("[fn get_request_response] Primary iota-bridge responded with status {}", response.status());
+            if let Some(failover_http_url) = &self.opt.failover_secondary_http_url {
+                response = self.send_request_to_secondary_iota_bridge(
+                    req_parts_primary_iota_bridge,
+                    failover_http_url,
+                    format!("Primary iota-bridge responded with http error status {}", response.status()),
+                ).await?;
+            }
+        }
+
+        if self.opt.use_lorawan_rest {
             response = StreamsTransportSocket::handle_lorawan_rest_response(response).await?;
         }
         Ok(response)
     }
 
+    async fn send_request_to_secondary_iota_bridge(
+        &self,
+        mut cloned_req_parts: IotaBridgeRequestParts,
+        failover_http_url: &String,
+        err_info: String,
+    )  -> Result<Response<Body>> {
+        cloned_req_parts.uri = cloned_req_parts.uri.replace(self.opt.http_url.as_str(), failover_http_url.as_str());
+        log::warn!("[fn send_request_to_secondary_iota_bridge] {}. Sending request to secondary iota-bridge. URI: {}", err_info, cloned_req_parts.uri);
+        let failover_req = cloned_req_parts.into_request(RequestBuilderTools::get_request_builder())?;
+        self.hyper_client.request(failover_req).await.map_err(|err| anyhow!(err))
+    }
+
     async fn handle_request_retransmit(&mut self, mut response: Response<Body>, channel_id: AppAddr) -> Result<Response<Body>> {
         let request_key_bytes = body::to_bytes(response.body_mut()).await.expect("Failed to read body bytes for retrieving the request_key");
-        let mut retransmit_request = self.request_builder_streams.retransmit(
+
+        let retransmit_request_parts = self.request_builder_streams.get_retransmit_request_parts(
             &Vec::<u8>::from(request_key_bytes),
             channel_id,
             self.initialization_cnt,
         )?;
 
-        if self.use_lorawan_rest {
-            let retransmit_request_parts = IotaBridgeRequestParts::from_request(retransmit_request, false).await;
-            retransmit_request = self.get_lorawan_rest_request(retransmit_request_parts)?
-        }
-
-        let response = self.get_request_response(retransmit_request).await?;
+        let response = self.get_request_response(retransmit_request_parts).await?;
 
         if response.status() != StatusCode::ALREADY_REPORTED {
             log::warn!("[fn handle_request_retransmit] Expected retransmit response with status 208-ALREADY_REPORTED. Got status {}", response.status());
@@ -238,6 +282,7 @@ impl StreamsTransportSocket
                 bail!("Received 0 bytes response from server.")
             }
         } else {
+            log::error!("Iota-Bridge responded with http error status on lorawan-rest request. Status: {}", ret_val.status());
             bail!("Iota-Bridge responded with http error status on lorawan-rest request. Status: {}", ret_val.status())
         }
         Ok(ret_val)
@@ -251,7 +296,7 @@ impl StreamsTransportSocket
             // LoraWAN network automatically (compare comment in function StreamsTransportViaBufferCallback::recv_message_via_http()
             let cmpr_message = TangleMessageCompressed::from_tangle_message(msg, self.initialization_cnt);
             self.request_builder_streams
-                .get_send_message_request_parts(&cmpr_message, EndpointUris::SEND_COMPRESSED_MESSAGE, true, self.dev_eui.clone())
+                .get_send_message_request_parts(&cmpr_message, EndpointUris::SEND_COMPRESSED_MESSAGE, true, self.opt.dev_eui.clone())
                 .map_err(|e| LetsError::External(e.into()))?
         } else {
             self.request_builder_streams
@@ -271,7 +316,7 @@ impl StreamsTransportSocket
                 EndpointUris::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS,
                 true,
                 QueryParameters::RECEIVE_COMPRESSED_MESSAGE_FROM_ADDRESS_CMPR_ADDR,
-                self.dev_eui.clone(),
+                self.opt.dev_eui.clone(),
             )
         } else {
             self.request_builder_streams.get_receive_message_from_address_request_parts(

@@ -22,7 +22,7 @@ pub fn get_tangle_address_from_strings(channel_id: &str, message_id: &str) -> le
 }
 
 pub fn get_iota_node_url(iota_node: &str) -> String {
-    let (protocol, port) = if iota_node != "127.0.0.1" {
+    let (protocol, port) = if iota_node != "127.0.0.1" && iota_node != "host.docker.internal" {
         ("https", "")
     } else {
         ("http", ":14265")

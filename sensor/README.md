@@ -66,17 +66,32 @@ all Sensor applications provide CLI commands to manage the Streams usage:
                   --------  WARNING  ---------- Currently there is no confirmation cli dialog
                   -----------------------------       use this option carefully!
                               
+### Specifying the *IOTA Bridge*
+The *x86/PC Sensor* directly accesses the *IOTA Bridge*. Use the following
+arguments to manage *IOTA Bridge* usage:
+
+    -b, --iota-bridge-url <IOTA_BRIDGE_URL>
+            The url of the iota-bridge to connect to.
+            Default value is http://localhost:50000
+            
+            Example: iota-bridge-url="http://192.168.47.11:50000"
+            
+    -o, --failover-iota-bridge-url <FAILOVER_IOTA_BRIDGE_URL>
+            Specifies a secondary iota-bridge used for failover.
+            In case the primary iota-bridge (specified by the CLI argument '--iota-bridge-url')
+            returns an erroneous http response, the sensor will try to use a secondary
+            iota-bridge instance specified by this argument.
+            The implemented failover handling is very simple: The secondary iota-bridge is only
+            called in case of errors and only once (per error). If this argument is not provided,
+            no failover is done.
+            
+            Example: --failover-iota-bridge-url="http://192.168.47.11:50000"
+
 ### Remote Control CLI commands
 As all Sensor applications running on ESP32 do not provide an interactive terminal, the 
 *x86/PC Sensor* can be used to remote control the ESP32
 applications. The x86/PC Sensor provides following CLI commands to manage the
 remote control functionality:
-
-    -t, --iota-bridge-url <IOTA_BRIDGE_URL>
-            The url of the iota-bridge to connect to.
-            Default value is http://localhost:50000
-            
-            Example: iota-bridge-url="http://192.168.47.11:50000"
 
     -c, --act-as-remote-control
             Use this argument to remotely control a running sensor application on

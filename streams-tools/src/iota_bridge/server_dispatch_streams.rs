@@ -406,6 +406,7 @@ impl DispatchStreams {
         match self.health_checker.is_healthy().await {
             Ok(healthy) => {
                 if healthy {
+                    log::debug!("[fn check_health] Streams Node is healthy");
                     None
                 } else {
                     log::error!("[fn check_health] Streams Node is currently not healthy. Returning 503 http response.");

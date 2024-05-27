@@ -37,7 +37,6 @@ use crate::{
         binary_persist_iota_bridge_req::{
             IotaBridgeRequestParts,
             HttpMethod,
-            HeaderFlags,
         }
     },
     http::{
@@ -175,7 +174,7 @@ impl RequestBuilderStreams {
         }
         let mut buffer: Vec<u8> = vec![0; message.needed_size()];
         message.to_bytes(buffer.as_mut_slice()).expect("Persisting into binary data failed");
-        let header_flags = RequestBuilderStreams::get_header_flags(is_compressed, HttpMethod::POST);
+        let header_flags = RequestBuilderTools::get_header_flags(is_compressed, HttpMethod::POST);
         Ok(IotaBridgeRequestParts::new(
             header_flags,
             uri,
@@ -202,7 +201,7 @@ impl RequestBuilderStreams {
         if let Some(eui) = dev_eui {
             uri = format!("{}&{}={}", uri, QueryParameters::SEND_COMPRESSED_MESSAGE_DEV_EUI, eui)
         }
-        let header_flags = RequestBuilderStreams::get_header_flags(is_compressed, HttpMethod::GET);
+        let header_flags = RequestBuilderTools::get_header_flags(is_compressed, HttpMethod::GET);
         Ok(IotaBridgeRequestParts::new(
             header_flags,
             uri,
@@ -232,16 +231,8 @@ impl RequestBuilderStreams {
         .into_request(RequestBuilderTools::get_request_builder())
     }
 
-    fn get_header_flags(is_compressed: bool, method: HttpMethod) -> HeaderFlags {
-        let mut header_flags = HeaderFlags::from(method);
-        if is_compressed {
-            header_flags.insert(HeaderFlags::NEEDS_REGISTERED_LORAWAN_NODE);
-        }
-        header_flags
-    }
-
     // @param request_key:  Received by the original REST call via response body.
-    pub fn retransmit(self: &Self, request_key: &Vec<u8>, channel_id: AppAddr, initialization_cnt: u8) -> Result<Request<Body>> {
+    pub fn get_retransmit_request_parts(self: &Self, request_key: &Vec<u8>, channel_id: AppAddr, initialization_cnt: u8) -> Result<IotaBridgeRequestParts> {
         let mut uri = self.tools.get_uri(EndpointUris::RETRANSMIT);
         let request_key_b64 = STANDARD.encode(request_key);
         uri = format!("{uri}?{req_key_arg}={request_key_b64}&{int_cnt_arg}={initialization_cnt}",
@@ -249,10 +240,18 @@ impl RequestBuilderStreams {
                       int_cnt_arg = QueryParameters::RETRANSMIT_INITIALIZATION_CNT
         );
         let body_bytes = channel_id.as_bytes().to_owned();
-        RequestBuilderTools::get_request_builder()
-            .method("POST")
-            .uri(uri)
-            .body(Body::from(body_bytes.clone()))
+        let header_flags = RequestBuilderTools::get_header_flags(false, HttpMethod::POST);
+        Ok(IotaBridgeRequestParts::new(
+            header_flags,
+            uri,
+            body_bytes
+        ))
+    }
+
+    // @param request_key:  Received by the original REST call via response body.
+    pub fn retransmit(self: &Self, request_key: &Vec<u8>, channel_id: AppAddr, initialization_cnt: u8) -> Result<Request<Body>> {
+        let req_parts = self.get_retransmit_request_parts(request_key, channel_id, initialization_cnt)?;
+        req_parts.into_request(RequestBuilderTools::get_request_builder())
     }
 }
 

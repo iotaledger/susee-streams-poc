@@ -81,9 +81,16 @@ arguments to manage *IOTA Bridge* usage:
             In case the primary iota-bridge (specified by the CLI argument '--iota-bridge-url')
             returns an erroneous http response, the sensor will try to use a secondary
             iota-bridge instance specified by this argument.
-            The implemented failover handling is very simple: The secondary iota-bridge is only
-            called in case of errors and only once (per error). If this argument is not provided,
-            no failover is done.
+            The implemented failover-handling is very simple: The secondary iota-bridge is only
+            called in case of errors and only once (per error).
+            
+            If this argument is not provided, no failover is done.
+            
+            The error response behavior of the iota-bridge is designed to allow failover-handling
+            run on an application-server-connector. Therefore this argument must be used together
+            with the --use-lorawan-rest-api argument. In theory, it would be possible to use
+            --failover-iota-bridge-url while accessing iota-bridge API functions directly,
+            but this would break the communication between the iota-bridge and the Sensor.
             
             Example: --failover-iota-bridge-url="http://192.168.47.11:50000"
 

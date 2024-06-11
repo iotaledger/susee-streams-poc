@@ -118,6 +118,51 @@ roles and technical components of the SUSEE project please see below in the
   * Manages multiple channels resp. *Sensors* using a local SQLite3 database
   * Provides a [Message Explorer](management-console#run-message-explorer) to explore the *Sensor* messages 
 
+
+
+###### Why is IOTA Streams used?
+
+*IOTA Streams* is a library that has been developed by the IOTA Foundation
+to ease decentralized access control for data streams that are
+communicated via a public permissionless distributed ledgers.
+
+*IOTA Streams* prrovides the following features:
+* Structuring of message streams using *Streams Channels* and *Message Branches*
+* Secure private encrypted data transmissions
+* Automatic secure authentication of participants through
+  asymmetric cryptography (private & public key pair)
+* Simple signing of messages by participants
+* Can be used with any transport media
+* Navigation within the message lists (a.k.a. *Message Branches*)
+* Access control via write and read rights of participants
+
+###### "Proof of Inclusion" or why is IOTA Distributed Ledger used?
+
+Sending *Sensor* messages via the *IOTA Distributed Ledger* (DL) allows to prove 
+the authenticity and broadcasting time of the messages using a
+*Proof of Inclusion* (PoI).
+
+Generally spoken, a PoI allows to prove that a block (containing the *Sensor*
+message as payload) has been referenced by a
+[milestone](https://wiki.iota.org/learn/protocols/coordinator/)
+even when the block data have already been pruned from the *IOTA Nodes*
+of the *IOTA DL*.
+
+To allow this, a PoI contains a 
+[proof of membership](https://medium.com/crypto-0-nite/merkle-proofs-explained-6dd429623dc5)
+of the 
+[Merkle Tree](https://en.wikipedia.org/wiki/Merkle_tree)
+that has been build for the *IOTA DL* for the specific milestone.
+
+The PoI must be stored together with the block data in your own data backend.
+This way the PoI and block data can be validated later on using an *IOTA Node*
+instance that runs the
+[INX Proof of Inclusion](https://github.com/iotaledger/inx-poi)
+plugin.
+
+The [*SUSEE Node*](susee-node/README.md) contained in the *susee-streams-poc*
+provides an *INX Proof of Inclusion* plugin.
+
 ###### How is IOTA Streams used?
 The *Streams* channel used for the SUSEE project generally can be described as follows:
 * One single branch per *Sensor*

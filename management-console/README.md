@@ -278,10 +278,12 @@ files from the initialization system to the *SUSEE Node* follow these steps:
   * wallet-management-console.txt
 * In the admin home folder of the *SUSEE Node*:<br>
   `$ sudo chown 65532:65532 management-console-data/*`<br>
-  `$ sudo cp management-console-data/* susee-poc/data/management-console`<br>
+  `$ sudo cp -a management-console-data/* susee-poc/data/management-console`<br>
   We expect here, that the docker compose environment runs in the subfolder
   `susee-poc` in the admin home folder as been described
-  [here](../docker#start-iota-bridge-and-message-explorer-as-public-available-service)
+  [here](../docker#start-iota-bridge-and-message-explorer-as-public-available-service).<br>
+  The -a (--archive) flag used with the cp command helps to preserve file
+  permissions and ownership.
 * In the `susee-poc` subfolder of the admin home folder:<br>
   `docker compose restart management-console`
   

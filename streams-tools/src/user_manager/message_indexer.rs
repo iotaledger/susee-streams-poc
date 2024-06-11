@@ -90,8 +90,9 @@ impl Default for MessageIndexerOptions {
 
 impl fmt::Display for MessageIndexerOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "MessageIndexerOptions:\n     iota_node: {}\n     port: {}",
-               self.iota_node, self.inx_collector_port
+        let throttle_ms = self.throttle_sleep_time_millisecs.unwrap_or(0);
+        write!(f, "MessageIndexerOptions:\n     iota_node: {}\n     port: {}\n     throttle [ms]: {}",
+               self.iota_node, self.inx_collector_port, throttle_ms
         )
     }
 }
@@ -159,11 +160,13 @@ impl MessageIndexer {
             }
         }
 
+        log::debug!("[fn get_transport_msg_payload()] message_hex_str: {}", message_hex_str);
         let payload_data = hex::decode(message_hex_str)
             .map_err(|e| LetsError::External(anyhow!("Error on hex decoding payload_data for msg_index '{}'. Error: {}", msg_index_hex_str, e)))?;
 
         let transport_msg = TransportMessage::new(payload_data);
         let _preparsed: PreparsedMessage = transport_msg.clone().parse_header().await?;
+        log::debug!("[fn get_transport_msg_payload()] _preparsed: {:?}", _preparsed);
         Ok(vec![transport_msg])
     }
 

@@ -18,8 +18,10 @@ use hyper::{
 
 use lets::{
     transport::{
+        Transport,
         tangle::Client
     },
+    message::TransportMessage
 };
 
 use crate::{
@@ -51,15 +53,19 @@ use super::{
         HealthChecker,
         HealthCheckerOptions
     },
+    streams_transport_no_tangle::{
+        StreamsTransportNoTangle,
+        StreamsTransportNoTangleOptions
+    }
 };
 
 #[derive(Clone)]
-pub struct ClientFactory {
+pub struct TangleTransportFactory {
     iota_node: String,
 }
 
 #[async_trait(?Send)]
-impl  TransportFactory for ClientFactory {
+impl  TransportFactory for TangleTransportFactory {
     type Output = Client<MessageIndexer>;
 
     async fn new_transport<'a>(&self) -> Rc<RefCell<Self::Output>> {
@@ -74,25 +80,46 @@ impl  TransportFactory for ClientFactory {
 }
 
 #[derive(Clone)]
-pub struct IotaBridgeOptions {
+pub struct NoTangleTransportFactory {
     iota_node: String,
-    error_handling: ErrorHandlingStrategy,
+}
+
+#[async_trait(?Send)]
+impl  TransportFactory for NoTangleTransportFactory {
+    type Output = StreamsTransportNoTangle;
+
+    async fn new_transport<'a>(&self) -> Rc<RefCell<Self::Output>> {
+        Rc::new(RefCell::new(
+            StreamsTransportNoTangle::new(
+                StreamsTransportNoTangleOptions::new(self.iota_node.clone())
+            )
+        ))
+    }
+}
+
+#[derive(Clone)]
+pub struct IotaBridgeOptions {
+    pub iota_node: String,
+    pub error_handling: ErrorHandlingStrategy,
+    pub use_tangle_transport: bool,
 }
 
 impl IotaBridgeOptions {
     pub fn new(iota_node: &str, error_handling: ErrorHandlingStrategy) -> Self {
         Self {
             iota_node: iota_node.to_string(),
-            error_handling
+            error_handling,
+            use_tangle_transport: true,
         }
     }
 }
 
 impl fmt::Display for IotaBridgeOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "IotaBridgeOptions:\n   iota_node: {}\n   error_handling: {}",
+        write!(f, "IotaBridgeOptions:\n   iota_node: {}\n   error_handling: {}\n   use_tangle_transport: {}",
                self.iota_node,
                self.error_handling,
+               self.use_tangle_transport
         )
     }
 }
@@ -111,23 +138,54 @@ pub struct IotaBridge<'a> {
 impl<'a> IotaBridge<'a>
 {
     pub async fn new(options: IotaBridgeOptions, lora_wan_node_store: LoraWanNodeDataStore, pending_request_store: PendingRequestDataStore, buffered_message_store: BufferedMessageDataStore) -> IotaBridge<'a> {
-        let client_factory = ClientFactory {iota_node: options.iota_node.clone()};
-        let health_checker = HealthChecker::new(HealthCheckerOptions::new(options.iota_node.clone()));
-        IotaBridge {
-            scope_provide: ServerScopeProvide::new(),
-            dispatch_streams: DispatchStreams::new(
-                options.error_handling.clone(),
-                client_factory.clone(),
+        let dispatch_streams = if options.use_tangle_transport {
+            Self::get_dispatch_streams(
+                &options,
                 lora_wan_node_store.clone(),
                 pending_request_store,
-                health_checker,
-            ),
+                TangleTransportFactory {iota_node: options.iota_node.clone()}
+            )
+        } else {
+            Self::get_dispatch_streams(
+                &options,
+                lora_wan_node_store.clone(),
+                pending_request_store,
+                NoTangleTransportFactory {iota_node: options.iota_node.clone()}
+            )
+        };
+
+        IotaBridge {
+            scope_provide: ServerScopeProvide::new(),
+            dispatch_streams,
             dispatch_command: DispatchCommand::new(),
             dispatch_confirm: DispatchConfirm::new(),
-            dispatch_lorawan_node: DispatchLoraWanNode::new(lora_wan_node_store.clone()),//, pending_request_store.clone()),
+            dispatch_lorawan_node: DispatchLoraWanNode::new(lora_wan_node_store.clone()),
             dispatch_lorawan_rest: DispatchLorawanRest::new(),
             process_finally: ProcessFinally::new(lora_wan_node_store, buffered_message_store),
         }
+    }
+
+    fn get_dispatch_streams<TransportFactoryT>(
+        options: &IotaBridgeOptions,
+        lora_wan_node_store: LoraWanNodeDataStore,
+        pending_request_store: PendingRequestDataStore,
+        trans_factory: TransportFactoryT
+    ) -> DispatchStreams
+        where
+            TransportFactoryT: TransportFactory + 'static,
+            for<'b> <TransportFactoryT as TransportFactory>::Output: Transport<'b, Msg = TransportMessage, SendResponse = TransportMessage> + 'static
+    {
+        let health_checker = HealthChecker::new(HealthCheckerOptions::new(
+            options.iota_node.clone(),
+            options.use_tangle_transport,
+        ));
+        DispatchStreams::new(
+            options.error_handling.clone(),
+            trans_factory,
+            lora_wan_node_store,
+            pending_request_store,
+            health_checker,
+        )
     }
 
     pub async fn handle_request(&mut self, req: Request<Body>) -> Result<Response<Body>> {

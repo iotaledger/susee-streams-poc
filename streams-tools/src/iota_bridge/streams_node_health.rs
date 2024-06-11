@@ -33,12 +33,14 @@ pub struct HealthCheckerOptions {
     pub iota_node: String,
     pub inx_collector_port: u16,
     pub minio_db_poort: u16,
+    pub use_tangle_transport: bool,
 }
 
 impl HealthCheckerOptions {
-    pub fn new(iota_node: String) -> Self {
+    pub fn new(iota_node: String, use_tangle_transport: bool) -> Self {
         let mut ret_val = Self::default();
         ret_val.iota_node = iota_node;
+        ret_val.use_tangle_transport = use_tangle_transport;
         ret_val
     }
 
@@ -61,6 +63,7 @@ impl Default for HealthCheckerOptions {
             iota_node: "127.0.0.1".to_string(),
             inx_collector_port: STREAMS_TOOLS_CONST_INX_COLLECTOR_PORT,
             minio_db_poort: STREAMS_TOOLS_CONST_MINIO_DB_PORT,
+            use_tangle_transport: true,
         }
     }
 }
@@ -104,9 +107,9 @@ impl HealthChecker {
         }
     }
 
-    pub async fn is_healthy(&self) -> Result<bool> {
-        #[cfg(feature = "http_client_tls")]
-        {
+    #[cfg(feature = "http_client_tls")]
+    async fn is_iota_node_healthy(&self) -> Result<bool> {
+        if self.options.use_tangle_transport {
             let iota_node_url = format!("{}{}",
                                         self.options.get_iota_node_url(),
                                         EndpointUris::get_uri___iota_node___health()
@@ -115,6 +118,15 @@ impl HealthChecker {
             if !self.https_client.is_request_successful(iota_node_url, "IOTA Node", None).await? {
                 return Ok(false);
             }
+        }
+
+        Ok(true)
+    }
+
+    pub async fn is_healthy(&self) -> Result<bool> {
+        #[cfg(feature = "http_client_tls")]
+        if !self.is_iota_node_healthy().await? {
+            return Ok(false);
         }
 
         let inx_collector_url = format!("{}{}",

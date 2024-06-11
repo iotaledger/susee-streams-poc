@@ -51,6 +51,7 @@ use cli::{
     IotaBridgeCli,
     ARG_KEYS,
     get_arg_matches,
+    shall_tangle_transport_be_used,
 };
 
 mod cli;
@@ -89,16 +90,24 @@ fn main() {
         file_path_and_name: get_data_folder_file_path(&cli.data_dir, "iota-bridge.sqlite3")
     };
 
-    run_buffered_message_loop_in_background(&local, cli.node, db_connection_opt.clone());
+    run_buffered_message_loop_in_background(
+        &local,
+        cli.node,
+        shall_tangle_transport_be_used(&cli),
+        db_connection_opt.clone()
+    );
     local.block_on(&rt, run(db_connection_opt.clone(), cli));
 }
 
-fn run_buffered_message_loop_in_background(local: &LocalSet, iota_node: &str, db_connection_opt: DbFileBasedDaoManagerOptions) {
+fn run_buffered_message_loop_in_background(local: &LocalSet, iota_node: &str, use_tangle_transport: bool, db_connection_opt: DbFileBasedDaoManagerOptions) {
+    let mut options = BufferedMessageLoopOptions::new(
+        iota_node,
+        move || { BufferedMessageDataStore::new(db_connection_opt.clone()) }
+    );
+    options.use_tangle_transport = use_tangle_transport;
+
     local.spawn_local(
-        run_buffered_message_loop( BufferedMessageLoopOptions::new(
-            iota_node,
-            move || { BufferedMessageDataStore::new(db_connection_opt.clone()) }
-        ))
+        run_buffered_message_loop(options)
     );
 }
 
@@ -116,10 +125,12 @@ async fn run<'a>(db_connection_opt: DbFileBasedDaoManagerOptions, cli: IotaBridg
     } else {
         ErrorHandlingStrategy::default()
     };
-    let options = IotaBridgeOptions::new(
+    let mut options = IotaBridgeOptions::new(
         cli.node,
         error_handling,
     );
+
+    options.use_tangle_transport = shall_tangle_transport_be_used(&cli);
     log::info!("Using {}", options);
     let client = IotaBridge::new(options, lora_wan_node_store, pending_request_store, buffered_message_store).await;
 

@@ -14,6 +14,7 @@ mod dispatch_scope;
 mod fifo_queue;
 mod streams_transport_pool;
 mod streams_node_health;
+mod streams_transport_no_tangle;
 
 #[cfg(feature = "http_client_tls")]
 mod streams_node_health_https_client;

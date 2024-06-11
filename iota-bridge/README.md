@@ -15,7 +15,7 @@ It provides a REST API to:
 * Send remote control confirmations from a *Sensor* application to the *x86/PC Sensor*
   or *Management Console* application
 * Receive IotaBridgeRequest packages containing one of the above described REST API requests as
-  a binary serialized package which can be used to interact with the IOTA Bridge e.g. via LoRaWAN
+  a binary serialized package which can be used to interact with the *IOTA Bridge* e.g. via LoRaWAN
 
 ## Prerequisites and Build
 Please have a look at the [Prerequisites](../README.md#prerequisites)
@@ -48,6 +48,7 @@ the *IOTA-Bridge* offers the following CLI arguments.
                 -n="example.com"
              [default: 127.0.0.1]
 
+#### Error Handling
 The `--error-handling` argument can be used to control the handling of SUSEE-Node service
 errors. For more details please see the
 [IOTA Bridge Error Handling](#iota-bridge-error-handling-for-lorawan-node-endpoints)
@@ -86,7 +87,33 @@ section below.
             For more details regarding the different error types please see the
             iota-bridge Readme.md file.
              [default: always-return-errors]         
-                      
+
+#### Send messages not using *IOTA Tangle*
+
+In case of an IOTA protocol update in the IOTA mainnet or Shimmernet, the deployed
+*IOTA Bridge* will not be able to communicate with an *IOTA Node* anymore.
+The `--do-not-use-tangle-transport` argument can be used to bypass the *IOTA Node*
+and to send the Sensor messages directly to the deployed
+[INX Collector](../susee-node/README.md#susee-node-resources).
+This option may be used as a workaround until the new protocol version has been integrated in the
+*IOTA Bridge* and other *susee-streams-poc* applications (in other words: Until the
+*susee-streams-poc* has been updated to the new protocol version).
+
+Using the `--do-not-use-tangle-transport` argument to bypass the *IOTA Node* means that no 
+[Proof of Inclusion Validation](../README.md#proof-of-inclusion-or-why-is-iota-distributed-ledger-used)
+can be done later on. 
+
+    -t, --do-not-use-tangle-transport
+            If this argument is NOT specified, the IOTA tangle
+            will be used for Sensor message transport.
+            If this argument is specified, the messages will be send directly
+            via the inx-collector to the database.
+            
+            Example for sending messages directly to the inx-collector:
+            
+                    ./iota-bridge --do-not-use-tangle-transport -n="my-susee-node-domain.com"
+
+
 ## IOTA Bridge REST API
 
 Most of the REST API is used internally by the accompanying susee-streams-poc applications.

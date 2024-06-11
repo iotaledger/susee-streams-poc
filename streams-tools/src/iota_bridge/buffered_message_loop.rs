@@ -33,15 +33,20 @@ use crate::{
         Limit,
         MatchType
     },
-    iota_bridge::{
-        BufferedMessageDataStore,
-        dao::BufferedMessage,
-    },
     helpers::get_iota_node_url,
     user_manager::message_indexer::{
         MessageIndexer,
         MessageIndexerOptions
     },
+};
+
+use super::{
+    BufferedMessageDataStore,
+    dao::BufferedMessage,
+    streams_transport_no_tangle::{
+        StreamsTransportNoTangle,
+        StreamsTransportNoTangleOptions
+    }
 };
 
 type LetsClient = Client::<MessageIndexer, TransportMessage, TransportMessage>;
@@ -53,6 +58,7 @@ pub struct BufferedMessageLoopOptions {
     pub send_messages_interval_in_secs: u64,
     pub max_send_messages_working_time_in_secs: u64,
     pub idle_status_log_messages_interval_secs: u64,
+    pub use_tangle_transport: bool,
 }
 
 impl BufferedMessageLoopOptions {
@@ -63,6 +69,7 @@ impl BufferedMessageLoopOptions {
             send_messages_interval_in_secs: 5,
             max_send_messages_working_time_in_secs: 1,
             idle_status_log_messages_interval_secs: 60,
+            use_tangle_transport: true,
         }
     }
 }
@@ -139,7 +146,7 @@ async fn send_all_buffered_messages(opt: BufferedMessageLoopOptions) -> Result<L
     let mut ret_val = LoopStatus::new(0,0, None);
     'iterate_messages: loop {
         log::debug!("[fn send_all_buffered_messages] Calling check_buffered_message_existence_and_handle_it()");
-        match check_buffered_message_existence_and_handle_it(opt.iota_node.as_str(), &mut buffered_message_store).await {
+        match check_buffered_message_existence_and_handle_it(&opt, &mut buffered_message_store).await {
             Ok(loop_status) => {
                 log::debug!("[fn send_all_buffered_messages] check_buffered_message_existence_and_handle_it returned loop_status: {:?}", loop_status);
                 ret_val.processed += loop_status.processed;
@@ -165,7 +172,7 @@ async fn send_all_buffered_messages(opt: BufferedMessageLoopOptions) -> Result<L
     Ok(ret_val)
 }
 
-async fn check_buffered_message_existence_and_handle_it(iota_node: &str, buffered_message_store: &mut BufferedMessageDataStore) -> Result<LoopStatus> {
+async fn check_buffered_message_existence_and_handle_it(opt: &BufferedMessageLoopOptions, buffered_message_store: &mut BufferedMessageDataStore) -> Result<LoopStatus> {
     let mut conditions = Vec::<Condition>::new();
     let mut conditions_mngr = Conditions(&mut conditions);
     conditions_mngr.add(None, "link", MatchType::ListEverything);
@@ -173,7 +180,7 @@ async fn check_buffered_message_existence_and_handle_it(iota_node: &str, buffere
     let (messages, total_cnt) = buffered_message_store.filter(conditions, Some(limit))?;
     log::debug!("[fn check_buffered_message_existence_and_handle_it] messages.len = {}, total_cnt: {}", messages.len(), total_cnt);
     let ret_val = if messages.len() > 0 {
-        match handle_buffered_messages(iota_node, messages, buffered_message_store).await {
+        match handle_buffered_messages(opt, messages, buffered_message_store).await {
             Ok(proc_msgs) => LoopStatus::new( total_cnt - proc_msgs, proc_msgs, None),
             Err(err) => {
                 LoopStatus::new( total_cnt, 0, Some(err))
@@ -190,29 +197,50 @@ async fn check_buffered_message_existence_and_handle_it(iota_node: &str, buffere
 }
 
 async fn handle_buffered_messages(
-    iota_node: &str,
+    opt: &BufferedMessageLoopOptions,
     messages: Vec::<BufferedMessage>,
     buffered_message_store: &mut BufferedMessageDataStore
 ) -> LetsResult<usize> {
-    let mut client = create_lets_client(iota_node).await?;
+    let mut transport: Box<(dyn Transport<'_, Msg=TransportMessage, SendResponse=TransportMessage>)> =
+        if opt.use_tangle_transport {
+            create_lets_client(opt.iota_node.as_str()).await?
+        } else {
+            create_no_tangle_transport(opt.iota_node.as_str())?
+        };
     let mut processed_messages: usize = 0;
+    log::debug!("[fn handle_buffered_messages] Transport has been created. Starting loop over messages.");
     for message in messages {
-        processed_messages += send_buffered_message(&mut client, &message, buffered_message_store).await?;
+        processed_messages += send_buffered_message(&mut transport, &message, buffered_message_store).await?;
     }
     Ok(processed_messages)
 }
 
-async fn create_lets_client(iota_node: &str) -> LetsResult<LetsClient> {
+async fn create_lets_client(iota_node: &str) -> LetsResult<Box<LetsClient>> {
     let indexer = MessageIndexer::new(MessageIndexerOptions::new(iota_node.to_string()));
-    LetsClient::for_node(
+    Ok(Box::new(LetsClient::for_node(
             &get_iota_node_url(iota_node),
             indexer
         )
-        .await
+        .await?
+    ))
 }
 
-async fn send_buffered_message(client: &mut LetsClient, message: &BufferedMessage, buffered_message_store: &mut BufferedMessageDataStore) -> LetsResult<usize> {
-    let _response = client.send_message(
+fn create_no_tangle_transport(iota_node: &str) -> LetsResult<Box<StreamsTransportNoTangle>> {
+    Ok(Box::new(
+        StreamsTransportNoTangle::new(
+            StreamsTransportNoTangleOptions::new(iota_node.to_string())
+        )
+    ))
+}
+
+async fn send_buffered_message<'a>(
+    transport: &mut Box<dyn Transport<'a, Msg=TransportMessage,
+    SendResponse=TransportMessage>>,
+    message: &BufferedMessage,
+    buffered_message_store: &mut BufferedMessageDataStore
+) -> LetsResult<usize>
+{
+    let _response = transport.send_message(
             message.link.parse().unwrap(),
             TransportMessage::new(message.body.clone())
         )

@@ -99,7 +99,7 @@ This option may be used as a workaround until the new protocol version has been 
 *IOTA Bridge* and other *susee-streams-poc* applications (in other words: Until the
 *susee-streams-poc* has been updated to the new protocol version).
 
-Using the `--do-not-use-tangle-transport` argument to bypass the *IOTA Node* means that no 
+Using the `--do-not-use-tangle-transport` argument means that no 
 [Proof of Inclusion Validation](../README.md#proof-of-inclusion-or-why-is-iota-distributed-ledger-used)
 can be done later on. 
 

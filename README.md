@@ -124,9 +124,9 @@ roles and technical components of the SUSEE project please see below in the
 
 *IOTA Streams* is a library that has been developed by the IOTA Foundation
 to ease decentralized access control for data streams that are
-communicated via a public permissionless distributed ledgers.
+communicated via public permissionless distributed ledgers.
 
-*IOTA Streams* prrovides the following features:
+*IOTA Streams* provides the following features:
 * Structuring of message streams using *Streams Channels* and *Message Branches*
 * Secure private encrypted data transmissions
 * Automatic secure authentication of participants through
@@ -160,8 +160,9 @@ instance that runs the
 [INX Proof of Inclusion](https://github.com/iotaledger/inx-poi)
 plugin.
 
-The [*SUSEE Node*](susee-node/README.md) contained in the *susee-streams-poc*
-provides an *INX Proof of Inclusion* plugin.
+The [*SUSEE Node*](susee-node/README.md), contained in the *susee-streams-poc*,
+provides an *INX Proof of Inclusion* plugin and stores the block data together with their
+PoIs.
 
 ###### How is IOTA Streams used?
 The *Streams* channel used for the SUSEE project generally can be described as follows:

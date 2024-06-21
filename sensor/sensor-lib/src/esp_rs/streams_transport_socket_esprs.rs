@@ -104,7 +104,7 @@ impl StreamsTransport for StreamsTransportSocketEspRs {
         let options = options.unwrap_or_default();
         log::debug!("[fn new()] Creating new HttpClient using options: {}", options);
         let mut esp_http_client_opt = HttpConfiguration::default();
-        esp_http_client_opt.timeout = Some(Duration::from_secs(60));
+        esp_http_client_opt.timeout = Some(Duration::from_secs(120));
         Self {
             request_builder: RequestBuilderStreams::new(options.http_url.as_str()),
             initialization_cnt: 0,

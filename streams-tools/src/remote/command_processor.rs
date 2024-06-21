@@ -46,10 +46,10 @@ pub trait CommandProcessor {
     fn get_dev_eui(&self) -> String;
     async fn fetch_next_command(&self) -> Result<(Command, Vec<u8>)>;
     async fn send_confirmation(&self, confirmation_request: Request<Body>) -> Result<()>;
-    async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>>;
+    async fn process_command(&mut self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>>;
 }
 
-pub async fn run_command_fetch_loop(cmd_prcssr: impl CommandProcessor, options: Option<CommandFetchLoopOptions>) -> Result<()> {
+pub async fn run_command_fetch_loop(mut cmd_prcssr: impl CommandProcessor, options: Option<CommandFetchLoopOptions>) -> Result<()> {
     let opt = options.unwrap_or_default();
     loop {
         if let Ok((command, buffer)) = cmd_prcssr.fetch_next_command().await {

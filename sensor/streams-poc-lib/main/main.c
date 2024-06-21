@@ -29,17 +29,36 @@
 
 #include <inttypes.h>
 
+// Defines how the Sensor application connects to the iota-bridge.
+// Following connection types can only be used for Sensor-Initialization:
+//  * SMCT_CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS
+//  * SMCT_LWIP
+//  * SMCT_STREAMS_POC_LIB_MANAGED_WIFI
+//
+// This is because a Sensor is expected to send messages via an
+// Application-Server-Connector in real world scenarios.
+// Therefore only SMCT_CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK
+// can be used for Send-Message processing.
+//
+// Sensor-Initialization may happen in a location where WiFi is available.
+// Therefore the above listed connection types can be used for
+// Sensor-Initialization.
+//
 // SMCT_CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS
+//      ------- Only available for Sensor-Initialization ------
 //      Callback driven, where the callback directly connects to the iota-bridge
 //      via a WiFi connection controlled by the test app.
 // SMCT_CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK
+//      Available for: Sensor-Initialization and Send-Message processing.
 //      Callback driven, where the callback uses the 'Application Server Connector Mock',
 //      which is connected via a WiFi socket controlled by the test app.
 // SMCT_LWIP:
+//      ------- Only available for Sensor-Initialization ------
 //      Direct http communication between streams-poc-lib and iota-bridge
-//      via a lwip connection provided by the test app. Currently a WiFi connect is used, but
+//      via a lwip connection provided by the test app. Currently a WiFi connection is used, but
 //      other connections that support LWIP can be used equivalent.
 // SMCT_STREAMS_POC_LIB_MANAGED_WIFI
+//      ------- Only available for Sensor-Initialization ------
 //      Direct http communication between streams-poc-lib and iota-bridge via a WiFi
 //      connection controlled by the streams-poc-lib.
 typedef enum {
@@ -53,29 +72,42 @@ typedef enum {
    ############################ Test CONFIG ###############################################
    ######################################################################################## */
 
-static const sensor_manager_connection_type_t SENSOR_MANAGER_CONNECTION_TYPE = SMCT_CALLBACK_DIRECT_IOTA_BRIDGE_ACCESS;
+// Choose which connection type shall be used to connect the iota-bridge
+static const sensor_manager_connection_type_t SENSOR_MANAGER_CONNECTION_TYPE = SMCT_CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK;
 
 // Please edit your Wifi credentials here. Needed for Sensor initialization.
 #define STREAMS_POC_LIB_TEST_WIFI_SSID "Susee Demo"
 #define STREAMS_POC_LIB_TEST_WIFI_PASS "susee-rocks"
 // The url of the iota-bridge to connect to. Needed for Sensor initialization.
-#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.189.223:50000")
+#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.0.100:50000")
 // IP address and port of the LoRaWAN AppServer Connector Mockup Tool to connect to.
 // Needed for sending messages.
-#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.189.223:50001")
+#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.0.100:50001")
 
 #define SEND_MESSAGES_EVERY_X_SEC 5
 
-// Setting STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH to NULL will make the streams-poc-lib
-// using its own vfs_fat partition as been described in streams-poc-lib.h
-// (sensor/streams-poc-lib/components/streams-poc-lib/include/streams-poc-lib.h)
-//
-// Specifying a STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH here will make the streams-poc-lib
-// using a prepared file system. This test application can only handle vfs_fat base_path
-// names so no subfolders are allowed.
-// Example:
-//          #define STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH ("/awesome-data")
-#define STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH NULL
+// Defines how streams client data shall be stored
+// Possible values: [CLIENT_DATA_STORAGE_VFS_FAT, CLIENT_DATA_STORAGE_CALL_BACK]
+// More details can be found in sensor/streams-poc-lib/components/streams-poc-lib/include/streams-poc-lib.h
+static const StreamsClientDataStorageType s_streams_client_data_storage_type = CLIENT_DATA_STORAGE_CALL_BACK;
+
+// Defines how vfs_fat data partitions, needed to store files in spiflash, shall be managed
+// Possible values: [VFS_FAT_STREAMS_POC_LIB_MANAGED, VFS_FAT_APPLICATION_MANAGED]
+// More details can be found in sensor/streams-poc-lib/components/streams-poc-lib/include/streams-poc-lib.h
+static const VfsFatManagement s_vfs_fat_management = VFS_FAT_APPLICATION_MANAGED;
+
+// In case s_vfs_fat_management == VFS_FAT_APPLICATION_MANAGED the following macro defines
+// the path used as param vfs_fat_path for the prepare_client_data_storage___vfs_fat___application_managed()
+// function call.
+// This test application will prepare a file system which is used by the streams_poc_lib.
+// This test application can only handle vfs_fat base_path names, so no subfolders are allowed.
+#define STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH ("/awesome-data")
+
+// In case s_streams_client_data_storage_type == CLIENT_DATA_STORAGE_CALL_BACK,
+// this test application will store the Streams client state data in a file
+// with the following filename.
+#define STREAMS_CLIENT_DATA_FILE_NAME ("/client-data.bin")
+
 
 #define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_PSK
 #define STREAMS_POC_LIB_TEST_MAXIMUM_RETRY 5
@@ -115,6 +147,11 @@ static uint64_t s_mac_id = 0;
 
 static bool s_perform_p_caller_user_data_test = false;
 
+// Several static variables needed for the streams-client-data callback
+static char s_streams_client_data_file_name_buf[256];
+static uint8_t s_streams_client_data_buffer[2048];
+static size_t s_streams_client_data_buffer_len;
+static bool s_application_managed_fat_fs_is_mounted = false;
 
 // This is the binary representation of the content of the file /test/meter_reading_1.json
 #define MESSAGE_DATA_LENGTH 50 // 80 // 213
@@ -170,6 +207,158 @@ typedef struct test_p_caller_user_data_wrapper{
     test_p_caller_user_data_t fun_ptr;
 } test_p_caller_user_data_wrapper_t;
 
+// --------------------------------------------------------------------------------------------------------------
+
+void set_streams_client_data_buffer(
+   const uint8_t *client_data_bytes,
+   size_t client_data_bytes_length
+) {
+    memcpy(s_streams_client_data_buffer, client_data_bytes, client_data_bytes_length);
+    s_streams_client_data_buffer_len = client_data_bytes_length;
+    ESP_LOGI(TAG, "[fn set_streams_client_data_buffer()] Copied client_data_bytes into local data buffer. length: %i", client_data_bytes_length);
+}
+
+const char *get_vfs_fat_base_path() {
+    switch (s_vfs_fat_management) {
+     case VFS_FAT_STREAMS_POC_LIB_MANAGED:
+        return get_vfs_fat_mount_base_path();
+     case VFS_FAT_APPLICATION_MANAGED:
+        return STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH;
+     default:
+        ESP_LOGE(TAG, "[fn prepare_streams_client_data_file_name()] s_vfs_fat_management value is not allowed: %d", s_vfs_fat_management);
+        return NULL;
+    }
+}
+
+bool streams_client_data_update_call_back(
+    const uint8_t *client_data_bytes,
+    size_t client_data_bytes_length,
+    void *p_caller_user_data
+) {
+    if (client_data_bytes_length > 0) {
+        ESP_LOGI(TAG, "[fn streams_client_data_update_call_back()] Opening file for writing: %s", s_streams_client_data_file_name_buf);
+        FILE *f = fopen(s_streams_client_data_file_name_buf, "wb+");
+        if (f == NULL) {
+            ESP_LOGE(TAG, "[fn streams_client_data_update_call_back()] Failed to open file for writing %s", s_streams_client_data_file_name_buf);
+            return false;
+        }
+        // Step 1: Write size of client_data_bytes to file
+        size_t bytes_written = fwrite(&client_data_bytes_length, sizeof(size_t), 1, f);
+        if (bytes_written <= 0) {
+            return false;
+        };
+        // Step 2: Write client_data_bytes to file
+        bytes_written = fwrite(client_data_bytes, 1, client_data_bytes_length, f);
+        if (bytes_written <= 0) {
+            return false;
+        };
+        int success_is_zero = fclose(f);
+        if (success_is_zero != 0) {
+            return false;
+        }
+        ESP_LOGI(TAG, "[fn streams_client_data_update_call_back()] Wrote client_data_bytes into file. client_data_bytes_length: %i", client_data_bytes_length);
+    } else {
+        ESP_LOGI(TAG, "[fn streams_client_data_update_call_back()] client_data_bytes_length == 0. Removing file %s", s_streams_client_data_file_name_buf);
+        int success_is_zero = remove(s_streams_client_data_file_name_buf);
+        if (success_is_zero < 0) {
+            ESP_LOGD(TAG, "[fn streams_client_data_update_call_back()] remove file failed, probably the file didn't exist");
+        }
+    }
+
+    ESP_LOGI(TAG, "[fn streams_client_data_update_call_back()] Updating s_streams_client_data_buffer" );
+    set_streams_client_data_buffer(client_data_bytes, client_data_bytes_length);
+    return true;
+}
+
+void unmout_vfs_fat(wl_handle_t wl_handle) {
+    if (s_application_managed_fat_fs_is_mounted && wl_handle != WL_INVALID_HANDLE) {
+        ESP_LOGI(TAG, "[fn unmout_vfs_fat] unmounting vfs_fat");
+        ESP_ERROR_CHECK(esp_vfs_fat_spiflash_unmount(get_vfs_fat_base_path(), wl_handle));
+        s_application_managed_fat_fs_is_mounted = false;
+    }
+}
+
+static bool mount_fatfs(wl_handle_t *p_wl_handle)
+{
+    if (false == s_application_managed_fat_fs_is_mounted) {
+        const char* base_path = get_vfs_fat_base_path();
+        ESP_LOGI(TAG, "[fn mount_fatfs] Mounting FAT filesystem with base_path '%s'", base_path);
+        const esp_vfs_fat_mount_config_t mount_config = {
+            .max_files = 4,
+            .format_if_mount_failed = true,
+            .allocation_unit_size = CONFIG_WL_SECTOR_SIZE};
+        esp_err_t err = esp_vfs_fat_spiflash_mount(
+            base_path,
+            "storage",
+            &mount_config,
+            p_wl_handle);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "[fn mount_fatfs] Failed to mount FATFS (%s)", esp_err_to_name(err));
+            return false;
+        }
+        s_application_managed_fat_fs_is_mounted = true;
+        return true;
+    } else {
+        ESP_LOGW(TAG, "[fn mount_fatfs] Function mount_fatfs() should not be called if s_application_managed_fat_fs_is_mounted == false");
+        return false;
+    }
+}
+
+int read_streams_client_data_from_file() {
+    wl_handle_t wl_handle = WL_INVALID_HANDLE;
+    if (false == s_application_managed_fat_fs_is_mounted) {
+        ESP_LOGI(TAG, "[fn read_streams_client_data_from_file()] Mounting FatFs");
+        mount_fatfs(&wl_handle);
+    } else {
+        ESP_LOGI(TAG, "[fn read_streams_client_data_from_file()] FatFs is already mounted");
+    }
+
+    s_streams_client_data_buffer_len = 0;
+    ESP_LOGI(TAG, "[fn read_streams_client_data_from_file()] Opening file for reading: %s", s_streams_client_data_file_name_buf);
+    FILE *f = fopen(s_streams_client_data_file_name_buf, "rb");
+    if (f == NULL) {
+        ESP_LOGE(TAG, "[fn read_streams_client_data_from_file()] Failed to open file for reading %s", s_streams_client_data_file_name_buf);
+        unmout_vfs_fat(wl_handle);
+        return 0;
+    }
+    // Step 1: Read size of client_data_bytes
+    size_t client_data_bytes_length;
+    int bytes_read = fread(&client_data_bytes_length, sizeof(size_t), 1, f);
+    if (bytes_read == 0) {
+        ESP_LOGE(TAG, "[fn read_streams_client_data_from_file()] File is empty. Returning 0.");
+        unmout_vfs_fat(wl_handle);
+        return 0;
+    };
+    if (bytes_read < 0) {
+        ESP_LOGE(TAG, "[fn read_streams_client_data_from_file()] fread() failed. Returning error.");
+        unmout_vfs_fat(wl_handle);
+        return bytes_read;
+    };
+    ESP_LOGI(TAG, "[fn read_streams_client_data_from_file()] Reading %d bytes of streams-client-data", client_data_bytes_length);
+    // Step 2: Read client_data_bytes
+    bytes_read = fread(s_streams_client_data_buffer, 1, client_data_bytes_length, f);
+    if (bytes_read != client_data_bytes_length) {
+        ESP_LOGE(TAG, "[fn read_streams_client_data_from_file()] bytes_read != client_data_bytes_length. Returning error.\n  bytes_read: %d \n  client_data_bytes_length: %d",
+        bytes_read, client_data_bytes_length);
+        unmout_vfs_fat(wl_handle);
+        return -1;
+    };
+    ESP_LOGD(TAG, "[fn read_streams_client_data_from_file()] Successfully read %d bytes", bytes_read);
+    int success_is_zero = fclose(f);
+    unmout_vfs_fat(wl_handle);
+    if (success_is_zero != 0) {
+        ESP_LOGE(TAG, "[fn read_streams_client_data_from_file()] fclose() failed. Returning error.");
+        return -1;
+    }
+    s_streams_client_data_buffer_len = bytes_read;
+    ESP_LOGI(TAG, "[fn read_streams_client_data_from_file()] Read client_data_bytes into local data buffer. client_data_bytes_length: %i",
+        s_streams_client_data_buffer_len
+    );
+    return s_streams_client_data_buffer_len;
+}
+
+// --------------------------------------------------------------------------------------------------------------
+
 static void wifi_init_event_handler(void *arg, esp_event_base_t event_base,
                                     int32_t event_id, void *event_data) {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
@@ -192,25 +381,6 @@ static void wifi_init_event_handler(void *arg, esp_event_base_t event_base,
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
-}
-
-static bool mount_fatfs(wl_handle_t *p_wl_handle)
-{
-    ESP_LOGI(TAG, "[fn mount_fatfs] Mounting FAT filesystem with base_path '%s'", STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH);
-    const esp_vfs_fat_mount_config_t mount_config = {
-        .max_files = 4,
-        .format_if_mount_failed = true,
-        .allocation_unit_size = CONFIG_WL_SECTOR_SIZE};
-    esp_err_t err = esp_vfs_fat_spiflash_mount(
-        STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
-        "storage",
-        &mount_config,
-        p_wl_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "[fn mount_fatfs] Failed to mount FATFS (%s)", esp_err_to_name(err));
-        return false;
-    }
-    return true;
 }
 
 void wifi_init_sta(void)
@@ -468,6 +638,84 @@ int get_handle_of_prepared_socket(dest_addr_t *p_dest_addr)
     return sock;
 }
 
+size_t prepare_streams_client_data_file_name() {
+    const char *base_path = get_vfs_fat_base_path();
+    strcpy(s_streams_client_data_file_name_buf, base_path);
+    strcat(s_streams_client_data_file_name_buf, STREAMS_CLIENT_DATA_FILE_NAME);
+    return strlen(s_streams_client_data_file_name_buf);
+}
+
+bool prepare_client_data_persistence_for_call_back_usage(streams_client_data_persistence_t *p_streams_client_data_persistence) {
+    int bytes_read_or_success = read_streams_client_data_from_file();
+    if (bytes_read_or_success < 0) {
+        ESP_LOGE(TAG, "[fn prepare_client_data_persistence_for_call_back_usage] read_streams_client_data_from_file() returned error");
+        return false;
+    }
+    bool is_sensor_initialized = (bytes_read_or_success > 0);
+    ESP_LOGD(TAG, "[fn prepare_client_data_persistence_for_call_back_usage] is_sensor_initialized: %i", is_sensor_initialized);
+
+    switch (s_vfs_fat_management) {
+        case VFS_FAT_STREAMS_POC_LIB_MANAGED:
+            ESP_LOGD(TAG, "[fn prepare_client_data_persistence_for_call_back_usage] case VFS_FAT_STREAMS_POC_LIB_MANAGED");
+            return prepare_client_data_storage___call_back___streams_poc_lib_managed_vfs_fat(
+                p_streams_client_data_persistence,
+                is_sensor_initialized,
+                s_streams_client_data_buffer,
+                s_streams_client_data_buffer_len,
+                streams_client_data_update_call_back,
+                NULL
+            );
+        case VFS_FAT_APPLICATION_MANAGED:
+            ESP_LOGD(TAG, "[fn prepare_client_data_persistence_for_call_back_usage] case VFS_FAT_APPLICATION_MANAGED");
+            bool result = prepare_client_data_storage___call_back___application_managed_vfs_fat(
+                p_streams_client_data_persistence,
+                STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
+                is_sensor_initialized,
+                s_streams_client_data_buffer,
+                s_streams_client_data_buffer_len,
+                streams_client_data_update_call_back,
+                NULL
+            );
+            ESP_LOGD(TAG, "[fn prepare_client_data_persistence_for_call_back_usage] result is %d", result);
+            return result;
+        default:
+            ESP_LOGE(TAG, "[fn prepare_client_data_persistence] Unknown s_streams_client_data_storage_type: %d",
+                s_streams_client_data_storage_type);
+   }
+   return false;
+}
+
+bool prepare_client_data_persistence(streams_client_data_persistence_t *p_streams_client_data_persistence) {
+    if (prepare_streams_client_data_file_name() <= 0) {
+        return false;
+    }
+
+    switch (s_streams_client_data_storage_type) {
+        case CLIENT_DATA_STORAGE_VFS_FAT: {
+            switch (s_vfs_fat_management) {
+                case VFS_FAT_STREAMS_POC_LIB_MANAGED:
+                    return prepare_client_data_storage___vfs_fat___streams_poc_lib_managed(p_streams_client_data_persistence);
+                case VFS_FAT_APPLICATION_MANAGED:
+                    return prepare_client_data_storage___vfs_fat___application_managed(
+                        p_streams_client_data_persistence,
+                        STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH
+                    );
+                default:
+                    ESP_LOGE(TAG, "[fn prepare_client_data_persistence] Unknown s_streams_client_data_storage_type: %d",
+                        s_streams_client_data_storage_type);
+            }
+        }
+        break;
+        case CLIENT_DATA_STORAGE_CALL_BACK:{
+            return prepare_client_data_persistence_for_call_back_usage(p_streams_client_data_persistence);
+       }
+       default:
+            ESP_LOGE(TAG, "[fn prepare_client_data_persistence] Unknown s_streams_client_data_storage_type: %d",
+                s_streams_client_data_storage_type);
+    }
+    return false;
+}
+
 void prepare_socket_and_send_message_via_app_srv_connector_mock(dest_addr_t *p_dest_addr) {
     s_socket_handle = get_handle_of_prepared_socket(p_dest_addr);
     if (s_socket_handle > -1) {
@@ -475,9 +723,20 @@ void prepare_socket_and_send_message_via_app_srv_connector_mock(dest_addr_t *p_d
         test_p_caller_user_data_wrapper_t some_caller_user_data;
         some_caller_user_data.fun_ptr = &test_p_caller_user_data;
         s_perform_p_caller_user_data_test = true;
-
-        ESP_LOGI(TAG, "[fn prepare_socket_and_send_message_via_app_srv_connector_mock] Calling send_message for MESSAGE_DATA of length %d \n\n", MESSAGE_DATA_LENGTH);
-        send_message(MESSAGE_DATA, MESSAGE_DATA_LENGTH, cb_fun_send_request_via_app_srv_connector_mock, STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH, &some_caller_user_data);
+        streams_client_data_persistence_t client_data_persistence;
+        bool succes = prepare_client_data_persistence(&client_data_persistence);
+        if (succes) {
+            ESP_LOGI(TAG, "[fn prepare_socket_and_send_message_via_app_srv_connector_mock] Calling send_message for MESSAGE_DATA of length %d \n\n", MESSAGE_DATA_LENGTH);
+            send_message(
+                MESSAGE_DATA,
+                MESSAGE_DATA_LENGTH,
+                cb_fun_send_request_via_app_srv_connector_mock,
+                &client_data_persistence,
+                &some_caller_user_data
+            );
+        } else {
+            ESP_LOGI(TAG, "[fn prepare_socket_and_send_message_via_app_srv_connector_mock] prepare_client_data_persistence had no Success");
+        }
 
         ESP_LOGI(TAG, "[fn prepare_socket_and_send_message_via_app_srv_connector_mock] Shutting down socket");
         shut_down_socket(s_socket_handle);
@@ -499,13 +758,16 @@ void init_sensor_via_app_srv_connector_mock(dest_addr_t *p_dest_addr) {
     if (s_socket_handle > -1) {
         char dev_eui_buffer[128];
         get_base_mac_48_as_mocked_u64_dev_eui_string(dev_eui_buffer);
-        start_sensor_manager(
-            cb_fun_send_request_via_app_srv_connector_mock,
-            dev_eui_buffer,
-            STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
-            NULL
-        );
-
+        streams_client_data_persistence_t client_data_persistence;
+        bool succes = prepare_client_data_persistence(&client_data_persistence);
+        if (succes) {
+            start_sensor_manager(
+                cb_fun_send_request_via_app_srv_connector_mock,
+                dev_eui_buffer,
+                &client_data_persistence,
+                NULL
+            );
+        }
         ESP_LOGI(TAG, "[fn init_sensor_via_app_srv_connector_mock] Shutting down socket");
         shut_down_socket(s_socket_handle);
     }
@@ -583,12 +845,16 @@ void init_sensor_via_callback_io(void) {
             ESP_LOGI(TAG, "[fn init_sensor_via_callback_io] Starting sensor_manager using IOTA-Bridge: %s", STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL);
             char dev_eui_buffer[128];
             get_base_mac_48_as_mocked_u64_dev_eui_string(dev_eui_buffer);
-            start_sensor_manager(
-                send_request_via_wifi,
-                dev_eui_buffer,
-                STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
-                NULL
-            );
+            streams_client_data_persistence_t client_data_persistence;
+            bool succes = prepare_client_data_persistence(&client_data_persistence);
+            if (succes) {
+                start_sensor_manager(
+                    send_request_via_wifi,
+                    dev_eui_buffer,
+                    &client_data_persistence,
+                    NULL
+                );
+            };
         }
         break;
         case SMCT_CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK:
@@ -624,13 +890,17 @@ void prepare_lwip_socket_based_sensor_processing(bool do_sensor_initialization) 
                 ESP_LOGI(TAG, "[fn prepare_lwip_socket_based_sensor_processing] Calling start_sensor_manager_lwip() without WiFi credentials");
                 char dev_eui_buffer[128];
                 get_base_mac_48_as_mocked_u64_dev_eui_string(dev_eui_buffer);
-                start_sensor_manager_lwip(
-                    STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,
-                    dev_eui_buffer,
-                    STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
-                    NULL,
-                    NULL
-                );
+                streams_client_data_persistence_t client_data_persistence;
+                bool success = prepare_client_data_persistence(&client_data_persistence);
+                if (success) {
+                    start_sensor_manager_lwip(
+                        STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,
+                        dev_eui_buffer,
+                        &client_data_persistence,
+                        NULL,
+                        NULL
+                    );
+                }
             }
             break;
             default:
@@ -645,7 +915,13 @@ void prepare_lwip_socket_based_sensor_processing(bool do_sensor_initialization) 
 }
 
 void process_test() {
-    if (is_streams_channel_initialized(STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH)) {
+    ESP_LOGD(TAG, "[fn process_test] Starting");
+    streams_client_data_persistence_t client_data_persistence;
+    bool success = prepare_client_data_persistence(&client_data_persistence);
+    if (!success) {
+        return;
+    }
+    if (is_streams_channel_initialized(&client_data_persistence)) {
         ESP_LOGI(TAG, "[fn process_test] Streams channel already initialized. Going to send messages every %d seconds", SEND_MESSAGES_EVERY_X_SEC);
         prepare_lwip_socket_based_sensor_processing(false);
     }
@@ -666,7 +942,7 @@ void process_test() {
                 start_sensor_manager_lwip(
                     STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL,
                     dev_eui_buffer,
-                    STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH,
+                    &client_data_persistence,
                     STREAMS_POC_LIB_TEST_WIFI_SSID,
                     STREAMS_POC_LIB_TEST_WIFI_PASS
                 );
@@ -700,15 +976,14 @@ void app_main(void) {
     ESP_LOGI(TAG, "[fn app_main] Free heap: %ld\n", esp_get_free_heap_size());
 
     wl_handle_t wl_handle = WL_INVALID_HANDLE;
-    if (STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH) {
+    if (s_vfs_fat_management == VFS_FAT_APPLICATION_MANAGED) {
         mount_fatfs(&wl_handle);
     }
 
     process_test();
 
-    if (STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH != NULL && wl_handle != WL_INVALID_HANDLE) {
-        ESP_LOGI(TAG, "[fn app_main] unmounting vfs_fat");
-        ESP_ERROR_CHECK(esp_vfs_fat_spiflash_unmount(STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH, wl_handle));
+    if (s_vfs_fat_management == VFS_FAT_APPLICATION_MANAGED && wl_handle != WL_INVALID_HANDLE) {
+        unmout_vfs_fat(wl_handle);
     }
 
     ESP_LOGI(TAG, "[fn app_main] Exiting Sensor App");

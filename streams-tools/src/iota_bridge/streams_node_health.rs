@@ -80,17 +80,20 @@ struct EndpointUris {}
 
 impl EndpointUris {
     pub const INX_COLLECTOR_BLOCK: &'static str = "/block";
-    pub const MINIO_HEALTH: &'static str = "/minio/health/live";
-    pub const IOTA_NODE_HEALTH: &'static str = "/health";
 
+    // Disabled code - See function is_healthy() TODO MinioHealthCheck
+    // pub const MINIO_HEALTH: &'static str = "/minio/health/live";
+
+    pub const IOTA_NODE_HEALTH: &'static str = "/health";
 
     pub fn get_uri___inx_collector___get_not_existing_block_tag() -> String {
         format!("{}/{}?checkExistence=true", Self::INX_COLLECTOR_BLOCK, "not-existing-block")
     }
 
-    pub fn get_uri___minio_db___health() -> String {
-        Self::MINIO_HEALTH.to_string()
-    }
+    // Disabled code - See function is_healthy() TODO MinioHealthCheck
+    // pub fn get_uri___minio_db___health() -> String {
+    //     Self::MINIO_HEALTH.to_string()
+    // }
 
     pub fn get_uri___iota_node___health() -> String {
         Self::IOTA_NODE_HEALTH.to_string()
@@ -138,11 +141,15 @@ impl HealthChecker {
             return Ok(false);
         }
 
-        // The current version of minio health check below results in a dead lock
+        // The current version of minio health check below, results in a dead lock
         // if the code is run on the currently used SUSEE-Node (KVM VPS + docker).
         // Therefore the minio health check is commented out.
-        // TODO: Analyze and fix the minio health check using a different host system
-        //       (secondary SUSEE-Node)
+        // If the minio service would not be healthy, this would be handled by the
+        // block validation that is performed by the iota-bridge after each message
+        // that has been send. A minio health check would safe ~25 seconds of wait
+        // time but is not mandatory.
+        // TODO: MinioHealthCheck - Analyze and fix the minio health check using a
+        //       different host system (secondary SUSEE-Node)
         //
         // let minio_url = format!("{}{}",
         //                                 self.options.get_minio_db_url(),

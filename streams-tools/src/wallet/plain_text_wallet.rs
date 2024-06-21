@@ -138,6 +138,7 @@ fn create_persistence_file(file_name: &str) -> Result<PtwPersist>{
 fn write_persistence_file(file_name: &str, persist: &PtwPersist) -> Result<()>{
     let mut buffer = vec![0_u8; persist.needed_size()];
     let _data_len = persist.to_bytes(&mut buffer).expect("Error on persisting PtwPersist to binary buffer");
+    log::debug!("[fn write_persistence_file()] fs_write into persistence file '{}'", file_name);
     fs_write(file_name, buffer.as_slice()).expect(format!("Could not create persistence file '{}'", file_name).as_str());
     Ok(())
 }
@@ -149,11 +150,13 @@ fn read_persistence_file(file_name: &str) -> Result<PtwPersist> {
 
 impl PlainTextWallet {
     pub fn new(serialization_password: &str, file_path_name: Option<&str>, seed_derivation_phrase: Option<String>) -> Self{
+        log::debug!("[fn new()] Starting",);
         let file_name: &str;
         match file_path_name {
             Some(name) => file_name = name,
             _ => file_name = DEFAULT_FILE_NAME,
         }
+        log::debug!("[fn new()] file_name: '{}'", file_name);
         let ptw_persist: PtwPersist;
         if Path::new(file_name).exists(){
             ptw_persist = read_persistence_file(file_name).expect(format!("Error while processing the persistence file '{}'", file_name).as_str());

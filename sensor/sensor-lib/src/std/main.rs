@@ -61,6 +61,7 @@ use crate::{
         }
     }
 };
+use crate::std::client_data_persistence_std::ClientDataPersistenceStd;
 
 const MAX_SIZE_RANDOM_MESSAGE: usize = 4096;
 
@@ -120,7 +121,7 @@ pub async fn create_subscriber_manager<'a>(
     Ok(SubscriberManagerPlainTextWalletHttpClient::new(
         transport,
         wallet,
-        Some(String::from("user-state-sensor.bin")),
+        ClientDataPersistenceStd::new_prepared("user-state-sensor.bin"),
     )
     .await)
 }
@@ -410,7 +411,7 @@ impl<'a> CommandProcessor for CmdProcessor<'a> {
             .await
     }
 
-    async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
+    async fn process_command(&mut self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
         log::info!("DevEUI: {} - Received Command::{}", self.dev_eui, command);
         let mut subscriber = create_subscriber_manager(&self.cli).await?;
 

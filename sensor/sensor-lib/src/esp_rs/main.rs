@@ -1,5 +1,10 @@
 use core::str::FromStr;
 
+use std::{
+    rc::Rc,
+    cell::RefCell,
+};
+
 use anyhow::{
     anyhow,
     Result,
@@ -27,10 +32,10 @@ use streams::{
     User,
 };
 
-use susee_tools::SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC;
-
 use streams_tools::{
-    subscriber_manager::get_public_key_str,
+    subscriber_manager::{
+        get_public_key_str,
+    },
     binary_persist::{
         Subscription,
         SubscriberStatus,
@@ -49,9 +54,19 @@ use streams_tools::{
     SubscriberManager,
 };
 
+use susee_tools::SUSEE_CONST_COMMAND_CONFIRM_FETCH_WAIT_SEC;
+
 use payloads::{
     Message,
     get_message_bytes,
+};
+
+use crate::{
+    command_fetcher::CommandFetcher,
+    streams_poc_lib_api_types::{
+        send_request_via_lorawan_t,
+    },
+    request_via_buffer_cb::RequestViaBufferCallbackOptions,
 };
 
 use super::{
@@ -62,17 +77,12 @@ use super::{
     StreamsTransportSocketEspRs,
     StreamsTransportSocketEspRsOptions,
     streams_transport_via_buffer_cb::StreamsTransportViaBufferCallback,
-    esp32_subscriber_tools::{
-        create_subscriber,
-    },
     wifi_utils::init_wifi,
-};
-
-use crate::{
-    command_fetcher::CommandFetcher,
-    streams_poc_lib_api_types::send_request_via_lorawan_t,
-    request_via_buffer_cb::RequestViaBufferCallbackOptions,
-    esp_rs::esp32_subscriber_tools::setup_file_system,
+    client_data_persistence::{
+        create_subscriber,
+        ClientDataPersistence,
+        ClientDataPersistenceOptions,
+    },
 };
 
 fn print_heap_info() {
@@ -93,7 +103,7 @@ where
 {
     command_fetcher: CmdFetchT,
     streams_transport_opt: StreamsTransportT::Options,
-    vfs_fat_path: Option<String>,
+    client_data_persistence: Rc<RefCell<ClientDataPersistence>>,
     dev_eui: String,
 }
 
@@ -268,7 +278,8 @@ impl<TSR, CmdFetchT, StreamsTransportT> SensorFunctions for CmdProcessor<CmdFetc
     ) -> hyper::http::Result<Request<Body>>
     {
         let keyload_msg_link = Address::from_str(&keyload_msg_link_str).expect("Address::from_str() returned error");
-        subscriber_mngr.register_keyload_msg(&keyload_msg_link).await.expect("[fn register_keyload_msg] register_keyload_msg err");
+        subscriber_mngr.register_keyload_msg(&keyload_msg_link).await
+            .expect("[fn register_keyload_msg] register_keyload_msg err");
 
         Self::println_subscription_details(
             &subscriber_mngr.user.as_ref().unwrap(),
@@ -300,13 +311,22 @@ impl<CmdFetchT, StreamsTransportT> CmdProcessor<CmdFetchT, StreamsTransportT>
         StreamsTransportT: StreamsTransport,
         StreamsTransportT::Options: Clone,
 {
-    pub fn new<>(dev_eui: &str, vfs_fat_path: Option<String>, command_fetch_opt: CmdFetchT::Options, streams_transport_opt: StreamsTransportT::Options) -> CmdProcessor<CmdFetchT, StreamsTransportT> {
+    pub fn new<>(
+        dev_eui: &str,
+        client_data_persist_opt: ClientDataPersistenceOptions,
+        command_fetch_opt: CmdFetchT::Options,
+        streams_transport_opt: StreamsTransportT::Options
+    ) -> CmdProcessor<CmdFetchT, StreamsTransportT>
+    {
+        let client_data_persistence= Rc::new(RefCell::new(
+            ClientDataPersistence::new(client_data_persist_opt.clone())
+        ));
         CmdProcessor {
             command_fetcher: CmdFetchT::new(
                 Some(command_fetch_opt)
             ),
             streams_transport_opt,
-            vfs_fat_path,
+            client_data_persistence,
             dev_eui: dev_eui.to_string(),
         }
     }
@@ -330,13 +350,16 @@ impl<TSR, CmdFetchT, StreamsTransportT> CommandProcessor for CmdProcessor<CmdFet
         self.command_fetcher.send_confirmation(confirmation_request).await
     }
 
-    async fn process_command(&self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
-        let mut vfs_fat_handle = setup_file_system(self.vfs_fat_path.clone()).await?;
+    async fn process_command(&mut self, command: Command, buffer: Vec<u8>) -> Result<Request<Body>> {
+        log::debug!("[fn process_command]  Preparing client_data_persistence");
+        self.client_data_persistence.borrow_mut().prepare()?;
 
-        let mut user= create_subscriber::<StreamsTransportT, PlainTextWallet>(
-            Some(self.streams_transport_opt.clone()),
-            &vfs_fat_handle
-        ).await?;
+        log::debug!("[fn process_command]  Creating user");
+        let mut user=
+            create_subscriber::<StreamsTransportT, PlainTextWallet>(
+                Some(self.streams_transport_opt.clone()),
+                self.client_data_persistence.clone()
+            ).await?;
 
         print_heap_info();
 
@@ -344,10 +367,10 @@ impl<TSR, CmdFetchT, StreamsTransportT> CommandProcessor for CmdProcessor<CmdFet
             self, &mut user, command, buffer
         ).await.expect("Error on processing sensor commands");
 
-        log::debug!("[fn process_command]  Safe user client_status to disk");
-        user.safe_client_status_to_disk().await?;
-        log::debug!("[fn process_command]  vfs_fat_handle.drop_filesystem()");
-        vfs_fat_handle.drop_filesystem()?;
+        log::debug!("[fn process_command]  user.save_client_state()");
+        user.save_client_state().await?;
+        log::debug!("[fn process_command]  client_data_persistence.flush_resources()");
+        self.client_data_persistence.borrow_mut().flush_resources()?;
 
         confirmation_request.ok_or(anyhow!("No confirmation_request received"))
     }
@@ -356,7 +379,7 @@ impl<TSR, CmdFetchT, StreamsTransportT> CommandProcessor for CmdProcessor<CmdFet
 pub async fn process_main_esp_rs(
     lorawan_send_callback: send_request_via_lorawan_t,
     dev_eui: &str,
-    vfs_fat_path: Option<String>,
+    client_data_persist_opt: ClientDataPersistenceOptions,
     p_caller_user_data: *mut cty::c_void,
 ) -> Result<()>
 {
@@ -372,7 +395,7 @@ pub async fn process_main_esp_rs(
     let command_processor =
         CmdProcessor::<CommandFetcherBufferCb, StreamsTransportViaBufferCallback>::new(
             dev_eui,
-            vfs_fat_path,
+            client_data_persist_opt,
             CommandFetcherBufferCbOptions{
                 buffer_cb: request_via_callback_opt.clone(),
                 dev_eui_handshake_first: true,
@@ -392,7 +415,7 @@ pub async fn process_main_esp_rs(
 pub async fn process_main_esp_rs_lwip(
     iota_bridge_url: &str,
     dev_eui: &str,
-    vfs_fat_path: Option<String>,
+    client_data_persist_opt: ClientDataPersistenceOptions,
     opt_wifi_ssid: Option<String>,
     opt_wifi_pass: Option<String>,
 ) -> Result<()> {
@@ -414,7 +437,7 @@ pub async fn process_main_esp_rs_lwip(
     let command_processor =
         CmdProcessor::<CommandFetcherSocket, StreamsTransportSocketEspRs>::new(
             dev_eui,
-            vfs_fat_path,
+            client_data_persist_opt,
             CommandFetcherSocketOptions{
                 http_url: iota_bridge_url.to_string(),
                 dev_eui_handshake_first: true,

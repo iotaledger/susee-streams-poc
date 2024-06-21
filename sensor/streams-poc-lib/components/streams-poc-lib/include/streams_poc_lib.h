@@ -19,6 +19,49 @@ typedef enum LoRaWanError {
 } LoRaWanError;
 
 /**
+ * Defines how streams client data shall be stored
+ */
+typedef enum StreamsClientDataStorageType {
+  /**
+   * Streams client data are stored on the in the vfs_fat data partition
+   * managed by the Streams POC library or by the Sensor Application,
+   * according to the used VfsFatManagement option.
+   *
+   * Use one of the following functions to create a properly initialized
+   * streams_client_data_persistence_t instance:
+   * * prepare_client_data_storage___vfs_fat___streams_poc_lib_managed()
+   * * prepare_client_data_storage___vfs_fat___application_managed()
+   */
+  CLIENT_DATA_STORAGE_VFS_FAT = 1,
+  /**
+   * Storage of the streams client data is fully managed by the
+   * Sensor application:
+   * * initial streams client data are provided by the application
+   *   via an initial data buffer:
+   *   streams_client_data_persistence_t.latest_client_data_bytes
+   * * after the streams client data have changed the resulting
+   *   latest data are handed to the application via a callback
+   *   function that is called by the streams-poc-lib:
+   *   streams_client_data_persistence_t.update_client_data_call_back
+   *
+   * Use one of the following functions to create a properly initialized
+   * streams_client_data_persistence_t instance:
+   * * prepare_client_data_storage___call_back___streams_poc_lib_managed_vfs_fat()
+   * * prepare_client_data_storage___call_back___application_managed_vfs_fat()
+   */
+  CLIENT_DATA_STORAGE_CALL_BACK = 2,
+} StreamsClientDataStorageType;
+
+/**
+ * Indicates the initialization state of the sensor
+ */
+typedef enum StreamsClientInitializationState {
+  CLIENT_INIT_STATE_UNKNOWN = 0,
+  CLIENT_INIT_STATE_NOT_INITIALIZED = 1,
+  CLIENT_INIT_STATE_INITIALIZED = 2,
+} StreamsClientInitializationState;
+
+/**
  * Possible errors while communicating with the IOTA-Tangle via Streams protocol.
  * The contained values are just for example purposes.
  * The final list will differ a lot.
@@ -32,6 +75,127 @@ typedef enum StreamsError {
   STREAMS_RESPONSE_RESOLVED_WITHOUT_REQUEST = -5,
   STREAMS_RESPONSE_INTERNAL_CHANNEL_ERR = -6,
 } StreamsError;
+
+/**
+ * Defines how vfs_fat data partitions, needed to store files in spiflash, shall be managed
+ */
+typedef enum VfsFatManagement {
+  /**
+   * The Streams POC library will initialize and use its default
+   * '/spiflash' data partition.
+   * To use this option, the default 'storage' data partition
+   * needs to be configured in the 'partitions.scv' file of the
+   * applications build project.
+   * See /sensor/streams-poc-lib/partitions.scv as an example.
+   * https://docs.espressif.com/projects/esp-idf/en/v4.3/esp32/api-guides/partition-tables.html
+   */
+  VFS_FAT_STREAMS_POC_LIB_MANAGED = 1,
+  /**
+   * The Sensor application using the streams-poc-lib functions
+   * is responsible to manage a vfs_fat data partition.
+   *
+   * Following preconditions have to be fulfilled:
+   * * streams_client_data_persistence_t.vfs_fat_path must start with the base_path
+   *   of the vfs_fat data partition followed by optional subfolders.
+   *   The Streams POC library will not create any subfolders that are part
+   *   of vfs_fat_path so all needed subfolders must have been created before the
+   *   Streams POC library is used.
+   * * the FAT filesystem must have been initialized in the SPI flash and
+   *   registered in the VFS e.g. by using esp_vfs_fat_spiflash_mount()
+   *   or equivalent esp-idf functions
+   *   https://docs.espressif.com/projects/esp-idf/en/v4.3/esp32/api-reference/storage/wear-levelling.html
+   */
+  VFS_FAT_APPLICATION_MANAGED = 2,
+} VfsFatManagement;
+
+/**
+ * Signature of the callback function used to receive latest Streams client state data.
+ * See following function for more details:
+ * * prepare_client_data_storage___call_back___streams_poc_lib_managed_vfs_fat()
+ * * prepare_client_data_storage___call_back___application_managed_vfs_fat()
+ *
+ * The callback function:
+ * * must be implemented by the caller of the above listed functions.
+ * * will be called by the streams_poc_library to provide the client state data.
+ * * must store the data so that the data can be provided as
+ *   streams_client_data_persistence_t.latest_client_data_bytes when a streams_poc_library
+ *   function is called next time.
+ *
+ *   *************************************************************************************
+ *   * ATTENTION:                                                                        *
+ *   *            In case the callback function is not able to store the client state    *
+ *   *            data, the callback must return false.                                  *
+ *   *            In the current implementation of the susee-streams-poc applications    *
+ *   *            this would result in a streams-channel that ends with the latest send  *
+ *   *            message. The reason for this is, that the Sensor would send its next   *
+ *   *            message based on an older channel state as the state that is used by   *
+ *   *            all other channel participants, because these participants have        *
+ *   *            received the latest message but do not know that the latest state has  *
+ *   *            been lost.                                                             *
+ *   *                                                                                   *
+ *   *            -------------------------------------------------------------------    *
+ *   *            - Make sure that the client state data are always properly stored -    *
+ *   *            - and the callback function never needs to return false.          -    *
+ *   *            -------------------------------------------------------------------    *
+ *   *                                                                                   *
+ *   *           In future versions of the susee-streams-poc applications, a command     *
+ *   *           could be implemented to make other streams channel participants         *
+ *   *           skip the latest state and proceed with the previous state.              *
+ *   *                                                                                   *
+ *   *************************************************************************************
+ *
+ * @param client_data_bytes        Binary data of the response body.
+ *                                 The data are owned by the streams_poc_library.
+ * @param client_data_bytes_length Length of the client_data_bytes
+ * @param p_caller_user_data       Pointer to arbitrary data specified by the caller of the above
+ *                                 listed functions. p_caller_user_data can be used by the scope
+ *                                 that calls streams_poc_library functions to communicate with
+ *                                 the callback function implementation.
+ *                                 Have a look at function send_request_via_lorawan_t documentation
+ *                                 for an example and more details.
+ * @return                         true:   Latest Streams client state data have been successfully
+ *                                         processed.
+ *                                 false:  The client state data could not be stored so that the
+ *                                         client state remains in the previous state
+ *                                         (that results from the last successful callback function
+ *                                         call). See ATTENTION-Box above for more details.
+ */
+typedef bool (*streams_client_data_update_call_back_t)(const uint8_t *client_data_bytes, size_t client_data_bytes_length, void *p_caller_user_data);
+
+/**
+ * This struct bundles all data needed to manage streams-client-data-persistence.
+ *
+ * Do not set the values of this struct yourself. Instead, use one of the following functions
+ * to prepare a streams_client_data_persistence_t instance :
+ *
+ *     * prepare_client_data_storage___vfs_fat___streams_poc_lib_managed()
+ *     * prepare_client_data_storage___vfs_fat___application_managed()
+ *     * prepare_client_data_storage___call_back___streams_poc_lib_managed_vfs_fat()
+ *     * prepare_client_data_storage___call_back___application_managed_vfs_fat()
+ *
+ * Please have a look at these functions for more details.
+ *
+ * Usage example:
+ *
+ *     streams_client_data_persistence_t client_data_persistence;
+ *     bool success = prepare_client_data_storage___vfs_fat___application_managed(
+ *         &client_data_persistence,
+ *         "/awesome-data"
+ *     );
+ *     ...
+ *     send_message(MESSAGE_DATA, MESSAGE_DATA_LENGTH, lorawan_send_cb_fun, &client_data_persistence, &lorawan_send_cb_user_data);
+ *
+ */
+typedef struct streams_client_data_persistence_t {
+  enum VfsFatManagement vfs_fat_management;
+  enum StreamsClientDataStorageType streams_client_data_storage_type;
+  const char *vfs_fat_path;
+  enum StreamsClientInitializationState client_initialization_state;
+  const uint8_t *latest_client_data_bytes;
+  size_t latest_client_data_bytes_length;
+  streams_client_data_update_call_back_t update_client_data_call_back;
+  void *p_update_call_back_caller_user_data;
+} streams_client_data_persistence_t;
 
 /**
  * Signature of the callback function allowing the Streams POC library to receive the response for a
@@ -110,7 +274,7 @@ typedef struct iota_bridge_tcpip_proxy_options_t {
  * See function post_binary_request_to_iota_bridge() for more details.
  * @param status           HTTP response status.
  * @param body_bytes       Binary data of the response body.
- *                         The data sre owned by the streams_poc_library.
+ *                         The data are owned by the streams_poc_library.
  * @param body_length      Length of the body_bytes
  */
 typedef void (*http_response_call_back_t)(uint16_t status, const uint8_t *body_bytes, size_t body_length, void *p_caller_user_data);
@@ -121,6 +285,129 @@ typedef void (*http_response_call_back_t)(uint16_t status, const uint8_t *body_b
 const char *streams_error_to_string(enum StreamsError error);
 
 /**
+ * Returns the base_path that is used to mount the 'storage' data partition if
+ * VfsFatManagement::VFS_FAT_STREAMS_POC_LIB_MANAGED is used.
+ */
+const char *get_vfs_fat_mount_base_path(void);
+
+/**
+ * Prepare a streams_client_data_persistence_t instance to use the combination of:
+ * * StreamsClientDataStorageType::CLIENT_DATA_STORAGE_VFS_FAT
+ * * VfsFatManagement::VFS_FAT_STREAMS_POC_LIB_MANAGED
+ *
+ * Please see the documentation of these constants for further details.
+ *
+ * @param p_client_data_persistence    The streams_client_data_persistence_t instance to be prepared.
+ * @return                             true: Success, false: No success
+ */
+bool prepare_client_data_storage___vfs_fat___streams_poc_lib_managed(struct streams_client_data_persistence_t *p_client_data_persistence);
+
+/**
+ * Prepare a streams_client_data_persistence_t instance to use the combination of:
+ * * StreamsClientDataStorageType::CLIENT_DATA_STORAGE_VFS_FAT
+ * * VfsFatManagement::VFS_FAT_APPLICATION_MANAGED
+ *
+ * Please see the documentation of these constants for further details.
+ *
+ * @param p_client_data_persistence    The streams_client_data_persistence_t instance to be prepared.
+ * @param vfs_fat_path                 Path of the directory where files shall be read/written
+ *                                     by the Streams POC library.
+ *                                     A FAT filesystem needs to be provided by the caller of this
+ *                                     function. Please see the documentation of
+ *                                     VfsFatManagement::VFS_FAT_APPLICATION_MANAGED for the preconditions
+ *                                     that have to be fulfilled.
+ * @return                             true: Success, false: No success
+ *
+ * Examples:
+ *           // Use the root folder of the 'great-spi-flash' partition
+ *           // that has already been initialized using esp_vfs_fat_spiflash_mount()
+ *           // or equivalent esp-idf functions.
+ *           streams_client_data_persistence_t client_data_persistence;
+ *           prepare_client_data_storage___vfs_fat___application_managed(
+ *                 &client_data_persistence,
+ *                 "/great-spi-flash"
+ *           );
+ *
+ *           // Use the EXISTING subfolder 'streams-folder' in the
+ *           // already initialized data partition 'other-flash-partition'.
+ *           streams_client_data_persistence_t client_data_persistence;
+ *           prepare_client_data_storage___vfs_fat___application_managed(
+ *                 &client_data_persistence,
+ *                 "/other-flash-partition/streams-folder"
+ *           );
+ */
+bool prepare_client_data_storage___vfs_fat___application_managed(struct streams_client_data_persistence_t *p_client_data_persistence,
+                                                                 const char *vfs_fat_path);
+
+/**
+ * Prepare a streams_client_data_persistence_t instance to use the combination of:
+ * * StreamsClientDataStorageType::CLIENT_DATA_STORAGE_CALL_BACK
+ * * VfsFatManagement::VFS_FAT_STREAMS_POC_LIB_MANAGED
+ *
+ * Please see the documentation of these constants for further details.
+ *
+ * The params of this function are documented at the function
+ * prepare_client_data_storage___call_back___application_managed_vfs_fat(), because this function
+ * provides these parameters also.
+ */
+bool prepare_client_data_storage___call_back___streams_poc_lib_managed_vfs_fat(struct streams_client_data_persistence_t *p_client_data_persistence,
+                                                                               bool client_is_initialized,
+                                                                               const uint8_t *latest_client_data_bytes,
+                                                                               size_t latest_client_data_bytes_length,
+                                                                               streams_client_data_update_call_back_t update_client_data_call_back,
+                                                                               void *p_update_call_back_caller_user_data);
+
+/**
+ * Prepare a streams_client_data_persistence_t instance to use the combination of:
+ * * StreamsClientDataStorageType::CLIENT_DATA_STORAGE_CALL_BACK
+ * * VfsFatManagement::VFS_FAT_APPLICATION_MANAGED
+ *
+ * Please see the documentation of these constants for further details.
+ *
+ * @param p_client_data_persistence    The streams_client_data_persistence_t instance to be prepared.
+ * @param vfs_fat_path                 Path of the directory where files shall be read/written
+ *                                     by the Streams POC library.
+ *                                     A FAT filesystem needs to be provided by the caller of this
+ *                                     function. Please see the documentation of
+ *                                     VfsFatManagement::VFS_FAT_APPLICATION_MANAGED for the preconditions
+ *                                     that have to be fulfilled. Have a look at the
+ *                                     prepare_client_data_storage___vfs_fat___application_managed()
+ *                                     function documentation for some examples.
+ * @param client_is_initialized        If the sensor has not been initialized before
+ *                                     set this to false, otherwise use true.
+ *                                     In case of client_is_initialized == false
+ *                                     latest_client_data_bytes and latest_client_data_len
+ *                                     can be set to NULL resp. 0.
+ *                                     Otherwise latest_client_data_bytes needs to point
+ *                                     to the streams client-data array of size
+ *                                     latest_client_data_len.
+ * @param latest_client_data_bytes     Streams client-data that will be used to instantiate
+ *                                     the streams client.
+ *                                     In case of client_is_initialized == true, these data
+ *                                     have been received by the update_client_data_cb when
+ *                                     a streams_poc_library function has been called once
+ *                                     before.
+ * @param latest_client_data_len       Length of latest_client_data_bytes
+ * @param update_client_data_cb        This callback function will be called every time
+ *                                     when the streams client-data have changed.
+ *                                     See streams_client_data_update_call_back_t documentation
+ *                                     for further details.
+ * @param p_update_cb_user_data        Optional.
+ *                                     Will be provided as argument p_caller_user_data
+ *                                     when update_client_data_cb is called by the streams-poc-lib.
+ *                                     See function send_request_via_lorawan_t documentation for
+ *                                     further details.
+ * @return                             true: Success, false: No success
+ */
+bool prepare_client_data_storage___call_back___application_managed_vfs_fat(struct streams_client_data_persistence_t *p_client_data_persistence,
+                                                                           const char *vfs_fat_path,
+                                                                           bool client_is_initialized,
+                                                                           const uint8_t *latest_client_data_bytes,
+                                                                           size_t latest_client_data_bytes_length,
+                                                                           streams_client_data_update_call_back_t update_client_data_call_back,
+                                                                           void *p_update_call_back_caller_user_data);
+
+/**
  * Function provided by the Streams POC library to allow the SUSEE application to send messages encrypted and signed with
  * IOTA Streams via LoRaWan
  * @param message_data              Binary message data to be send
@@ -128,10 +415,10 @@ const char *streams_error_to_string(enum StreamsError error);
  * @param length                    Length of message_data
  * @param lorawan_send_callback     Callback function allowing the Streams POC library to send requests via LoRaWAN.
  *                                  See send_request_via_lorawan_t help above for more details.
- * @param vfs_fat_path              Optional.
- *                                  Path of the directory where the streams channel user state data and
- *                                  other files shall be read/written by the Streams POC library.
- *                                  See function is_streams_channel_initialized() below for further details.
+ * @param p_client_data_persistence Defines how the streams channel client state data and
+ *                                  other files shall be stored by the Streams POC library.
+ *                                  Use one of the prepare_.... functions above to create a properly
+ *                                  initialized p_client_data_persistence instance.
  * @param p_caller_user_data        Optional.
  *                                  Pointer to arbitrary data used by the caller of this function
  *                                  to communicate with the lorawan_send_callback implementation.
@@ -141,7 +428,7 @@ const char *streams_error_to_string(enum StreamsError error);
 enum StreamsError send_message(const uint8_t *message_data,
                                size_t length,
                                send_request_via_lorawan_t lorawan_send_callback,
-                               const char *vfs_fat_path,
+                               const struct streams_client_data_persistence_t *p_client_data_persistence,
                                void *p_caller_user_data);
 
 /**
@@ -171,24 +458,24 @@ enum StreamsError send_message(const uint8_t *message_data,
  * * Via WiFi, managed by the streams-poc-lib or via an other esp-lwIP based connection.
  *   Use function start_sensor_manager_lwip() instead.
  *
- * @param send_callback            Callback function allowing the Streams POC library to send
- *                                 requests via LoRaWAN, serial wired connections or other
- *                                 connection types that are managed by the application.
- *                                 See send_request_via_lorawan_t help above for more details.
- * @param dev_eui                  DevEUI of the sensor.
- * @param vfs_fat_path             Optional.
- *                                 Path of the directory where the streams channel user state data and
- *                                 other files shall be read/written by the Streams POC library.
- *                                 See function is_streams_channel_initialized() below for further details.
- * @param p_caller_user_data       Optional.
- *                                 Pointer to arbitrary data used by the caller of this function
- *                                 to communicate with the lorawan_send_callback implementation.
- *                                 See send_request_via_lorawan_t help above for more details.
- *                                 If no p_caller_user_data is provided set p_caller_user_data = NULL.
+ * @param send_callback             Callback function allowing the Streams POC library to send
+ *                                  requests via LoRaWAN, serial wired connections or other
+ *                                  connection types that are managed by the application.
+ *                                  See send_request_via_lorawan_t help above for more details.
+ * @param dev_eui                   DevEUI of the sensor.
+ * @param p_client_data_persistence Defines how the streams channel client state data and
+ *                                  other files shall be stored by the Streams POC library.
+ *                                  Use one of the prepare_.... functions above to create a properly
+ *                                  initialized p_client_data_persistence instance.
+ * @param p_caller_user_data        Optional.
+ *                                  Pointer to arbitrary data used by the caller of this function
+ *                                  to communicate with the lorawan_send_callback implementation.
+ *                                  See send_request_via_lorawan_t help above for more details.
+ *                                  If no p_caller_user_data is provided set p_caller_user_data = NULL.
  */
 int32_t start_sensor_manager(send_request_via_lorawan_t send_callback,
                              const char *dev_eui,
-                             const char *vfs_fat_path,
+                             const struct streams_client_data_persistence_t *p_client_data_persistence,
                              void *p_caller_user_data);
 
 /**
@@ -202,20 +489,23 @@ int32_t start_sensor_manager(send_request_via_lorawan_t send_callback,
  * @param iota_bridge_url  URL of the iota-bridge instance to connect to.
  *                                 Example:
  *                                    start_sensor_manager_wifi("Susee Demo", "susee-rocks", "http://192.168.0.100:50000", NULL);
- * @param dev_eui          DevEUI of the sensor.
- * @param vfs_fat_path     Optional.
- *                         Same as start_sensor_manager() vfs_fat_path parameter.
- * @param wifi_ssid        Optional.
- *                         Name (Service Set Identifier) of the WiFi to login.
- *                         If wifi_ssid == NULL, the caller of this function has to provide a
- *                         suitable tcp/ip network connection via esp-lwIP.
- * @param wifi_pass        Optional.
- *                         Password of the WiFi to login.
- *                         Needed if wifi_ssid != NULL otherwise set wifi_pass to NULL.
+ *
+ * @param dev_eui                   DevEUI of the sensor.
+ * @param p_client_data_persistence Defines how the streams channel client state data and
+ *                                  other files shall be stored by the Streams POC library.
+ *                                  Use one of the prepare_.... functions above to create a properly
+ *                                  initialized p_client_data_persistence instance.
+ * @param wifi_ssid                 Optional.
+ *                                  Name (Service Set Identifier) of the WiFi to login.
+ *                                  If wifi_ssid == NULL, the caller of this function has to provide a
+ *                                  suitable tcp/ip network connection via esp-lwIP.
+ * @param wifi_pass                 Optional.
+ *                                  Password of the WiFi to login.
+ *                                  Needed if wifi_ssid != NULL otherwise set wifi_pass to NULL.
  */
 int32_t start_sensor_manager_lwip(const char *iota_bridge_url,
                                   const char *dev_eui,
-                                  const char *vfs_fat_path,
+                                  const struct streams_client_data_persistence_t *p_client_data_persistence,
                                   const char *wifi_ssid,
                                   const char *wifi_pass);
 
@@ -223,54 +513,29 @@ int32_t start_sensor_manager_lwip(const char *iota_bridge_url,
  * Indicates if this sensor instance has already been initialized.
  * A sensor is initialized if it has subscribed to a streams channel and is ready to send
  * messages via the send_message() function.
+ *
+ * You only need to use this function in case StreamsClientDataStorageType::CLIENT_DATA_STORAGE_VFS_FAT
+ * is used.
+ *
+ * If StreamsClientDataStorageType::CLIENT_DATA_STORAGE_CALL_BACK is used, you don't need
+ * this function because in case you've never received and stored a latest streams client
+ * data buffer via the streams_client_data_persistence_t.update_client_data_call_back,
+ * the sensor has not been initialized before.
+ * Otherwise a streams_client_data_persistence_t.client_initialization_state exists and you
+ * know, the sensor has been initialized.
+ *
  * If this function returns false the initialization process can be started using the
  * function start_sensor_manager(). After start_sensor_manager() has been called you need to run
  * the management-console (project /management console) like this:
  *
  *     $ ./management-console --init-sensor --iota-bridge-url "http://192.168.47.11:50000"
  *
- * @param vfs_fat_path     Optional.
- *                         Path of the directory where the streams channel user state data and
- *                         other files shall be read/written by the Streams POC library.
- *
- *                         If no FAT filesystem is provided by the caller of this function
- *                         set vfs_fat_path = NULL.
- *
- *                         If a vfs_fat_path value path is defined, a FAT filesystem needs to be
- *                         provided by the caller of this function and following preconditions
- *                         have to be fulfilled:
- *                         * vfs_fat_path must start with the base_path of the vfs_fat data partition
- *                           followed by optional subfolders. The Streams POC library will not
- *                           create any subfolders that are part of vfs_fat_path so all needed
- *                           subfolders must have been created before Streams POC library is used.
- *                         * the FAT filesystem must have been initialized in the SPI flash and
- *                           registered in the VFS e.g. by using esp_vfs_fat_spiflash_mount()
- *                           or equivalent esp-idf functions
- *                           https://docs.espressif.com/projects/esp-idf/en/v4.3/esp32/api-reference/storage/wear-levelling.html
- *
- *                         In case no FAT filesystem is provided resp. vfs_fat_path is set to NULL:
- *                         * the Streams POC library will initialize and use its default
- *                           '/spiflash' data partition.
- *                         * the default '/spiflash' data partition needs to be configured in
- *                           the 'partitions.scv' file of the applications build project.
- *                           See /sensor/streams-poc-lib/partitions.scv as an example.
- *                           https://docs.espressif.com/projects/esp-idf/en/v4.3/esp32/api-guides/partition-tables.html
- *
- *                         Examples:
- *
- *                            // Use the default '/spiflash' partition managed by the Streams POC library
- *                            is_streams_channel_initialized(NULL)
- *
- *                            // Use the root folder of the 'great-spi-flash' partition
- *                            // that has already been initialized using esp_vfs_fat_spiflash_mount()
- *                            // or equivalent esp-idf functions.
- *                            is_streams_channel_initialized("/great-spi-flash")
- *
- *                            // Use the EXISTING subfolder 'streams-folder' in the
- *                            // already initialized data partition 'other-flash-partition'.
- *                            is_streams_channel_initialized("/other-flash-partition/streams-folder")
+ * @param p_client_data_persistence Defines how the streams channel client state data and
+ *                                  other files shall be stored by the Streams POC library.
+ *                                  Use one of the prepare_.... functions above to create a properly
+ *                                  initialized p_client_data_persistence instance.
  */
-bool is_streams_channel_initialized(const char *vfs_fat_path);
+bool is_streams_channel_initialized(const struct streams_client_data_persistence_t *p_client_data_persistence);
 
 /**
  * Send a data package to the iota-bridge using the "/lorawan-rest/binary_request" REST API endpoint.

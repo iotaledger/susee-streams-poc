@@ -1,20 +1,10 @@
 use std::{
-    path::Path,
     ops::Range,
     rc::Rc,
     str::FromStr,
-    fs::{
-        write,
-        read,
-        remove_file,
-    }
 };
 
-use anyhow::{
-    Result,
-    bail,
-    anyhow
-};
+use anyhow::{Result, bail, anyhow};
 
 use streams::{
     Address,
@@ -65,12 +55,20 @@ use smol::{
     block_on,
     stream::StreamExt
 };
+use std::cell::RefCell;
+
+pub trait SubscriberPersistence {
+    fn is_client_state_existing(&self) -> Result<bool>;
+    fn get_latest_client_state(&self) -> Result<Vec<u8>>;
+    fn persist_new_client_state(&mut self, client_state: Vec<u8>) -> Result<usize>;
+    fn clear_client_state(&mut self) -> Result<()>;
+}
 
 pub struct SubscriberManager<TransportT, WalletT: SimpleWallet>
 {
     transport: TransportT,
     wallet: WalletT,
-    serialization_file: Option<String>,
+    subscriber_persistence: Rc<RefCell<dyn SubscriberPersistence>>,
     compressed: Rc<CompressedStateManager>,
     compressed_subscription_handle: usize,
     is_synced: bool,
@@ -85,21 +83,26 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
 where
     TransportT: StreamsTransport,
 {
-    pub async fn new(mut transport: TransportT, wallet: WalletT, serialization_file: Option<String>) -> Self {
+    pub async fn new(mut transport: TransportT, wallet: WalletT, subscriber_persistence: Rc<RefCell<dyn SubscriberPersistence>>) -> Self {
         transport.set_initialization_cnt(wallet.get_initialization_cnt());
-        let mut ret_val = Self::create_new_instance(transport, wallet, serialization_file.clone()).await;
+        let mut ret_val = Self::create_new_instance(
+            transport,
+            wallet,
+            subscriber_persistence.clone()
+        ).await;
 
-        if let Some(serial_file_name) = serialization_file {
-            log::debug!("[fn new()] serial_file_name: '{}'", serial_file_name);
-            let new_path = Path::new(serial_file_name.as_str());
-            log::debug!("[fn new()] new_path: '{}'", new_path.display());
-            let path_extists = new_path.exists();
-            log::debug!("[fn new()] path_extists: '{}'", path_extists);
-            if path_extists {
-                log::debug!("[fn new()] Try to import User state from serialization file");
-                import_from_serialization_file(serial_file_name.as_str(), &mut ret_val).await
-                    .expect("Error while importing User state");
+        let is_client_state_existing = match subscriber_persistence.borrow().is_client_state_existing(){
+            Ok(is_initialized) => is_initialized,
+            Err(err) => {
+                log::error!("subscriber_persistence.is_client_state_existing() resulted in error: {}", err);
+                panic!("subscriber_persistence.is_client_state_existing() resulted in error. See log for details");
             }
+        };
+
+        if is_client_state_existing {
+            log::debug!("[fn new()] Try to import User state from subscriber_persistence");
+            import_from_client_data_persistence(subscriber_persistence, &mut ret_val).await
+                .expect("Error while importing User state");
         }
         ret_val
     }
@@ -115,28 +118,20 @@ where
     }
 
     pub async fn clear_client_state(&mut self) -> Result<()> {
-        if let Some(serial_file_name) = self.serialization_file.clone() {
-            log::debug!("[fn clear_client_state()] START");
+        log::debug!("[fn clear_client_state()] START");
 
-            if Path::new(serial_file_name.as_str()).exists(){
-                log::info!("[fn clear_client_state()] Removing file {}", serial_file_name);
-                remove_file(serial_file_name)?;
-            } else {
-                log::info!("[fn clear_client_state()] Can not remove file {} cause it does not exist.", serial_file_name);
-            }
+        log::debug!("[fn clear_client_state()] Calling subscriber_persistence.clear_client_state()");
+        self.subscriber_persistence.borrow_mut().clear_client_state()?;
 
-            log::debug!("[fn clear_client_state()] Setting all links and user to None");
-            self.prev_msg_link = None;
-            self.subscription_link = None;
-            self.user = None;
-            self.transport.set_initial_use_compressed_msg_state(false);
-            self.transport.remove_listener(self.compressed_subscription_handle);
+        log::debug!("[fn clear_client_state()] Setting all links and user to None");
+        self.prev_msg_link = None;
+        self.subscription_link = None;
+        self.user = None;
+        self.transport.set_initial_use_compressed_msg_state(false);
+        self.transport.remove_listener(self.compressed_subscription_handle);
 
-            log::debug!("[fn clear_client_state()] Ok");
-            Ok(())
-        } else {
-            bail!("[fn clear_client_state()] You need to specify the serialization_file constructor argument before using this function.");
-        }
+        log::debug!("[fn clear_client_state()] Ok");
+        Ok(())
     }
 }
 
@@ -316,11 +311,11 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
 
 impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
 {
-    async fn create_new_instance(transport: TransportT, wallet: WalletT, serialization_file: Option<String>) -> SubscriberManager<TransportT, WalletT> {
+    async fn create_new_instance(transport: TransportT, wallet: WalletT, subscriber_persistence: Rc<RefCell<dyn SubscriberPersistence>>) -> SubscriberManager<TransportT, WalletT> {
         Self {
             wallet,
             is_synced: false,
-            serialization_file: serialization_file,
+            subscriber_persistence: subscriber_persistence,
             transport,
             base_branch_topic: STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC.to_string(),
             user: None,
@@ -382,10 +377,10 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
         self.wallet.get_initialization_cnt()
     }
 
-    async fn export_to_serialization_file(&mut self, file_name: &str) -> Result<()> {
-        log::debug!("[fn export_to_serialization_file()] START");
+    async fn export_to_subscriber_persistence(&mut self) -> Result<()> {
+        log::debug!("[fn export_to_subscriber_persistence()] START");
         if self.user.is_some() {
-            log::debug!("[fn export_to_serialization_file()] user available");
+            log::debug!("[fn export_to_subscriber_persistence()] user available");
             let static_sized_buffer_front_length =
                 TANGLE_ADDRESS_BYTE_LEN               // PREV_MSG_LINK
                     + TANGLE_ADDRESS_BYTE_LEN               // SUBSCRIPTION_LINK
@@ -393,21 +388,21 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
                     + 1                                     // IS_SYNCED
                 ;
             let mut buffer: Vec<u8> = vec![0; static_sized_buffer_front_length];
-            log::debug!("[fn export_to_serialization_file()] buffer.len: {}", buffer.len());
+            log::debug!("[fn export_to_subscriber_persistence()] buffer.len: {}", buffer.len());
 
             // PREV_MSG_LINK
             let mut range: Range<usize> = RangeIterator::new(TANGLE_ADDRESS_BYTE_LEN);
-            log::debug!("[fn export_to_serialization_file()] persist PREV_MSG_LINK");
+            log::debug!("[fn export_to_subscriber_persistence()] persist PREV_MSG_LINK");
             self.persist_optional_tangle_address(&mut buffer, &mut range, self.prev_msg_link);
 
             // SUBSCRIPTION_LINK
             range.increment(TANGLE_ADDRESS_BYTE_LEN);
-            log::debug!("[fn export_to_serialization_file()] persist SUBSCRIPTION_LINK");
+            log::debug!("[fn export_to_subscriber_persistence()] persist SUBSCRIPTION_LINK");
             self.persist_optional_tangle_address(&mut buffer, &mut range, self.subscription_link);
 
             // USE_COMPRESSED_MSG
             serialize_bool(
-                "fn export_to_serialization_file",
+                "fn export_to_subscriber_persistence",
                 "use_compressed_msg",
                 self.compressed.get_use_compressed_msg(),
                 &mut buffer,
@@ -416,7 +411,7 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
 
             // IS_SYNCED
             serialize_bool(
-                "fn export_to_serialization_file",
+                "fn export_to_subscriber_persistence",
                 "is_synced",
                 self.is_synced,
                 &mut buffer,
@@ -424,35 +419,29 @@ impl<TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, WalletT>
             );
 
             // SUBSCRIBER
-            log::debug!("[fn export_to_serialization_file()] persist SUBSCRIBER");
+            log::debug!("[fn export_to_subscriber_persistence()] persist SUBSCRIBER");
             let passw = self.get_serialization_password().to_string();
             let mut persisted_user= vec![];
             if let Some(user) = self.user.as_mut() {
                 persisted_user = user.backup(passw.as_str())
                     .await.map_err(|e| anyhow!(e))?;
-                log::debug!("[fn export_to_serialization_file()] persisted_user length: {}", persisted_user.len());
+                log::debug!("[fn export_to_subscriber_persistence()] persisted_user length: {}", persisted_user.len());
             }
             buffer.append(&mut persisted_user);
-            log::debug!("[fn export_to_serialization_file()] write file '{}'", file_name);
-            write(file_name, &buffer).expect(format!("[SubscriberManager.subscribe()] Error while writing User state file '{}'", file_name).as_str());
+            log::debug!("[fn export_to_subscriber_persistence()] persist_latest_client_state to subscriber_persistence");
+            self.subscriber_persistence.borrow_mut().persist_new_client_state(buffer)?;
         }
-        log::debug!("[fn export_to_serialization_file()] Ok");
+        log::debug!("[fn export_to_subscriber_persistence()] Ok");
         Ok(())
     }
 
-    pub async fn safe_client_status_to_disk(&mut self) -> Result<()> {
-        if let Some(serial_file_name) = self.serialization_file.clone() {
-            self.export_to_serialization_file(serial_file_name.as_str()).await
-        } else {
-            bail!("[SubscriberManager.safe_client_status_to_disk()] You need to specify the serialization_file constructor argument before using this function.");
-        }
+    pub async fn save_client_state(&mut self) -> Result<()> {
+        self.export_to_subscriber_persistence().await
     }
 
-    pub fn save_user_state(&mut self) {
-        if let Some(serial_file_name) = self.serialization_file.clone() {
-            block_on(self.export_to_serialization_file(serial_file_name.as_str()))
-                .expect("Try to export User state into serialization file");
-        }
+    pub fn save_client_state_blocking(&mut self) {
+        block_on(self.export_to_subscriber_persistence())
+            .expect("Try to export Client state into serialization file");
     }
 }
 
@@ -471,13 +460,15 @@ pub fn println_maximum_initialization_cnt_reached_warning(fn_name: &str, current
     );
 }
 
-async fn import_from_serialization_file<'a, TransportT: StreamsTransport, WalletT: SimpleWallet>(
-    file_name: &str,
+async fn import_from_client_data_persistence<'a, TransportT: StreamsTransport, WalletT: SimpleWallet>(
+    subscriber_persistence: Rc<RefCell<dyn SubscriberPersistence>>,
     ret_val: &mut SubscriberManager<TransportT, WalletT>
 ) -> Result<()>{
-    log::debug!("[fn import_from_serialization_file()] START");
-    let buffer = read(file_name).expect(format!("[SubscriberManager::import_from_serialization_file()] Error while opening channel state file '{}'", file_name).as_str());
-    log::debug!("[fn import_from_serialization_file()] buffer len: {}", buffer.len());
+    log::debug!("[fn import_from_client_data_persistence()] START");
+    let buffer = subscriber_persistence
+        .borrow()
+        .get_latest_client_state()?;
+    log::debug!("[fn import_from_client_data_persistence()] buffer len: {}", buffer.len());
 
     // PREV_MSG_LINK
     let mut range: Range<usize> = RangeIterator::new(TANGLE_ADDRESS_BYTE_LEN);
@@ -489,7 +480,7 @@ async fn import_from_serialization_file<'a, TransportT: StreamsTransport, Wallet
 
     // USE_COMPRESSED_MSG
     let use_compressed_msg = deserialize_bool(
-        "fn import_from_serialization_file",
+        "fn import_from_client_data_persistence",
         "use_compressed_msg",
         buffer.as_slice(),
         &mut range
@@ -499,7 +490,7 @@ async fn import_from_serialization_file<'a, TransportT: StreamsTransport, Wallet
 
     // IS_SYNCED
     ret_val.is_synced = deserialize_bool(
-        "fn import_from_serialization_file",
+        "fn import_from_client_data_persistence",
         "is_synced",
         buffer.as_slice(),
         &mut range
@@ -518,25 +509,9 @@ async fn import_from_serialization_file<'a, TransportT: StreamsTransport, Wallet
         ret_val.announcement_link = Some(address.clone());
     }
 
-/*
-    let own_public_key_str = get_public_key_str(&user);
-
-    if let Ok(last_states) = user.fetch_state() {
-        let sensor_last_state: Vec<(String, Cursor<Address>)> = last_states
-            .into_iter()
-            .filter(|state| { state.0 == own_public_key_str} )
-            .collect();
-
-        if sensor_last_state.len() != 1 {
-            bail!("[SubscriberManager.import_from_serialization_file()] No prev_msg_link or multiple prev_msg_links found: Cnt: {}", sensor_last_state.len())
-        }
-
-        ret_val.prev_msg_link = Some(sensor_last_state[0].1.link);
-    }
-*/
     ret_val.user = Some(user);
 
-    log::debug!("[fn import_from_serialization_file()] Ok");
+    log::debug!("[fn import_from_client_data_persistence()] Ok");
     Ok(())
 }
 
@@ -585,7 +560,7 @@ impl<TransportT, WalletT: SimpleWallet> Drop for SubscriberManager<TransportT, W
         WalletT: SimpleWallet,
 {
     fn drop(&mut self) {
-        self.save_user_state();
+        self.save_client_state_blocking();
     }
 }
 

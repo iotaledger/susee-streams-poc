@@ -68,7 +68,7 @@ impl SensorManager {
         // save the user state immediately.
         // A probably safer alternative would be a tokio::signal::ctrl_c() handler but for
         // our test purposes this approach is sufficient and much simpler.
-        subscriber.save_user_state();
+        subscriber.save_client_state_blocking();
     }
 
     pub async fn send_file_content_as_msg_in_endless_loop(msg_file: &str, subscriber: &mut SubscriberManagerPlainTextWalletHttpClient) -> Result<()> {

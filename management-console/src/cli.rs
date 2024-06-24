@@ -11,8 +11,8 @@ use susee_tools::{
     cli_base::ArgMatchesAndOptions,
 };
 
-// TODO: Implement new CLI commands "--list-channels", "--user-states-database-path"
-// Instead of "--user-states-database-path" a management-console.config file (toml) could be useful.
+// TODO: Implement new CLI commands: "--list-channels", "--client-states-database-path"
+// Instead of "--client-states-database-path" a management-console.config file (toml) could be useful.
 
 pub struct ArgKeys {
     pub base: &'static BaseArgKeys,
@@ -47,7 +47,7 @@ The CLI argument defines the subscription message link for the sensor subscriber
 The subscription message link is logged to its console by the Sensor when the
 --subscribe-announcement-link CLI command is used.
 As the subscription message link contains the Streams channel ID the correct
-user state is fetched automatically out of the user-states-database.
+streams client state is fetched automatically out of the streams-clients-database.
 ";
 
 static SUBSCRIPTION_PUB_KEY_ABOUT: &str = "Add a Sensor to a Streams channel.
@@ -59,13 +59,13 @@ For more details have a look at the --subscription-link argument
 
 static CREATE_CHANNEL_ABOUT: &str = "Use this option to create (announce) a new Streams channel.
 The announcement link will be logged to the console.
-The ID and user_state of the new Streams channel will be stored in in the user-states-database.
+The ID and streams_client_state of the new Streams channel will be stored in in the client-states-database.
 ";
 
 static PRINTLN_CHANNEL_STATUS_ABOUT: &str = "Print information about currently existing channels.
 Each sensor is a subscriber in a dedicated Streams channel. The management-console
 manages these channels and stores the channel state information in its
-'user-states-management-console.sqlite3' database file. Use this CLI option to print
+'client-states-management-console.sqlite3' database file. Use this CLI option to print
 the relevant channel state information from the SQLite database to console.
 Use CLI argument '--channel-starts-with' to select the Streams channel you want to investigate.
 ";
@@ -73,7 +73,7 @@ Use CLI argument '--channel-starts-with' to select the Streams channel you want 
 static CHANNEL_STARTS_WITH_ABOUT: &str = "Specify the Streams channel when processing a management-console
 CLI command. As the Streams channels ID has 40 byte length and is
 not easy to handle manually you only need to specify the beginning
-of the channels ID so that it can be found in the user-states-database.
+of the channels ID so that it can be found in the client-states-database.
 If there are more than one channels that can be found by the provided search string
 the command will fail.
 
@@ -212,7 +212,7 @@ Example: --iota-bridge-url=\"http://192.168.47.11:50000\"
 
 static MANAGEMENTCONSOLE_APPLICATION_ABOUT: &str = "Management console for streams channels used in the SUSEE project.
 Can be used to create new Streams channels and to add Sensors (a.k.a. Streams subscribers)
-to those channels. Management of multiple channels is possible. The user states of the
+to those channels. Management of multiple channels is possible. The streams client states of the
 Streams channels are stored in a local SQLite3 database file.
 ";
 

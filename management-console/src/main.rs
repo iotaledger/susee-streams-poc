@@ -271,7 +271,7 @@ A keyload message has been created with the following keyload link:
     Ok(keyload_msg_link)
 }
 
-const DB_FILE_PATH_AND_NAME: &str = "user-states-management-console.sqlite3";
+const DB_FILE_PATH_AND_NAME: &str = "client-states-management-console.sqlite3";
 
 
 #[tokio::main]

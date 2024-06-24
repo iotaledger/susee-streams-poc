@@ -62,9 +62,9 @@ pub struct SubscriberData<'a> {
 #[derive(Default, Clone)]
 pub struct ChannelManagerOptions {
     pub serialization_file: Option<String>,
-    pub user_state: Option<Vec<u8>>,
-    // If specified, will be called on drop to serialize the user state
-    pub serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
+    pub streams_client_state: Option<Vec<u8>>,
+    // If specified, will be called on drop to serialize the Streams Client State
+    pub serialize_streams_client_state_callback: Option<SerializationCallbackRefToClosureString>,
     pub message_data_store_for_msg_caching: Option<MessageDataStoreOptions>,
     pub throttle_sleep_time_millisecs: Option<u64>,
 }
@@ -72,7 +72,7 @@ pub struct ChannelManagerOptions {
 pub struct ChannelManager<WalletT: SimpleWallet> {
     wallet: WalletT,
     serialization_file: Option<String>,
-    serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
+    serialize_streams_client_state_callback: Option<SerializationCallbackRefToClosureString>,
     base_branch_topic: String,
     options: ChannelManagerOptions,
     pub iota_node: String,
@@ -128,7 +128,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
             wallet,
             base_branch_topic: STREAMS_TOOLS_CONST_DEFAULT_BASE_BRANCH_TOPIC.to_string(),
             serialization_file: opt.serialization_file.clone(),
-            serialize_user_state_callback: opt.serialize_user_state_callback.clone(),
+            serialize_streams_client_state_callback: opt.serialize_streams_client_state_callback.clone(),
             user: None,
             announcement_link: None,
             keyload_link: None,
@@ -138,14 +138,14 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
         if let Some(serial_file_name) = &opt.serialization_file {
             if Path::new(serial_file_name.as_str()).exists(){
                 import_from_serialization_file(serial_file_name.as_str(), &mut ret_val, &opt).await
-                    .expect("Error on importing User state from serialization file");
+                    .expect("Error on importing Streams Client State from serialization file");
             }
-        } else if let Some(user_state) = &opt.user_state {
-            import_from_buffer(&user_state, &mut ret_val, &opt).await
-                .expect("Error on importing User state from binary user_state buffer");
+        } else if let Some(streams_client_state) = &opt.streams_client_state {
+            import_from_buffer(&streams_client_state, &mut ret_val, &opt).await
+                .expect("Error on importing Streams Client State from binary streams_client_state buffer");
         } else {
-            log::warn!("No binary user_state or serial_file_name for the user state provided.\n\
-            Will use empty Streams user state.")
+            log::warn!("No binary streams_client_state or serial_file_name for the Streams Client State provided.\n\
+            Will use empty Streams Client State.")
         }
 
         ret_val
@@ -231,7 +231,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
     async fn export_to_serialization_file(&mut self, file_name: &str) -> Result<()> {
         if let Some(user) = self.user.as_mut() {
             let buffer = user.backup( self.wallet.get_serialization_password()).await.map_err(|e| anyhow!(e))?;
-            write(file_name, &buffer).expect(format!("Try to write User state file '{}'", file_name).as_str());
+            write(file_name, &buffer).expect(format!("Try to write Streams Client State file '{}'", file_name).as_str());
         }
         Ok(())
     }
@@ -244,7 +244,7 @@ impl<WalletT: SimpleWallet> ChannelManager<WalletT> {
                 if let Some(channel_id ) = get_channel_id_from_link(announcement_link.to_string().as_str()) {
                     let bytes_serialized = serialize_callback(channel_id.clone(), buffer)
                         .expect(format!(
-                            "Error on serializing user state via serialize_user_state_callback for channel {}", channel_id).as_str());
+                            "Error on serializing Streams Client State via serialize_streams_client_state_callback for channel {}", channel_id).as_str());
                     ret_val = Some(bytes_serialized);
                 }
             }
@@ -257,11 +257,11 @@ impl<WalletT: SimpleWallet> Drop for ChannelManager<WalletT> {
     fn drop(&mut self) {
         if let Some(serial_file_name) = self.serialization_file.clone() {
             block_on(self.export_to_serialization_file(serial_file_name.as_str()))
-                .expect("Error on exporting User State into serialization file");
+                .expect("Error on exporting Streams Client State into serialization file");
         }
-        if let Some(serialize_callback_ref) = self.serialize_user_state_callback.clone() {
+        if let Some(serialize_callback_ref) = self.serialize_streams_client_state_callback.clone() {
             block_on(self.export_to_serialize_callback(serialize_callback_ref))
-                .expect("Error on exporting User State into serialization callback function");
+                .expect("Error on exporting Streams Client State into serialization callback function");
         }
     }
 }

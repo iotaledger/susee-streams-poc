@@ -72,9 +72,9 @@ impl<PrimaryKeyType: Clone> Clone for Box<dyn SerializationCallbackCloneBox<Prim
     }
 }
 
-// This can be used to store closures that will serialize a Streams user state
+// This can be used to store closures that will serialize a Streams Client State
 // String - pub streams_channel_id
-// Vec<u8> - pub streams_user_state
+// Vec<u8> - pub streams_client_state
 // -> Result<usize> - number of rows or bytes
 pub type SerializationCallbackRefToClosureString = Box<dyn SerializationCallbackCloneBox<String>>;
 pub type SerializationCallbackRefToClosureI64 = Box<dyn SerializationCallbackCloneBox<i64>>;

@@ -63,9 +63,9 @@ impl SensorManager {
                 print!("Got Error while sending Message: {}\r", err);
             }
         }
-        // safe_user_state is usually called by the drop handler of the subscriber but
+        // save_client_state_blocking is usually called by the drop handler of the subscriber but
         // as this loop runs until the user presses ctr-c we need this to
-        // save the user state immediately.
+        // save the streams client state immediately.
         // A probably safer alternative would be a tokio::signal::ctrl_c() handler but for
         // our test purposes this approach is sufficient and much simpler.
         subscriber.save_client_state_blocking();

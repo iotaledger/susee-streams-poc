@@ -121,7 +121,7 @@ pub async fn create_subscriber_manager<'a>(
     Ok(SubscriberManagerPlainTextWalletHttpClient::new(
         transport,
         wallet,
-        ClientDataPersistenceStd::new_prepared("user-state-sensor.bin"),
+        ClientDataPersistenceStd::new_prepared("client-state-sensor.bin"),
     )
     .await)
 }

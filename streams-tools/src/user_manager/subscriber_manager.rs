@@ -100,9 +100,9 @@ where
         };
 
         if is_client_state_existing {
-            log::debug!("[fn new()] Try to import User state from subscriber_persistence");
+            log::debug!("[fn new()] Try to import Streams Client State from subscriber_persistence");
             import_from_client_data_persistence(subscriber_persistence, &mut ret_val).await
-                .expect("Error while importing User state");
+                .expect("Error while importing Streams Client State");
         }
         ret_val
     }
@@ -211,8 +211,8 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
         if self.prev_msg_link.is_none() {
             panic!("[SubscriberManager.send_signed_packet()] Before sending messages you need to register a keyload message. Use register_keyload_msg() before using this function.")
         }
-        log::debug!("[fn send_signed_packet()] sync_user_state");
-        self.sync_user_state().await?;
+        log::debug!("[fn send_signed_packet()] sync_streams_user");
+        self.sync_streams_user().await?;
         log::debug!("[fn send_signed_packet()] call_user_send_signed_packet");
         let msg_link = self.call_user_send_signed_packet(input).await?;
         log::debug!("[fn send_signed_packet()] set new prev_msg_link");
@@ -250,10 +250,10 @@ impl<TSR, TransportT, WalletT: SimpleWallet> SubscriberManager<TransportT, Walle
         Ok(response.address())
     }
 
-    async fn sync_user_state(&mut self) -> Result<()> {
+    async fn sync_streams_user(&mut self) -> Result<()> {
         let user = self.user.as_mut().unwrap();
         if !self.compressed.get_use_compressed_msg() || !self.is_synced {
-            log::debug!("[fn sync_user_state()] syncing client state");
+            log::debug!("[fn sync_streams_user()] syncing client state");
             user.sync().await.map_err(|e| anyhow!(e))?;
             self.is_synced = true;
         }

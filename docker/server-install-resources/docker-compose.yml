@@ -30,7 +30,7 @@ services:
 # message explorer service.
 # As the Sensor initialization is done using a local
 # management-console instance, the locally created SQlite DB
-# (user-states-management-console.sqlite3) and wallet file
+# (client-states-management-console.sqlite3) and wallet file
 # (wallet-management-console.txt) need to be
 # uploaded to the data folder of the NODE_HOST before the
 # following lines can be uncommented.

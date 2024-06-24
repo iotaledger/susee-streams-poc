@@ -163,7 +163,7 @@ pub enum VfsFatManagement {
 #[allow(non_camel_case_types)]
 #[derive(PartialEq, Clone, Debug)]
 pub enum StreamsClientDataStorageType {
-    /// Streams client data are stored on the in the vfs_fat data partition
+    /// Streams client data are stored in the vfs_fat data partition
     /// managed by the Streams POC library or by the Sensor Application,
     /// according to the used VfsFatManagement option.
     ///
@@ -178,7 +178,7 @@ pub enum StreamsClientDataStorageType {
     /// * initial streams client data are provided by the application
     ///   via an initial data buffer:
     ///   streams_client_data_persistence_t.latest_client_data_bytes
-    /// * after the streams client data have changed the resulting
+    /// * after the streams client data have changed, the resulting
     ///   latest data are handed to the application via a callback
     ///   function that is called by the streams-poc-lib:
     ///   streams_client_data_persistence_t.update_client_data_call_back
@@ -233,7 +233,10 @@ pub enum StreamsClientInitializationState {
 ///   *           In future versions of the susee-streams-poc applications, a command     *
 ///   *           could be implemented to make other streams channel participants         *
 ///   *           skip the latest state and proceed with the previous state.              *
-///   *                                                                                   *
+///   * ATTENTION:                                                                        *
+///   *           In acse a client state is cleared per remote command (Command::         *
+///   *           CLEAR_CLIENT_STATE - binary_persist/binary_persist_command.rs)          *
+///   *           the client_data_bytes buffer may be empty.                              *
 ///   *************************************************************************************
 ///
 /// @param client_data_bytes        Binary data of the response body.

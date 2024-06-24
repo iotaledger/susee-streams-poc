@@ -39,7 +39,7 @@ use super::{
     }
 };
 
-pub static STREAMS_CLIENT_DATA_FILE_NAME: &str = "user-state-sensor.bin";
+pub static STREAMS_CLIENT_DATA_FILE_NAME: &str = "client-state-sensor.bin";
 
 #[derive(Clone)]
 pub struct ClientDataPersistenceOptions {

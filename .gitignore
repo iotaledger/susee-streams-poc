@@ -2,7 +2,7 @@
 /streams-tools/Cargo.lock
 /**/@rust_panic
 /**/wallet-*.txt
-/**/user-state-*.bin
+/**/client-state-*.bin
 /**/*.sqlite3
 /.embuild/espressif/
 Cargo.lock.bak-*

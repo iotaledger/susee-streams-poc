@@ -101,7 +101,7 @@ pub async fn get_initial_channel_manager<'a>(user_store: &UserDataStore, options
         initial_user_having_seed_derivation_phrase.external_id = external_id;
     }
     initial_user_having_seed_derivation_phrase.seed_derivation_phrase = wallet.seed_derivation_phrase.as_ref().unwrap().clone();
-    new_opt.serialize_user_state_callback = Some(
+    new_opt.serialize_streams_client_state_callback = Some(
         user_store.get_serialization_callback(&initial_user_having_seed_derivation_phrase)
     );
 
@@ -113,10 +113,10 @@ pub async fn get_initial_channel_manager<'a>(user_store: &UserDataStore, options
 }
 
 pub async fn get_channel_manager_for_channel_starts_with(channel_starts_with: &str, user_store: &mut UserDataStore, options: &MultiChannelManagerOptions, update_user_on_exit: bool) -> Result<ChannelManager<PlainTextWallet>> {
-    if let Ok((user_dao, serialize_user_state_callback)) = user_store.search_item(channel_starts_with) {
+    if let Ok((user_dao, serialize_streams_client_state_callback)) = user_store.search_item(channel_starts_with) {
         let wallet = get_wallet(options, Some(&user_dao))?;
-        let user_state_callback = if update_user_on_exit {
-            Some(serialize_user_state_callback)
+        let client_state_callback = if update_user_on_exit {
+            Some(serialize_streams_client_state_callback)
         } else {
             None
         };
@@ -124,7 +124,7 @@ pub async fn get_channel_manager_for_channel_starts_with(channel_starts_with: &s
             user_dao,
             wallet,
             options.iota_node.as_str(),
-            user_state_callback,
+            client_state_callback,
             options.message_data_store_for_msg_caching.clone(),
             options.inx_collector_access_throttle_sleep_time_millisecs,
         ).await
@@ -134,13 +134,14 @@ pub async fn get_channel_manager_for_channel_starts_with(channel_starts_with: &s
 }
 
 pub async fn get_channel_manager_for_channel_id<'a>(channel_id: &str, user_store: &UserDataStore, options: &MultiChannelManagerOptions) -> Result<ChannelManager<PlainTextWallet>> {
-    let (user_dao, serialize_user_state_callback) = user_store.get_item(&channel_id.to_string())?;
+    let (user_dao, serialize_streams_client_state_callback) =
+        user_store.get_item(&channel_id.to_string())?;
     let wallet = get_wallet(options, Some(&user_dao))?;
     get_channel_manager_by_user_dao(
         user_dao,
         wallet,
         options.iota_node.as_str(),
-        Some(serialize_user_state_callback),
+        Some(serialize_streams_client_state_callback),
         options.message_data_store_for_msg_caching.clone(),
         options.inx_collector_access_throttle_sleep_time_millisecs,
     ).await
@@ -166,14 +167,14 @@ async fn get_channel_manager_by_user_dao(
     user_dao: User,
     wallet: PlainTextWallet,
     node: &str,
-    serialize_user_state_callback: Option<SerializationCallbackRefToClosureString>,
+    serialize_streams_client_state_callback: Option<SerializationCallbackRefToClosureString>,
     message_data_store_for_msg_caching: Option<MessageDataStoreOptions>,
     throttle_sleep_time_millisecs: Option<u64>
 ) -> Result<ChannelManager<PlainTextWallet>>{
     let mut new_opt = ChannelManagerOptions::default();
     new_opt.throttle_sleep_time_millisecs = throttle_sleep_time_millisecs;
-    new_opt.user_state = Some(user_dao.streams_user_state.clone());
-    new_opt.serialize_user_state_callback = serialize_user_state_callback;
+    new_opt.streams_client_state = Some(user_dao.streams_client_state.clone());
+    new_opt.serialize_streams_client_state_callback = serialize_streams_client_state_callback;
     new_opt.message_data_store_for_msg_caching = message_data_store_for_msg_caching;
     Ok( ChannelManager::new(
         node,

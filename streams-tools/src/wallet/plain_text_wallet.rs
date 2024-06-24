@@ -208,6 +208,7 @@ impl SimpleWallet for PlainTextWallet {
 
     fn increment_initialization_cnt(&mut self) -> Result<u8> {
         self.persist.initialization_cnt += 1;
+        self.persist.seed = create_seed();
         self.write_wallet_file();
         Ok(self.persist.initialization_cnt)
     }

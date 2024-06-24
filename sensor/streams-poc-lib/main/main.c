@@ -89,21 +89,21 @@ static const sensor_manager_connection_type_t SENSOR_MANAGER_CONNECTION_TYPE = S
 // Defines how streams client data shall be stored
 // Possible values: [CLIENT_DATA_STORAGE_VFS_FAT, CLIENT_DATA_STORAGE_CALL_BACK]
 // More details can be found in sensor/streams-poc-lib/components/streams-poc-lib/include/streams-poc-lib.h
-static const StreamsClientDataStorageType s_streams_client_data_storage_type = CLIENT_DATA_STORAGE_CALL_BACK;
+static const StreamsClientDataStorageType STREAMS_CLIENT_DATA_STORAGE_TYPE = CLIENT_DATA_STORAGE_CALL_BACK;
 
 // Defines how vfs_fat data partitions, needed to store files in spiflash, shall be managed
 // Possible values: [VFS_FAT_STREAMS_POC_LIB_MANAGED, VFS_FAT_APPLICATION_MANAGED]
 // More details can be found in sensor/streams-poc-lib/components/streams-poc-lib/include/streams-poc-lib.h
-static const VfsFatManagement s_vfs_fat_management = VFS_FAT_APPLICATION_MANAGED;
+static const VfsFatManagement VFS_FAT_MANAGEMENT = VFS_FAT_APPLICATION_MANAGED;
 
-// In case s_vfs_fat_management == VFS_FAT_APPLICATION_MANAGED the following macro defines
+// In case VFS_FAT_MANAGEMENT == VFS_FAT_APPLICATION_MANAGED the following macro defines
 // the path used as param vfs_fat_path for the prepare_client_data_storage___vfs_fat___application_managed()
 // function call.
 // This test application will prepare a file system which is used by the streams_poc_lib.
 // This test application can only handle vfs_fat base_path names, so no subfolders are allowed.
 #define STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH ("/awesome-data")
 
-// In case s_streams_client_data_storage_type == CLIENT_DATA_STORAGE_CALL_BACK,
+// In case STREAMS_CLIENT_DATA_STORAGE_TYPE == CLIENT_DATA_STORAGE_CALL_BACK,
 // this test application will store the Streams client state data in a file
 // with the following filename.
 #define STREAMS_CLIENT_DATA_FILE_NAME ("/client-data.bin")
@@ -219,13 +219,13 @@ void set_streams_client_data_buffer(
 }
 
 const char *get_vfs_fat_base_path() {
-    switch (s_vfs_fat_management) {
+    switch (VFS_FAT_MANAGEMENT) {
      case VFS_FAT_STREAMS_POC_LIB_MANAGED:
         return get_vfs_fat_mount_base_path();
      case VFS_FAT_APPLICATION_MANAGED:
         return STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH;
      default:
-        ESP_LOGE(TAG, "[fn prepare_streams_client_data_file_name()] s_vfs_fat_management value is not allowed: %d", s_vfs_fat_management);
+        ESP_LOGE(TAG, "[fn prepare_streams_client_data_file_name()] VFS_FAT_MANAGEMENT value is not allowed: %d", VFS_FAT_MANAGEMENT);
         return NULL;
     }
 }
@@ -654,7 +654,7 @@ bool prepare_client_data_persistence_for_call_back_usage(streams_client_data_per
     bool is_sensor_initialized = (bytes_read_or_success > 0);
     ESP_LOGD(TAG, "[fn prepare_client_data_persistence_for_call_back_usage] is_sensor_initialized: %i", is_sensor_initialized);
 
-    switch (s_vfs_fat_management) {
+    switch (VFS_FAT_MANAGEMENT) {
         case VFS_FAT_STREAMS_POC_LIB_MANAGED:
             ESP_LOGD(TAG, "[fn prepare_client_data_persistence_for_call_back_usage] case VFS_FAT_STREAMS_POC_LIB_MANAGED");
             return prepare_client_data_storage___call_back___streams_poc_lib_managed_vfs_fat(
@@ -679,8 +679,8 @@ bool prepare_client_data_persistence_for_call_back_usage(streams_client_data_per
             ESP_LOGD(TAG, "[fn prepare_client_data_persistence_for_call_back_usage] result is %d", result);
             return result;
         default:
-            ESP_LOGE(TAG, "[fn prepare_client_data_persistence] Unknown s_streams_client_data_storage_type: %d",
-                s_streams_client_data_storage_type);
+            ESP_LOGE(TAG, "[fn prepare_client_data_persistence] Unknown STREAMS_CLIENT_DATA_STORAGE_TYPE: %d",
+                STREAMS_CLIENT_DATA_STORAGE_TYPE);
    }
    return false;
 }
@@ -690,9 +690,9 @@ bool prepare_client_data_persistence(streams_client_data_persistence_t *p_stream
         return false;
     }
 
-    switch (s_streams_client_data_storage_type) {
+    switch (STREAMS_CLIENT_DATA_STORAGE_TYPE) {
         case CLIENT_DATA_STORAGE_VFS_FAT: {
-            switch (s_vfs_fat_management) {
+            switch (VFS_FAT_MANAGEMENT) {
                 case VFS_FAT_STREAMS_POC_LIB_MANAGED:
                     return prepare_client_data_storage___vfs_fat___streams_poc_lib_managed(p_streams_client_data_persistence);
                 case VFS_FAT_APPLICATION_MANAGED:
@@ -701,8 +701,8 @@ bool prepare_client_data_persistence(streams_client_data_persistence_t *p_stream
                         STREAMS_POC_LIB_TEST_VFS_FAT_BASE_PATH
                     );
                 default:
-                    ESP_LOGE(TAG, "[fn prepare_client_data_persistence] Unknown s_streams_client_data_storage_type: %d",
-                        s_streams_client_data_storage_type);
+                    ESP_LOGE(TAG, "[fn prepare_client_data_persistence] Unknown STREAMS_CLIENT_DATA_STORAGE_TYPE: %d",
+                        STREAMS_CLIENT_DATA_STORAGE_TYPE);
             }
         }
         break;
@@ -710,8 +710,8 @@ bool prepare_client_data_persistence(streams_client_data_persistence_t *p_stream
             return prepare_client_data_persistence_for_call_back_usage(p_streams_client_data_persistence);
        }
        default:
-            ESP_LOGE(TAG, "[fn prepare_client_data_persistence] Unknown s_streams_client_data_storage_type: %d",
-                s_streams_client_data_storage_type);
+            ESP_LOGE(TAG, "[fn prepare_client_data_persistence] Unknown STREAMS_CLIENT_DATA_STORAGE_TYPE: %d",
+                STREAMS_CLIENT_DATA_STORAGE_TYPE);
     }
     return false;
 }
@@ -976,13 +976,13 @@ void app_main(void) {
     ESP_LOGI(TAG, "[fn app_main] Free heap: %ld\n", esp_get_free_heap_size());
 
     wl_handle_t wl_handle = WL_INVALID_HANDLE;
-    if (s_vfs_fat_management == VFS_FAT_APPLICATION_MANAGED) {
+    if (VFS_FAT_MANAGEMENT == VFS_FAT_APPLICATION_MANAGED) {
         mount_fatfs(&wl_handle);
     }
 
     process_test();
 
-    if (s_vfs_fat_management == VFS_FAT_APPLICATION_MANAGED && wl_handle != WL_INVALID_HANDLE) {
+    if (VFS_FAT_MANAGEMENT == VFS_FAT_APPLICATION_MANAGED && wl_handle != WL_INVALID_HANDLE) {
         unmout_vfs_fat(wl_handle);
     }
 

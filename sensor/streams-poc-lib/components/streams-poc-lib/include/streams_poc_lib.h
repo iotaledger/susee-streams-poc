@@ -23,7 +23,7 @@ typedef enum LoRaWanError {
  */
 typedef enum StreamsClientDataStorageType {
   /**
-   * Streams client data are stored on the in the vfs_fat data partition
+   * Streams client data are stored in the vfs_fat data partition
    * managed by the Streams POC library or by the Sensor Application,
    * according to the used VfsFatManagement option.
    *
@@ -39,7 +39,7 @@ typedef enum StreamsClientDataStorageType {
    * * initial streams client data are provided by the application
    *   via an initial data buffer:
    *   streams_client_data_persistence_t.latest_client_data_bytes
-   * * after the streams client data have changed the resulting
+   * * after the streams client data have changed, the resulting
    *   latest data are handed to the application via a callback
    *   function that is called by the streams-poc-lib:
    *   streams_client_data_persistence_t.update_client_data_call_back
@@ -141,7 +141,10 @@ typedef enum VfsFatManagement {
  *   *           In future versions of the susee-streams-poc applications, a command     *
  *   *           could be implemented to make other streams channel participants         *
  *   *           skip the latest state and proceed with the previous state.              *
- *   *                                                                                   *
+ *   * ATTENTION:                                                                        *
+ *   *           In acse a client state is cleared per remote command (Command::         *
+ *   *           CLEAR_CLIENT_STATE - binary_persist/binary_persist_command.rs)          *
+ *   *           the client_data_bytes buffer may be empty.                              *
  *   *************************************************************************************
  *
  * @param client_data_bytes        Binary data of the response body.
@@ -434,17 +437,30 @@ enum StreamsError send_message(const uint8_t *message_data,
 /**
  * Start an interactive app that can be used to automatically initialize the Streams channel or
  * to query the subscription status of the Streams client.
- * The "sensor_manager" provides the same functionality as the stand alone sensor application
- * contained in the project sensor/main-rust-esp-rs.
- * The sensor can be remote controlled using the 'sensor' app for x86 Linux-PCs
- * (project sensor/main-rust) or the 'management-console' app.
- * For more details about the possible remote commands have a look into the CLI help of those
- * two applications.
+ *
+ * After this function has been called, the sensor can be remote controlled using the
+ * x86/PC Sensor Application or the 'management-console' app.
+ * For more details about the possible remote commands have a look into the README files of these
+ * applications (sensor/README.md and management-console/README.md) and their CLI help.
  *
  * The "sensor_manager" repetitively polls commands from the iota-bridge and executes them. To stop
  * the sensor_manager command poll loop please return LoRaWanError::EXIT_SENSOR_MANAGER in your
  * implementation of the lorawan_send_callback.
  *
+ * Sensor RE-initialization
+ * ------------------------
+ * A reinitialization can be achieved using this function together with the
+ * CLIENT_DATA_STORAGE_CALL_BACK storage type. To perform a reinitialization, provide an empty
+ * streams_client_data_persistence_t.latest_client_data_bytes buffer when the
+ * 'prepare_client_data_storage___call_back___...' function is called, to prepare the call of this
+ * function. As the wallet file, stored in the vfs-fat filesystem is not cleared, the sensor
+ * application will be properly reinitialized. See sensor/README.md for more details regarding
+ * sensor reinitialization.
+ * Sensor reinitialization can also be achieved using CLIENT_DATA_STORAGE_VFS_FAT, if the file
+ * used to store the Streams client state is deleted.
+ *
+ * IOTA Bridge Connection
+ * ----------------------
  * In general the connection from the Sensor application to the iota-bridge can be realized in one
  * of the following ways:
  *

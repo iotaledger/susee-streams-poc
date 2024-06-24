@@ -1,124 +1,67 @@
 # SUSEE Streams POC
 
-      =============================================================================
-      ===                                                                       ===
-      ===                         IMPORTANT NOTE                                ===
-      ===                                                                       ===
-      === On 4th of October the IOTA mainnet has been updated to the Stardust   ===
-      === version of the IOTA protocol. The applications and libraries          ===
-      === provided on the 'main' branch of this repository can not be used      ===
-      === after the Stardust update.                                            ===
-      ===                                                                       ===
-      === The 'stardust' branch of this repository includes all needed          ===
-      === resources to use the SUSEE POC applications and libraries together    ===
-      === with IOTA Stardust.                                                   ===
-      ===                                                                       ===
-      === This is the current status of IOTA Stardust integration for the       ===
-      === SUSEE POC applications:                                               ===
-      ===                                                                       ===
-      === * All resources can be used with Stardust. See folder                 ===
-      ===   'susee-node' for more details.                                      ===
-      === * A SUSEE-Node has been setup for the field-test:                     ===
-      ===   - domain name: iotabridge.peeros.de                                 ===
-      ===   - services:                                                         ===
-      ===      - hornet                                                         ===
-      ===        - API: https://iotabridge.peeros.de/api/routes                 ===
-      ===        - Autopeering :14626/udp                                       ===
-      ===        - Gossip :15600/tcp                                            ===
-      ===      - hornet-dashboard (https://iotabridge.peeros.de/dashboard/)     ===
-      ===      - grafana (https://iotabridge.peeros.de/grafana)                 ===
-      ===      - inx-collector (:9030)                                          ===
-      ===      - iota-bridge (:50000)                                           ===
-      ===      - app-srv-connector-mock (:50001)                                ===
-      ===      - management-console, message explorer (:50002)                  ===
-      ===                                                                       ===
-      === * TODO: Finish Documentation:                                         ===
-      ===   * SUSEE-Node section in main readme                                 ===
-      ===   * Test/scripts folder: Update all scripts                           ===
-      ===   * Test folder: Update all command line expressions                  ===
-      ===   * Test folder: Add a "Start your private tangle" hint to all        ===
-      ===                  test descriptions                                    === 
-      ===   * Test folder: Streams-collector section in main readme             ===
-      ===   * Sensor folder: Mention SUSEE-Node in readme                       ===
-      ===   * streams-poc-lib folder: Mention SUSEE-Node in readme              ===
-      ===   * main-streams-poc-lib-pio folder:                                  ===
-      ===     Mention SUSEE-Node in readme                                      ===
-      ===   * Sensor folder: Mention SUSEE-Node in main readme                  ===
-      ===   * Principles of how the DevEUI-Handshake at the beginning of        ===
-      ===     automatic sensor initialization is done                           ===
-      ===   * New SUSEE-Node Readme section "Check Health Manually"             ===
-      ===   * New section "SUSEE-Node for Message Explorer" in management-      ===
-      ===     console and SUSEE-Node Readmes                                    ===
-      ===   * New SUSEE-Node Readme section for docker-compose-minio-client.yml ===
-      === * Define STORAGE_DEFAULT_BUCKET 'iota-mainnet' in hornet .env file    ===
-      ==  * ESP-32-Sensor: Support F-Ram to store STREAMS User State            ===
-      === * SUSEE-Node Hardening:                                               ===
-      ===   * message-explorer                                                  ===
-      ===     * https for message-explorer -> subdomain: explorer.iotabridge... ===
-      ===     * Remove message-explorer rest API (port 50002) from exposed      ===
-      ===       ports of the SUSEE-Node therafter                               ===
-      ===   * Remove inx-collector rest API (port 9030) from exposed ports      ===
-      ===     of the SUSEE-Node therafter                                       ===
-      ===   * Remove minio http ports (9000 + 9001) from exposed ports          ===
-      ===     of the SUSEE-Node as it can be accessed via https (minio and      ===
-      ===     minioui subdomains)                                               ===
-      ===   * Restrict access to inx-collector rest API (collector.iotabridge..)===
-      ===     to specific IPs or implement an API-Key authentication via        ===
-      ===     query param 'api-key', query param 'api-key-salt', a preshared    ===
-      ===     key used by poth inx-collectors, where the 'api-key' is derived   ===
-      ===     from the preshared key, the salt and the 'synchronised-block'     ===
-      ===     blockKey                                                          ===
-      ===   * Restrict system access as far as possible                         ===
-      === * Perform load tests for IOTA Bridge simulating 250 Sensors           ===
-      ===   sending messages with 10 minute interval                            ===
-      === * Version info endpoint for iota-bridge + log output                  ===
-      =============================================================================
-
-      References:
-      * https://blog.iota.org/iota-stardust-upgrade/
-      * https://blog.iota.org/stardust-upgrade-iota-tokenomics/
-
 ## About
-This project contains five test applications providing command line interfaces (CLI) to evaluate the *IOTA Streams*
-functionality that is used in the SUSEE project. Additionally, the static library *streams-poc-lib* provides C bindings
-for the most relevant *Sensor* specific functionality for the SUSEE project.
+This repository provides a static library for the ESP32-C3 platform,
+called the *Streams POC Library*, which can be used to encrypt and
+sign *Sensor* messages using *IOTA Streams*.
 
-Following test applications are contained. For more details regarding the general workflows, actors,
+Additionally, five test command line interface (CLI) applications
+and a *SUSEE Node* docker compose setup are provided to run the
+needed backend services and to develop, test
+and evaluate the contained source code.
+
+All contained applications and libraries use the IOTA Stardust protocol.
+
+The code in this repository has ben developed during the SUSEE project
+to evaluate the needed *IOTA Streams* functionality.
+
+Here is an overview of the SW components that are used in the SUSEE project;
+
+<img src="components overview.png" alt="SUSEE Components Overview" width="600"/>
+
+<br>
+
+For more details regarding the general workflows, actors,
 roles and technical components of the SUSEE project please see below in the 
-<a href="#workflow-model">Workflow Model</a> section:
+<a href="#workflow-model">Workflow Model</a> section.
+
+Following applications and libraries are contained in this repository:
 
 * [IOTA Bridge](iota-bridge)<br>
   * Needed by all Sensor applications to access the IOTA Tangle
     * Provides an http rest api used by the *Sensor* applications to access the tangle<br>
     * Attaches the *Streams* packages received from the *Sensor* applications to the tangle
-  * Forwards remote control commands from the *x86/PC Sensor* or *Management Console* to the Sensor applications
-  * Forwards command confirmations from Sensor applications to the *x86/PC Sensor* or *Management Console*
-* [ESP32 Sensor](sensor/main-rust-esp-rs)<br>
-  * Imitates the processes running in the smart meter (a.k.a. *Sensor*)
-  * Runs on ESP32-C3 devices
-  * Can be remote controlled by the *x86/PC Sensor*
-* [streams-poc-lib](sensor/streams-poc-lib)<br>
-  * Provides C bindings for most functionalities of the *ESP32 Sensor*
-  * Can be used with Espressifs ESP-IDF build process for ESP32-C3 devices
-  * Includes a test application written in C to test the library functionality using a WIFI socket instead of
-    a LoRaWAN connection
-  * Provides most features of the *ESP32 Sensor* via its library interface
-* [AppServer Connector Mockup Tool](app-srv-connector-mock)<br>
-  * Acts as *Application Server Connector* for the *streams-poc-lib* test application
-  * Receives & sends binary packages from/to the streams-poc-lib test application via a socket
-    connection and transmits these packages to the *IOTA-Bridge* via its `lorawan-rest` API functions.
+  * Forwards remote control commands from the *Management Console* to the Sensor applications
+  * Forwards command confirmations from Sensor applications to the *Management Console*
 * [x86/PC Sensor](sensor/main-rust)<br>
-  * Runs on x86/PC
-  * Used to send commands to the *ESP32 Sensor* or *streams-poc-lib* test app
-  * Can also be used to imitate an *ESP32 Sensor* on x86/PC platforms including
-    the possibility to be remote controlled
+  * *Sensor* application for the x86/PC platform
+  * Imitates a *Sensor* application on x86/PC
+  * Can be used to test *SUSEE Streams POC* code without ESP32-C3 devices
+* [streams-poc-lib](sensor/streams-poc-lib)<br>
+  * Provides C bindings to build a *Sensor* application on the ESP32-C3 platform with C
+  * Can be used with Espressifs
+    [ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/index.html)
+    build process for ESP32-C3 devices
+  * Includes a test application written in C to test the library functionality
+    using a WIFI socket instead of a LoRaWAN connection
+* [AppServer Connector Mockup Tool](app-srv-connector-mock)<br>
+  * Acts as [*Application Server Connector*](#technical-components)
+    for the *streams-poc-lib* test application
+  * Receives & sends binary packages from/to the streams-poc-lib test application
+    via a socket connection and transmits these packages to the *IOTA-Bridge*
+    via its `lorawan-rest` API functions.
 * [Management Console](management-console)<br>
   * [Admin](#roles)-Tool to process workflows needed for *Initialization* of the *Sensor* and the monitoring of *Sensor Processing*
   * Manages the *Add/Remove Subscriber* workflows
   * Manages multiple channels resp. *Sensors* using a local SQLite3 database
   * Provides a [Message Explorer](management-console#run-message-explorer) to explore the *Sensor* messages 
-
-
+* [ESP32 Sensor](sensor/main-rust-esp-rs)<br>
+  * Historical application project that is now deprecated
+  * Has been used to imitate processes running in the *Sensor* on the ESP32-C3 platform
+    before the *streams-poc-lib* existed
+  * Can still be used to compile 
+    [ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/index.html)
+    code using the RUST cargo build toolchain but can't be flashed and run anymore
 
 ###### Why is IOTA Streams used?
 
@@ -165,19 +108,19 @@ provides an *INX Proof of Inclusion* plugin and stores the block data together w
 PoIs.
 
 ###### How is IOTA Streams used?
-The *Streams* channel used for the SUSEE project generally can be described as follows:
+The *Streams Channel* used for the SUSEE project generally can be described as follows:
 * One single branch per *Sensor*
 * The Sensor will be a subscriber and will be the only publishing actor in the single branch
-* The energy provider will be the author of the *Streams* channel
+* The energy provider will be the author of the *Streams Channel*
 * Additional stakeholders (e.g. home owner) could be added as reading subscribers to the single branch
 * Handshake:
-  * The *Sensor* initialization (initial handshake consisting of announcement/subscription/keyload) between
+  * The *Sensor Initialization* (initial handshake consisting of announcement/subscription/keyload) between
     *Sensor* and the channel author will be done before a *Sensor* is installed in a home, which means for
     the initial handshake the limitations of LoRaWAN don't apply
   * If anything changes in the single branch channel setup, e.g. the addition of a new reading subscriber,
     the *Sensor* will have to be able to receive new keyload information downstream via LoRaWAN 
 
-## Prerequisites
+## Build Prerequisites
 
 ### For x86/PC
 
@@ -200,6 +143,10 @@ Please follow the steps described in the ESP32 specific application projects:
 * [ESP32 Sensor](sensor/main-rust-esp-rs#prerequisites)
 * [streams-poc-lib](sensor/streams-poc-lib#prerequisites)
 * [PlatformIO Example for streams-poc-lib](sensor/main-streams-poc-lib-pio#prerequisites-and-build)
+
+### For Docker
+Please follow the official
+[docker install instructions](https://docs.docker.com/get-docker/). 
 
 ## Build
 
@@ -227,17 +174,75 @@ The next section describes how to build it.
 ### For ESP32
 
 Please follow the steps described in the ESP32 specific application projects:
-* [ESP32 Sensor](sensor/main-rust-esp-rs#build)
 * [streams-poc-lib](sensor/streams-poc-lib#build)
 * [PlatformIO Example for streams-poc-lib](sensor/main-streams-poc-lib-pio#prerequisites-and-build)
+* [ESP32 Sensor](sensor/main-rust-esp-rs#build)
 
-### Docker
+### Docker build
 Most applications described here can be run in docker containers
-that can be build using docker compose.
+that can be build using a Dockerfile and can be run using docker compose.
 Have a look into the [Docker folder README](./docker/README.md)
 for more details.
 
+*IOTA Bridge* and *Management Console* are services provided by the
+[SUSEE Node](#reliable-susee-node-backend) which is needed to run
+the *SUSEE Streams POC* Applications.
+There are several options to set up and deploy a *SUSEE Node*.
+Have a look into the [SUSEE Node](./susee-node)
+README for more details. 
+
+## Folders, Libraries and Project Dependencies 
+
+Here is a commented folder structure for this repository:
+
+* [app-srv-connector-mock](./app-srv-connector-mock)<br>
+  Application project for the *AppServer Connector Mockup Tool*
+* [docker](./docker)<br>
+  Resources to run the *SUSEE Streams POC* Applications with docker compose
+* [iota-bridge](./iota-bridge)<br>
+  Application project for the *IOTA Bridge*
+* [management-console](./management-console)<br>
+  Application project for the *Management Console*
+* [sensor](./sensor)<br>
+  Several projects to build *Sensor* applications:
+  * [main-rust-esp-rs](./sensor/main-rust-esp-rs)<br>
+    Application project for the deprecated *ESP32 Sensor*
+  * [main-rust](./sensor/main-rust)<br>
+    Application project for the *x86/PC Sensor*
+  * [main-streams-poc-lib-pio](./sensor/main-streams-poc-lib-pio)<br>
+    Example application to use the *Streams POC Library* with
+    [PlatformIO](https://platformio.org/)
+  * [sensor-lib](./sensor/sensor-lib)<br>
+    A shared static library project to gather code used for *Sensor*
+    applications and the *Streams POC Library*
+  * [streams-poc-lib](./sensor/streams-poc-lib)<br>
+    Library project for the *Streams POC Library*
+* [streams-tools](./streams-tools)<br>
+  A shared static library project to facilitate IOTA Streams usage in general
+* [susee-node](./susee-node)<br>
+  Resources to setup *SUSEE Nodes*
+* [susee-tools](./susee-tools)<br>
+  A shared static library project to gather SUSEE specific code
+* [test](./test)<br>
+  Test resources
+
+The static shared libraries and applications contained in this repository
+build the following dependency structure:
+
+<img src="sw-dependencies.png" alt="SW Dependencies" width="800"/>
+
 ## CLI API and file persistence 
+
+The main parts of the CLI API and most of the application specific details are
+documented in the application specific README files:
+* [Management Console CLI](management-console/README.md#management-console-cli)
+* [CLI of the Sensor Applications](sensor/README.md#cli-of-the-sensor-applications)
+* [IOTA-Bridge Console CLI](iota-bridge/README.md#iota-bridge-console-cli)
+* [AppServer Connector Mockup Tool CLI](app-srv-connector-mock/README.md#appserver-connector-mockup-tool-cli)
+
+This section documents only those aspects of the *SUSEE Streams POC*
+applications that are used in general resp. are shared by several of
+these applications.
 
 ### Common CLI options
 
@@ -246,9 +251,10 @@ Using the --help option of all four x86/PC applications will show the app specif
 target/release/management-console --help # Use 'sensor', 'app-srv-connector-mock' or "iota-bridge" instead of 'management-console' for the other apps
 ```
 
-*Management Console* and the *x86/PC Sensor* provide the following options.
-*IOTA-Bridge* and *AppServer Connector Mockup Tool* are using the same options expect `--wallet-file`
-as these applications do not need a wallet:
+All four x86/PC applications provide the following options except
+of `--wallet-file`. 
+*IOTA-Bridge* and *AppServer Connector Mockup Tool* are not
+using `--wallet-file` as these applications do not need a wallet:
 
     -h, --help
             Print help information
@@ -277,60 +283,117 @@ the location of stored data:
                 --data-dir="/home/admin/a_folder"
              [default: ./data/management-console]
 
-#### Application specific CLIs
-
-Please have a look at the application specific README files:
-
-* [Management Console CLI](management-console/README.md#management-console-cli)
-* [CLI of the Sensor Applications](sensor/README.md#cli-of-the-sensor-applications)
-* [IOTA-Bridge Console CLI](iota-bridge/README.md#iota-bridge-console-cli)
-* [AppServer Connector Mockup Tool CLI](app-srv-connector-mock/README.md#appserver-connector-mockup-tool-cli)
+The following section explains which data are stored in this location.
 
 ### Common file persistence
 
-The *Management Console* and the [*Sensor* applications](./sensor/README.md) use the following files for persistence
-* Wallet for the user seed<br><br>
+The *Management Console* and the [*Sensor* applications](./sensor/README.md) use the
+following files for persistence:
+
+* Wallet file for the user seed and *Initialization Count*<br><br>
   *x86/PC*<br>
-  The applications are using a plain text wallet that stores the automatically generated seed in a text file.
-  If option '--wallet-file' is not used, a default filename 'wallet-<APPLICATION-NAME>.txt' is used.
-  If the file does not exist, a new seed is created and stored in a new wallet file. Otherwise the seed stored
+  The applications are using a plain text wallet that stores the automatically
+  generated seed in a text file.
+  If option '--wallet-file' is not used, a default filename
+  'wallet-<APPLICATION-NAME>.txt' is used.
+  If the file does not exist, a new seed is created and stored in
+  a new wallet file. Otherwise the seed stored
   in the wallet file is used.<br>
   
-  As the wallet file contains the plain text seed (not encrypted) make absolutely sure to<br>
+  As the wallet file contains the plain text seed (not encrypted) 
+  make absolutely sure to<br>
   **DO NOT USE THIS WALLET FOR PRODUCTION PURPOSES**<br>
   Instead implement the [SimpleWallet trait](streams-tools/src/wallet/plain_text_wallet.rs)
   using a secure wallet library like [stronghold](https://github.com/iotaledger/stronghold.rs).
   <br><br>
-  The *Management Console* uses the seed to derive seeds for each managed channel.
-  The channel seed is derived from the main seed, stored in the wallet file, and a seed-derivation-phrase,
+  The *Management Console* uses the seed to derive seeds for 
+  each managed channel.
+  The channel seed is derived from the main seed, stored in 
+  the wallet file, and a seed-derivation-phrase,
   stored in the local SQLite3 database file.<br>
   
-  *ESP32 Sensor*<br>
+  *Sensor* Applications also use the wallet file to store the
+  [Initialization Count](./sensor/README.md#initialization-count).
+  
+  *ESP32*<br>
   The text file used for the plain text wallet is stored using
   [VFS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/vfs.html?highlight=vfs)
   and [FAT paths](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/fatfs.html).
   For production purposes the seed needs to be stored in
   [encrypted flash or NVM storage](https://docs.espressif.com/projects/esp-jumpstart/en/latest/security.html).
 
-* User state<br>
+* *Streams Client State*<br>
+  The *Streams Client State* needs to be stored on the device that uses Streams
+  to encrypt/decrypt and sign *Sensor* messages. It is updated after each
+  send message and every time a command is received from the *IOTA-Bridge*.
+
   *x86/PC*<br>
-  On application start the current user state is loaded from a file named 'user-state-[APPLICATION-NAME].bin'.
-  On application exit the current user state is written into this file.
+  On application start the current *Streams Client State* is loaded from 
+  a file named 'client-state-[APPLICATION-NAME].bin'.
+  On application exit the current *Streams Client State* is written into 
+  this file.
   <br><br>
-  The *Management Console* stores the user states of all managed channels in the local SQLite3 database file.
+  The *Management Console* stores the *Streams Client States* of all managed 
+  channels in the local SQLite3 database file.
   <br><br>
   *ESP32*<br>
-  The *ESP32 Sensor* reads and persists its user state every time a command is received
-  from the *IOTA-Bridge*. Like the wallet text file the state is persisted in a FAT partition located in the SPI
-  flash memory of the ESP32 board. This way the user state is secured against power outages of the ESP32.
-
+  The *Streams POC Library* offers two options to store the latest
+  *Streams Client State* that are documented in the C interface header file
+  [streams_poc_lib.h](./sensor/streams-poc-lib/components/streams-poc-lib/include/streams_poc_lib.h)
+  for the StreamsClientDataStorageType:
+  * CLIENT_DATA_STORAGE_VFS_FAT:<br>
+    The *Streams POC Library* reads and persists its 
+    *Streams Client State* like the wallet text file in a
+    VFS-FAT partition located in the SPI flash memory of the ESP32 device.
+    There are several options how the VFS-FAT partition is mounted which are
+    documented for the VfsFatManagement type in the streams_poc_lib.h file.
+  * CLIENT_DATA_STORAGE_CALL_BACK:<br>
+    The *Sensor* Application provides the latest *Streams Client State* data via
+    an initial buffer and receives updated states via a callback function.
+    This way the *Sensor* Application is responsible to store the
+    *Streams Client State* and fully controls how it's done.
 <br>  
 
 **IOTA Bridge**<br>
-The *IOTA Bridge* stores a map of LoraWAN DevEUIs and *Streams* channel IDs in a local SQLite3
+The *IOTA Bridge* stores a map of LoraWAN DevEUIs and *Streams Channel* IDs in a local SQLite3
 database "iota-bridge.sqlite3". More details can be found in the 
 [Compressed Streams Messages](sensor/README.md#deveuis-and-compressed-streams-messages)
 section.
+
+## Reliable SUSEE-Node backend
+
+To run the *SUSEE Streams POC* Applications a [*SUSEE Node*](./susee-node)
+needs to be run.
+
+Until the *Stardust* version of the IOTA protocol has been released
+in the IOTA mainnet, the *SUSEE Streams POC* Applications
+could be used without any self deployed server infrastructure.
+
+Since the *Stardust* update on the 4th of October 2023 a self hosted indexing service
+is needed to allow the retrieval of the *IOTA Streams* messages.
+
+The provided solution, integrated in the *SUSEE Node*, is based on the
+[INX Collector](https://github.com/teleconsys/inx-collector) by
+[Teleconsys](https://www.teleconsys.it/) and also acts as a 
+*Selective Permanode*. A *Selective Permanode* would have been
+needed before the *Stardust* protocol update anyway, because data
+blocks resp. messages have always been pruned after some time from
+the *IOTA Nodes*. A *Selective Permanode* filters SUSEE specific
+blocks out of the 
+[IOTA Tangle](https://wiki.iota.org/get-started/introduction/iota/introduction/#the-tangle)
+and stores these blocks in a distributed self owned
+database (cloud or onpremise).
+
+If usual appliances (cloud hosted or onpremise, VPS or physical) are used
+to host the *SUSEE Node*, it is recommended to have
+redundant services because these appliances can have downtimes
+of several minutes per week.
+The *SUSEE Node* therefore provides a very simple
+[primary, secondary redundancy with failover](https://www.cloudflare.com/learning/performance/what-is-server-failover/)
+to achieve higher availability. 
+
+More Details about the *SUSEE Node* contained in this repository can be found
+in the [SUSEE Node README](./susee-node).
 
 ## Test
 
@@ -343,10 +406,10 @@ to run tests.
 #### Restrictions of the provided tests
 
 A LoRaWAN communication infrastructure for test purposes is often not available.
-Therefore the current POC *Sensor* applications (*ESP32 Sensor*, *x86/PC Sensor* and the 
+Therefore the current POC *Sensor* applications (*x86/PC Sensor* and the 
 *streams-poc-lib* test application) are using WiFi to connect to the *IOTA Bridge*
 or the *AppServer Connector Mockup Tool*. This implies that the provided test
-applications can not simulate a real world system due to the different
+applications cannot simulate a real world system due to the different
 communication channel behaviors.  
 
 ###### Regarding *Sensor Initialization*:
@@ -413,22 +476,22 @@ have an impact on the way *IOTA Streams* is used are described.
 Here are the roles of the *SUSEE Workflows* that are impacted by *IOTA Streams*:
 * *Sensor*
   * Sends meter data messages as encrypted *IOTA Streams* packages via LoRaWAN
-  * Is the only participant in an *IOTA Streams* channel
+  * Is the only participant in an *IOTA Streams Channel*
     that sends meter data, so it uses a communication channel that is dedicated to it
   * Stores the identity of the *End Customer*
   * Allows the *End Customer* to directly manage the participation in the data transfer
     (e.g. to activate or cancel the participation)
   * Sends and receives control data (*Commands* and *Confirmations*)
-    to participate in the management of the used *IOTA Streams* channel (these
-    control data are not transfered via the *IOTA Streams* channel) 
+    to participate in the management of the used *IOTA Streams Channel* (these
+    control data are not transfered via the *IOTA Streams Channel*) 
 * *Read Only Participant*<br>
-  Can read meter data messages from a *Sensor* specific *IOTA Streams* channel
+  Can read meter data messages from a *Sensor* specific *IOTA Streams Channel*
   (this could be for example the *End Customer* where the *Sensor* is installed)
 * *Admin*
-  * Administrates the *IOTA Streams* channel for each *Sensor*
+  * Administrates the *IOTA Streams Channel* for each *Sensor*
   * Inserts or removes *Sensors* from the administrative system and creates
-    dedicated *IOTA Streams* channels for them
-  * Inserts or removes *Read Only Participants* to/from the Sensor dedicated *IOTA Streams* channel
+    dedicated *IOTA Streams Channels* for them
+  * Inserts or removes *Read Only Participants* to/from the Sensor dedicated *IOTA Streams Channel*
 
 ### Technical Components
 
@@ -440,7 +503,7 @@ The following technical components are needed for the SUSEE system to implement 
     closely connected extension unit (e.g. the SUSEE Module)
 * *Management Console*
   * Application used by the *Admin* role, providing all needed functionality
-    (described for the *Admin* role) to manage the *IOTA Streams* channels
+    (described for the *Admin* role) to manage the *IOTA Streams Channels*
     of all *Sensors* of an *Energy provider or metering point operator*
   * Runs at the *Energy provider or metering point operator*
 * *LoRaWAN Application Server*
@@ -556,16 +619,16 @@ channel. Every *Sensor* uses its own exclusive channel:
 
 #### Initialization
 
-The *Sensor* initialization is the initial handshake between *Management Console*
+The *Sensor Initialization* is the initial handshake between *Management Console*
 and *Sensor*. It will be done before a *Sensor* is installed in an
 *End Customers* facility and is controlled by the *Admin* role.
 
-Regarding the *IOTA Streams* channel that is used to manage the communication
+Regarding the *IOTA Streams Channel* that is used to manage the communication
 between all communication participants, the following *Streams* specific actions have to be performed:
 
 | Module               | Streams Action                                                                 | Result        |
 | -------------------- | ------------------------------------------------------------------------------ | ------------- |
-| *Management Console* | Create a new *IOTA Streams* channel                                            | *Announcement Link* |
+| *Management Console* | Create a new *IOTA Streams Channel*                                            | *Announcement Link* |
 | *Sensor*             | Subscribe to the channel using the *Announcement Link*                         | *Subscription Link*, *Public Key* |
 | *Management Console* | Add the Sensor to the channel using its *Subscription Link* and *Public Key*   | *Keyload Message* |
 | *Sensor*             | Register the *Keyload Message* which specifies all participants of the channel | - |
@@ -598,14 +661,14 @@ Dataflow of the *Sensor Processing Workflow*:
 
 <img src="sensor-processing-diagram.jpg" alt="Sensor Processing Workflow" width="800"/>
 
-To allow the [reinitialization](#sensor-reinitialization) and
+To allow the [Reinitialization](#sensor-reinitialization) and
 [Add/Remove Subscriber](#addremove-subscriber) workflows the SUSEE application
 protocoll needs to provide the ability to switch between *Sensor Processing*,
 *Add/Remove Subscriber* and *Sensor Reinitialization* workflows on demand.
 
 #### Add/Remove Subscriber
 
-Participants of the *Sensors* *IOTA Streams* channel are added or removed by the *Admin*.
+Participants of the *Sensors* *IOTA Streams Channel* are added or removed by the *Admin*.
 For this purpose a new *Keyload Message* message is send from the *Management-Console* to the *Sensor*.
 
 Contrary to the *Initialization* workflow, here LoRaWAN is also used for a back channel from the
@@ -615,15 +678,34 @@ The dataflow matches the dataflow of the *Sensor Processing* workflow.
 
 #### Sensor Reinitialization
 
-The safest way to assure the best data privacy is to use different *IOTA Streams* channels.
-In a situation where an already used *Sensor* hardware shall be reused in a different property
-it may be suitable to create a new channel for the already initialized Sensor
-(*Sensor Reinitialization*).
+When an already used *Sensor* hardware shall be reused for a different *End Customer*
+(e.g. in the same building where the *Sensor* is already installed),
+the best data privacy can be achieved by using different *IOTA Streams Channels* for the
+old and the new *End Customer*.
+
+During a *Sensor Reinitialization*, the *Streams Channel* of an already initialized
+*Sensor* is replaced by a new one, while the *Sensors* DevEUI is maintained.
+
+Due to the use of
+[Compressed Messages](./sensor/README.md#deveuis-and-compressed-streams-messages)
+between *Sensor* and *IOTA Bridge*,
+the [initialization-count](./sensor/README.md#initialization-count)
+must be incremented during a *Sensor Reinitialization*. 
+
+Otherwise, an *IOTA Bridge*, having cached an outdated *IOTA Streams Channel*-id,
+would have no possibility to detect that a new *Streams Channel* is used.
+This would result in  the *IOTA Bridge* using a wrong *Streams Channel*-id
+for the *Sensor* in case compressed messages are used.
 
 After a *Sensor Reinitialization* all evtl. needed *Read Only Participants* have to subscribe to the
-new channel again. In case all channel participants shall have no access to *Sensor* messages of the
-old *Sensor* (pre reinitialization messages) participants will be subscribed with new identities
-(key pairs). In case a participant needs access to old and new messagges (e.g. *Admin* role) an
-already existing identity could be reused.
+new channel again:
+* In case all channel participants shall have no access to *Sensor* messages of the
+  old *Sensor* (pre reinitialization messages) participants must be subscribed with new identities
+  (key pairs).
+* In case a participant needs access to old and new massages (e.g. *Admin* role) an
+  already existing identity must be reused.
 
-Currently it is not clear if LoRaWAN can be used for *Sensor Reinitialization*.
+Currently, it is not clear if LoRaWAN can be used for *Sensor Reinitialization*.
+
+More details regarding *Sensor Reinitialization* can be found here:
+*  

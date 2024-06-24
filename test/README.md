@@ -56,35 +56,93 @@ working directory from where the application has been started.
 Following the definition of our *test workspace*, this is the folder where the applications
 are stored.
 
+## SUSEE Node
+
+As described in the repository 
+[main README](../README.md#reliable-susee-node-backend) 
+a [*SUSEE Node*](../susee-node/README.md)
+needs to be run before any *SUSEE Streams POC* Application
+can be used.
+
+For test purposes a 
+[private tangle](../susee-node/README.md#private-tangle-for-development-purposes)
+together with a locally running *IOTA Bridge* instance will usually be the best option.
+
+If a physical or virtual appliance and a domain name
+for the appliance is available, a
+[production like test SUSEE Node](../susee-node/README.md#use-in-production)
+may be the better option for you (or you team).
+
+If a local *IOTA Bridge* instance with private tangle is used, the 
+*SUSEE Streams POC* Applications
+can be used without any additional CLI arguments.
+
+If a production like *SUSEE Node* for test purposes is used,
+* the domain name of the *SUSEE Node* and/or
+* the full URL of the nodes *IOTA Bridge* service
+
+will need to be specified using the proper CLI arguments.
+In the test steps described below, we will use the domain
+`iotabridge.example.com` resp. the *IOTA Bridge* URL
+`http://iotabridge.example.com:50000` for this purpose.
+
+If you are using an *IOTA Bridge* with private tangle, don't forget to start it first:
+```bash
+  # in the 'susee-node/priv_tangle' subfolder:
+  > ./run.sh
+```
+
+After the tests have been finished stop the private tangle using:
+```bash
+  # in the 'priv_tangle' subfolder:
+  > docker compose --profile "2-nodes" down
+```
+
+Please have a look into the 
+[Private tangle for development purposes](../susee-node/README.md#private-tangle-for-development-purposes)
+section of the [SUSEE Node README](../susee-node) for more tips how to setup and run the
+private tangle.
+
 ## Sensor Initialization
 There are two ways to initialize a *Sensor*. The easiest way is to use the
 [`--init-sensor` option](../management-console/README.md#automatic-sensor-initialization)
-of the *Management Console* application which will perform an automatic *Sensor* initialization.
+of the *Management Console* application which will perform an automatic *Sensor Initialization*.
 
-If you prefer to have more insights into the initialization process you can do the *Sensor* initialization
+If you prefer to have more insights into the initialization process you can do the *Sensor Initialization*
 manually, using the *Management Console* application CLI.
 
-Depending on the *Sensor* app (x86/PC, ESP32 Sensor, streams-poc-lib test application) the steps
-to initialize the sensor are different. In the following sections the *Sensor* initialization is therefore
+Depending on the *Sensor* app (x86/PC, streams-poc-lib test application) the steps
+to initialize the sensor are different. In the following sections the *Sensor Initialization* is therefore
 described for each *Sensor* application seperately.
 
 Here are some general hints and aspects that apply to all *Sensor* applications:
 
 * As described [above](#test-workspace) we recommend using the
   `target/release` folder as *test workspace*.
+
 * Initialization vs. Reinitialization<br>
-  In the tests described below we will do a *Sensor* initialization and therefore
-  we will make sure that the filesystem used by the *Sensor* app does not contain
-  *IOTA Streams* user state and wallet files. Have a look into the
-  [Sensor README](../sensor/README.md#initialization-count), the
-  [initialization](../README.md#initialization) and
-  [reinitialization](../README.md#sensor-reinitialization) workflow description
-  for more details regarding the differences between those two workflows.<br>
-  In the [Sensor Reinitialization](#sensor-reinitialization) section the *reinitialization*
-  of the *streams-poc-lib test application* and the *x86/PC Sensor* is described.<br>
-  In the [streams-poc-lib README](../sensor/streams-poc-lib/README.md#sensor-initialization-vs-reinitialization)
-  you will also find more details about the special handling of *Sensor* applications
-  using real LoRaWAN DevEUIs.
+  In the tests described below we will do a *Sensor Initialization*, and therefore
+  we will make sure the *Sensor* application does not already own
+  an *IOTA Streams* client state and wallet file (in the used filesystem and/or
+  defined by
+  [Streams Client Data Storage](../sensor/streams-poc-lib/README.md#configuring-the-test-application)).
+
+  For more details regarding the differences between *Initialization* and *Reinitialization*,
+  have a look into the descriptions of the 
+  [Initialization](../README.md#initialization) and the
+  [Reinitialization](../README.md#sensor-reinitialization) workflow, and into the
+  [initialization-count documentation](../sensor/README.md#initialization-count)
+  in the Sensor README.
+
+  In the
+  [Sensor Initialization vs Reinitialization](../sensor/streams-poc-lib/README.md#sensor-initialization-vs-reinitialization)
+  section of the *Streams POC Library* README you will find more details about the
+  handling of *Sensor* applications using real world LoRaWAN DevEUIs.
+  
+  In the [Sensor Reinitialization](#sensor-reinitialization) section below,
+  the *Reinitialization* of the *streams-poc-lib test application* and the
+  *x86/PC Sensor* is described.
+
 * In case a SUSEE POC application is listening to an external ip address,
   the example ip `192.168.47.11` is used in the test descriptions below.
   Please replace the ip address with the ip address of the network interface of your computer.
@@ -131,7 +189,17 @@ need to define the following precompiler macros in the test application
 * STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL
 * STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS
 
-Please have a look at the `Test CONFIG` section of the 
+If you are using a production like *SUSEE Node*, set 
+`STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL` to "http://iotabridge.example.com:50000"
+and `STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS` to 
+"iotabridge.example.com:50001".
+
+If you are using a private tangle with a local *IOTA Bridge*, set 
+`STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL` to "http://<your-ip-address.goes-here>:50000"
+and `STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS` to 
+"<your-ip-address.goes-here>:50001".
+
+Please also have a look at the `Test CONFIG` section of the 
 [main.c](../sensor/streams-poc-lib/main.c) file and the
 [streams-poc-lib README](../sensor/streams-poc-lib/README.md) for more details.
 
@@ -143,10 +211,7 @@ When the streams-poc-lib test application has been
 * Depending on the state of the *Sensor* one of the following steps is needed to 
   properly manage the initialization status:
   * If the device has never been initialized: Move on to "Start the *IOTA Bridge*",
-    to do a *Sensor* initialization.
-  * If the device has already been initialized and has not been powered off
-    ([why is this important?](#sensor-reinitialization---streams-poc-lib-test-application))
-    you can just move on to "Start the *IOTA Bridge*", to do a *Sensor* **re**initialization.
+    to do a *Sensor Initialization*.
   * If the device has already been initialized and has been powered off thereafter,
     you need to erase the flash of the *Sensor* device to do an initialization
     ([why is this needed?](#sensor-reinitialization---streams-poc-lib-test-application)).<br>
@@ -158,12 +223,24 @@ When the streams-poc-lib test application has been
     `iota-bridge.sqlite3` in the [workspace folder](#test-workspace).<br>
     [Here](../sensor/streams-poc-lib/README.md#sensor-initialization-vs-reinitialization)
     you can find out why this is needed.
-* Start the *IOTA Bridge*
+    <br><br>
+* Start the *IOTA Bridge*<br>
+  If you are using a production like *SUSEE Node*, you can proceed with
+  the next step because you don't need a local *IOTA Bridge* instance.
+  
+  If you are using a private tangle, make sure the
+  [docker-compose environment](../susee-node/README.md#private-tangle-for-development-purposes)
+  has already been startet and start the local *IOTA Bridge* instance with
   ```bash
       > ./iota-bridge -l "192.168.47.11:50000"
-      [IOTA Bridge] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
-      Listening on http://192.168.47.11:50000
-  ```  
+  
+        [INFO  iota_bridge] Using IotaBridgeOptions:
+            iota_node: 127.0.0.1
+            error_handling: always-return-errors
+            use_tangle_transport: true
+        [INFO  iota_bridge] Listening on http://192.168.47.11:50000
+  ```
+  <br>
 * Start the *streams-poc-lib* test application to listen for remote commands<br>
   The *streams-poc-lib* test application will start immediately after the boot sequence
   of the *Sensor* device. If you are using a USB interface for power supply and serial
@@ -171,7 +248,7 @@ When the streams-poc-lib test application has been
   after you have plugged in the USB cable.<br>
   To review the boot process and application start, you should **prepare** the
   IDF log monitoring tool in an additional shell in the root folder of the *streams-poc-lib*
-  ([/sensor/streams-poc-lib](../sensor/streams-poc-lib)).
+  ([/sensor/streams-poc-lib](../sensor/streams-poc-lib)).<br>
   To **prepare** means that you just type, but don't enter the last statement of the
   following commands. After preparing the log monitoring tool you power on the *Sensor* device
   and then you press enter:
@@ -180,367 +257,343 @@ When the streams-poc-lib test application has been
       > get_idf
       > idf.py monitor                    # just type it - press enter after device power on
   ```
+  <br>
 * Run the *Management Console* with the following options
-  In an additional shell<br>
+  in an additional shell<br><br>
+  If you are using a private tangle:
   ```bash
   > ./management-console --init-sensor --iota-bridge-url "http://192.168.47.11:50000"
+  ```
+  If you are using a production like *SUSEE Node*:
+  ```bash
+  > ./management-console --init-sensor --iota-bridge-url "http://iotabridge.example.com:50000" --node "iotabridge.example.com"
   ```
 
 The *Management Console* then will perform all the initialization steps fully automatically.
 See the [CLI help for the `--init-sensor` option](../management-console/README.md#automatic-sensor-initialization)
 of the *Management Console* for further details.
 
-If you you want to test a *Sensor* **re**initialization, DO NOT power of the device and
-process the above described test steps again.
-
 #### Automatic Sensor Initialization - streams-poc-lib test application with AppServer Connector
 
 In case the `SENSOR_MANAGER_CONNECTION_TYPE` in the test application
 [main.c file](../sensor/streams-poc-lib/main/main.c) has been set to
 `SMCT_CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK`,
+and you are using a private tangle with local *IOTA Bridge* instance,
 the [*AppServer Connector Mockup Tool*](../app-srv-connector-mock) needs to be run in an
 additional shell to perform the test steps described above:
 ```bash
     > ./app-srv-connector-mock -l 192.168.47.11:50001`
 ```  
 The *AppServer Connector Mockup Tool* communicates with the *IOTA Bridge* via localhost therefore
-the *IOTA Bridge* needs to be started without any command line arguments:
+the local *IOTA Bridge* instance needs to be started without any command line arguments:
 ```bash
     > ./iota-bridge
-    [IOTA Bridge] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
-    Listening on http://127.0.0.1:50000
+    [INFO  iota_bridge] Using IotaBridgeOptions:
+       iota_node: 127.0.0.1
+       error_handling: always-return-errors
+       use_tangle_transport: true
+    [INFO  iota_bridge] Listening on http://127.0.0.1:50000
 ``` 
 The *Management Console* also needs to access the *IOTA Bridge* via localhost:
 ```bash
     > ./management-console --init-sensor --iota-bridge-url "http://127.0.0.1:50000"
 ``` 
 
+If you are using a production like *SUSEE Node* for your tests, you don't need to start
+a local *AppServer Connector Mockup Tool* instance as the *SUSEE Node* provides this
+service also, if the relevant configuration section has been uncommented in the
+[docker compose.yml file](../docker/README.md#start-iota-bridge-and-message-explorer-as-public-available-service).
+
+The *Management Console* is started with a production like *SUSEE Node* like this:
+```bash
+    > ./management-console --init-sensor --iota-bridge-url "http://iotabridge.example.com:50000" --node "iotabridge.example.com"
+```
+
 #### Automatic Sensor Initialization - x86/PC
 
-Follow these steps to automatically initialize an *x86/PC Sensor*.
-If you want to test a
-[Sensor reinitialization](#sensor-reinitialization---x86pc)
-later on we recommend to use the
-[--dev-eui](../sensor/README.md#static-deveui)
-argument of the *Sensor* CLI to specify a static DevEUI.
+Follow the steps described in this section to automatically initialize an *x86/PC Sensor*.
 
-* Make sure that the *Streams* channel is not already initialized<br>
-  If the *Sensor* has already been initialized,
-  delete the `wallet-sensor.txt` and `user-state-sensor.bin`
-  files in the [workspace folder](#test-workspace).<br>
-* Start the *IOTA Bridge*<br>
-  The *IOTA Bridge* needs to listen on localhost which is the default setting:
+**Please Note**: If the *x86/PC Sensor* has already been initialized before,
+it's easier and usually more reasonable to do a
+*Sensor Reinitialization for x86/PC Sensors*
+([See below](#sensor-reinitialization---x86pc)).
+
+Doing an *Initialization* as been described here, you might want to use the
+[--dev-eui](../sensor/README.md#static-deveui)
+argument of the *Sensor* CLI, to specify a static DevEUI
+facilitating a later *Sensor Reinitialization*.
+Have a look into the `Initialization vs. Reinitialization` hints
+in the [Sensor Initialization](#sensor-initialization) section above,
+and the 
+[Sensor Reinitialization - x86/PC](#sensor-reinitialization---x86pc) 
+section below for more details.
+
+* Make sure the *Streams Channel* has not been already initialized<br>
+  If the *Sensor* has been initialized before,
+  delete the `wallet-sensor.txt` and `client-state-sensor.bin`
+  files in the [workspace folder](#test-workspace).
+  
+  You also need to delete the
+  [*IOTA Bridge* SQLite database file](../iota-bridge/README.md#caching-of-lorawan-deveuis-and-streams-channel-meta-data)
+  `iota-bridge.sqlite3` in the [workspace folder](#test-workspace).
+  The reason for this is equivalent to the reason that applies to the
+  *Streams POC Library* test application described
+  [here](../sensor/streams-poc-lib/README.md#sensor-initialization-vs-reinitialization).
+  
+* If you are using a production like *SUSEE Node*, proceed with the next step,
+  otherwise (means you are using a private tangle) you need to start the
+  *IOTA Bridge*.<br>
+  
+  As your *x86/PC Sensor* will run on the same machine as the *IOTA Bridge*
+  both applications can communicate via localhost wich is the default setting:
   ```bash
   > ./iota-bridge
-  [IOTA Bridge] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
-  Listening on http://127.0.0.1:50000
+  [INFO  iota_bridge] Using IotaBridgeOptions:
+         iota_node: 127.0.0.1
+         error_handling: always-return-errors
+         use_tangle_transport: true
+  [INFO  iota_bridge] Listening on http://127.0.0.1:50000
   ``` 
-* Start the *x86/PC Sensor* to listen for remote commands<br>
-  In an additional shell:
+* Start the *x86/PC Sensor* to listen for remote commands
+  In an additional shell.
+  <br><br>
+  If you are using a private tangle:<br>
   ```bash
   > ./sensor --act-as-remote-controlled-sensor
+  [2INFO  streams_tools::remote::command_processor] [fn run_command_fetch_loop()] DevEUI: 13145628835347543691 - Received Command::NO_COMMAND
   ``` 
-  if you want to test a
-  [Sensor reinitialization](#sensor-reinitialization---x86pc)
-  later on:
+  If you are using a production like *SUSEE Node*:<br>
   ```bash
-  > ./sensor --act-as-remote-controlled-sensor --dev-eui=12345678
+  > ./sensor --act-as-remote-controlled-sensor --iota-bridge-url "http://iotabridge.example.com:50000"
+  [2INFO  streams_tools::remote::command_processor] [fn run_command_fetch_loop()] DevEUI: 13145628835347543691 - Received Command::NO_COMMAND
   ```
-* Run the *Management Console*<br>
-  In an additional shell:
+* Run the *Management Console* in an additional shell
+  <br><br>
+  If you are using a private tangle:<br>
   ```bash
-  > ./management-console --init-sensor --iota-bridge-url "http://127.0.0.1:50000"
+  > ./management-console --init-sensor
+  [INFO  management_console] Using node '127.0.0.1' for tangle connection
+  [INFO  management_console] Initializing remote sensor
+  [INFO  management_console] Using http://127.0.0.1:50000 as iota-bridge url
+  [INFO  management_console] DevEUI: ANY - Sending dev_eui_handshake command to remote sensor.
   ```
-
-The *Management Console* then will perform all the initialization steps fully automatically.
-
-#### Automatic Sensor Initialization - ESP32 Sensor
-
-__MAINTAINANCE MODE FOR ESP32 SENSOR APPLICATION__<br>
-Please note that the *ESP32 Sensor* application is only maintained but its
-functionality will not be extended to support tests for the latest versions
-of the SUSEE application protocol. For tests on ESP32 devices the
-[*streams-poc-lib test application*](#automatic-sensor-initialization---streams-poc-lib-test-application)
-is the recommended application.
-
-Similar to the *streams-poc-lib test application*, the *ESP32 Sensor* needs to be build
-and flashed on the *Sensor* device. This is described
-[here](../sensor/main-rust-esp-rs/README.md#prerequisites).
-
-Please note that the [environment variables](../sensor/main-rust-esp-rs/README.md#build)
-`SENSOR_MAIN_POC_WIFI_SSID`, `..._WIFI_PASS`
-and `..._IOTA_BRIDGE_URL` need to be set correctly, equivalent to the precompiler
-macros used in the *streams-poc-lib test application*
-(see [above](#automatic-sensor-initialization---streams-poc-lib-test-application)).
-
-Follow these steps to automatically initialize an *ESP32 Sensor*:
-
-* Make sure that the *Streams* channel is not already initialized<br>
-  If the *Sensor* has already been initialized, there are two options
-  to set its state back to an uninitialized state:<br> 
-  * The easiest way is to use the *Espressif IDF SDK* tool `idf.py` to erase the flash
-    and to flash the *ESP32 Sensor* to the device again:
-    ```bash
-        > get_idf
-        > idf.py erase_flash
-        > cargo espflash --monitor --partition-table="partitions.csv" --release
-    ```      
-  * Remotely execute the ` --clear-client-state` functionality
-    of the *ESP32 Sensor* app.
-    Use the `--act-as-remote-control` argument of the *x86/PC Sensor* to remote-control
-    the *ESP32 Sensor* as been described
-    [here](../sensor/README.md#remote-control-cli-commands).<br>
-* Start the *IOTA Bridge*<br>
-  The *ESP32 Sensor* will communicate with the *IOTA Bridge* directly via WiFi
-  so that the *IOTA Bridge* needs to listen on the external ip address:
+  If you are using a production like *SUSEE Node*:<br>
   ```bash
-  > ./iota-bridge -l "192.168.47.11:50000"
-  ``` 
-* Start the *ESP32 Sensor* application to listen for remote commands<br>
-  In an additional shell in the folder `/sensor/main-rust-esp-rs`:
-  ```bash
-  > cargo espmonitor --chip=esp32c3 /dev/ttyYOURPORT`
+  > ./management-console --init-sensor --node "iotabridge.example.com" --iota-bridge-url "http://iotabridge.example.com:50000"
+  [INFO  management_console] Using node 'iotabridge.example.com' for tangle connection
+  [INFO  management_console] Initializing remote sensor
+  [INFO  management_console] Using http://iotabridge.example.com:50000 as iota-bridge url
+  [INFO  management_console] DevEUI: ANY - Sending dev_eui_handshake command to remote sensor.
   ```
-* Run the *Management Console* with the following options
-  In an additional shell:
-  ```bash
-  > ./management-console --init-sensor --iota-bridge-url "http://192.168.47.11:50000"
-  ```  
 
 The *Management Console* then will perform all the initialization steps fully automatically.
 
 ### Sensor Reinitialization
 
-As been described in the
-[Sensor initialization section above](#sensor-initialization) the tests described
-above perform a *Sensor* initialization that differs from a *Sensor* reinitialization.
+The [above described test steps](#sensor-initialization)
+perform a *Sensor Initialization*. Here we explain how to do a *Sensor Reinitialization*.
 
-During a *Sensor* reinitialization the DevEUI and the
-Seed (secret key to derive private-public key pairs) of the Sensor is maintained, and
-the *initialization count* of the *Sensor* is incremented. This is described in more detail
-in the [Sensor README](../sensor/README.md#initialization-count).
+During a [Sensor Reinitialization](../README.md#sensor-reinitialization)
+the DevEUI of the Sensor
+is maintained, and the
+[initialization-count](./sensor/README.md#initialization-count)
+of the *Sensor* is incremented.
+This is described in more detail in the
+[Sensor README](../sensor/README.md#initialization-count).
 
 #### Sensor Reinitialization - streams-poc-lib test application
 
 As been described in the
-[streams-poc-lib README](../sensor/streams-poc-lib/README.md#sensor-initialization-vs-reinitialization)
-we recommend to reinitialize a *streams-poc-lib test application Sensor* after it has been
-initialized once.
+[streams-poc-lib README](../sensor/streams-poc-lib/README.md#sensor-initialization-vs-reinitialization),
+currently it is not possible to test a *Sensor Reinitialization*
+with the *Streams POC Library* test application.
 
-To test a *Sensor* reinitialization with the *streams-poc-lib test application*
-you just need to follow the initialization steps described
-[above](#automatic-sensor-initialization---streams-poc-lib-test-application)
-directly after a *Sensor* initialization has been finished, without powering off
-the device and without erasing the device flash storage.
-
-In the [uninitialized-mode](../sensor/streams-poc-lib/README.md#uninitialized-mode)
-the test-application will poll commands until the device is powered off.
-After a *Sensor* initialization followed by a device reboot, the *Sensor* will be in the
-[initialized-mode](../sensor/streams-poc-lib/README.md#initialized-mode)
-and will continuously send messages but will not poll any commands anymore.
-
-Therefore testing a *Sensor* reinitialization, using the *streams-poc-lib
-test application*, currently is only possible in the uninitialized-mode.
-
-For later use in production, the SUSEE application protocol needs to be extended to start
-command polling on demand during the
-[sensor-processing](../README.md#sensor-processing) workflow.
+Nevertheless, a reinitialization of your *Sensor* Application using the
+*Streams POC Library*, can be achieved easily as been described
+[here](../sensor/streams-poc-lib/README.md#use-reinitialization-instead)
 
 #### Sensor Reinitialization - x86/PC
 
-In contrast to the [Sensor initialization](#automatic-sensor-initialization---x86pc)
-the `wallet-sensor.txt` and `user-state-sensor.bin` files are maintained.
+Repeating the steps described in the
+[Automatic Sensor Initialization](#automatic-sensor-initialization---x86pc)
+section, after the *Sensor* has already been initialized
+WITHOUT deleting any file in the file system, will result in a *Sensor Reinitialization*.
+ 
+Because the `wallet-sensor.txt` and `client-state-sensor.bin` are not deleted,
+the *x86/PC Sensor* will recognize the already existing *Streams Channel*,
+and store the increased initialization count in the `wallet-sensor.txt` file. 
+The `client-state-sensor.bin` will be replaced by the *x86/PC Sensor* with a
+new version of the file containing the *Streams Client State* of the new
+*Streams Channel*.
 
-To reuse the [mocked DevEUI](../sensor/README.md#mocked-deveuis) we need to
-specify the DevEUI using the [--dev-eui](../sensor/README.md#static-deveui)
-argument. There are two possible ways to do this:
-* Use the `--dev-eui` *Sensor* CLI argument during the
-  [initialization](#automatic-sensor-initialization---x86pc)
-  of the *Sensor* (recommended). 
-* Use a hex or text editor to open the `wallet-sensor.txt` file in the
-  [workspace folder](#test-workspace) and copy the value of the randomly chosen
-  DevEui. The DevEui is located at the back  of the file and is encoded as utf8
-  string in decimal presentation (radix 10).
+The DevEUI will is maintained automatically because it is stored in the
+`wallet-sensor.txt` file. 
 
-Follow these steps to automatically **re**initialize a *x86/PC Sensor*.
-
-* Start the *IOTA Bridge*<br>
-  The *IOTA Bridge* needs to listen on localhost which is the default setting:
-```bash
-    > ./iota-bridge
-    [IOTA Bridge] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
-    Listening on http://127.0.0.1:50000
-``` 
-* Start the *x86/PC Sensor* to listen for remote commands<br>
-  In an additional shell:
-  ```bash
-  > ./sensor --act-as-remote-controlled-sensor --dev-eui=12345678
-  ```
-  Please replace `12345678` with the used DevEUI.
-* Run the *Management Console*<br>
-  In an additional shell:
-  ```bash
-  > ./management-console --init-sensor --iota-bridge-url "http://127.0.0.1:50000"
-  ```
-
-The *Management Console* then will perform all the initialization steps fully automatically.
+If you need to reuse a DevEUI for repetitive tests, where the `wallet-sensor.txt` file
+is not guarantied to be maintained you can use the
+[--dev-eui](../sensor/README.md#static-deveui)
+*x86/PC Sensor* CLI argument to specify a static DevEUI.
 
 ### Manual Sensor Initialization
 
 The recommended way to initialize a *Sensor* is the
 [automatic initialization](#automatic-sensor-initialization).
-The manual *Sensor* initialization described here may be usefull 
+The manual *Sensor Initialization* described here may be usefull 
 to have more insights into the initialization process.
  
 The process uses the *Sensor* and *Management Console* CLI to process each
 initialization step.
 
-Depending on the *Sensor* app (x86/PC, ESP32 Sensor, streams-poc-lib test application) the steps
+Depending on the *Sensor* app (x86/PC, streams-poc-lib test application) the steps
 to initialize the sensor are different. In the following
-we only describe the *Sensor* initialization for the *x86/PC Sensor* and the
+we only describe the *Sensor Initialization* for the *x86/PC Sensor* and the
 [streams-poc-lib test application](#subscribe-the-sensor---streams-poc-lib-test-application).
+
+For the sake of simplicity the below described steps use a local *IOTA Bridge* and private
+tangle. If you want to use a production like *SUSEE Node* you need to add the CLI argument
+`--node "iotabridge.example.com"`
+to all management-console executions in this section.
+
+#### Start the private tangle
+
+As been described in 
+[docker-compose environment](../susee-node/README.md#private-tangle-for-development-purposes)
+the private tangle is started like this:
+
+```bash
+  # in the 'susee-node/priv_tangle' subfolder:
+  > ./run.sh
+```
 
 #### Create the channel using the *Management Console*
 
 In the [workspace](#test-workspace) folder:
 ```bash
-    > ./management-console --create-channel
-    
-      [Management Console] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
-      seed_derivation_phrase: YXWVURQPONKJIHGDCBA9XWVUTQPONMJIHGFCBA9ZWVUTSPONMLIHGFEBA9ZYVUTSRONMLKHGFEDA9ZYXU
-      [Management Console] A channel has been created with the following announcement link:
-                           Announcement Link: 9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:b95d1456eac7595be498fa87
-                                Tangle Index: 1ac42554c457897b8cc146665c6bed7ee7fe816f2a93c269517e7f3f350ce5d1
-```
-Please note that the logged [seed_derivation_phrase](../README.md#common-file-persistence)
-does not compromise the seed used for the created *Streams* channel because it is used together with
-the private seed of the *Management Console* to derive the *Streams* channel seed.
+    > ./management-console --create-channel --dev-eui 12345678
 
-The logged Tangle Index can be used to find the announcement message via the
-[IOTA Tangle Explorer](https://explorer.iota.org/mainnet).
+    [INFO  management_console] Using node '127.0.0.1' for tangle connection
+    [WARN  streams_tools::user_manager::channel_manager] No binary streams_client_state or serial_file_name for the Streams Client State provided.
+        Will use empty Streams Client State.
+    [INFO  management_console] [Management Console] A channel has been created with the following announcement link:
+                                    Announcement Link: fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:132369f378d7b97973f7d831
+                                         Tangle Index: "c92de9662ca4c4da85323e38956d6803526600115cf41bac918274aaee609f58"
+```
 
 #### Subscribe the *Sensor* - x86/PC version
 
-To use a *Sensor* application we need to start the *IOTA Bridge* first.
-In an additional shell in the [workspace](#test-workspace) start it like this:
+If you use a local *IOTA Bridge* and private tangle, we need
+to start the *IOTA Bridge* first, before we can
+use the *x86/PC Sensor* application.
+
+In an additional shell in the [workspace](#test-workspace) start *IOTA Bridge* like this:
 ```bash
     > ./iota-bridge
-    
-      [IOTA Bridge] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
-      Listening on http://127.0.0.1:50000
+    [INFO  iota_bridge] Using IotaBridgeOptions:
+           iota_node: 127.0.0.1
+           error_handling: always-return-errors
+           use_tangle_transport: true
+    [INFO  iota_bridge] Listening on http://127.0.0.1:50000
 ```
 
 Now the subscription message can be created using the announcement link from the console log of the
-*Management Console* above. Just enter the following in a command shell in the [workspace](#test-workspace) folder:
+*Management Console* above. Just enter the following in a command shell in the
+ [workspace](#test-workspace) folder:
 ```bash
-    > ./sensor --subscribe-announcement-link\
-             "9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:b95d1456eac7595be498fa87"
-    
-      [StreamsTransportSocket.new_from_url()] Initializing instance with options:
-      StreamsTransportSocketOptions:
-           http_url: http://localhost:50000,
-           dev_eui:  5702837152734510599,
-           use_lorawan_rest:  false
-
-      [StreamsTransportSocket.recv_message] Receiving message with 151 bytes tangle-message-payload:
-      0000000104000000000000000000000000009d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760e0000019d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b7600edc02666d79c10bffa5e23a1b1e36144aed73c8ac68c8481ea5e3758ec26ccf9d4af2d9cce8287be5b3cfe1ab72b57df725cbd7477c883511a55e5b6f3d3800c
-      
-      [StreamsTransportSocket.send_message] Sending message with 279 bytes tangle-message-payload:
-      000050010400000001349d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000b95d1456eac7595be498fa870000000000000000001d1f2ff9b9a87ae85e40c888a216ac7e92cb4032d37843d88ba71888f051c4440e000001b95d1456eac7595be498fa872b898b350029cccc87fd63abe9bf9740cfe24ba210e3b4ac7f3d828a707a75035b7362ce15b7580e3c21b128da06df7e1198dff750aa9edc8b83c25b8b8b764f8664ac099fa80633508f4a1370b1061adda31da493a1954df75ea0bd1c0fc6164d0ab357905083be689cf2acf5394aa7db6d9f9a24df4f51c4cc6175f962bdad7e747e0bc32d2907887ede24d36d19839690a71305e300f5b632fdc3460f210c
-      
-      [Sensor] A subscription with the following details has been created:
-                   Subscription Link:     9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:fd0bb1141e0e38cceb386414
-                        Tangle Index:     f77553a929bfe18dabe1c15180bfb9d562c0c551c0cc4e7636e6bfaa89cfc1b9
-                   Subscriber public key: 1d1f2ff9b9a87ae85e40c888a216ac7e92cb4032d37843d88ba71888f051c444
-                   Initialization count:  0
+    > ./sensor --subscribe-announcement-link fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:132369f378d7b97973f7d831 --dev-eui 12345678
+    [INFO  streams_tools::streams_transport::streams_transport_socket] [fn new()] Initializing instance with options:
+        StreamsTransportSocketOptions:
+                      http_url:          http://127.0.0.1:50000,
+                      failover_http_url: None,
+                      dev_eui:           12345678,
+                      use_lorawan_rest:  false
+        
+    [INFO  streams_tools::streams_transport::streams_transport_socket] [fn recv_message()] Receiving message with 199 bytes tangle-message-payload:
+        0002000004000000002bbd714fc82f455b64f782c2d5c19d11003ad0aff873d65f4605e2c77a3a4a5f60b4b5f255e5679e83c995c7e09bedb72f00e30086e2540cdd04d8a543be1166daec13faa5285fffe5214d177560bf2ece490e000001bc4897b121751b671d2f520e3ba8029284e7568827e858ef12821292f3b726e66106345a7c9f62009f680280e21d8f25780b08e16e173992bb12fe07ffef860c2ab1d05ba2eeb5551f610c7723d9851768338208f6471ef96ad7406c429449995e5b127bc132ed0b
+        
+    [INFO  streams_tools::streams_transport::streams_transport_socket] [fn send_message()] Sending message with 269 bytes tangle-message-payload:
+        000250000400000001132369f378d7b97973f7d8312bbd714fc82f455b64f782c2d5c19d1100920e9cc16b7a46bb26ce6f31b4b9ce6b15024b37b61e40061f232c80d9e6168f00cb5f4a3366d39ae41fa354bc0d2d01a67706ebdbcddded7d7ac4479035ff5b160e000001fa317176f2e46009932518ed6b33b4e70a09eab5f4dceed9e15f66a36aab9c4fd59c465cdc1300456e4cbecabdc9473f21a954562710c8f710d257f191523739879c69d82ffe9b5bcc6bd3b12f864ec3cb29832ed0c81d67f74852859b3c23790c00d363ecbdd1543e779cd9ae47583cfe4127b334d7189bf6413d134a907f33828c9f00368eae9f35403d3628e8189c4d260978e036e0821e8f9811b38018d9ba05
+        
+    [INFO  sensor_lib::std::sensor_manager] [Sensor] A subscription with the following details has been created:
+                     Subscription Link:     fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:4de5c29740525dda11f4664a
+                          Tangle Index:     "a249336fb8fe2778d51f5b73170393daf371f9c6f5ee5ef40ad1586f53f93be6"
+                     User public key: 920e9cc16b7a46bb26ce6f31b4b9ce6b15024b37b61e40061f232c80d9e6168f
+                     Initialization count:  0
 ```
 
 The *IOTA-Bridge* also logs every data package that is transferred. Regarding absolute length of transferred binary packages
 only take the *IOTA-Bridge* log into account as these are the correct package sizes. *Sensor* and *Management-Console* only
 log the sizes of the tangle-message-payload: 
 ```bash
-[IOTA Bridge] Handling request /message?addr=9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:b95d1456eac7595be498fa87
-
------------------------------------------------------------------
-[IOTA-Bridge - DispatchStreams] receive_message_from_address() - Received Message from tangle with absolut length of 255 bytes. Data:
-@9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:b95d1456eac7595be498fa87[0000000104000000000000000000000000009d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760e0000019d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b7600edc02666d79c10bffa5e23a1b1e36144aed73c8ac68c8481ea5e3758ec26ccf9d4af2d9cce8287be5b3cfe1ab72b57df725cbd7477c883511a55e5b6f3d3800c]->00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
-
------------------------------------------------------------------
-[IOTA Bridge] Handling request /message/send
-
------------------------------------------------------------------
-[IOTA-Bridge - DispatchStreams] send_message() - Incoming Message to attach to tangle with absolut length of 383 bytes. Data:
-@9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:fd0bb1141e0e38cceb386414[000050010400000001349d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000b95d1456eac7595be498fa870000000000000000001d1f2ff9b9a87ae85e40c888a216ac7e92cb4032d37843d88ba71888f051c4440e000001b95d1456eac7595be498fa872b898b350029cccc87fd63abe9bf9740cfe24ba210e3b4ac7f3d828a707a75035b7362ce15b7580e3c21b128da06df7e1198dff750aa9edc8b83c25b8b8b764f8664ac099fa80633508f4a1370b1061adda31da493a1954df75ea0bd1c0fc6164d0ab357905083be689cf2acf5394aa7db6d9f9a24df4f51c4cc6175f962bdad7e747e0bc32d2907887ede24d36d19839690a71305e300f5b632fdc3460f210c]->00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
+[INFO  iota_bridge] Handling request from client address 127.0.0.1:43212 - URI: /message?addr=fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:132369f378d7b97973f7d831
+[INFO  streams_tools::iota_bridge::server_dispatch_streams] [fn receive_message_from_address()] Received Message from tangle with absolut length of 251 bytes. Data:
+    0002000004000000002bbd714fc82f455b64f782c2d5c19d11003ad0aff873d65f4605e2c77a3a4a5f60b4b5f255e5679e83c995c7e09bedb72f00e30086e2540cdd04d8a543be1166daec13faa5285fffe5214d177560bf2ece490e000001bc4897b121751b671d2f520e3ba8029284e7568827e858ef12821292f3b726e66106345a7c9f62009f680280e21d8f25780b08e16e173992bb12fe07ffef860c2ab1d05ba2eeb5551f610c7723d9851768338208f6471ef96ad7406c429449995e5b127bc132ed0b
+    
+[INFO  iota_bridge] Handling request from client address 127.0.0.1:43212 - URI: /message?addr=fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:4de5c29740525dda11f4664a
+[INFO  streams_tools::iota_bridge::server_dispatch_streams] Address msg_index is: a249336fb8fe2778d51f5b73170393daf371f9c6f5ee5ef40ad1586f53f93be6
+[ERROR streams_tools::iota_bridge::helpers] [IOTA-Bridge - receive_message_from_address] Error: Transport error for address fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:4de5c29740525dda11f4664a: No message found
+[INFO  iota_bridge] Handling request from client address 127.0.0.1:43212 - URI: /message/send
+[INFO  streams_tools::iota_bridge::server_dispatch_streams] [fn println_send_message_for_incoming_message()] Incoming Message to attach to tangle with absolut length of 321 bytes. Data:
+    000250000400000001132369f378d7b97973f7d8312bbd714fc82f455b64f782c2d5c19d1100920e9cc16b7a46bb26ce6f31b4b9ce6b15024b37b61e40061f232c80d9e6168f00cb5f4a3366d39ae41fa354bc0d2d01a67706ebdbcddded7d7ac4479035ff5b160e000001fa317176f2e46009932518ed6b33b4e70a09eab5f4dceed9e15f66a36aab9c4fd59c465cdc1300456e4cbecabdc9473f21a954562710c8f710d257f191523739879c69d82ffe9b5bcc6bd3b12f864ec3cb29832ed0c81d67f74852859b3c23790c00d363ecbdd1543e779cd9ae47583cfe4127b334d7189bf6413d134a907f33828c9f00368eae9f35403d3628e8189c4d260978e036e0821e8f9811b38018d9ba05
 ```
 
 The subscription link and public key then must be used with the management-console to accept the subscription
 ```bash
     > ./management-console\
-            --subscription-link "9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:fd0bb1141e0e38cceb386414"\
-            --subscription-pub-key "1d1f2ff9b9a87ae85e40c888a216ac7e92cb4032d37843d88ba71888f051c444"
+            --dev-eui 12345678\
+            --subscription-link "fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:4de5c29740525dda11f4664a"\
+            --subscription-pub-key "920e9cc16b7a46bb26ce6f31b4b9ce6b15024b37b61e40061f232c80d9e6168f"
 
-      [Management Console] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
-      seed_derivation_phrase: YXWVURQPONKJIHGDCBA9XWVUTQPONMJIHGFCBA9ZWVUTSPONMLIHGFEBA9ZYVUTSRONMLKHGFEDA9ZYXU
-      [Management Console] A keyload message has been created with the following keyload link:
-                           Keyload link: 9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:14f52c1b44f91f3e8e5b9eb1
-                           Tangle Index: c0afd0f66d410ccd4af5d1e2af6c6657d1e47eef8dc2eb3ff6dac65871a268e0
+    [INFO  management_console] Using node '127.0.0.1' for tangle connection
+    [INFO  management_console] A keyload message has been created with the following keyload link:
+                             Keyload link: fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:d5321d18f1c59370dd52bd7e
+                             Tangle Index: "3be1f4251da5b33ab5b9f5a19c4fa95a1db89700ac8b176df96df91d790b4062"
 ```
 
 To finalize the subscription the keyload message link has to be registered by the *Sensor* because it is the root message
-of the branch used by the *Sensor* to publish its messages.
+of the *Stream Branch* used by the *Sensor* to publish its messages.
 ```bash
-    > ./sensor --register-keyload-msg "9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:14f52c1b44f91f3e8e5b9eb1"
+    > ./sensor --register-keyload-msg "fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:d5321d18f1c59370dd52bd7e"
       
-      [StreamsTransportSocket.new_from_url()] Initializing instance with options:
-      StreamsTransportSocketOptions:
-           http_url: http://localhost:50000,
-           dev_eui:  5702837152734510599,
-           use_lorawan_rest:  false
-      
-      [SubscriberManager.register_keyload_msg()] - Replacing the old previous message link with new keyload message link
-                                        Old previous message link: 00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
-                                        Keyload message link: 9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:14f52c1b44f91f3e8e5b9eb1
-      
-      [Sensor] Messages will be send in the branch defined by the following keyload message:
-                   Keyload  msg Link:     9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:14f52c1b44f91f3e8e5b9eb1
-                        Tangle Index:     c0afd0f66d410ccd4af5d1e2af6c6657d1e47eef8dc2eb3ff6dac65871a268e0
-                   Subscriber public key: 1d1f2ff9b9a87ae85e40c888a216ac7e92cb4032d37843d88ba71888f051c444
-                   Initialization count:  0
+    [INFO  streams_tools::streams_transport::streams_transport_socket] [fn new()] Initializing instance with options:
+        StreamsTransportSocketOptions:
+                      http_url:          http://127.0.0.1:50000,
+                      failover_http_url: None,
+                      dev_eui:           12345678,
+                      use_lorawan_rest:  false
+        
+    [INFO  streams_tools::streams_transport::streams_transport_socket] [fn recv_message()] Receiving message with 291 bytes tangle-message-payload:
+        000220000400000001132369f378d7b97973f7d8312bbd714fc82f455b64f782c2d5c19d11003ad0aff873d65f4605e2c77a3a4a5f60b4b5f255e5679e83c995c7e09bedb72f0102913e235e5d095092612c22dd2ff3f641225cab4c816e50a02fa4d4c379f013ce0e0000012b58d02681d7fa4fdad70a95c91a6b9c010180f4094b0633270d58136e31e1b741da3168fd8f3c96498382b7f4b67a08174ef54e015f8f1982722de4ddcaef883c08ab4896412feb52f2ca6633ccf222f8044a96115be82c7d5c302f3f5f0d1bbfc04a685fa399784619ef28e7a1ca21403b21d6be000029925913eb7a3651148099380484c1e8497b1652dc2a40133b871704c619f4f297d6a2ad776751fa58925b1966ad737943e7f1e4385eec2e555411e9dcf75109
+        
+    [INFO  streams_tools::user_manager::subscriber_manager] [fn register_keyload_msg()] Replacing the old previous message link with new keyload message link
+                                          Old previous message link: 00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
+                                          Keyload message link: fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:d5321d18f1c59370dd52bd7e
+        
+    [INFO  sensor_lib::std::sensor_manager] [Sensor] Messages will be send in the branch defined by the following keyload message:
+                     Keyload  msg Link:     fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:d5321d18f1c59370dd52bd7e
+                          Tangle Index:     "3be1f4251da5b33ab5b9f5a19c4fa95a1db89700ac8b176df96df91d790b4062"
+                     User public key: 920e9cc16b7a46bb26ce6f31b4b9ce6b15024b37b61e40061f232c80d9e6168f
+                     Initialization count:  0
 ```
 
 #### Subscribe the *Sensor* - streams-poc-lib test application
 
-If we run a *streams-poc-lib test application Sensor* we can initialize the *Sensor*
+The *Streams POC Library* test application
 in the [uninitialized mode](../sensor/streams-poc-lib/README.md#uninitialized-mode)
-combined with *x86/PC Sensor* used as
+can be manually initialized using the *x86/PC Sensor* used as
 [remote control](../sensor/README.md#remote-control-cli-commands). 
 
-In the following, we expect the *streams-poc-lib test application Sensor* to be compiled
-with the `SENSOR_MANAGER_CONNECTION_TYPE` **not** been set to
-`SMCT_CALLBACK_VIA_APP_SRV_CONNECTOR_MOCK`. Have a look at the
-[automatic-sensor-initialization](#automatic-sensor-initialization---streams-poc-lib-test-application)
-section for more details.
-
-The *IOTA-Bridge* must be started this way:
-```bash
-    > ./iota-bridge -l "192.168.47.11:50000"
-    > 
-    > [IOTA Bridge] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
-    > Listening on http://192.168.47.11:50000
-```
-
-Please replace the ip address used in this example with the ip address of the network interface of your computer.
-Have a look at the
-[Sensor Initialization](#sensor-initialization)
-section for more details.
+Without describing all test steps in detail here, the process 
+to subscribe the *Streams POC Library* test application *Sensor*
+is equivalent to subscribing the *x86/PC Sensor*
+[described above](#subscribe-the-sensor---x86pc-version).
 
 Before we can send the `subscribe-announcement-link` command to the *test application* you need to
 connect the serial port of your ESP32 board to your computer. Given the *Sensor* is in the 
 [uninitialized mode](../sensor/streams-poc-lib/README.md#uninitialized-mode) the
-*ESP32 Sensor* will poll commands from the *IOTA-Bridge* every 5 seconds after it has been powered up.
+test application will poll commands from the *IOTA-Bridge* every 5 seconds after it has been powered up.
  
 To see the console log output of the *test application* you need to start a serial port monitor application like
-`idf.py monitor` (or [cargo espmonitor](https://github.com/esp-rs/espmonitor) in case of the *ESP32 Sensor*).
+`idf.py monitor`.
 ```bash
     > get_idf
     > idf.py monitor
@@ -567,16 +620,17 @@ are the following ones:
     Fetching next command in 2 secs
     ...
  ```
+
 Now we can the send the `subscribe-announcement-link` command to the *test application* using the
 *x86/PC Sensor* app. The CLI command is almost the same as used in the
 [Subscribe the *Sensor* x86/PC version](#subscribe-the-sensor---x86pc-version) section.
-We only need to add the `--act-as-remote-control` and `--iota-bridge-url` command to use the *Sensor* app 
-as remote control for the *ESP32 Sensor*:
+We only need to add the `--act-as-remote-control` and `--iota-bridge-url` command to use the
+*Sensor* app as remote control for the test application:
  ```bash
      > ./sensor -c -b "http://192.168.47.11:50000" --subscribe-announcement-link\
               "9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:b95d1456eac7595be498fa87"
 
-    [Sensor] Acting as remote sensor using http://192.168.0.101:50000 as iota-bridge url
+    [Sensor] Acting as remote sensor using http://192.168.47.11 as iota-bridge url
     [Sensor] Sending subscribe_announcement_link command to remote sensor. announcement_link: 9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:b95d1456eac7595be498fa87
     Received Confirmation::NO_CONFIRMATION    
     [Sensor] Remote sensor confirmed Subscription: Subscription:
@@ -586,153 +640,17 @@ as remote control for the *ESP32 Sensor*:
  ```
 
 The whole communication between the *x86/PC Sensor* remote control and the 
-*streams-poc-lib test application* can be reviewed in the *IOTA-Bridge* log:
- ```bash
-    -----------------------------------------------------------------
-    [IOTA Bridge] Handling request /command/subscribe_to_announcement
-    
-    [IOTA-Bridge - DispatchCommand] subscribe_to_announcement() - Received command SUBSCRIBE_TO_ANNOUNCEMENT_LINK.
-    Binary length: 110
-    Queue length: 1
-    -----------------------------------------------------------------
-    [IOTA Bridge] Handling request /lorawan-rest/binary_request?deveui=180796021399420
-    
-    [IOTA-Bridge - DispatchLorawanRest] post_binary_request() - Incoming request for dev_eui '180796021399420' with 26 bytes length
-    [IOTA-Bridge - DispatchLorawanRest] post_binary_request() - Request is valid DispatchLorawanRest request
-    IotaBridgeRequestParts:
-                         method: GET
-                         uri: /command/next
-                         body length: 0
-                    
-    [IOTA-Bridge - DispatchCommand] fetch_next_command() - Returning command SUBSCRIBE_TO_ANNOUNCEMENT_LINK.
-    Blob length: 110
-    Queue length: 0
-    [dispatch_lorawan_rest_request] Returning response for dev_eui '180796021399420'
-    IotaBridgeResponseParts:
-                         status: 200 OK
-                         body length: 110
-                    
-    -----------------------------------------------------------------
-    [IOTA Bridge] Handling request /lorawan-rest/binary_request?deveui=180796021399420
-    
-    [IOTA-Bridge - DispatchLorawanRest] post_binary_request() - Incoming request for dev_eui '180796021399420' with 132 bytes length
-    [IOTA-Bridge - DispatchLorawanRest] post_binary_request() - Request is valid DispatchLorawanRest request
-    IotaBridgeRequestParts:
-                         method: GET
-                         uri: /message?addr=9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:b95d1456eac7595be498fa87
-                         body length: 0
-                    
-    -----------------------------------------------------------------
-    [IOTA-Bridge - DispatchStreams] receive_message_from_address() - Received Message from tangle with absolut length of 255 bytes. Data:
-    @9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:b95d1456eac7595be498fa87[0000000104000000000000000000000000009d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760e0000019d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b7600edc02666d79c10bffa5e23a1b1e36144aed73c8ac68c8481ea5e3758ec26ccf9d4af2d9cce8287be5b3cfe1ab72b57df725cbd7477c883511a55e5b6f3d3800c]->00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
-    
-    [dispatch_lorawan_rest_request] Returning response for dev_eui '180796021399420'
-    IotaBridgeResponseParts:
-                         status: 208 Already Reported
-                         body length: 259
-                    
-    -----------------------------------------------------------------
-    [IOTA Bridge] Handling request /lorawan-rest/binary_request?deveui=180796021399420
-    
-    [IOTA-Bridge - DispatchLorawanRest] post_binary_request() - Incoming request for dev_eui '180796021399420' with 333 bytes length
-    [IOTA-Bridge - DispatchLorawanRest] post_binary_request() - Request is valid DispatchLorawanRest request
-    IotaBridgeRequestParts:
-                         method: POST
-                         uri: /message/compressed/send
-                         body length: 296
-                    
-    -----------------------------------------------------------------
-    [IOTA-Bridge - DispatchStreams] send_message() - Incoming Message to attach to tangle with absolut length of 383 bytes. Data:
-    @9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:5d4b48fa2045f727dea5e63f[000050010400000001349d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000b95d1456eac7595be498fa870000000000000000004a905c7963f9c9d3e6e98b7b5e210eefb8b2456bd3ae05bed12ec35f8e632b110e000001b95d1456eac7595be498fa8768e92219a1281a10a52eecd9d2f10827cc696affc000e4e040c39878d166143d71e4fd53a309cbbcd55615929408879d3e4120f24275d350c7ef3c68d7d59f7c6858c918b8072daa7e737945220894ec5a40db12ebf204e8465cb95337096614ff1590dfb52eba0b7c7e72958e24ed49d841728a597a3f2c5bcbf9e7b04b91af5af7f660bf51502be7c3574a82c51b863de2b84482a799a8f92293b590089300]->00000000000000000000000000000000000000000000000000000000000000000000000000000000:000000000000000000000000
-    
-    -----------------------------------------------------------------
-    [IOTA Bridge] Handling request /confirm/next
-    
-    [IOTA-Bridge - DispatchConfirm] fetch_next_confirmation() - No confirmation available. Returning Confirmation::NO_CONFIRMATION.
-    
-    [dispatch_lorawan_rest_request] Returning response for dev_eui '180796021399420'
-    IotaBridgeResponseParts:
-                         status: 200 OK
-                         body length: 0
-                    
-    -----------------------------------------------------------------
-    [IOTA Bridge] Handling request /lorawan-rest/binary_request?deveui=180796021399420
-    
-    [IOTA-Bridge - DispatchLorawanRest] post_binary_request() - Incoming request for dev_eui '180796021399420' with 213 bytes length
-    [IOTA-Bridge - DispatchLorawanRest] post_binary_request() - Request is valid DispatchLorawanRest request
-    IotaBridgeRequestParts:
-                         method: POST
-                         uri: /confirm/subscription
-                         body length: 179
-                    
-    [IOTA-Bridge - DispatchConfirm] subscription() - Received confirmation SUBSCRIPTION.
-    Binary length: 179
-    Queue length: 1
-    [dispatch_lorawan_rest_request] Returning response for dev_eui '180796021399420'
-    IotaBridgeResponseParts:
-                         status: 200 OK
-                         body length: 0
-                    
-    -----------------------------------------------------------------
-    [IOTA Bridge] Handling request /lorawan-rest/binary_request?deveui=180796021399420
-    
-    [IOTA-Bridge - DispatchLorawanRest] post_binary_request() - Incoming request for dev_eui '180796021399420' with 26 bytes length
-    [IOTA-Bridge - DispatchLorawanRest] post_binary_request() - Request is valid DispatchLorawanRest request
-    IotaBridgeRequestParts:
-                         method: GET
-                         uri: /command/next
-                         body length: 0
-                    
-    [IOTA-Bridge - DispatchCommand] fetch_next_command() - No command available. Returning Command::NO_COMMAND.
-    
-    [dispatch_lorawan_rest_request] Returning response for dev_eui '180796021399420'
-    IotaBridgeResponseParts:
-                         status: 200 OK
-                         body length: 1
-                    
-    -----------------------------------------------------------------
-    [IOTA Bridge] Handling request /confirm/next
-    
-    [IOTA-Bridge - DispatchConfirm] fetch_next_confirmation() - Returning confirmation SUBSCRIPTION.
-    Blob length: 179
-    Queue length: 0
- ```
+*streams-poc-lib test application* can be reviewed in the *IOTA-Bridge* log.
+
 Please note that during the process the *Sensor* and the *IOTA Bridge* switched from
 [uncompressed messages](../sensor/README.md#deveuis-and-compressed-streams-messages) to compressed
 messages (search for `208 Already Reported` in the log output above).
 After the *IOTA Bridge* responded the `208 Already Reported` status, the *Sensor* uses the
 'message/compressed' endpoints of the *IOTA Bridge*.
 
-
-Meanwhile the *streams-poc-lib test application* will output the following log information:
-```bash
-    I (113123) HTTP_CLIENT: Body received in fetch header state, 0x3fcbc9dd, 116
-    I (113126) streams_tools::remote::command_processor: [fn run_command_fetch_loop] Starting process_command for command: SUBSCRIBE_TO_ANNOUNCEMENT_LINK.
-    I (113139) sensor_lib::esp_rs::main: [fn print_heap_info] heap_caps_get_free_size(MALLOC_CAP_8BIT): 128176
-    I (113144) streams_tools::remote::command_processor: [fn process_command]  processing SUBSCRIBE_ANNOUNCEMENT_LINK: 9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:b95d1456eac7595be498fa87
-    I (113839) HTTP_CLIENT: Body received in fetch header state, 0x3fcc2e0b, 265
-    I (113843) sensor_lib::esp_rs::streams_transport_via_buffer_cb: [StreamsTransportViaBufferCallback::request()] Received StatusCode::ALREADY_REPORTED (208)- Set use_compressed_msg = true
-    I (113854) sensor_lib::esp_rs::streams_transport_via_buffer_cb: [StreamsTransportViaBufferCallback::request()] use_compressed_msg = 'true'
-    I (113867) sensor_lib::esp_rs::streams_transport_via_buffer_cb: [StreamsTransportViaBufferCallback.recv_message_via_http] Received response with content length of 259
-    I (113883) sensor_lib::esp_rs::streams_transport_via_buffer_cb: [StreamsTransportViaBufferCallback.recv_message] Receiving message with 151 bytes tangle-message-payload:
-    0000000104000000000000000000000000009d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760e0000019d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b7600edc02666d79c10bffa5e23a1b1e36144aed73c8ac68c8481ea5e3758ec26ccf9d4af2d9cce8287be5b3cfe1ab72b57df725cbd7477c883511a55e5b6f3d3800c
-    
-    I (114071) sensor_lib::esp_rs::streams_transport_via_buffer_cb: [StreamsTransportViaBufferCallback.send_message] Sending message with 279 bytes tangle-message-payload:
-    000050010400000001349d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000b95d1456eac7595be498fa870000000000000000004a905c7963f9c9d3e6e98b7b5e210eefb8b2456bd3ae05bed12ec35f8e632b110e000001b95d1456eac7595be498fa8768e92219a1281a10a52eecd9d2f10827cc696affc000e4e040c39878d166143d71e4fd53a309cbbcd55615929408879d3e4120f24275d350c7ef3c68d7d59f7c6858c918b8072daa7e737945220894ec5a40db12ebf204e8465cb95337096614ff1590dfb52eba0b7c7e72958e24ed49d841728a597a3f2c5bcbf9e7b04b91af5af7f660bf51502be7c3574a82c51b863de2b84482a799a8f92293b590089300
-    
-    I (118959) HTTP_CLIENT: Body received in fetch header state, 0x3fcc3437, 6
-    I (118962) sensor_lib::esp_rs::streams_transport_via_buffer_cb: [StreamsTransportViaBufferCallback::request()] use_compressed_msg = 'true'
-    [Sensor] New subscription:
-             Subscription Link:     9d507222fb77bb5980509d8224250932691cdfdac6e61b8048da6c7274f10b760000000000000000:5d4b48fa2045f727dea5e63f
-                  Tangle Index:     64b410c8c2957caa984f6148d65db374d70cc90b7b01581bb123fa9aa5528396
-             Subscriber public key: 4a905c7963f9c9d3e6e98b7b5e210eefb8b2456bd3ae05bed12ec35f8e632b11
-             Initialization Count:  0
-
-```
-
-As with the x86/PC version of the *Sensor* app the console log of *IOTA-Bridge* and the *ESP32 Sensor* will
+As with the x86/PC version of the *Sensor* app the console log of *IOTA-Bridge* and the test application will
 contain the length of transferred binary data (*IOTA-Bridge*) and the subscription link and subscriber
-public key (*ESP32 Sensor*).  
+public key (*Streams POC Library* test application).  
 
 The subscription link and public key then must be used with the management-console to accept the subscription as being
 described in the x86/PC section above.
@@ -753,61 +671,58 @@ The following sections show how to send messages using a *streams-poc-lib test a
 A *streams-poc-lib test application* in the [initialized mode](../sensor/streams-poc-lib/README.md#initialized-mode)
 will start sending messages after the device has booted.
 
-Before we start the *Sensor* we need to start the [*AppServer Connector Mockup Tool*](../app-srv-connector-mock)
-in a command shell in the [workspace](#test-workspace) folder:
+Before we start the *Sensor* we need to start the
+[*AppServer Connector Mockup Tool*](../app-srv-connector-mock)
+in a command shell in the [workspace](#test-workspace) folder.
+
+If you are using a local *IOTA Bridge* with private tangle (don't forget to start the 
+docker compose environment for the private tangle first):
 ```bash
     > ./app-srv-connector-mock -l 192.168.47.11:50001
 ```
 
-The *IOTA Bridge* is also started in an additional command shell in the [workspace](#test-workspace) folder.
-The *AppServer Connector Mockup Tool* communicates with the *IOTA Bridge* via localhost therefore
+If you are using a production like *SUSEE Node* for your tests, you don't need to start
+a local *AppServer Connector Mockup Tool* instance as the *SUSEE Node* provides this
+service also, if the relevant configuration section has been uncommented in the
+[docker compose.yml file](../docker/README.md#start-iota-bridge-and-message-explorer-as-public-available-service).
+
+If you are using a local *IOTA Bridge* with private tangle,
+the *IOTA Bridge* is started in an additional command shell in
+the [workspace](#test-workspace) folder.
+The *AppServer Connector Mockup Tool* communicates with the
+*IOTA Bridge* via localhost therefore
 the *IOTA Bridge* needs to be started without any command line arguments:
 ```bash
     > ./iota-bridge
 ```
 
-Now we are ready to boot the *Sensor* device. To view the log output of the *test application* start
-the monitoring tool in a command shell in the [workspace](#test-workspace) folder right after the
+Now we are ready to boot the *Sensor* device. To view the log output of 
+the *test application* start
+the monitoring tool in a command shell in the 
+[workspace](#test-workspace) folder right after the
 device has powered on:
 ```bash
     > get_idf
     > idf.py monitor
 ```
 
-After successfully connecting to the WiFi the Sensor starts to send messages every 5 seconds.
+After successfully connecting to the WiFi the Sensor starts to 
+send messages every 5 seconds.
  
 ### Send messages - x86/PC Sensor
 
-Before we can send messages using the *x86/PC Sensor* we need to start the *IOTA Bridge*:
+If you are using a local *IOTA Bridge* with private tangle (don't forget to start the 
+docker compose environment for the private tangle first),
+we need to start the *IOTA Bridge* before we can send messages using the *x86/PC Sensor*:
 ```bash
     > ./iota-bridge
 ```
 
 The folder [test/payloads](./payloads) contains several message files that can be
-send like this. In this example we assume that the [workspace](#test-workspace) folder
+sent like this. In this example we assume that the [workspace](#test-workspace) folder
 is the `target/release` folder:
 ```bash
     > ./sensor --file-to-send "../../test/payloads/meter_reading_1_compact.json"
-
-    [StreamsTransportSocket.new_from_url()] Initializing instance with options:
-    StreamsTransportSocketOptions:
-         http_url: http://localhost:50000,
-         dev_eui:  11032547256235370273,
-         use_lorawan_rest:  false
-    
-    [Sensor] Message file '../../test/payloads/meter_reading_1_compact.json' contains 136 bytes payload
-    
-    Sending message file ../../test/payloads/meter_reading_1_compact.json
-    
-    [StreamsTransportSocket.recv_message] Receiving message with 298 bytes tangle-message-payload:
-    00001001040000000134f9fe4cc2c7a410c7ef47fce620bcaa32ef138a1619df6e0c4dbbaaf3a198046500000000000000009b4a4b02b097a5aef5218a97000000000000000200f9fe4cc2c7a410c7ef47fce620bcaa32ef138a1619df6e0c4dbbaaf3a19804650e0000019b4a4b02b097a5aef5218a97ce445bd603732ec1e1501b5b1ec1a1a101010010a07eba358dfea330fca75c261b0fee382479c1f97be07a316e76002d76b03cb3ccd6b275cf295392f797b863c3577fa962718cd003747a23dc02244f32fe44359b87ff8e640c699e08418917139c98368cc99421a1766f792cdd22339d8bc4976c917ad1dbd44efeaecd5c4a299b4e14b1f7e1a933fca09ccdd296990df366e9672427e2a027c476169807bc45be969a5ec53fd48ddc261de5dccb4ff7110b
-    
-    [StreamsTransportSocket.send_message] Sending message with 354 bytes tangle-message-payload:
-    00003001040000000134f9fe4cc2c7a410c7ef47fce620bcaa32ef138a1619df6e0c4dbbaaf3a19804650000000000000000a440b4921e414c3adb85f7290000000000000003008e3f72ebfa3898603a24612ba76c73b2f085e48b3faa664f48174d732fac87990e000001a440b4921e414c3adb85f7298e3f72ebfa3898603a24612ba76c73b2f085e48b3faa664f48174d732fac879900770b32be3212111caeedd779c3d0d324fabf44a5cf49ac08af86b00461d086dec3776db9a13e95e10184a00ac2094501eba08e426518d099fb40d290ad6753b1a6fd523db74842fd6901a78eda8d3b0a5e3faa731210f3084a74232157be73b4f8ffef7440025b6fd1b42aba2cc9b3a2fc7c521ca0b967cb07f5f747482e9eb8ef739356b9f10c53ab136562f024124b043f61a3693449a53f1de4300eb58c2be8cd9dcd8f9e383cec785fabe4b7134eaca3f892ec2f3292887bd1dfd06406ad0da927b3ab1c39236405
-    
-    Previous message address now is f9fe4cc2c7a410c7ef47fce620bcaa32ef138a1619df6e0c4dbbaaf3a19804650000000000000000:3d710a402b4b27db4ace90a7
-    
-    Sending Message again in 5 secs
 ```
 
 ## View Sensor messages using the *Message Explorer*
@@ -815,16 +730,26 @@ is the `target/release` folder:
 Messages that have been send by *Sensors* can be explored using the *Message Explorer* which can
 be started using the
 [--run-explorer-api-server](../management-console/README.md#run-message-explorer)
-argument of the *Management-Console* CLI:
+argument of the *Management-Console* CLI.
 
+If you are using a private tangle (don't forget to start the 
+docker compose environment for the private tangle first):
 ```bash
     > ./management-console --run-explorer-api-server
-      [Management Console] Using node 'https://chrysalis-nodes.iota.org' for tangle connection
-      2023-06-26T11:42:49.840054Z  INFO listening on 127.0.0.1:8080
+      [INFO  management_console] Using node '127.0.0.1' for tangle connection
+      [INFO  management_console] listening on 127.0.0.1:8080
+      ...
 ```
 
+If you are using a production like *SUSEE Node* for your tests, you don't need to start
+a local *Management Console* instance as the *SUSEE Node* provides this
+service also, if the relevant configuration section has been uncommented in the
+[docker compose.yml file](../docker/README.md#start-iota-bridge-and-message-explorer-as-public-available-service).
+
 The REST API of the *Message Explorer* can be tested using the swagger-ui which is provided by the
-*Message Explorer* also, and can be opened using the following link: http://127.0.0.1:8080/swagger-ui
+*Message Explorer* also, and can be opened using the following links:
+* Local *Management Console* instance: http://127.0.0.1:8080/swagger-ui
+* Production like *SUSEE Node*: http://iotabridge.example.com:50002/swagger-ui
 
 <img src="message-explorer-swagger-ui-screenshot.png" alt="Swagger UI of the Message Explorer" width="600"/>
 
@@ -833,7 +758,8 @@ Please note that a *Sensor* is called *Node* here (used in the sense of LoRaWAN 
 
 <img src="swagger-ui-try-it-out.png" alt="Try-it-out Button of the Swagger UI" width="600"/>
 
-Click on the links provided below to open the endpoint specific swagger-ui form, which allows to edit
+Click on the links provided below to open the endpoint
+specific swagger-ui form of a local *Management Console* instance, which allows to edit
 and execute API requests after you have pressed `Try it out`:
 
 * List all existing *Nodes* using the

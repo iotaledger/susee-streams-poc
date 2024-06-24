@@ -3,7 +3,7 @@
 The *IOTA Bridge* is a REST service for messages transferred between the following list of actors:
 
 * *Management Console*
-* All kinds of *Sensor* applications like *ESP32 Sensor* and *x86/PC Sensor*
+* All kinds of *Sensor* applications like *Streams POC Library* test application and *x86/PC Sensor*
 * *IOTA Tangle* nodes
 * Services accessing the LoRaWAN AP-Server (a.k.a. *Application Server Connector*)
 
@@ -18,7 +18,7 @@ It provides a REST API to:
   a binary serialized package which can be used to interact with the *IOTA Bridge* e.g. via LoRaWAN
 
 ## Prerequisites and Build
-Please have a look at the [Prerequisites](../README.md#prerequisites)
+Please have a look at the [Prerequisites](../README.md#build-prerequisites)
 and [Build](../README.md#build) section of the main README of this repository.
 
 ## IOTA-Bridge Console CLI
@@ -147,7 +147,8 @@ in your C code you will receive a binary package via the `lorawan_send_callback`
 to specify to call send_message(). You'll transmit this binary package e.g. via LoRaWAN. In your LoRaWAN Application
 Server you can use the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge* to hand the binary package over to it. 
 
-The body of the resulting HTTP Resonse needs to be returned to the *ESP32 Sensor* via the `response_callback`
+The body of the resulting HTTP Resonse needs to be returned to your *Sensor* Application
+which then needs to transmit it to the streams-poc-lib via the `response_callback`
 function that is provided by the streams-poc-lib.
 
 Have a look into the following documentation for more details:
@@ -307,7 +308,7 @@ The usage of compressed messages is only possible after one or more normal strea
 been send. The *IOTA Bridge* then learns which Streams Channel ID is used
 by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI.
 Additionally the [initialization count](../sensor/README.md#initialization-count)
-is stored to allow [*Sensor* reinitialization detection](../test/README.md#sensor-reinitialization).
+is stored to allow [*Sensor Reinitialization* detection](../test/README.md#sensor-reinitialization).
 
 The mapping of LoraWAN DevEUI to Streams Channel meta data is stored in a local SQLite3 database.
 The database file "iota-bridge.sqlite3" is stored in the directory where the

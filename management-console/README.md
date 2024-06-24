@@ -1,11 +1,11 @@
 # Management Console
 
 The *Management Console* is used to create new Streams channels and to add Sensors (a.k.a. Streams subscribers)
-to those channels. Management of multiple channels is possible. The user states of the
-Streams channels are stored in a local SQLite3 database file (user-states-database).
+to those channels. Management of multiple channels is possible. The streams client states of the
+Streams channels are stored in a local SQLite3 database file (client-states-database).
 
 ## Prerequisites and Build
-Please have a look at the [Prerequisites](../README.md#prerequisites)
+Please have a look at the [Prerequisites](../README.md#build-prerequisites)
 and [Build](../README.md#build) section of the main README of this repository.
 
 ## Management Console CLI
@@ -56,8 +56,8 @@ the *Management Console* offers the following CLI arguments.
     -c, --create-channel
             Use this option to create (announce) a new Streams channel.
             The announcement link will be logged to the console.
-            The ID and user_state of the new Streams channel will be stored in in the
-            user-states-database.
+            The ID and streams_client_state of the new Streams channel will
+            be stored in in the client-states-database.
 
     -e, --dev-eui <DEV_EUI>
             The DevEUI of the sensor to act on.
@@ -70,7 +70,7 @@ the *Management Console* offers the following CLI arguments.
             Print information about currently existing channels.
             Each sensor is a subscriber in a dedicated Streams channel. The management-console
             manages these channels and stores the channel state information in its
-            'user-states-management-console.sqlite3' database file. Use this CLI option to print
+            'client-states-management-console.sqlite3' database file. Use this CLI option to print
             the relevant channel state information from the SQLite database to console.
             Use CLI argument '--channel-starts-with' to select the Streams channel you want to
             investigate.
@@ -79,7 +79,7 @@ the *Management Console* offers the following CLI arguments.
             Specify the Streams channel when processing a management-console
             CLI command. As the Streams channels ID has 40 byte length and is
             not easy to handle manually you only need to specify the beginning
-            of the channels ID so that it can be found in the user-states-database.
+            of the channels ID so that it can be found in the client-states-database.
             If there are more than one channels that can be found by the provided search string
             the command will fail.
             
@@ -109,17 +109,18 @@ Following CLI arguments are used to subscribe *Sensors* to an existing channel:
             The subscription message link is logged to its console by the Sensor when the
             --subscribe-announcement-link CLI command is used.
             As the subscription message link contains the Streams channel ID the correct
-            user state is fetched automatically out of the user-states-database.
+            streams client state is fetched automatically out of the client-states-database.
 
 The SUBSCRIPTION_PUB_KEY and SUBSCRIPTION_LINK will be logged to the console by the *Sensor* app when the 
-CLI command --subscribe-announcement-link of the *Sensor* app is used. This applies to the x86/PC version 
-of the *Sensor* app and to the *ESP32 Sensor* application. In case of the *ESP32 Sensor*
+CLI command --subscribe-announcement-link of the *Sensor* app is used.
+This applies to the x86/PC version of the *Sensor* app and to the *Streams POC Library* test application.
+In case of the *Streams POC Library* test application
 these properties are also logged to the console of the *Sensor* app that is used as *Sensor remote control*.
 
 #### Automatic *Sensor* Initialization
 
 Instead of creating a Streams chanel and subscribing a Sensor manually
-the whole process (called *Sensor* initialization) can be done automatically:
+the whole process (called *Sensor Initialization*) can be done automatically:
 
     -i, --init-sensor
             Initialize the streams channel of a remote sensor.
@@ -218,7 +219,7 @@ To allow fully automated channel initializations the SUSEE Streams POC applicati
 are using an own communication protocol consisting of `commands` and `confirmations` where a `confirmation`
 always carries the relevant data resulting from a command executed by a remote sensor.
 
-Alternatively to see the log output of the *ESP32 Sensor* app you can use a serial port monitor like `idf.py monitor`
+Alternatively to see the log output of the *Streams POC Library* test application you can use a serial port monitor like `idf.py monitor`
 or [cargo espmonitor](https://github.com/esp-rs/espmonitor).
 
 If you use the `--init-sensor` option all relevant Streams channel properties like announcement-link,
@@ -274,7 +275,7 @@ files from the initialization system to the *SUSEE Node* follow these steps:
   the *Sensors* contains a subfolder `data/management-console`.<br>
   Upload following files from `data/management-console` to the  
   previously created `management-console-data` folder on the *SUSEE Node*:
-  * user-states-management-console.sqlite3
+  * client-states-management-console.sqlite3
   * wallet-management-console.txt
 * In the admin home folder of the *SUSEE Node*:<br>
   `$ sudo chown 65532:65532 management-console-data/*`<br>

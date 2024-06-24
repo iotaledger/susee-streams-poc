@@ -296,30 +296,35 @@ as described
 
 ### Sensor Initialization vs Reinitialization
 
-As the [DevEUI](../README.md#mocked-deveuis) of the *streams-poc-lib test application* is derived from the 
-[base MAC address of the ESP32 MCU](../README.md#mocked-deveuis)
+##### Avoid multiple Initializations with static DevEUIs
+As the [DevEUI](../README.md#mocked-deveuis) of the *streams-poc-lib test application*
+is derived from the 
+[base MAC address of the ESP32 MCU](../README.md#mocked-deveuis),
 the DevEUI will remain the same even if the device flash storage has
 been erased.
 
-The difference between an [initialization](../../README.md#initialization) 
-and [reinitialization](../../README.md#sensor-reinitialization) using the
-*streams-poc-lib test application* just includes that a new
-[random seed](../../README.md#common-file-persistence)
-is generated and the [initialization count](../README.md#initialization-count)
-is set to zero.
+This means, after the flash storage has been erased with `idf.py erase-flash`,
+and the *streams-poc-lib test application*
+*Sensor* has been initialized after a previous initialization, the
+[initialization count](../README.md#initialization-count)
+will be set to zero while the DevEUI remains the same.
 
 As a consequence of the *initialization count* reset and the static DevEUI, an
-*IOTA Bridge* having cached an outdated *IOTA Streams* channel id
+*IOTA Bridge*, having cached an outdated *IOTA Streams Channel*-id
 with *initialization count* zero, has no possibility
-to detect that the channel id has been changed. Therefore, the 
-*streams-poc-lib test application* should only be initialized once.
+to detect that the channel-id has changed. 
 
-If the *Streams* channel needs to be replaced after the *initialization*,
-a *reinitialization* should be processed. Otherwise, in case the device flash has
-been erased, the databases of all deployed
-*IOTA Bridge* instances need to be cleared, or the specific dataset in these
-*IOTA Bridge* databases needs to be updated/deleted using the *IOTA Bridge*
+Therefore, after the flash storage of a *streams-poc-lib test application*
+device has been erased, the databases of all deployed
+*IOTA Bridge* instances need to be deleted,
+or the specific dataset in these
+*IOTA Bridge* databases need to be updated/deleted using the *IOTA Bridge*
 [lorawan-node API endpoint](../../iota-bridge/README.md#lorawan-node-endpoints).
+
+Otherwise, the *IOTA Bridge* would use a wrong *Streams Channel*-id in case the
+*streams-poc-lib test application* uses compressed messages.
+
+##### Use Reinitialization instead
 
 To avoid the above described problem a *Sensor Reinitialization* must be done if a
 DevEUI is maintained while the *IOTA Streams Channel*-id is changed.

@@ -222,7 +222,7 @@ app-srv-connector-mock:50001 from within other docker containers.
 It will connect the iota-bridge via the docker bridge network.
 
 The *AppServer Connector Mockup Tool* can be used together with the
-[ESP32 Sensor](../sensor/main-rust-esp-rs)
+[*Streams POC Library* test application](../sensor/streams-poc-lib)
 as been described in
 [Send messages using the Sensor](../test/README.md#send-messages---streams-poc-lib-test-application)
 section, because the port 50001 can be accessed via the external address of the docker host.
@@ -294,7 +294,18 @@ Upload some resources needed for the installation process to the server host sys
 On the server host system, 
 please edit the `docker-compose.yml` file
 using an editor of you choice and, if needed,
-uncomment the `management-console` section of the file. 
+uncomment the `management-console` section and/or the
+`app-srv-connector-mock` section
+of the file.
+
+The `management-console` section needs to be uncommented if you
+want to use the
+[message explorer](../test/README.md#view-sensor-messages-using-the-message-explorer)
+to view the messages received by the *SUSEE Node*.
+
+The `app-srv-connector-mock` section needs to be uncommented if you
+want to use the *SUSEE Node* for testing the
+[*Streams POC Library* test application](../sensor/streams-poc-lib).
 
 Please also edit the file `~/susee-poc/env.example`
 and set the static ip address resp. domain name

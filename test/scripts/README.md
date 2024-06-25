@@ -20,11 +20,11 @@ These are the used files:
    Though debug profile would also do, it would be very time-consuming, because the POW is very slow for debug builds.
 
 2) If you use a local *IOTA Bridge* instance with a private tangle,
-   start the application in a shell on your test machine.
+   start the application in a shell on your test as shown below.
    
    Don't forget to start the docker compose environment for
    the private tangle before you start the *IOTA Bridge*
-   as been [here](../../susee-node/README.md#private-tangle-for-development-purposes)
+   as been described [here](../../susee-node/README.md#private-tangle-for-development-purposes).
    
    In the `./target/release` folder of this repository:
    ```bash
@@ -35,7 +35,7 @@ These are the used files:
    you don't need to start a local *IOTA Bridge instance* but you need
    to edit the following variables in the `./test/scripts/.env` file
    (replace 'iotabridge.example.com' with the domain name of your
-   *SUSE Node*) :
+   *SUSEE Node*) :
    * IOTA_BRIDGE_URL = "http://iotabridge.example.com:50000"
    * NODE_HOST = "iotabridge.example.com"
 

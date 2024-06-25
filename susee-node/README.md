@@ -1,37 +1,98 @@
 # *SUSEE Node* Resources
 
-This folder contains resources to run a *SUSEE Node*.
-A *SUSEE Node* provides several services that are needed to 
-use the susee-streams-poc applications with the
-[Stardust update](https://wiki.iota.org/learn/protocols/stardust/introduction/) of the IOTA protocol
-([IOTA mainnet](https://wiki.iota.org/get-started/introduction/iota/introduction/)
-or [Shimmer Network](https://wiki.iota.org/get-started/introduction/shimmer/introduction/)).
+This folder contains resources to run single *SUSEE Node*
+instance and redundant *SUSEE Node* setups.
+
+A *SUSEE Node* provides all web services needed to 
+run the *SUSEE Streams POC* and send *Sensor*
+messages via a LoRaWAN communication infrastructure.
 
 The *SUSEE Node* provides the following web services that
-are run using docker virtualization and docker-compose:
+are run using docker virtualization and docker-compose.
 
-* A [Hornet](https://wiki.iota.org/hornet/welcome/) node
-* An [INX Collector](https://github.com/teleconsys/inx-collector) plugin
-* An [INX Proof of Inclusion](https://github.com/iotaledger/inx-poi) plugin
-
-One of the main purposes of the *SUSEE Node* is to provide a fully functional
-[inx-collector](https://github.com/teleconsys/inx-collector)
-service. The inx-collector maps Streams addresses to IOTA block-ids and additionally acts as a selective
-permanode for all indexed blocks.
-
-Additionally the following web services, implemented by susee-streams-poc applications,
-are run using the docker-compose setup described in the
-[docker](../docker/README.md) section of this repository:
-
+*SUSEE Streams POC* applications:
 * [*IOTA Bridge* REST API](../iota-bridge/README.md#iota-bridge-rest-api)
 * [*Message Explorer* REST API](../management-console/README.md#run-message-explorer)
   implemented by the *Management Console* 
-  
-<br/><br/>
+* [*AppServer Connector Mockup Tool*](../app-srv-connector-mock)
+
+*IOTA Node* and *Selective Permanode* services:  
+* [IOTA Hornet Node](https://wiki.iota.org/hornet/welcome/) node
+* [INX Collector](https://github.com/teleconsys/inx-collector) plugin
+* [INX Proof of Inclusion](https://github.com/iotaledger/inx-poi) plugin
+* [Minio](https://min.io/) object database
+
+Since the
+[Stardust update](https://wiki.iota.org/learn/protocols/stardust/introduction/)
+of the IOTA protocol in the
+[IOTA mainnet](https://wiki.iota.org/get-started/introduction/iota/introduction/),
+*IOTA Streams* can only be used with a self deployed *Tag Indexing Service*.
+This *Tag Indexing Service* used for *SUSEE* is a modified version of the
+[inx-collector](https://github.com/teleconsys/inx-collector)
+by [Teleconsys](https://www.teleconsys.it/)
+which also acts as a *Selective Permanode*.
+The modified *INX Collector* stores *IOTA* blocks using
+hashed *IOTA Streams* addresses (called *message index*)
+as storage keys.
+
+The source code of the modified *INX Collector* can be found here:
+https://github.com/chrisgitiota/inx-collector/tree/streams-collector
+
+Because data blocks being send via the *IOTA Tangle* without providing a
+[Storage Deposit](https://wiki.iota.org/learn/protocols/stardust/core-concepts/storage-deposit/)
+will be pruned after some time from *IOTA Nodes*,
+data centric applications need a *Selective Permanode* functionality
+which is also provided by the *INX Collector*.
+
+A *Selective Permanode* filters application specific blocks
+out of the *IOTA Tangle* and stores these blocks in a self
+owned database. The *INX Collector* for *SUSEE* filters
+*SUSEE* specific blocks by a configurable
+[block tag](https://wiki.iota.org/tips/tips/TIP-0023/)
+prefix and stores these blocks together with a *Proof of Inclusion*
+in a [Minio](https://min.io/) object database.
+
+Using the *Proof of Inclusion* that has been stored with the data block,
+the authenticity and broadcasting time of the data payload contained in the
+block can be proved any time in the future even when the
+blocks have been pruned from the *IOTA Nodes*.
+More details about *Proof of Inclusion* can be found in the
+[main README](../README.md#proof-of-inclusion-or-why-is-iota-distributed-ledger-used).
+
+Creating and validating a *Proof of Inclusion* is done using an
+[INX Proof of Inclusion](https://github.com/iotaledger/inx-poi) plugin
+which is also included in the *SUSEE Node*.
+
+*INX Collector* and *INX Proof of Inclusion* are *INX Plugins*.
+*INX Plugins* communicate with an *IOTA Node* via the
+[INX Interface](https://github.com/iotaledger/inx)
+which allows the plugins to have fast and extensive access to the
+nodes internal *Tangle* data structures and *IOTA*
+protocol communication.
+
+To run *INX Plugins* the deployment of an own 
+*IOTA Node* is obligatory. 
+The *SUSEE Node* therefore also runs an
+[IOTA Hornet Node](https://wiki.iota.org/hornet/welcome/)
+and several additional *INX Plugins* that are needed for its use.
+
+Here is an overview of the services contained in the
+*SUSEE Node* and the communication between internal and 
+external services: 
+
+<br/>
 
 <img src="SUSEE-Node-Services.png" alt="SUSEE-Node-Services" width="500"/>
 
 <br/>
+
+The following sections describe how to run single *SUSEE Node*
+instances for production and develop purposes and how to
+configure
+[multiple *SUSEE Node* instances](#redundant-susee-node-setup)
+to build a small and simple *SUSEE Node* 'cluster'.
+
+## How to Deploy a SUSEE Node
 
 We cover two different usage scenarios, production and development.
 This is described in the sections 
@@ -40,7 +101,7 @@ and
 [Private tangle for development purposes](private-tangle-for-development-purposes)
 in more detail.
 
-## Use in production
+### Use in production
 
 As the inx-collector system includes a Hornet Node which communicates with other Nodes in
 the IOTA- or Shimmer-network,
@@ -335,13 +396,13 @@ to production environments as distributed system,
 see the [Deploy MinIO: Multi-Node Multi-Drive](https://min.io/docs/minio/linux/operations/install-deploy-manage/deploy-minio-multi-node-multi-drive.html#deploy-minio-distributed)
 documentation page.
 
-### Deploy *IOTA Bridge* and *Message Explorer*
+#### Deploy *IOTA Bridge* and *Message Explorer*
 
 Please follow the instructions described in the section
 [Start IOTA Bridge and Message Explorer as public available service](../docker/README.md#start-iota-bridge-and-message-explorer-as-public-available-service)
 of the [docker folder](../docker/README.md).
 
-### Update Docker Images
+#### Update Docker Images
 
 ```bash
   # in the `hornet` or `susee-poc` folder of your *SUSEE Node*
@@ -349,17 +410,7 @@ of the [docker folder](../docker/README.md).
   > docker compose up -d
 ```
 
-## Primary+Secondary *SUSEE-Node* Setup
-
-TODO: Add Description here
-
-<br/><br/>
-
-<img src="SUSEE-Node-Primary-Secondary-Setup.png" alt="Primary+Secondary Setup with two SUSEE-Nodes" width="800"/>
-
-<br/>
-
-## Private tangle for development purposes
+### Private tangle for development purposes
 
 As a production system will be too expensive for development purposes we use a private tangle
 with docker-compose instead. The system will be accessible on the development machine via localhost
@@ -442,3 +493,15 @@ To stop the private tangle using the `2-minio` profile:
   # in the 'priv_tangle' subfolder:
   > docker compose --profile "2-minio" down
 ```
+
+## Redundant SUSEE Node setup
+
+### Primary+Secondary *SUSEE-Node* Setup
+
+TODO: Add Description here
+
+<br/><br/>
+
+<img src="SUSEE-Node-Primary-Secondary-Setup.png" alt="Primary+Secondary Setup with two SUSEE-Nodes" width="800"/>
+
+<br/>

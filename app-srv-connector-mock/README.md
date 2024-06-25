@@ -5,19 +5,19 @@ the test application for the *Streams POC Library*.
 The *streams-poc-lib* provides a test application in its main.c file (sensor/streams-poc-lib/main/main.c)
 that can be used to test the library via a WIFI connection instead of a LoRaWAN connection.
 
-The binary packages that are send via WIFI cannot be sent directly to the *IOTA-Bridge*. The packages need to
-be posted to the *IOTA-Bridge* using the `lorawan-rest` API endpoints of the *IOTA-Bridge*.
+The binary packages that are send via WIFI cannot be sent directly to the *IOTA Bridge*. The packages need to
+be posted to the *IOTA Bridge* using the `lorawan-rest` API endpoints of the *IOTA Bridge*.
 
 This *AppServer Connector Mockup Tool* receives the binary packages from the *Streams POC Library*
 test application via a socket connection
-and posts these packages to the *IOTA-Bridge* `lorawan-rest` API functions.
+and posts these packages to the *IOTA Bridge* `lorawan-rest` API functions.
 The resulting response is transmitted
 via the socket connection back to the *Streams POC Library* test application.
 
 In a real world scenario a service running on the *LoRaWAN Application Server* (or tightly connected to it) would
 post the binary packages received via LoRaWAN (resp. e.g. via MQTT)
-to the *IOTA-Bridge* via the `lorawan-rest` API endpoints. Finally, the binary response received from 
-the *IOTA-Bridge* would be send back to the *Sensor* via the *LoRaWAN Application Server*.
+to the *IOTA Bridge* via the `lorawan-rest` API endpoints. Finally, the binary response received from 
+the *IOTA Bridge* would be send back to the *Sensor* via the *LoRaWAN Application Server*.
 
 ## Prerequisites and Build
 Please have a look at the [Prerequisites](../README.md#build-prerequisites)

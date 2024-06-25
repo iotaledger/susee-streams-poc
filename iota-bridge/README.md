@@ -25,7 +25,7 @@ and [Build](../README.md#build) section of the main README of this repository.
 
 In addition to the common CLI options described in the
 [CLI API section of the main README file](../README.md#common-cli-options)
-the *IOTA-Bridge* offers the following CLI arguments.
+the *IOTA Bridge* offers the following CLI arguments.
 
     -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
             IP address and port to listen to.
@@ -312,7 +312,7 @@ is stored to allow [*Sensor Reinitialization* detection](../test/README.md#senso
 
 The mapping of LoraWAN DevEUI to Streams Channel meta data is stored in a local SQLite3 database.
 The database file "iota-bridge.sqlite3" is stored in the directory where the
-*IOTA-Bridge* is started.
+*IOTA Bridge* is started.
 
 To review the data stored in the local SQLite3 database we recommend the
 [DB Browser for SQLite](https://sqlitebrowser.org/) application.

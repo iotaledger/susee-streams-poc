@@ -19,11 +19,25 @@ These are the used files:
 1) Build the project with **release** profile as been described in the [main README file](../../README.md#for-x86pc-1).
    Though debug profile would also do, it would be very time-consuming, because the POW is very slow for debug builds.
 
-2) Run an `iota-bridge` instance in a shell on your test machine.<br>
-   In the `./target/release` folder:
-```bash
-    > ./iota-bridge
-```
+2) If you use a local *IOTA Bridge* instance with a private tangle,
+   start the application in a shell on your test machine.
+   
+   Don't forget to start the docker compose environment for
+   the private tangle before you start the *IOTA Bridge*
+   as been [here](../../susee-node/README.md#private-tangle-for-development-purposes)
+   
+   In the `./target/release` folder of this repository:
+   ```bash
+       > ./iota-bridge
+   ```
+
+   If a production like *SUSEE Node* for test purposes is used,
+   you don't need to start a local *IOTA Bridge instance* but you need
+   to edit the following variables in the `./test/scripts/.env` file
+   (replace 'iotabridge.example.com' with the domain name of your
+   *SUSE Node*) :
+   * IOTA_BRIDGE_URL = "http://iotabridge.example.com:50000"
+   * NODE_HOST = "iotabridge.example.com"
 
 ## Prepare and run the multi *Sensor* test
 
@@ -57,12 +71,12 @@ To find out if all *Sensors* have been initialized, have a look into the
 `prepare_multi_sensor_test.log` in the `workspace` folder. This log file will contain many
 "DevEUI: ANY - Received Confirmation::NO_CONFIRMATION" entries like this:
 
-    [2024-02-14T14:27:17Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
-    [2024-02-14T14:27:20Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
-    [2024-02-14T14:27:23Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
-    [2024-02-14T14:27:26Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
-    [2024-02-14T14:27:29Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
-    [2024-02-14T14:27:32Z INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+    [INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+    [INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+    [INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+    [INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+    [INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
+    [INFO  streams_tools::remote::remote_sensor] DevEUI: ANY - Received Confirmation::NO_CONFIRMATION
 
 There will occur several "DevEUI: ANY - Received Confirmation::NO_CONFIRMATION" messages during the initialization
 process as the *Management Console* periodically tries to find new *Sensors* ready to be initialized. These

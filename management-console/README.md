@@ -1,8 +1,13 @@
 # Management Console
 
 The *Management Console* is used to create new Streams channels and to add Sensors (a.k.a. Streams subscribers)
-to those channels. Management of multiple channels is possible. The streams client states of the
-Streams channels are stored in a local SQLite3 database file (client-states-database).
+to those channels.
+
+Management of multiple channels is possible. The streams client states of the
+Streams channels are stored in a local SQLite3 database file (client-states-database)
+as been described in the 
+[Common file persistence](../README.md#common-file-persistence)
+section.
 
 ## Prerequisites and Build
 Please have a look at the [Prerequisites](../README.md#build-prerequisites)

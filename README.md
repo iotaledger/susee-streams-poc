@@ -48,7 +48,7 @@ Following applications and libraries are contained in this repository:
   * Acts as [*Application Server Connector*](#technical-components)
     for the *streams-poc-lib* test application
   * Receives & sends binary packages from/to the streams-poc-lib test application
-    via a socket connection and transmits these packages to the *IOTA-Bridge*
+    via a socket connection and transmits these packages to the *IOTA Bridge*
     via its `lorawan-rest` API functions.
 * [Management Console](management-console)<br>
   * [Admin](#roles)-Tool to process workflows needed for *Initialization* of the *Sensor* and the monitoring of *Sensor Processing*
@@ -103,7 +103,7 @@ instance that runs the
 [INX Proof of Inclusion](https://github.com/iotaledger/inx-poi)
 plugin.
 
-The [*SUSEE Node*](susee-node/README.md), contained in the *susee-streams-poc*,
+The [*SUSEE Node*](susee-node/README.md), contained in this repository,
 provides an *INX Proof of Inclusion* plugin and stores the block data together with their
 PoIs.
 
@@ -184,7 +184,7 @@ that can be build using a Dockerfile and can be run using docker compose.
 Have a look into the [Docker folder README](./docker/README.md)
 for more details.
 
-*IOTA Bridge* and *Management Console* are services provided by the
+*IOTA Bridge*, *Management Console* and other services are provided by the
 [SUSEE Node](#reliable-susee-node-backend) which is needed to run
 the *SUSEE Streams POC* Applications.
 There are several options to set up and deploy a *SUSEE Node*.
@@ -253,7 +253,7 @@ target/release/management-console --help # Use 'sensor', 'app-srv-connector-mock
 
 All four x86/PC applications provide the following options except
 of `--wallet-file`. 
-*IOTA-Bridge* and *AppServer Connector Mockup Tool* are not
+*IOTA Bridge* and *AppServer Connector Mockup Tool* are not
 using `--wallet-file` as these applications do not need a wallet:
 
     -h, --help
@@ -266,13 +266,14 @@ using `--wallet-file` as these applications do not need a wallet:
             Specifies the wallet file to use.
             Set this to path and name of the wallet file.
             If this option is not used:
-            * A file 'wallet-<APPLICATION-NAME>.txt' is used if existing
-            * If 'wallet-<APPLICATION-NAME>.txt' does not exist:
+            * A file 'wallet-{APPLICATION-NAME}.txt' is used if existing
+            * If 'wallet-{APPLICATION-NAME}.txt' does not exist:
               A new seed is created and written into a new file
-              'wallet-<APPLICATION-NAME>.txt'.
+              'wallet-{APPLICATION-NAME}.txt'.
 
-Additionally, *IOTA-Bridge* and *Management Console* provide an option to control
-the location of stored data:
+Additionally, *IOTA Bridge* and *Management Console* provide an option to control
+the location of stored data. The default value for the data location is the path
+`./data/{APPLICATION-NAME}`:
 
     -d, --data-dir <DATA_DIR>
             The folder where all data files are stored.
@@ -281,7 +282,7 @@ the location of stored data:
             Examples:
                 --data-dir="my_data/timestamp"
                 --data-dir="/home/admin/a_folder"
-             [default: ./data/management-console]
+             [default: ./data/{APPLICATION-NAME}]
 
 The following section explains which data are stored in this location.
 
@@ -290,12 +291,13 @@ The following section explains which data are stored in this location.
 The *Management Console* and the [*Sensor* applications](./sensor/README.md) use the
 following files for persistence:
 
-* Wallet file for the user seed and *Initialization Count*<br><br>
+* Wallet file for the user seed and *Initialization Count*
+
   *x86/PC*<br>
   The applications are using a plain text wallet that stores the automatically
   generated seed in a text file.
   If option '--wallet-file' is not used, a default filename
-  'wallet-<APPLICATION-NAME>.txt' is used.
+  'wallet-{APPLICATION-NAME}.txt' is used.
   If the file does not exist, a new seed is created and stored in
   a new wallet file. Otherwise the seed stored
   in the wallet file is used.<br>
@@ -325,11 +327,11 @@ following files for persistence:
 * *Streams Client State*<br>
   The *Streams Client State* needs to be stored on the device that uses Streams
   to encrypt/decrypt and sign *Sensor* messages. It is updated after each
-  send message and every time a command is received from the *IOTA-Bridge*.
+  send message and every time a command is received from the *IOTA Bridge*.
 
   *x86/PC*<br>
   On application start the current *Streams Client State* is loaded from 
-  a file named 'client-state-[APPLICATION-NAME].bin'.
+  a file named 'client-state-{APPLICATION-NAME}.bin'.
   On application exit the current *Streams Client State* is written into 
   this file.
   <br><br>
@@ -604,7 +606,7 @@ underlay the following restrictions:
        is given.
     * Platform: X86/PC, standard server or edge computing hardware depending
       on the chosen topology. 
-    * In the current POC implementation the *IOTA-Bridge* forwards remote 
+    * In the current POC implementation the *IOTA Bridge* forwards remote 
       control data (*Commands* and *Confirmations*) from the *Sensor*
       to the remote control (*x86/PC Sensor* or *Management Console*).
       In a later production system for the *Sensor Processing* workflow
@@ -665,6 +667,8 @@ To allow the [Reinitialization](#sensor-reinitialization) and
 [Add/Remove Subscriber](#addremove-subscriber) workflows the SUSEE application
 protocoll needs to provide the ability to switch between *Sensor Processing*,
 *Add/Remove Subscriber* and *Sensor Reinitialization* workflows on demand.
+The dynamic switch from *Sensor Processing* workflow to 
+*Reinitialization* or *Add/Remove Subscriber* workflow is currently not implemented.
 
 #### Add/Remove Subscriber
 
@@ -675,6 +679,8 @@ Contrary to the *Initialization* workflow, here LoRaWAN is also used for a back 
 *LoRaWAN Application Server* to the *Sensor*.
 
 The dataflow matches the dataflow of the *Sensor Processing* workflow.
+
+This workflow is currently not implemented.
 
 #### Sensor Reinitialization
 
@@ -700,12 +706,15 @@ for the *Sensor* in case compressed messages are used.
 After a *Sensor Reinitialization* all evtl. needed *Read Only Participants* have to subscribe to the
 new channel again:
 * In case all channel participants shall have no access to *Sensor* messages of the
-  old *Sensor* (pre reinitialization messages) participants must be subscribed with new identities
-  (key pairs).
+  old *Sensor* (pre reinitialization messages) participants must be subscribed with
+  new identities (key pairs).
 * In case a participant needs access to old and new massages (e.g. *Admin* role) an
   already existing identity must be reused.
 
 Currently, it is not clear if LoRaWAN can be used for *Sensor Reinitialization*.
 
 More details regarding *Sensor Reinitialization* can be found here:
-*  
+* [Sensor - Initialization Count Documentation](./sensor/README.md#initialization-count)
+* [Streams POC Library - Initialization vs Reinitialization](./sensor/streams-poc-lib/README.md#sensor-initialization-vs-reinitialization)
+* [Test - Sensor Initialization Documentation](./Test/README.md#sensor-initialization)
+

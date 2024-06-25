@@ -24,13 +24,13 @@ This is described in the [Sensor Initialization](#sensor-initialization)
 and [Send messages using the Sensor](#send-messages-using-the-sensor)
 section below.
 
-Please note that the tests provided here underlie
-[several restrictions](../README.md#restrictions-of-the-provided-tests) that are described in
-the main README.
-
-Please also note that you may also process the tests described in this README,
-using the docker images for the SUSEE applications as been described in the
-[docker folder](../docker/README.md).
+Please note:
+* that the tests provided here underlie
+  [several restrictions](../README.md#restrictions-of-the-provided-tests) that are described in
+  the main README.
+* that you may also process the tests described in this README,
+  using the docker images for the SUSEE applications as been described in the
+  [docker folder](../docker/README.md).
 
 ## Test workspace
 As all built applications are located in the `target/debug` or `target/release`
@@ -61,11 +61,12 @@ are stored.
 As described in the repository 
 [main README](../README.md#reliable-susee-node-backend) 
 a [*SUSEE Node*](../susee-node/README.md)
+or a [private tangle](../susee-node/README.md#private-tangle-for-development-purposes)
+combined with a local *IOTA Bridge* instance
 needs to be run before any *SUSEE Streams POC* Application
 can be used.
 
-For test purposes a 
-[private tangle](../susee-node/README.md#private-tangle-for-development-purposes)
+For test purposes a private tangle
 together with a locally running *IOTA Bridge* instance will usually be the best option.
 
 If a physical or virtual appliance and a domain name
@@ -92,7 +93,7 @@ If you are using an *IOTA Bridge* with private tangle, don't forget to start it 
   > ./run.sh
 ```
 
-After the tests have been finished stop the private tangle using:
+After the tests have been finished, stop the private tangle using:
 ```bash
   # in the 'priv_tangle' subfolder:
   > docker compose --profile "2-nodes" down
@@ -147,7 +148,7 @@ Here are some general hints and aspects that apply to all *Sensor* applications:
   the example ip `192.168.47.11` is used in the test descriptions below.
   Please replace the ip address with the ip address of the network interface of your computer.
   You need also to make sure, the used port is opened in the firewall of your OS.
-  After having started the application (e.g. the *IOTA-Bridge*) you can use telnet from another
+  After having started the application (e.g. the *IOTA Bridge*) you can use telnet from another
   machine in your LAN to verify that the application can be accessed
   from within the LAN.
 
@@ -163,6 +164,14 @@ we need to start three applications.
 in parallel. If you use the *x86/PC Sensor*, it will be launched in an additional
 command shell running parallel to the other two programs. In case a Sensor application
 running on an ESP32 device is used, the log monitor utility will run in the third command shell.
+
+The initialization steps described below will only initialize
+one single *Sensor* as the *Management Console* CLI argument
+`--init-sensor` is used. If you need to initialize multiple *Sensors*
+please use the CLI argument `--init-multiple-sensors` instead.
+You can find more details about initializing multiple *Sensors*
+in parallel in the 
+[*Management Console* README](../management-console/README.md#automatic-sensor-initialization).
 
 #### Automatic Sensor Initialization - streams-poc-lib test application
 
@@ -214,7 +223,7 @@ When the streams-poc-lib test application has been
     to do a *Sensor Initialization*.
   * If the device has already been initialized and has been powered off thereafter,
     you need to erase the flash of the *Sensor* device to do an initialization
-    ([why is this needed?](#sensor-reinitialization---streams-poc-lib-test-application)).<br>
+    ([why is this needed?](../sensor/streams-poc-lib/README.md#uninitialized-mode)).<br>
     You can run `idf.py erase-flash` and flash the
     *streams-poc-lib test application* again as been described in the
     [streams-poc-lib README](../sensor/streams-poc-lib/README.md#build).<br>
@@ -322,6 +331,10 @@ Doing an *Initialization* as been described here, you might want to use the
 [--dev-eui](../sensor/README.md#static-deveui)
 argument of the *Sensor* CLI, to specify a static DevEUI
 facilitating a later *Sensor Reinitialization*.
+You only need to use `--dev-eui`, if you need to reuse the DevEUI for
+repetitive tests, where the `wallet-sensor.txt` file
+is not guarantied to be maintained.
+
 Have a look into the `Initialization vs. Reinitialization` hints
 in the [Sensor Initialization](#sensor-initialization) section above,
 and the 
@@ -360,12 +373,12 @@ section below for more details.
   If you are using a private tangle:<br>
   ```bash
   > ./sensor --act-as-remote-controlled-sensor
-  [2INFO  streams_tools::remote::command_processor] [fn run_command_fetch_loop()] DevEUI: 13145628835347543691 - Received Command::NO_COMMAND
+  [INFO  streams_tools::remote::command_processor] [fn run_command_fetch_loop()] DevEUI: 13145628835347543691 - Received Command::NO_COMMAND
   ``` 
   If you are using a production like *SUSEE Node*:<br>
   ```bash
   > ./sensor --act-as-remote-controlled-sensor --iota-bridge-url "http://iotabridge.example.com:50000"
-  [2INFO  streams_tools::remote::command_processor] [fn run_command_fetch_loop()] DevEUI: 13145628835347543691 - Received Command::NO_COMMAND
+  [INFO  streams_tools::remote::command_processor] [fn run_command_fetch_loop()] DevEUI: 13145628835347543691 - Received Command::NO_COMMAND
   ```
 * Run the *Management Console* in an additional shell
   <br><br>
@@ -426,13 +439,10 @@ The `client-state-sensor.bin` will be replaced by the *x86/PC Sensor* with a
 new version of the file containing the *Streams Client State* of the new
 *Streams Channel*.
 
-The DevEUI will is maintained automatically because it is stored in the
-`wallet-sensor.txt` file. 
-
-If you need to reuse a DevEUI for repetitive tests, where the `wallet-sensor.txt` file
-is not guarantied to be maintained you can use the
-[--dev-eui](../sensor/README.md#static-deveui)
-*x86/PC Sensor* CLI argument to specify a static DevEUI.
+The DevEUI is maintained automatically because it is stored in the
+`wallet-sensor.txt` file. You don't need to use the `--dev-eui`
+*Sensor* CLI argument if your fine with your DevEUI
+only being stored as long as the `wallet-sensor.txt` file exist.
 
 ### Manual Sensor Initialization
 
@@ -520,8 +530,8 @@ Now the subscription message can be created using the announcement link from the
                      Initialization count:  0
 ```
 
-The *IOTA-Bridge* also logs every data package that is transferred. Regarding absolute length of transferred binary packages
-only take the *IOTA-Bridge* log into account as these are the correct package sizes. *Sensor* and *Management-Console* only
+The *IOTA Bridge* also logs every data package that is transferred. Regarding absolute length of transferred binary packages
+only take the *IOTA Bridge* log into account as these are the correct package sizes. *Sensor* and *Management-Console* only
 log the sizes of the tangle-message-payload: 
 ```bash
 [INFO  iota_bridge] Handling request from client address 127.0.0.1:43212 - URI: /message?addr=fed80116a0d8c9d0c661ef7bbaa26d581b039c7481d243f3b6ca1b308d4495afa26af3e10009f5af:132369f378d7b97973f7d831
@@ -590,7 +600,7 @@ is equivalent to subscribing the *x86/PC Sensor*
 Before we can send the `subscribe-announcement-link` command to the *test application* you need to
 connect the serial port of your ESP32 board to your computer. Given the *Sensor* is in the 
 [uninitialized mode](../sensor/streams-poc-lib/README.md#uninitialized-mode) the
-test application will poll commands from the *IOTA-Bridge* every 5 seconds after it has been powered up.
+test application will poll commands from the *IOTA Bridge* every 5 seconds after it has been powered up.
  
 To see the console log output of the *test application* you need to start a serial port monitor application like
 `idf.py monitor`.
@@ -640,16 +650,16 @@ We only need to add the `--act-as-remote-control` and `--iota-bridge-url` comman
  ```
 
 The whole communication between the *x86/PC Sensor* remote control and the 
-*streams-poc-lib test application* can be reviewed in the *IOTA-Bridge* log.
+*streams-poc-lib test application* can be reviewed in the *IOTA Bridge* log.
 
 Please note that during the process the *Sensor* and the *IOTA Bridge* switched from
 [uncompressed messages](../sensor/README.md#deveuis-and-compressed-streams-messages) to compressed
-messages (search for `208 Already Reported` in the log output above).
+messages (search for `208 Already Reported` in the *IOTA Bridge* log output).
 After the *IOTA Bridge* responded the `208 Already Reported` status, the *Sensor* uses the
 'message/compressed' endpoints of the *IOTA Bridge*.
 
-As with the x86/PC version of the *Sensor* app the console log of *IOTA-Bridge* and the test application will
-contain the length of transferred binary data (*IOTA-Bridge*) and the subscription link and subscriber
+As with the x86/PC version of the *Sensor* app the console log of the *IOTA Bridge* and the test application will
+contain the length of transferred binary data (*IOTA Bridge*) and the subscription link and subscriber
 public key (*Streams POC Library* test application).  
 
 The subscription link and public key then must be used with the management-console to accept the subscription as being
@@ -697,11 +707,11 @@ the *IOTA Bridge* needs to be started without any command line arguments:
 ```
 
 Now we are ready to boot the *Sensor* device. To view the log output of 
-the *test application* start
-the monitoring tool in a command shell in the 
+the *test application*, start the monitoring tool in a command shell in the 
 [workspace](#test-workspace) folder right after the
 device has powered on:
 ```bash
+    > # In the folder sensor/streams-poc-lib
     > get_idf
     > idf.py monitor
 ```
@@ -759,15 +769,16 @@ Please note that a *Sensor* is called *Node* here (used in the sense of LoRaWAN 
 <img src="swagger-ui-try-it-out.png" alt="Try-it-out Button of the Swagger UI" width="600"/>
 
 Click on the links provided below to open the endpoint
-specific swagger-ui form of a local *Management Console* instance, which allows to edit
-and execute API requests after you have pressed `Try it out`:
+specific swagger-ui form of a local *Management Console* instance, which allows editing
+and executing API requests after you have pressed `Try it out`
+(the links only work using a local *Management Console* instance):
 
 * List all existing *Nodes* using the
   [GET /nodes](http://127.0.0.1:8080/swagger-ui/#/nodes/nodes_index) endpoint. After pressing the `Try it out`
   and `Execute` buttons, the *Message Explorer* will respond to the request with a list of all existing *Nodes*
   resp. *Sensors*.
   
-* Copy the channel-id of the *Sensor* of interest from the *Node* result list.
+* Copy the channel-id of the *Sensor*, that you are interested in, from the *Node* result list.
   
 * List all messages of the *Node* using the
   [GET /messages](http://127.0.0.1:8080/swagger-ui/#/messages/messages_index) endpoint.

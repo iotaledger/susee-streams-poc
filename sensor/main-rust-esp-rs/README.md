@@ -76,7 +76,7 @@ instructions there to build for Extensa core based MCUs (ESP32-C3 is a Risc-V co
 
 All build steps must be executed in the main folder of this project (where this README is located):
 
-Before building we need to specify the WiFi SSID, the WiFi password and the url of the used *IOTA-Bridge* as
+Before building we need to specify the WiFi SSID, the WiFi password and the url of the used *IOTA Bridge* as
 environment variables. These variables will be hard coded into the *ESP32 Sensor*.
 Currently this is the only way to initiate a socket connection to the ESP32.
 This also means that currently you need to compile the ESP32 *Sensor* app yourself to test it:

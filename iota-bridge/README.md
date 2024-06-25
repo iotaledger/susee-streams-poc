@@ -164,7 +164,7 @@ have a look into the
 
 ### IOTA Bridge Error Handling for lorawan-node Endpoints
 
-The `--error-handling` argument described above can be used to specify
+The `--error-handling` argument described above, can be used to specify
 how internal errors of the *SUSEE Node* are handled when
 the `lorawan-rest/binary_request` endpoint is used.
 

@@ -1,5 +1,7 @@
 # *SUSEE Node* Resources
 
+## About
+
 This folder contains resources to run single *SUSEE Node*
 instance and redundant *SUSEE Node* setups.
 
@@ -33,7 +35,7 @@ by [Teleconsys](https://www.teleconsys.it/)
 which also acts as a *Selective Permanode*.
 The modified *INX Collector* stores *IOTA* blocks using
 hashed *IOTA Streams* addresses (called *message index*)
-as storage keys.
+as *Block Storage Keys*.
 
 The source code of the modified *INX Collector* can be found here:
 https://github.com/chrisgitiota/inx-collector/tree/streams-collector
@@ -100,6 +102,15 @@ This is described in the sections
 and
 [Private tangle for development purposes](private-tangle-for-development-purposes)
 in more detail.
+
+For the production scenario, the setup of the *SUSEE Node*
+appliance and the *IOTA Node* + *Selective Permanode* services
+is described below.
+As services implemented by *SUSEE Streams POC* applications
+are run using a *Docker Compose* setup described in the
+[docker folder](../docker/README.md) of this repository,
+the deploment of these services is described
+[there](../docker/README.md#start-iota-bridge-and-message-explorer-as-public-available-service).
 
 ### Use in production
 
@@ -405,7 +416,7 @@ of the [docker folder](../docker/README.md).
 #### Update Docker Images
 
 ```bash
-  # in the `hornet` or `susee-poc` folder of your *SUSEE Node*
+  # in the `hornet` or `susee-poc` folder of your SUSEE-Node
   > docker compose pull
   > docker compose up -d
 ```
@@ -496,12 +507,168 @@ To stop the private tangle using the `2-minio` profile:
 
 ## Redundant SUSEE Node setup
 
+Deployed to cost effective usual appliances (cloud hosted or onpremise,
+VPS or physical), a *SUSEE Node* will often suffer from service outages
+due to appliance downtimes of several minutes per week or due to
+temporarily reduced appliance performance.
+
+The service outages can be reduced by a simple redundancy architecture
+using a primary and a secondary *SUSEE Node* deployed to two different
+data centers. This will be called *Primary+Secondary Setup* in the following.
+
+The available *SUSEE Node* can be run behind a load balancer, or the
+*Application Server Connector* can do a simple
+[failover](https://www.cloudflare.com/learning/performance/what-is-server-failover/).
+
+The failover strategy used for the *Primary+Secondary Setup*
+can be very simple and depends on the implementation of the
+*Application Server Connector*.
+The strategy must be chosen to take into account, which appliances,
+networks and storage capabilities are available at each datacenter.
+
+Following strategies can be considered. Mixing the strategies is also possible:
+* *Prefer Primary Node*<br>
+  In case the *IOTA Bridge* of the primary *SUSEE Node* 
+  returns an error, the *Application Server Connector* will
+  try to use the *IOTA Bridge* of the secondary *SUSEE Node*.
+  The secondary *SUSEE Node* is only
+  used in case of errors and only once (per error).
+* *Spread Load*<br>
+  The *Application Server Connector* distributes the work load
+  using a simple round robin logic.
+  In case an *IOTA Bridge* returns an error, the
+  *Application Server Connector* tries to use the other
+  *IOTA Bridge* instance. If both *IOTA Bridge* instances
+  return errors, the *Application Server Connector* could
+  retry to successfully transmit the request until a timeout
+  is exceeded.
+* *Use a dedicated Loadbalancer*<br>
+  A [Loadbalancer](https://en.wikipedia.org/wiki/Load_balancing_(computing))
+  would allow dynamic horizontal scaling but would introduce
+  additional complexity and costs.
+
 ### Primary+Secondary *SUSEE-Node* Setup
 
-TODO: Add Description here
+The *SUSEE Node* is prepared to be used in a *Primary+Secondary Setup*.
 
-<br/><br/>
+<br/>
 
 <img src="SUSEE-Node-Primary-Secondary-Setup.png" alt="Primary+Secondary Setup with two SUSEE-Nodes" width="800"/>
 
 <br/>
+
+#### Node Synchronisation
+
+The *SUSEE Node* uses two technologies providing synchronisation mechanisms:
+
+* *IOTA Network*<br>
+  The *INX Collector* of each *SUSEE Node* will receive every data block
+  that is send via the *IOTA Tangle*, regardless which *SUSEE Node* has been
+  used to send the block. In theory, given the *IOTA Nodes*, *INX Collectors*
+  and *Minio Databases* of all *SUSEE Nodes* would have no outages, no additional
+  synchronization would be needed to have identical database contents.
+* The *Minio Database* provides sveral synchronization features which can be
+  mainly differentiated in
+  [Server-Side](https://min.io/docs/minio/linux/administration/bucket-replication.html)
+  - and
+  [Client-Side](https://min.io/docs/minio/linux/reference/minio-mc/mc-mirror.html#command-mc.mirror)
+  -Bucket Replication.
+
+Applying two independent and not aligned synchronization mechanisms in parallel,
+can result in access failures or performance issues, caused by unnecessary
+processing due to the poorly aligned algorithms.
+ 
+The *SUSEE Nodes* therefore use a synchronisation mechanism, tightly
+aligned to the *IOTA Network* synchronization and the
+([above decribed](#about)) *SUSEE Node* service
+architecture.
+
+We call this synchronisation mechanism '*Cluster wide block validation*'.
+
+##### Cluster wide block validation
+
+At the end of the block sending process of a *SUSEE* node,
+every *Sensor* message, received by the *IOTA Bridge* and send via
+the *IOTA Tangle*, must be stored as a block in the *Minio Database*.
+For each `send-message` request, the *IOTA Bridge*
+[validates](../iota-bridge/README.md#iota-bridge-error-handling-for-lorawan-node-endpoints)
+the existence of the block, before the request is finished.
+
+Validating the existence of the block in the *Minio Database*
+is done via the *INX Collector*.
+
+The *INX Collector* also provides
+the option to configure a peer *INX Collector* instance in its
+configuration using the `--peercollector.hostUrl` start parameter.
+*Cluster wide block validation* is based on two simple principles:
+* a block being validated in the local *Minio Database* will also
+  be validated in the *Minio Database* of the *Peer INX Collector*
+* a block that can't be found in the *Peer INX Collectors* *Minio*
+  database, is fetched by the *Peer INX Collector* from the original
+  *INX Collector*
+
+The current implementation involves the primary and secondary
+*SUSEE Node*. In general, these principles could be applied to an
+arbitrary number of nodes.
+
+To securely manage the *Block Storage Keys* that need to
+be validated in the cluster, these keys are stored in the
+*Minio Database* in the following *Minio Buckets*:
+* keys-to-send-to-peer-collector<br>
+  Used by the original *INX Collector* to store *Block Storage Keys*
+  that could not be communicated to the *Peer INX Collector*
+  due to a *Peer INX Collector* service outage.<br>
+  The original *INX Collector* will try to communicate these
+  keys later on and in case of success remove the keys from the
+  bucket.
+* objects-inspection-list<br>
+  Used by the *Peer INX Collector* to store *Block Storage Keys*
+  that need to be validated in the local *Minio Database*.
+  After a blocks existence has been successfuly validated the
+  *Block Storage Key* is removed. If the block can not be found
+  in the local *Minio Database*, the block is fetched from the
+  original *INX Collector*, stored in the local *Minio Database*
+  and finally (on success) the *Block Storage Key* is removed
+  from the bucket.
+  
+Please note that the association between original *INX Collector*
+and *Peer INX Collector* is bidirectional.
+The *INX Collector* of secondary *SUSEE Node* is the *Peer INX Collector*
+for the primary *SUSEE Node* and vice versa.
+
+The *Cluster wide block validation* has been working reliabel
+and with less performance impact during all work load tests so far.
+
+##### Minio Database synchronization
+
+Although the synchronization features of the *Minio Database*
+are not used to synchronize the primary and secondary *SUSEE Nodes*,
+these features can be used for synchronization tasks of optional
+additional nodes, for example for backup puposes.
+
+#### Log files
+
+TODO: How logs can be viewed and archived
+
+#### Manual Node Health Check  
+
+TODO: How to manually find out if the *SUSEE Node* is healthy
+
+### Minio client service for backup tasks
+
+TODO:
+* explain docker-compose-minio-client.yml
+* Data backup with minio mc mirror
+
+### Node trouble shooting
+
+TODO: What to do if hornet gets unsynched
+
+### Heterogeneous Example System 
+
+TODO:
+* Redundant example system, consisting of three
+  *SUSEE-Nodes* that are differently configured
+    * Explain role of each SUSEE-Node
+    * Which service runs where
+    * lifecycles of iota-mainnet buckets

@@ -163,8 +163,9 @@ The console log will look like this:
     Previous message address now is 01dc8b65fa2174cf9bf4e565a601cd49af206734f7b00de790f57de3650a72ef0000000000000000:0d563a792cbd97cad4565739
 
 You may want to use the [message explorer](http://127.0.0.1:8080/swagger-ui/#/nodes)
-to view the channel of the streams channel of the sensor
-and to view the sensor messages. This is described
+to list existing *Streams Channels* (called 'nodes' in the *Message Explorer* API),
+view the *Streams Channel ID* of the node
+and to list the sensor messages of the node. This is described
 [here](../test/README.md#view-sensor-messages-using-the-message-explorer)
 in more detail.
 

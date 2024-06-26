@@ -171,7 +171,7 @@ one single *Sensor* as the *Management Console* CLI argument
 please use the CLI argument `--init-multiple-sensors` instead.
 You can find more details about initializing multiple *Sensors*
 in parallel in the 
-[*Management Console* README](../management-console/README.md#automatic-sensor-initialization).
+[*Management Console* README](../management-console/README.md#multiple-parallel-automatic-sensor-initialization).
 
 #### Automatic Sensor Initialization - streams-poc-lib test application
 
@@ -448,7 +448,7 @@ only being stored as long as the `wallet-sensor.txt` file exist.
 
 The recommended way to initialize a *Sensor* is the
 [automatic initialization](#automatic-sensor-initialization).
-The manual *Sensor Initialization* described here may be usefull 
+The manual *Sensor Initialization* described here may be useful 
 to have more insights into the initialization process.
  
 The process uses the *Sensor* and *Management Console* CLI to process each

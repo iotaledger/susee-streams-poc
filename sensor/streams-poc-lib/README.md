@@ -152,13 +152,24 @@ for your test environment:
 Additionally you need to specify at least one of the following ip addresses
 (both are recommended) to allow the test application to connect to the
 *IOTA Bridge* or [*AppServer Connector Mockup Tool*](../../app-srv-connector-mock).
-Please replace the preconfigured ip addresses (`192.168.47.11` in the example below)
+Please replace the preconfigured ip addresses
+(`192.168.47.11` in the example below)
 with the ip address of the device that runs the
 specific service. Please do not edit the port numbers.
 
 ```` C
 #define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://192.168.47.11:50000")
 #define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("192.168.47.11:50001")
+````
+
+If you are using a production like *SUSEE Node* as been described in the
+[test folder README](../../test/README.md#susee-node)
+specify the macro values like this (replace `iotabridge.example.com`
+with the domain name of your *SUSEE Node*):
+
+```` C
+#define STREAMS_POC_LIB_TEST_IOTA_BRIDGE_URL ("http://iotabridge.example.com:50000")
+#define STREAMS_POC_LIB_TEST_APP_SRV_CONNECTOR_MOCK_ADDRESS ("iotabridge.example.com:50001")
 ````
 
 **Streams Client Data Storage and VFS-FAT Management**

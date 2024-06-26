@@ -162,7 +162,7 @@ socket connection instead of a LoRaWAN connection. For further details please
 have a look into the
 [*AppServer Connector Mockup Tool* README](../app-srv-connector-mock/README.md).
 
-### IOTA Bridge Error Handling for lorawan-node Endpoints
+### IOTA Bridge Error Handling for lorawan-rest Endpoints
 
 The `--error-handling` argument described above, can be used to specify
 how internal errors of the *SUSEE Node* are handled when
@@ -305,17 +305,93 @@ As been descibed in the
 compressed streams messages can be used to
 reduce the LoRaWAN payload size.
 The usage of compressed messages is only possible after one or more normal streams messages have
-been send. The *IOTA Bridge* then learns which Streams Channel ID is used
+been send. The *IOTA Bridge* then learns which *Streams Channel ID* is used
 by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI.
 Additionally the [initialization count](../sensor/README.md#initialization-count)
 is stored to allow [*Sensor Reinitialization* detection](../test/README.md#sensor-reinitialization).
 
-The mapping of LoraWAN DevEUI to Streams Channel meta data is stored in a local SQLite3 database.
+The mapping of LoraWAN DevEUI to *Streams Channel* meta data is stored in a local SQLite3 database.
 The database file "iota-bridge.sqlite3" is stored in the directory where the
 *IOTA Bridge* is started.
 
 To review the data stored in the local SQLite3 database we recommend the
 [DB Browser for SQLite](https://sqlitebrowser.org/) application.
+
+## Commands and Confirmations
+
+Behind the scenes *Commands* and *Confirmations* are used by the 
+*Management Console* and the *Sensor* to communicate with each other.
+The *Commands* and *Confirmations* are send via the *IOTA Bridge*
+which provides all needed web API endpoints for the communication process.
+
+The *IOTA Bridge* acts as a simple proxy without interfering in the process
+controlled by the *Management Console*.
+
+Commands are created by the *Management Console* via the *IOTA Bridge* web API
+and fetched by the *Sensor* through cyclic HTTP REST polling.
+  
+Confirmations are created by the *Sensor* via the *IOTA Bridge* web API
+and fetched by the *Management Console* through cyclic HTTP REST polling.
+
+Cyclic HTTP REST polling is very slow compared to other web communication
+protocols (for example *WebRTC* or *HTTP/2* features) but is used here
+because of its simplicity and reliability in usage scenarios with very
+slow and unreliable connections.
+  
+The properties that are communicated between *Management Console* and 
+*Sensor* are basic data types like integers, UTF8 strings or binary data
+packages.
+
+*Commands* and *Confirmations* are mainly used for the
+[Automatic Sensor Initialization](../management-console/README.md#automatic-sensor-initialization)
+and
+[Multiple Parallel Automatic Sensor Initialization](../management-console/README.md#multiple-parallel-automatic-sensor-initialization).
+
+#### Commands
+
+*IOTA Bridge* API Endpoints:
+
+| Method| Path                                        | Comment            |
+|------ |---------------------------------------------|--------------------|
+|GET    | command/next/{dev_eui}                      | *Sensor* fetches next command |
+|POST   | command/subscribe_to_announcement/{dev_eui} | Make the *Sensor* to subscribe to a announcement link |
+|POST   | command/register_keyload_msg/{dev_eui}      | Make the *Sensor* registering a keyload message |
+|GET    | command/dev_eui_handshake/{dev_eui}         | *Management Console* wants to perform a *DevEUI Handshake* with a *Sensor* |
+|GET    | command/clear_client_state/{dev_eui}        | Make the *Sensor* clear its client state |
+|POST   | command/send_messages/{dev_eui}             | Make the *Sensor* send messages in an endless loop |
+|GET    | command/println_subscriber_status/{dev_eui} | Make the *Sensor* print its subscriber status to the console log |
+
+The url parameter {dev_eui} is a string identifier for the *Sensor* used in several other
+*IOTA Bridge* API endpoint functions.
+
+<br>
+
+<img src="commands-uml-diagram.png" alt="Commands used for Management Console to Sensor communication" width="600"/>
+
+<br>
+
+#### Confirmations
+
+*IOTA Bridge* API Endpoints:
+
+| Method| Path                                    | Comment            |
+|------ |-----------------------------------------|--------------------|
+|GET    | confirm/next/{dev_eui}                  | *Management Console* fetches next command |
+|POST   | confirm/subscription/{dev_eui}          | *Sensor* confirms successful *Streams Channel* subscription |
+|POST   | confirm/keyload_registration/{dev_eui}  | *Sensor* confirms successful registration of a keyload link |
+|POST   | confirm/dev_eui_handshake/{dev_eui}     | *Sensor* confirms accepting a *DevEUI Handshake* |
+|POST   | confirm/clear_client_state/{dev_eui}    | *Sensor* confirms successfully having cleared its client state |
+|POST   | confirm/subscriber_status/{dev_eui}     | *Sensor* confirms having printed its subscriber status to the console log |
+|POST   | confirm/send_messages/{dev_eui}         | *Sensor* will never use this as the messages are send in an endless loop |
+
+The url parameter {dev_eui} is a string identifier for the *Sensor* used in several other
+*IOTA Bridge* API endpoint functions.
+
+<br>
+
+<img src="confirmations-uml-diagram.png" alt="Confirmations used for Sensor to Management Console communication" width="600"/>
+
+<br>
 
 ## Use in Production
 

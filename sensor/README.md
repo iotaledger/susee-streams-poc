@@ -120,7 +120,7 @@ remote control functionality:
             Therefore in case you are using 'act-as-remote-control' you will also need to use
             the 'iota-bridge' option to connect to the iota-bridge.
 
-The *streams-poc-lib* test application can only bee remote controlled if the streams channel has
+The *streams-poc-lib* test application can only bee remote controlled if the *Streams Channel* has
 not already been initialized (further details can be found in the
 [streams-poc-lib README](../sensor/streams-poc-lib/README.md)).
 
@@ -201,7 +201,7 @@ This can be achieved using the `--dev-eui` argument:
 #### Compressed Streams Messages
 To reduce the LoRaWAN payload size, compressed streams messages can be used to communicate
 between a *Sensor* and the *IOTA Bridge*.
-Compressed messages do not contain Streams Channel IDs and other data that can be restored by the
+Compressed messages do not contain *Streams Channel IDs* and other data that can be restored by the
 *IOTA Bridge*.
 
 **IMPORTANT NOTE:** To restore the omitted data of a compressed message, the *IOTA Bridge*
@@ -213,12 +213,12 @@ because in the SUSEE project the encryption key never leaves the
 
 #### Sensor to Bridge Pairing
 The usage of compressed messages is only possible after one or more normal streams messages have
-been send using the *IOTA Bridge*. The *IOTA Bridge* then learns which Streams Channel ID is used
+been send using the *IOTA Bridge*. The *IOTA Bridge* then learns which *Streams Channel ID* is used
 by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI.
 Using LoraWAN, the DevEUI is available via the protocol automatically and does not need 
 to be transferred as message payload.
 
-The mapping of LoraWAN DevEUI to Streams Channel ID is stored in a 
+The mapping of LoraWAN DevEUI to *Streams Channel ID* is stored in a 
 [local SQLite3 database](../iota-bridge/README.md#caching-of-lorawan-deveuis-and-streams-channel-meta-data)
 managed by the *IOTA Bridge*.
 
@@ -322,7 +322,7 @@ and how the DevEUI is transfered to the *IOTA Bridge*:
   <br><br>
 * **x86/PC Sensor**<br>
   The LoRaWAN DevEUI is mocked using a persistent random value. The random value is stored
-  in the wallet file together with the Streams channel
+  in the wallet file together with the *Streams Channel*
   [plain text seed](../README.md#common-file-persistence).
   The *x86/PC Sensor* application does not use the 
   [AppServer Connector Mockup Tool](../app-srv-connector-mock)

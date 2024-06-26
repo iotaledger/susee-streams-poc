@@ -3,11 +3,23 @@
 The *Management Console* is used to create new Streams channels and to add Sensors (a.k.a. Streams subscribers)
 to those channels.
 
-Management of multiple channels is possible. The streams client states of the
+Managing multiple channels is possible. The streams client states of the
 Streams channels are stored in a local SQLite3 database file (client-states-database)
 as been described in the 
 [Common file persistence](../README.md#common-file-persistence)
 section.
+
+The *Management Console* can also be used to start the *Message Explorer*
+web service. See the [Run Message Explorer](#run-message-explorer)
+section and the "*View Sensor messages using the Message Explorer*"
+[section in the test documentation](../test/README.md#view-sensor-messages-using-the-message-explorer)
+for more details.
+
+The *Message Explorer* service can be deployed on a
+[SUSEE Node](../susee-node/README.md), if the relevant 
+configuration section in the 
+[docker compose.yml file](../docker/README.md#start-iota-bridge-and-message-explorer-as-public-available-service)
+has been uncommented.
 
 ## Prerequisites and Build
 Please have a look at the [Prerequisites](../README.md#build-prerequisites)
@@ -20,6 +32,29 @@ In addition to the common CLI options described in the
 the *Management Console* offers the following CLI arguments.
 
 #### Connections to SUSEE-Node Services
+
+The following CLI arguments can be used to configure the communication
+with the *IOTA Bridge* and the *IOTA Node*.
+
+If you are using a local *IOTA Bridge* instance with private tangle
+(as been described
+[here](../susee-node/README.md#private-tangle-for-development-purposes)),
+you don't need to specify any of these arguments.
+
+Otherwise use the following arguments:
+
+* `--iota-bridge-url`<br>
+  The *IOTA Bridge* instance used to send/receive
+  remote commands/confirmations
+  (used for [automatic sensor initialization](#automatic-sensor-initialization))
+* `--node`<br>
+  The domain name of the
+  [SUSEE Node](../susee-node)
+  providing the
+  *IOTA Node* web API used to interact with the *IOTA Tangle*.
+
+
+Here is the CLI help text for both arguments:
 
     -b, --iota-bridge-url <IOTA_BRIDGE_URL>
             The url of the iota-bridge to connect to.
@@ -58,6 +93,14 @@ the *Management Console* offers the following CLI arguments.
 
 #### Streams Channel Management
 
+Following arguments are useful to manually initialize a *Sensor* as been described in the
+[Manual Sensor Initialization section in the test documentation](../test/README.md#manual-sensor-initialization).
+Usually the [Automatic Sensor Initialization](#automatic-sensor-initialization)
+is preferred over *Manual Sensor Initialization*, so you might want to start with the
+*Automatic Sensor Initialization*.
+
+Here is the CLI help text for the *Streams Channel Management* CLI arguments:
+
     -c, --create-channel
             Use this option to create (announce) a new Streams channel.
             The announcement link will be logged to the console.
@@ -92,14 +135,16 @@ the *Management Console* offers the following CLI arguments.
             
                 >   ./management-console --channel-starts-with=6f5aa6cb --println-channel-status
 
-The argument `--dev-eui` is needed for the `--create-channel` and for for the
-[Subscribe *Sensors*](#subscribe-sensors)
-arguments also.
+Please also note the following dependencies between CLI arguments:
+* The argument `--dev-eui` is needed for the `--create-channel` and for for the
+  [Subscribe *Sensors*](#subscribe-sensors)
+  arguments also.
+* The `--channel-starts-with` argument is only needed for the `--println-channel-status` argument.
 
-The `--channel-starts-with` argument is only needed for the `--println-channel-status` argument.
-
-#### Subscribe *Sensors*
-Following CLI arguments are used to subscribe *Sensors* to an existing channel:
+#### Subscribe Sensors
+Following CLI arguments are used to subscribe *Sensors* to an existing channel,
+if you are doing a manually *Sensor* initialization as been described in the
+[Manual Sensor Initialization section in the test documentation](../test/README.md#manual-sensor-initialization):
 
     -k, --subscription-pub-key <SUBSCRIPTION_PUB_KEY>
             Add a Sensor to a Streams channel.
@@ -122,10 +167,22 @@ This applies to the x86/PC version of the *Sensor* app and to the *Streams POC L
 In case of the *Streams POC Library* test application
 these properties are also logged to the console of the *Sensor* app that is used as *Sensor remote control*.
 
-#### Automatic *Sensor* Initialization
+#### Automatic Sensor Initialization
 
-Instead of creating a Streams chanel and subscribing a Sensor manually
-the whole process (called *Sensor Initialization*) can be done automatically:
+Instead of manually creating a Streams chanel and subscribing a Sensor,
+the whole process (called *Sensor Initialization*) can be done automatically
+using the `--init-sensor` argument.
+
+**IMPORTANT NOTE:** 
+The *Management Console* will do a *DevEUI Handshake*
+[see below](#-deveui-handshake)
+to find a *Sensor*, ready for automatic initialization.
+After having finished an `--init-sensor`
+process, **wait at least 10 Minutes** until a next `init-sensor`
+or `--init-multiple-sensors` session is started.
+See the explanations at the end of the
+[Multiple Parallel Automatic *Sensor* Initialization](#multiple-parallel-automatic-sensor-initialization)
+section below to find out the reason for this.
 
     -i, --init-sensor
             Initialize the streams channel of a remote sensor.
@@ -194,6 +251,30 @@ the whole process (called *Sensor Initialization*) can be done automatically:
                                             # Successful keyload registration is acknowledged with
                                             # a KEYLOAD_REGISTRATION Confirmation
 
+To allow fully automated channel initializations the SUSEE Streams POC applications and the streams-poc-lib
+are using an own communication protocol consisting of `commands` and `confirmations` where a `confirmation`
+always carries the relevant data resulting from a command executed by a remote sensor.
+
+Alternatively, to see the log output of the *Streams POC Library* test application, you can use a serial port monitor like `idf.py monitor`
+or [cargo espmonitor](https://github.com/esp-rs/espmonitor).
+
+If you use the `--init-sensor` option, all relevant *Streams Channel* properties like announcement-link,
+subscription_pub_key, ... are logged to the console of the *Management Console* application,
+equivalent to the usage of the *Sensor* application when it's used as a *Sensor remote control*. 
+
+#### Multiple Parallel Automatic Sensor Initialization
+
+If you need to initialize multiple *Sensors*,
+use the following CLI argument to automatically initialize
+multiple *Sensors* in parallel.
+
+**IMPORTANT NOTE:** After having finished an `--init-multiple-sensors`
+process, **wait at least 10 Minutes** until a next
+`--init-multiple-sensors` or `--init-sensor` session is started.
+See the explanations at the end of this section to find out the reason for this.
+
+Here is the CLI help text for the `--init-multiple-sensors` CLI argument:
+
     -m, --init-multiple-sensors
             Initialize the streams channel of multiple sensors in parallel.
             Initializes a Sensor like the --init-sensor argument does, but will do this for
@@ -220,16 +301,80 @@ the whole process (called *Sensor Initialization*) can be done automatically:
                 >   ./management-console --init-multiple-sensors \
                                          --iota-bridge-url="http://192.168.47.11:50000"
 
-To allow fully automated channel initializations the SUSEE Streams POC applications and the streams-poc-lib
-are using an own communication protocol consisting of `commands` and `confirmations` where a `confirmation`
-always carries the relevant data resulting from a command executed by a remote sensor.
+The *Management Console* will do a first *DevEUI Handshake*
+[see below](#-deveui-handshake)
+to find a first *Sensor*, ready for automatic initialization.
 
-Alternatively to see the log output of the *Streams POC Library* test application you can use a serial port monitor like `idf.py monitor`
-or [cargo espmonitor](https://github.com/esp-rs/espmonitor).
+After the first *DevEUI Handshake* has been successfully finished,
+the *Management Console* will start the automatic *Sensor* initialization
+for the found *Sensor* as been described [above](#automatic-sensor-initialization).
 
-If you use the `--init-sensor` option all relevant Streams channel properties like announcement-link,
-subscription_pub_key, ... are logged to the console of the *Management Console* app equivalent to
-the usage of the *Sensor* app when it's used as a *Sensor remote control*. 
+After the automatic *Sensor* initialization has been started,
+the *Management Console* will immediately create a new
+*DevEUI Handshake* command to find another *Sensor*
+ready for automatic initialization.
+
+The automatic *Sensor* initialization processes are
+processed concurrently (means in parallel).
+Every time the *Management Console* finds another *Sensor*,
+ready for initialization, a new initialization processes
+is spawned.
+
+This also means, the *IOTA Bridge* always has
+an available *DevEUI Handshake* command for the *DevEUI* `ANY`
+while a *Multiple Parallel Automatic Sensor Initialization*
+is running. This is also true for the state of the *IOTA Bridge*
+after an automatic *Sensor* initialization.
+
+The *IOTA Bridge*
+therefore deletes all commands and confirmations after a
+maximum lifetime of 10 Minutes. Otherwise a future
+*Multiple Parallel Automatic Sensor Initialization*
+process would start with an outdated *DevEUI Handshake* command
+and the initialization would fail.
+
+##### DevEUI Handshake
+
+At the beginning of the normal *Sensor* initialization (`--init-sensor`) and the
+multiple *Sensor* initialization (`--init-multiple-sensors`) 
+described [above](#multiple-parallel-automatic-sensor-initialization)
+a *DevEUI Handshake* is done by the *Management Console* and by any
+*Sensor*, ready to start an initialization.
+
+The *DevEUI Handshake* is used by the *Management Console* to find out
+the *DevEUI* of a *Sensor*, ready to start the automatic initialization process.
+
+A *DevEUI Handshake* process contains the following steps:
+
+* The *Management Console* creates a *DevEUI Handshake* command via the 
+  [IOTA Bridge web API](../iota-bridge/README.md#commands-and-confirmations).
+  The *DevEUI Handshake* command is created for the *DevEUI* `ANY`,
+  which is used as url parameter in the *IOTA Bridge web API*.
+  
+* A *Sensor* ready to be initialized, fetches the *DevEUI Handshake* command
+  from the *IOTA Bridge*. It uses the *DevEUI* `ANY` as url parameter to
+  fetch the command via the *IOTA Bridge web API*.
+  
+* The *Sensor* sends a *DevEUI Handshake* confirmation containing its
+  *DevEUI* to the *Management Console*.<br>
+  Although the confirmation itself contains the real *DevEUI* of the
+  *Sensor*, it uses the *DevEUI* `ANY` as url parameter when the
+  confirmation is created via the *IOTA Bridge web API*.
+  
+* The *Management Console* fetches the *DevEUI Handshake* confirmation
+  and proceeds the automatic *Sensor* initialization, using the *DevEUI*
+  contained in the confirmation for future command/confirmation communication.
+  The automatic *Sensor* initialization itself is described
+  [here](#automatic-sensor-initialization).<br>
+  The *Management Console* uses the *DevEUI* `ANY` as url parameter
+  to fetch the *DevEUI Handshake* confirmation from the *IOTA Bridge*
+  via its web API but uses the received real *Sensor* *DevEUI* for
+  future communication.
+  
+The *DevEUI* `ANY` is only used during the *DevEUI Handshake* process.
+During all other processes, the commands and confirmations are
+fetched/created using the real *DevEUI* of the *Sensor* that has
+been initially exchanged via the *DevEUI Handshake*.
 
 #### Run Message Explorer
 
@@ -271,8 +416,10 @@ and to run the *Message Explorer* you need to copy
 two files from the initialization system to the *Message Explorer* system.
 
 For example expect the initialization of the *Sensors* has been done on your local
-development system and the *Message Explorer* runs on a *SUSEE Node*. To upload the
-files from the initialization system to the *SUSEE Node* follow these steps:
+development system and the *Message Explorer* runs on a
+[SUSEE Node](../susee-node).
+To upload the files from the initialization system to the 
+*SUSEE Node* follow these steps:
 
 * Create a folder `management-console-data` In the home folder of the
   *SUSEE Node* admin user.

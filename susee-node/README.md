@@ -567,12 +567,11 @@ The *SUSEE Node* uses two technologies providing synchronisation mechanisms:
   used to send the block. In theory, given the *IOTA Nodes*, *INX Collectors*
   and *Minio Databases* of all *SUSEE Nodes* would have no outages, no additional
   synchronization would be needed to have identical database contents.
-* The *Minio Database* provides sveral synchronization features which can be
-  mainly differentiated in
-  [Server-Side](https://min.io/docs/minio/linux/administration/bucket-replication.html)
-  - and
-  [Client-Side](https://min.io/docs/minio/linux/reference/minio-mc/mc-mirror.html#command-mc.mirror)
-  -Bucket Replication.
+* *Minio Database*<br>
+  The *Minio Database* provides several synchronization features which can be
+  mainly differentiated in:
+  * [Server-Side Bucket Replication](https://min.io/docs/minio/linux/administration/bucket-replication.html)
+  * [Client-Side Bucket Replication](https://min.io/docs/minio/linux/reference/minio-mc/mc-mirror.html#command-mc.mirror)
 
 Applying two independent and not aligned synchronization mechanisms in parallel,
 can result in access failures or performance issues, caused by unnecessary
@@ -614,17 +613,17 @@ arbitrary number of nodes.
 To securely manage the *Block Storage Keys* that need to
 be validated in the cluster, these keys are stored in the
 *Minio Database* in the following *Minio Buckets*:
-* keys-to-send-to-peer-collector<br>
+* `keys-to-send-to-peer-collector`<br>
   Used by the original *INX Collector* to store *Block Storage Keys*
   that could not be communicated to the *Peer INX Collector*
   due to a *Peer INX Collector* service outage.<br>
   The original *INX Collector* will try to communicate these
-  keys later on and in case of success remove the keys from the
+  keys later on and in case of success, remove the keys from the
   bucket.
-* objects-inspection-list<br>
+* `objects-inspection-list`<br>
   Used by the *Peer INX Collector* to store *Block Storage Keys*
   that need to be validated in the local *Minio Database*.
-  After a blocks existence has been successfuly validated the
+  After the block-existence has been successfully validated, the
   *Block Storage Key* is removed. If the block can not be found
   in the local *Minio Database*, the block is fetched from the
   original *INX Collector*, stored in the local *Minio Database*
@@ -633,10 +632,10 @@ be validated in the cluster, these keys are stored in the
   
 Please note that the association between original *INX Collector*
 and *Peer INX Collector* is bidirectional.
-The *INX Collector* of secondary *SUSEE Node* is the *Peer INX Collector*
+The *INX Collector* of the secondary *SUSEE Node* is the *Peer INX Collector*
 for the primary *SUSEE Node* and vice versa.
 
-The *Cluster wide block validation* has been working reliabel
+The *Cluster wide block validation* has been working reliably
 and with less performance impact during all work load tests so far.
 
 ##### Minio Database synchronization
@@ -644,7 +643,7 @@ and with less performance impact during all work load tests so far.
 Although the synchronization features of the *Minio Database*
 are not used to synchronize the primary and secondary *SUSEE Nodes*,
 these features can be used for synchronization tasks of optional
-additional nodes, for example for backup puposes.
+additional nodes, for example for backup purposes.
 
 #### Log files
 
@@ -659,6 +658,8 @@ TODO: How to manually find out if the *SUSEE Node* is healthy
 TODO:
 * explain docker-compose-minio-client.yml
 * Data backup with minio mc mirror
+
+### SUSEE-Node for Message Explorer
 
 ### Node trouble shooting
 

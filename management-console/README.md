@@ -45,7 +45,7 @@ Otherwise use the following arguments:
 
 * `--iota-bridge-url`<br>
   The *IOTA Bridge* instance used to send/receive
-  remote commands/confirmations
+  remote [commands/confirmations](../iota-bridge/README.md#commands-and-confirmations)
   (used for [automatic sensor initialization](#automatic-sensor-initialization))
 * `--node`<br>
   The domain name of the
@@ -175,10 +175,11 @@ using the `--init-sensor` argument.
 
 **IMPORTANT NOTE:** 
 The *Management Console* will do a *DevEUI Handshake*
-[see below](#-deveui-handshake)
+([see below](#deveui-handshake))
 to find a *Sensor*, ready for automatic initialization.
-After having finished an `--init-sensor`
-process, **wait at least 10 Minutes** until a next `init-sensor`
+If you exit the `--init-sensor` process before the *DevEUI Handshake*
+has been finished (for eaxample with 'ctrl'+'c'),
+**wait at least 10 Minutes** until a next `init-sensor`
 or `--init-multiple-sensors` session is started.
 See the explanations at the end of the
 [Multiple Parallel Automatic *Sensor* Initialization](#multiple-parallel-automatic-sensor-initialization)
@@ -252,8 +253,11 @@ section below to find out the reason for this.
                                             # a KEYLOAD_REGISTRATION Confirmation
 
 To allow fully automated channel initializations the SUSEE Streams POC applications and the streams-poc-lib
-are using an own communication protocol consisting of `commands` and `confirmations` where a `confirmation`
-always carries the relevant data resulting from a command executed by a remote sensor.
+are using an own communication protocol consisting of
+[Commands and Confirmations](../iota-bridge/README.md#commands-and-confirmations)
+where a *Confirmation*
+always carries the relevant data resulting from a command executed
+by a remote sensor.
 
 Alternatively, to see the log output of the *Streams POC Library* test application, you can use a serial port monitor like `idf.py monitor`
 or [cargo espmonitor](https://github.com/esp-rs/espmonitor).
@@ -265,7 +269,7 @@ equivalent to the usage of the *Sensor* application when it's used as a *Sensor 
 #### Multiple Parallel Automatic Sensor Initialization
 
 If you need to initialize multiple *Sensors*,
-use the following CLI argument to automatically initialize
+use the `--init-multiple-sensors` CLI argument to automatically initialize
 multiple *Sensors* in parallel.
 
 **IMPORTANT NOTE:** After having finished an `--init-multiple-sensors`
@@ -302,7 +306,7 @@ Here is the CLI help text for the `--init-multiple-sensors` CLI argument:
                                          --iota-bridge-url="http://192.168.47.11:50000"
 
 The *Management Console* will do a first *DevEUI Handshake*
-[see below](#-deveui-handshake)
+[see below](#deveui-handshake)
 to find a first *Sensor*, ready for automatic initialization.
 
 After the first *DevEUI Handshake* has been successfully finished,

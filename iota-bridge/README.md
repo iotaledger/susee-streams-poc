@@ -317,6 +317,25 @@ The database file "iota-bridge.sqlite3" is stored in the directory where the
 To review the data stored in the local SQLite3 database we recommend the
 [DB Browser for SQLite](https://sqlitebrowser.org/) application.
 
+#### Use in Production
+
+A network of LoRaWAN connected *Sensors* can consist of multiple millions of *Sensors*.
+Given these *Sensors* would send messages every 15 minutes this leads to ~1.11 K request/s
+per million users.
+
+Despite all limitations that are caused by the available
+[performance of the IOTA mainnet](https://blog.iota.org/chrysalis-iota-1-5-phase-1-now-live-on-mainnet-958ec4a4a415/),
+this means that in a large scale scenario the *IOTA Bridge* would have to run in an industrial
+web server tech stack including load-balancers, auto-scaling and so on.
+
+In case [compressed streams messages](#caching-of-lorawan-deveuis-and-streams-channel-meta-data)
+are used the *IOTA Bridge* needs an appropriately fast central or distributed
+high availability data storage solution like (e.g. mariadb, postgres, mongodb, couchdb, ...).
+
+Alternatively to handle thousands of requests per second using a high performance *IOTA Bridge*
+the service could run on edge devices to handle only dozens or hundreds of requests in a specific
+region resp. sector oft the LoRaWAN network. 
+
 ## Commands and Confirmations
 
 Behind the scenes *Commands* and *Confirmations* are used by the 
@@ -347,69 +366,85 @@ packages.
 and
 [Multiple Parallel Automatic Sensor Initialization](../management-console/README.md#multiple-parallel-automatic-sensor-initialization).
 
+One *Management Console* can communicate with multiple *Sensors*
+in parallel, where each *Command* can have only one receiving *Sensor*
+and each *Confirmation* only one *Sensor* as originator.
+The *Sensor* being the receiver or originator
+is identified by its *DevEUI*.
+At the beginning of an automatic
+*Sensor* initialization, the *DevEUI* of a Sensor is determined using a
+[DevEUI Handshake](../management-console/README.md#deveui-handshake).
+ 
 #### Commands
 
-*IOTA Bridge* API Endpoints:
+Commands are created by the *Management Console* using one of the following
+*IOTA Bridge* API endpoints:
 
-| Method| Path                                        | Comment            |
+| Method| Path                                        | *Command Type*     |
 |------ |---------------------------------------------|--------------------|
-|GET    | command/next/{dev_eui}                      | *Sensor* fetches next command |
-|POST   | command/subscribe_to_announcement/{dev_eui} | Make the *Sensor* to subscribe to a announcement link |
-|POST   | command/register_keyload_msg/{dev_eui}      | Make the *Sensor* registering a keyload message |
-|GET    | command/dev_eui_handshake/{dev_eui}         | *Management Console* wants to perform a *DevEUI Handshake* with a *Sensor* |
-|GET    | command/clear_client_state/{dev_eui}        | Make the *Sensor* clear its client state |
-|POST   | command/send_messages/{dev_eui}             | Make the *Sensor* send messages in an endless loop |
-|GET    | command/println_subscriber_status/{dev_eui} | Make the *Sensor* print its subscriber status to the console log |
+|POST   | command/subscribe_to_announcement/{dev_eui} | SUBSCRIBE_TO_ANNOUNCEMENT_LINK |
+|POST   | command/register_keyload_msg/{dev_eui}      | REGISTER_KEYLOAD_MESSAGE |
+|GET    | command/dev_eui_handshake/{dev_eui}         | DEV_EUI_HANDSHAKE |
+|GET    | command/clear_client_state/{dev_eui}        | CLEAR_CLIENT_STATE |
+|POST   | command/send_messages/{dev_eui}             | START_SENDING_MESSAGES |
+|GET    | command/println_subscriber_status/{dev_eui} | PRINTLN_SUBSCRIBER_STATUS |
 
-The url parameter {dev_eui} is a string identifier for the *Sensor* used in several other
-*IOTA Bridge* API endpoint functions.
+Commands are fetched by a *Sensor* using the GET `command/next/{dev_eui}` endpoint.
+
+List of existing *Commands*:
+
+| *Command Type*                | Comment            |
+|-------------------------------|--------------------|
+|NO_COMMAND                     | Returned to *Sensor* in case no *Command* is available |
+|SUBSCRIBE_TO_ANNOUNCEMENT_LINK | *Sensor* shall subscribe to an announcement link |
+|REGISTER_KEYLOAD_MESSAGE       | *Sensor* shall register a keyload message |
+|DEV_EUI_HANDSHAKE              | *Management Console* wants to perform a *DevEUI Handshake* with a *Sensor* |
+|CLEAR_CLIENT_STATE             | *Sensor* shall clear its client state |
+|PRINTLN_SUBSCRIBER_STATUS      | *Sensor* shall print its subscriber status to the console log |
+|START_SENDING_MESSAGES         | *Sensor* shall send messages in an endless loop |
+|STOP_FETCHING_COMMANDS         | Internally used inside the *Sensor* to stop *Command* polling |
+
+UML diagram of the existing *Commands* in the representation used for transport via LoRaWAN:
 
 <br>
 
-<img src="commands-uml-diagram.png" alt="Commands used for Management Console to Sensor communication" width="600"/>
+<img src="commands-uml-diagram.png" alt="Commands used for Management Console to Sensor communication" width="800"/>
 
 <br>
 
 #### Confirmations
 
-*IOTA Bridge* API Endpoints:
+*Confirmations* are created by a *Sensor* using one of the following
+*IOTA Bridge* API endpoints:
 
-| Method| Path                                    | Comment            |
-|------ |-----------------------------------------|--------------------|
-|GET    | confirm/next/{dev_eui}                  | *Management Console* fetches next command |
-|POST   | confirm/subscription/{dev_eui}          | *Sensor* confirms successful *Streams Channel* subscription |
-|POST   | confirm/keyload_registration/{dev_eui}  | *Sensor* confirms successful registration of a keyload link |
-|POST   | confirm/dev_eui_handshake/{dev_eui}     | *Sensor* confirms accepting a *DevEUI Handshake* |
-|POST   | confirm/clear_client_state/{dev_eui}    | *Sensor* confirms successfully having cleared its client state |
-|POST   | confirm/subscriber_status/{dev_eui}     | *Sensor* confirms having printed its subscriber status to the console log |
-|POST   | confirm/send_messages/{dev_eui}         | *Sensor* will never use this as the messages are send in an endless loop |
+| Method| Path                                    | *Confirmation Type* |
+|------ |-----------------------------------------|---------------------|
+|POST   | confirm/subscription/{dev_eui}          | SUBSCRIPTION |
+|POST   | confirm/keyload_registration/{dev_eui}  | KEYLOAD_REGISTRATION |
+|POST   | confirm/dev_eui_handshake/{dev_eui}     | DEV_EUI_HANDSHAKE |
+|POST   | confirm/clear_client_state/{dev_eui}    | CLEAR_CLIENT_STATE |
+|POST   | confirm/subscriber_status/{dev_eui}     | SUBSCRIBER_STATUS |
+|POST   | confirm/send_messages/{dev_eui}         | SEND_MESSAGES |
 
-The url parameter {dev_eui} is a string identifier for the *Sensor* used in several other
-*IOTA Bridge* API endpoint functions.
+*Confirmations* are fetched by the *Management Console* using the 
+GET `confirm/next/{dev_eui}` endpoint.
+
+List of existing *Confirmations*:
+
+| *Confirmation Type* | Comment            |
+|---------------------|--------------------|
+|NO_CONFIRMATION      | Returned to *Management Console* in case no *Confirmation* is available |
+|SUBSCRIPTION         | *Sensor* confirms successful *Streams Channel* subscription |
+|KEYLOAD_REGISTRATION | *Sensor* confirms successful registration of a keyload link |
+|DEV_EUI_HANDSHAKE    | *Sensor* confirms accepting a *DevEUI Handshake* |
+|CLEAR_CLIENT_STATE   | *Sensor* confirms successfully having cleared its client state |
+|SUBSCRIBER_STATUS    | *Sensor* confirms having printed its subscriber status to the console log |
+|SEND_MESSAGES        | *Sensor* will never use this as the messages are send in an endless loop |
+
+UML diagram of the existing *Confirmations* in the representation used for transport via LoRaWAN:
 
 <br>
 
-<img src="confirmations-uml-diagram.png" alt="Confirmations used for Sensor to Management Console communication" width="600"/>
-
-<br>
-
-## Use in Production
-
-A network of LoRaWAN connected *Sensors* can consist of multiple millions of *Sensors*.
-Given these *Sensors* would send messages every 15 minutes this leads to ~1.11 K request/s
-per million users.
-
-Despite all limitations that are caused by the available
-[performance of the IOTA mainnet](https://blog.iota.org/chrysalis-iota-1-5-phase-1-now-live-on-mainnet-958ec4a4a415/),
-this means that in a large scale scenario the *IOTA Bridge* would have to run in an industrial
-web server tech stack including load-balancers, auto-scaling and so on.
-
-In case [compressed streams messages](#caching-of-lorawan-deveuis-and-streams-channel-meta-data)
-are used the *IOTA Bridge* needs an appropriately fast central or distributed
-high availability data storage solution like (e.g. mariadb, postgres, mongodb, couchdb, ...).
-
-Alternatively to handle thousands of requests per second using a high performance *IOTA Bridge*
-the service could run on edge devices to handle only dozens or hundreds of requests in a specific
-region resp. sector oft the LoRaWAN network. 
+<img src="confirmations-uml-diagram.png" alt="Confirmations used for Sensor to Management Console communication" width="1000"/>
 
 

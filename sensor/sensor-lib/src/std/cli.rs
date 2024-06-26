@@ -137,7 +137,6 @@ Example: --dev-eui=12345678
 
 static CLEAR_CLIENT_STATE_ABOUT: &str = "Deletes the current client status of the sensor so that
 all subscriptions get lost and the sensor can be used to subscribe to a new Streams channel.
-TODO: In future versions the seed will also be replaced by a new generated seed.
 TODO: -----------------------------
       --------  WARNING  ---------- Currently there is no confirmation cli dialog
       -----------------------------       use this option carefully!

@@ -61,7 +61,6 @@ all Sensor applications provide CLI commands to manage the Streams usage:
             Deletes the current client status of the sensor so that
             all subscriptions get lost and the sensor can be used to subscribe to a new Streams
             channel.
-            TODO: In future versions the seed will also be replaced by a new generated seed.
             TODO: -----------------------------
                   --------  WARNING  ---------- Currently there is no confirmation cli dialog
                   -----------------------------       use this option carefully!

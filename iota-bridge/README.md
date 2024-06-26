@@ -339,7 +339,7 @@ region resp. sector oft the LoRaWAN network.
 ## Commands and Confirmations
 
 Behind the scenes *Commands* and *Confirmations* are used by the 
-*Management Console* and the *Sensor* to communicate with each other.
+*Management Console* and a *Sensor* to communicate with each other.
 The *Commands* and *Confirmations* are send via the *IOTA Bridge*
 which provides all needed web API endpoints for the communication process.
 
@@ -347,10 +347,13 @@ The *IOTA Bridge* acts as a simple proxy without interfering in the process
 controlled by the *Management Console*.
 
 Commands are created by the *Management Console* via the *IOTA Bridge* web API
-and fetched by the *Sensor* through cyclic HTTP REST polling.
-  
-Confirmations are created by the *Sensor* via the *IOTA Bridge* web API
+and fetched by a *Sensor* through cyclic HTTP REST polling.
+Confirmations are created by a *Sensor* via the *IOTA Bridge* web API
 and fetched by the *Management Console* through cyclic HTTP REST polling.
+Although currently not used a *Sensor* can connect to the *IOTA Bridge*
+web API for *Commands* and *Confirmations* via the LoRaWAN communication
+infrastructure by using the `lorawan-rest/binary_request`
+[endpoint](#lorawan-rest-endpoints) of the *IOTA Bridge*.
 
 Cyclic HTTP REST polling is very slow compared to other web communication
 protocols (for example *WebRTC* or *HTTP/2* features) but is used here
@@ -404,7 +407,9 @@ List of existing *Commands*:
 |START_SENDING_MESSAGES         | *Sensor* shall send messages in an endless loop |
 |STOP_FETCHING_COMMANDS         | Internally used inside the *Sensor* to stop *Command* polling |
 
-UML diagram of the existing *Commands* in the representation used for transport via LoRaWAN:
+<br>
+
+Diagram of the existing *Commands* in the representation used for transport via LoRaWAN:
 
 <br>
 
@@ -441,7 +446,9 @@ List of existing *Confirmations*:
 |SUBSCRIBER_STATUS    | *Sensor* confirms having printed its subscriber status to the console log |
 |SEND_MESSAGES        | *Sensor* will never use this as the messages are send in an endless loop |
 
-UML diagram of the existing *Confirmations* in the representation used for transport via LoRaWAN:
+<br>
+
+Diagram of the existing *Confirmations* in the representation used for transport via LoRaWAN:
 
 <br>
 

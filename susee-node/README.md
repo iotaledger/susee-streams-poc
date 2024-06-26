@@ -659,7 +659,7 @@ TODO:
 * explain docker-compose-minio-client.yml
 * Data backup with minio mc mirror
 
-### SUSEE-Node for Message Explorer
+### SUSEE Node for Message Explorer
 
 ### Node trouble shooting
 

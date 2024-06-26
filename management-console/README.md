@@ -306,7 +306,7 @@ Here is the CLI help text for the `--init-multiple-sensors` CLI argument:
                                          --iota-bridge-url="http://192.168.47.11:50000"
 
 The *Management Console* will do a first *DevEUI Handshake*
-[see below](#deveui-handshake)
+([see below](#deveui-handshake))
 to find a first *Sensor*, ready for automatic initialization.
 
 After the first *DevEUI Handshake* has been successfully finished,
@@ -413,6 +413,19 @@ The file needs to be located on your local machine to open it.
 Have a look into the [test documentation](../test#view-sensor-messages-using-the-message-explorer)
 to find out more about how to use the swagger-ui to list messages of a specific sensor.
 
+#### Message Caching
+
+The *Message Explorer* will cache all *Sensor* messages, once fetched from the
+[Minio database](../susee-node/), in the encrypted form in the local
+[SQlite database](../README.md#common-file-persistence) of the
+*Management Console*.
+
+This Message Caching significantly speeds up the message delivery
+by the *Message Explorer*.
+
+The message cache is cinously updated every hour by a background task
+of the *Message Explorer*.
+
 #### Using different *Management Console* instances for initialization and *Message Explorer*
 
 If you are using a different *Management Console* instance to initialize the *Sensor*
@@ -444,3 +457,10 @@ To upload the files from the initialization system to the
 * In the `susee-poc` subfolder of the admin home folder:<br>
   `docker compose restart management-console`
   
+#### SUSEE Node for Message Explorer
+
+The [SUSEE Node folder](../susee-node) contains a docker-compose file
+to setup a more lightweight *SUSEE Node* restricted to only run the
+*Message Explorer*. Have a look 
+[here](../susee-node#susee-node-for-message-explorer  )
+for more details.

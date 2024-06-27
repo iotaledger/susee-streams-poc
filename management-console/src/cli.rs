@@ -203,7 +203,8 @@ address using the --iota-bridge-url argument.
 
 If you are using an IOTA-Bridge provided by an external host, you need to specify the
 domain or address using the --iota-bridge-url argument. For example use
-\"http://iotabridge.peeros.de:50000\" for the SUSEE-Node provided by peerOS.
+\"http://iotabridge.example.com:50000\" if you run a SUSEE Node as been
+described in the /susee-node folder of the susee-streams-poc repository.
 
 Default value is {}
 

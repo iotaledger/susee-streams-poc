@@ -645,27 +645,208 @@ are not used to synchronize the primary and secondary *SUSEE Nodes*,
 these features can be used for synchronization tasks of optional
 additional nodes, for example for backup purposes.
 
-#### Log files
+For example the
+[Minio client services for backup tasks](#minio-client-services-for-backup-tasks)
+can be used to setup a backup appliance.
+
+## Node Maintenance
+
+### Log files
 
 TODO: How logs can be viewed and archived
 
-#### Manual Node Health Check  
+### Manual Node Health Check  
 
 TODO: How to manually find out if the *SUSEE Node* is healthy
-
-### Minio client service for backup tasks
-
-TODO:
-* explain docker-compose-minio-client.yml
-* Data backup with minio mc mirror
-
-### SUSEE Node for Message Explorer
 
 ### Node trouble shooting
 
 TODO: What to do if hornet gets unsynched
 
-### Heterogeneous Example System 
+## Minio client services for backup tasks
+
+A [MinIO Client](https://min.io/docs/minio/linux/reference/minio-mc.html)
+can be used with docker to run
+*MinIO Client* CLI commands
+for one time data management tasks
+or permanently running backup services.
+
+### Minio Client commands for manual interaction
+
+The docker compose file 
+[`docker-compose-minio-client.yml`](hornet-install-resources/docker-compose-minio-client.yml)
+in the `/susee-node/hornet-install-resources` folder
+contains a service definition that can be used to run
+[MinIO Client](https://min.io/docs/minio/linux/reference/minio-mc.html) 
+commands.
+
+This can be used for example to start a 
+`minio-client` service in the `hornet` docker compose
+environment using the
+[`mirror`](https://min.io/docs/minio/linux/reference/minio-mc/mc-mirror.html)
+*MinIO Client* CLI command.
+
+Here is the documentation for the *MinIO Client service*, contained in the
+`docker-compose-minio-client.yml` file:
+
+    # =====================================================================
+    #   IMPORTANT: Don't follow the instructions below using a production
+    #              System. If you do it anyway, be sure you'll know what
+    #              you are doing.
+    # =====================================================================
+    #
+    # This file contains a service definition for a minio Client
+    # service that can be copied into the docker-compose.yml file in
+    # the hornet folder of your SUSEE-Node to run MINIO MC executions
+    # in the docker compose environment.
+    #
+    # To enable the minio-client:
+    # * Copy the minio-client service definition into the docker-compose.yml
+    #   file in the hornet folder of your SUSEE-Node.
+    #
+    # * In the hornet folder of your SUSEE-Node:
+    #   > docker compose up minio-client
+    #
+    #   Output will be:
+    #      [+] Running 3/3
+    #      Container traefik       Running                                                                                                                     0.0s
+    #      Container minio         Running                                                                                                                     0.0s
+    #      Container minio-client  Created                                                                                                                     0.2s
+    #      Attaching to minio-client
+    #      minio-client  | Added `localdb` successfully.
+    #      minio-client  | [2024-05-12 15:44:14 UTC]     0B shimmer-mainnet-default/
+    #      minio-client exited with code 0
+    #
+    # * Replace the statement '/usr/bin/mc ls localdb;'
+    #   in the entrypoint definition of the minio-client service definition
+    #   with a statement of your choice. Several examples can be found at the
+    #   back of this comment block.
+    #
+    # * In the hornet folder of your SUSEE-Node:
+    #   > docker compose start minio-client
+    #
+    # * After finishing work with the minio-client remove the service
+    #   from the environment:
+    #   > docker compose down minio-client
+    #
+    # * Delete the service definition from the docker-compose.yml file
+    #   if you don't want it to be started on next 'docker compose up'
+    #
+    #
+    # -----------------------------------------------------------------------
+    # -------              Examples for mc executions             -----------
+    # -----------------------------------------------------------------------
+    #
+    #   --------------------------------------
+    # * Copy data from other minio/S3 sources.
+    #   --------------------------------------
+    #   Precondition: The environment variables MINIO_MIRROR_SOURCE_API_URL,
+    #   MINIO_MIRROR_SOURCE_USER and MINIO_MIRROR_SOURCE_PASSWORD need to be
+    #   defined in the .env file like this:
+    #     ###########################
+    #     # Minio Mirroring section #
+    #     ###########################
+    #     MINIO_MIRROR_SOURCE_USER=mirror-service-user
+    #     MINIO_MIRROR_SOURCE_PASSWORD=SecretPasswordGoesHere
+    #     MINIO_MIRROR_SOURCE_API_URL=https://minio.iotabridge.example.com
+    #
+    #   Execution statement for a one time mirroring:
+    #      /usr/bin/mc alias set sourcedb ${MINIO_MIRROR_SOURCE_API_URL:-https://minio-api-url-must-be-defined-in-env.com} ${MINIO_MIRROR_SOURCE_USER:-susee-minio-source-admin} ${MINIO_MIRROR_SOURCE_PASSWORD:-susee-secret-source-password};
+    #      /usr/bin/mc mirror sourcedb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default} localdb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default};
+    #
+    #   Alternative mirror statements:
+    #   * One time mirroring with client side filtering (slow because of client side filtering):
+    #       /usr/bin/mc mirror --newer-than 300s --older-than 25s --summary sourcedb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default} localdb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default};
+    #   * Mirror + watch:
+    #       /usr/bin/mc mirror --watch sourcedb/${MINIO_BACKUP_SOURCE_BUCKET:-iota-mainnet} localdb/${MINIO_BACKUP_TARGET_BUCKET:-shimmer-mainnet-default};
+    #
+    #   Minio mirror watch documentation:
+    #   * https://min.io/docs/minio/linux/reference/minio-mc/mc-mirror.html#mc.mirror.-watch
+
+### Independent docker compose environment for backup purposes
+
+Having an independent *MinIO server service*
+allows to use a *MINIO Client service* permanently,
+for example to backup the data contained in the *Minio*
+database of another *SUSEE Node*.
+
+The `docker-compose-minio-backup.yml` file contained
+in the `/susee-node/hornet-install-resources` folder,
+can be used
+to create an independent docker compose environment
+for backup purposes.
+
+To set up such an environment:
+* Create a new folder with a useful name describing the
+  usecase of the environment ('minio-backup' for example).
+* Copy the `docker-compose-minio-backup.yml` file into the new folder
+  and rename it to `docker-compose.yml`
+* In your new environment folder,
+  create a ./data/minio` subfolder with access rights so that
+  the docker daemon has write-access to that folder
+  (for example via 'sudo chown 65532:65532 ./data/minio')
+* Create a .env file in the new folder, defining the
+  following environment variables:
+  * MINIO_ROOT_USER
+  * MINIO_ROOT_PASSWORD
+  * MINIO_BACKUP_SOURCE_API_URL
+  * MINIO_BACKUP_SOURCE_USER
+  * MINIO_BACKUP_SOURCE_PASSWORD
+  * MINIO_BACKUP_SOURCE_BUCKET
+  * MINIO_BACKUP_TARGET_BUCKET
+
+The .env should look like this:
+
+    MINIO_MIRROR_SOURCE_USER=mirror-service-user
+    MINIO_MIRROR_SOURCE_PASSWORD=SecretPasswordGoesHere
+    MINIO_MIRROR_SOURCE_API_URL=https://minio.iotabridge.example.com
+    ...
+
+The Minio User credentials can be configured in the minio
+web UI console of the source minio server.
+See the *Minio Console* documentation for
+[User Access Keys](https://min.io/docs/minio/linux/administration/console/security-and-access.html#minio-console-user-access-keys)
+for more details.
+
+The new environment will run the following services:
+* minio<br>
+  The independent *MinIO server service*
+* minio-client<br>
+  The *Minio Client* running the `mirror --watch` command
+* mc-restarter<br>
+  Will restart the *Minio Client* every day
+
+The `mirror --watch` *MinIO Client* CLI command sometimes fails
+to synchronize all data. This happens when the data source
+*SUSEE Node* runs under heavy workload or if the connection
+is not stable.
+
+To circumvent this problem the *MinIO Client service*
+can be periodically restartet.
+
+The `docker-compose-minio-backup.yml` file therefore contains a
+service definition for a
+*MINIO Client Restarter* service.
+
+Here is the documentation for the *MINIO Client Restarter Service*, contained in the file:
+
+    # Restarts the minio-client every 24 hours to force a mirroring
+    # of the complete dataset.
+    #
+    # If the primary SUSEE-Node is under heavy workload the "mirror --watch"
+    # synchronisation sometimes fails, so that several messages are missing in the
+    # local minio database.
+    #
+    # Restarting the minio-client every 24 hours causes a new "mirror --watch"
+    # process which starts with a complete dataset comparison.
+    # This way the missing messages are synchronised.
+
+## SUSEE Node for Message Explorer
+
+TODO: Describe setup for Message Explorer Node
+
+
+## Heterogeneous Example System 
 
 TODO:
 * Redundant example system, consisting of three

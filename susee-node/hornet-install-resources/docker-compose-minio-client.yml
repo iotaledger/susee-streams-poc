@@ -1,6 +1,6 @@
 # =====================================================================
 #   IMPORTANT: Don't follow the instructions below using a production
-#              System. If you do it anyway be sure you'll know what
+#              System. If you do it anyway, be sure you'll know what
 #              you are doing.
 # =====================================================================
 #
@@ -38,9 +38,13 @@
 #   from the environment:
 #   > docker compose down minio-client
 #
-# * Delete the service definition from the
-
-# Examples for mc executions:
+# * Delete the service definition from the docker-compose.yml file
+#   if you don't want it to be started on next 'docker compose up'
+#
+#
+# -----------------------------------------------------------------------
+# -------              Examples for mc executions             -----------
+# -----------------------------------------------------------------------
 #
 #   --------------------------------------
 # * Copy data from other minio/S3 sources.
@@ -53,16 +57,21 @@
 #     ###########################
 #     MINIO_MIRROR_SOURCE_USER=mirror-service-user
 #     MINIO_MIRROR_SOURCE_PASSWORD=SecretPasswordGoesHere
-#     MINIO_MIRROR_SOURCE_API_URL=https://minio.iotabridge.peeros.de
+#     MINIO_MIRROR_SOURCE_API_URL=https://minio.iotabridge.example.com
 #
-#   Execution statement:
+#   Execution statement for a one time mirroring:
 #      /usr/bin/mc alias set sourcedb ${MINIO_MIRROR_SOURCE_API_URL:-https://minio-api-url-must-be-defined-in-env.com} ${MINIO_MIRROR_SOURCE_USER:-susee-minio-source-admin} ${MINIO_MIRROR_SOURCE_PASSWORD:-susee-secret-source-password};
 #      /usr/bin/mc mirror sourcedb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default} localdb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default};
 #
 #   Alternative mirror statements:
-#      /usr/bin/mc mirror --newer-than 300s --older-than 25s --summary sourcedb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default} localdb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default};
-
-
+#   * One time mirroring with client side filtering (slow because of client side filtering):
+#       /usr/bin/mc mirror --newer-than 300s --older-than 25s --summary sourcedb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default} localdb/${STORAGE_DEFAULT_BUCKET:-shimmer-mainnet-default};
+#   * Mirror + watch:
+#       /usr/bin/mc mirror --watch sourcedb/${MINIO_BACKUP_SOURCE_BUCKET:-iota-mainnet} localdb/${MINIO_BACKUP_TARGET_BUCKET:-shimmer-mainnet-default};
+#
+#   Minio mirror watch documentation:
+#   * https://min.io/docs/minio/linux/reference/minio-mc/mc-mirror.html#mc.mirror.-watch
+#
 services:
 
   ##################################################################

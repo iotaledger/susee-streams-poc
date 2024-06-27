@@ -1,0 +1,130 @@
+services:
+
+  ##################################################################
+  #
+  # docker-compose.yml file to set up a docker compose backup
+  # environment.
+  #
+  # To create the new environment:
+  # * Create a new folder with a useful name describing the
+  #   usecase of the environment ('minio-backup' for example).
+  # * Copy this docker-compose file into the new folder
+  #   and rename it to `docker-compose.yml`
+  # * Create a ./data/minio subfolder with access rights so that
+  #   the docker daemon has write access to that folder
+  #   (for example via 'sudo chown 65532:65532 ./data/minio')
+  # * Create a .env file in the folder, defining the
+  #   following environment variables:
+  #   * MINIO_ROOT_USER
+  #   * MINIO_ROOT_PASSWORD
+  #   * MINIO_BACKUP_SOURCE_API_URL
+  #   * MINIO_BACKUP_SOURCE_USER
+  #   * MINIO_BACKUP_SOURCE_PASSWORD
+  #   * MINIO_BACKUP_SOURCE_BUCKET
+  #   * MINIO_BACKUP_TARGET_BUCKET
+  #
+  #  The .env should look like this:
+  #     MINIO_MIRROR_SOURCE_USER=mirror-service-user
+  #     MINIO_MIRROR_SOURCE_PASSWORD=SecretPasswordGoesHere
+  #     MINIO_MIRROR_SOURCE_API_URL=https://minio.iotabridge.example.com
+  #     ...
+  #
+  #  The Minio User credentials can be configured in the minio
+  #  web UI console of the source minio server.
+  #  See https://min.io/docs/minio/linux/administration/console/security-and-access.html#minio-console-user-access-keys
+  #  for more details.
+  #
+  ##################################################################
+
+
+
+  ##################################################################
+  #  MINIO data storage                                            #
+  ##################################################################
+
+  # This is a Minio service definition that can be used independently
+  # from the minio service contained in the 'hornet' docker compose
+  # environment which can be run on the same appliance.
+  #
+  # The minio service running in the hornet environment
+  # uses local ports 9000 and 9001.
+  #
+  # This minio service in this environment uses local ports 9002
+  # and 9003.
+  #
+  # The minio web console ui can be used via
+  #
+  #   http://192.168.47.11:9003/browser
+  #
+  # (replace 192.168.47.11 with the external ip of your system)
+  minio:
+    image: minio/minio
+    stop_grace_period: 5m
+    restart: unless-stopped
+    volumes:
+      - ./data/minio:/data
+    mem_limit: 2048m
+    mem_reservation: 1664m
+    environment:
+      GOMEMLIMIT: 1536MiB
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-susee-minio-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-susee-secret-password}
+    command: server --console-address ":9001" /data
+    ports:
+      - 9003:9001/tcp
+      - 9002:9000/tcp
+
+  ##################################################################
+  #  MINIO Client service                                          #
+  ##################################################################
+
+  # Service starting a Minio Client running a mirror --watch command.
+  # https://min.io/docs/minio/linux/reference/minio-mc/mc-mirror.html#mc.mirror.-watch
+  #
+  # To reduce the CPU workload the speed of the minio usage scanner
+  # is set to the slowest possible value.
+  minio-client:
+    image: minio/mc:latest
+    stop_grace_period: 60s
+    restart: unless-stopped
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias --quiet set localdb http://minio:9000 ${MINIO_ROOT_USER:-susee-minio-admin} ${MINIO_ROOT_PASSWORD:-susee-secret-password};
+      /usr/bin/mc alias set sourcedb ${MINIO_BACKUP_SOURCE_API_URL:-https://minio-api-url-must-be-defined-in-env.com} ${MINIO_BACKUP_SOURCE_USER:-susee-minio-source-admin} ${MINIO_BACKUP_SOURCE_PASSWORD:-susee-secret-source-password};
+      echo $(date) 'Configuring minio usage scanner to the slowest possible speed';
+      /usr/bin/mc admin config set localdb scanner speed=slowest;
+      echo $(date) 'Starting mc mirror for full backup';
+      /usr/bin/mc mirror --watch sourcedb/${MINIO_BACKUP_SOURCE_BUCKET:-iota-mainnet} localdb/${MINIO_BACKUP_TARGET_BUCKET:-iota-mainnet};
+      exit 0;
+      "
+
+  ##################################################################
+  #  MINIO Client Restarter                                        #
+  ##################################################################
+
+  # Restarts the minio-client every 24 hours to force a mirroring
+  # of the complete dataset.
+  #
+  # If the primary SUSEE-Node is under heavy workload the "mirror --watch"
+  # synchronisation sometimes fails, so that several messages are missing in the
+  # local minio database.
+  #
+  # Restarting the minio-client every 24 hours causes a new "mirror --watch"
+  # process which starts with a complete dataset comparison.
+  # This way the missing messages are synchronised.
+  mc-restarter:
+    image: docker:cli
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]
+    command: ["/bin/sh", "-c", "
+            while true;
+                echo $(date) '- Sleeping ${MINIO_CLIENT_RESTART_PERIOD_SECS:-86400} secs until next restart';
+                do sleep ${MINIO_CLIENT_RESTART_PERIOD_SECS:-86400};
+                echo $(date) '- Restarting minio-client';
+                docker restart minio-client;
+            done
+        "]
+    restart: unless-stopped
+

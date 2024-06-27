@@ -708,7 +708,7 @@ new channel again:
 * In case all channel participants shall have no access to *Sensor* messages of the
   old *Sensor* (pre reinitialization messages) participants must be subscribed with
   new identities (key pairs).
-* In case a participant needs access to old and new massages (e.g. *Admin* role) an
+* In case a participant needs access to old and new messages (e.g. *Admin* role) an
   already existing identity must be reused.
 
 Currently, it is not clear if LoRaWAN can be used for *Sensor Reinitialization*.
@@ -716,5 +716,5 @@ Currently, it is not clear if LoRaWAN can be used for *Sensor Reinitialization*.
 More details regarding *Sensor Reinitialization* can be found here:
 * [Sensor - Initialization Count Documentation](./sensor/README.md#initialization-count)
 * [Streams POC Library - Initialization vs Reinitialization](./sensor/streams-poc-lib/README.md#sensor-initialization-vs-reinitialization)
-* [Test - Sensor Initialization Documentation](./Test/README.md#sensor-initialization)
+* [Test - Sensor Initialization Documentation](./test/README.md#sensor-initialization)
 

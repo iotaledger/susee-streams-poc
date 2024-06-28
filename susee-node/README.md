@@ -376,12 +376,18 @@ create an `.env` file from it.
   > cp env_template .env
 ```
 
-Now we are able to prepare the data folder and to start the docker compose system:
+Now we are able to prepare the data folder:
 ```bash
   # Execute the prepare_docker.sh script in the hornet folder
   > sudo ./prepare_docker.sh
-   
-  # We are now ready to start the services in the background
+```
+
+Now we are able to start the `hornet` docker compose environment.
+The first start of a hornet node can take a long time. Please have a look at the
+[Hornet service stopps after 'docker compose up'](#hornet-service-stopps-after-docker-compose-up)
+section while you are waiting for the `hornet` service to get healthy:
+```bash   
+  # In the hornet folder, start the services in the background
   > docker compose up -d
 ```
 
@@ -742,6 +748,45 @@ is available on the docker website)
 can be chosen, to be integrated in an eventually available
 website monitoring tool.
 
+#### How many binary log files exist?
+
+To find out how many binary log files have been created
+for a specific container, follow these steps:
+* Find out the beginning of the container-id using `docker ps`
+* List all container folders in `/var/lib/docker/containers`
+  and find out the full container-id 
+* List the content of the `local-logs` folder of the container
+
+Here is an example session to list the binary log files for the `hornet` service:
+```bash
+    > docker ps
+
+--> d90c2cb8c20d   iotaledger/hornet:2.0                          "/app/hornet -c conf…"   2 weeks ago   Up 8 days (healthy)             1883/tcp, 8081/tcp, 8091/tcp, 9029/tcp, 14265/tcp, 0.0.0.0:14626->14626/udp, :::14626->14626/udp, 0.0.0.0:15600->15600/tcp, :::15600->15600/tcp   hornet
+    72b8787a62b5   minio/minio                                    "/usr/bin/docker-ent…"   2 weeks ago   Up 8 days                       0.0.0.0:9000-9001->9000-9001/tcp, :::9000-9001->9000-9001/tcp                                                                                     minio
+    f89cda3a7a77   iotaledger/inx-dashboard:1.0                   "/app/inx-dashboard …"   2 weeks ago   Up 8 days                       9092/tcp                                                                                                                                          inx-dashboard
+    353efc5ee9d3   traefik:v2.10                                  "/entrypoint.sh --pr…"   2 weeks ago   Up 8 days                       0.0.0.0:80->80/tcp, :::80->80/tcp, 0.0.0.0:443->443/tcp, :::443->443/tcp                                                                          traefik
+    ...
+    ...
+
+    > sudo ls -l /var/lib/docker/containers
+
+    drwx--x--- 5 root root 4096 Jun 20 10:08 ac80f1e440e0fe7de42cf0a5157cdf30e474894d5c8f61916f56d45ad5d63b39
+--> drwx--x--- 5 root root 4096 Jun 28 14:44 d90c2cb8c20dee4fe6d6847bbc0a652f1d5a2e1a5862aed651b4b54362458104
+    drwx--x--- 5 root root 4096 Jun 20 10:08 f89cda3a7a773daf798d373ea1c6324ed990f3ede57b17b635d19116cac367c4
+    ...
+    ...
+
+    > sudo ls -l /var/lib/docker/containers/d90c2cb8c20dee4fe6d6847bbc0a652f1d5a2e1a5862aed651b4b54362458104/local-logs
+
+    -rw-r----- 1 root root  846480 Jun 28 14:45 container.log
+    -rw-r----- 1 root root 5181503 Jun 28 14:02 container.log.1.gz
+    -rw-r----- 1 root root 5247221 Jun 26 20:15 container.log.2.gz
+    -rw-r----- 1 root root 5221193 Jun 25 02:35 container.log.3.gz
+    -rw-r----- 1 root root 5287911 Jun 23 09:00 container.log.4.gz
+    -rw-r----- 1 root root 5351264 Jun 21 15:18 container.log.5.gz
+```
+
+
 ### Manual Node Health Check
 
 In the current version the health of a *SUSEE Node* can only
@@ -765,10 +810,10 @@ Is the *IOTA Node* synced and healthy?
 ```
 
 **Check the `docker stats`**<br>
-In a shell as admin user on the *SUSEE Node* appliance.<br>
 The following expression sorts the `docker stats` table by the 4th column, which is 'MEM USAGE':
 ```bash
     > docker stats --no-stream --format "table {{.Name}}\t{{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}" | sort -k 4 -h
+    
     NAME                             CONTAINER      CPU %     MEM USAGE / LIMIT
     inx-indexer                      ed4a7a9c48ef   0.00%     0B / 0B
     inx-poi                          5330988eee2c   0.00%     13.43MiB / 16GiB
@@ -1150,17 +1195,3 @@ Here is the documentation for the *MINIO Client Restarter Service*, contained in
     # Restarting the minio-client every 24 hours causes a new "mirror --watch"
     # process which starts with a complete dataset comparison.
     # This way the missing messages are synchronised.
-
-## SUSEE Node for Message Explorer
-
-TODO: Describe setup for Message Explorer Node
-
-
-## Heterogeneous Example System 
-
-TODO:
-* Redundant example system, consisting of three
-  *SUSEE-Nodes* that are differently configured
-    * Explain role of each SUSEE-Node
-    * Which service runs where
-    * lifecycles of iota-mainnet buckets

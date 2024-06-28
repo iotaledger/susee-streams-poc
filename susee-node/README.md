@@ -649,19 +649,328 @@ For example the
 [Minio client services for backup tasks](#minio-client-services-for-backup-tasks)
 can be used to setup a backup appliance.
 
+Alternatively you can choose from several AWS S3 compatible paid
+cloud services.
+
 ## Node Maintenance
 
 ### Log files
 
-TODO: How logs can be viewed and archived
+The logs of the docker compose services can be accessed using the
+[docker compose logs](https://docs.docker.com/reference/cli/docker/compose/logs/)
+CLI command.
 
-### Manual Node Health Check  
+For fast log retrieval, the following expressions are often useful.
+Replace `{SERVICENAME}` with the docker compose service name of
+interest:
 
-TODO: How to manually find out if the *SUSEE Node* is healthy
+```bash
+  # ------------------------------------------------------------------------------------
+  # In the folder of the respective docker compose environment ('hornet' or 'susee-poc')
+  # ------------------------------------------------------------------------------------
+
+  # Show the last 500 entries of the services log
+  > docker compose logs {SERVICENAME} --tail 500
+
+  # Logs of the last 2 hours + follow
+  > docker compose logs {SERVICENAME} --since 2h -f
+
+  # Grep specific lines out of the logs
+  > docker compose logs {SERVICENAME} --since 2h -f | grep "keywords to search for"
+
+  # Logs between two specific timestamps
+  docker compose logs {SERVICENAME} --since 2024-02-27T12:57:00Z --until 2024-02-27T13:57:00Z
+
+  # Filter iota-bridge logs for errors and buffered messages (in the 'susee-poc' folder)
+  docker compose logs iota-bridge --since 1h -f | grep 'error\|Adding\|send_buffered_message'
+```
+
+Docker compose service names of interest usually are:
+* 'hornet' environment: `hornet`, `inx-collector`, `minio` 
+* 'susee-poc' environment: `iota-bridge`, `mangement-console` 
+
+##### Local File Logging Driver and log archival
+
+In the [Docker install](#docker-install) section, the 
+`docker_daemon_example.json` file, contained in the 
+`hornet-install-resources` folder, has been recommended
+as template for the active `docker_daemon.json` file.
+Therefore, the following settings will cause the docker logs
+on the *SUSEE Node* to be handled by the
+[Local File Logging Driver](https://docs.docker.com/config/containers/logging/local/):
+
+    "log-driver": "local",
+    "log-opts": {
+        "max-size": "50m",
+        "max-file": "20"
+    }
+
+These `docker_daemon.json` settings result in logfiles, being
+optimized for performance and disk use,
+with a maximum size of 50 MB that will be
+rotated until a maximum number of 20 files exist.
+
+As been stated by the 
+[Local File Logging Driver](https://docs.docker.com/config/containers/logging/local/)
+webpage:
+
+    The local logging driver uses file-based storage.
+    These files are designed to be exclusively accessed
+    by the Docker daemon.
+    
+    Interacting with these files with external tools may
+    interfere with Docker's logging system and result in
+    unexpected behavior, and should be avoided.
+
+The logs should be archived before they get
+lost due to the maximum number of 20 files. 
+The safest and easiest way to archive the logs is to dump
+them into a text file that is moved into an archive folder
+later on:
+```bash
+  # ------------------------------------------------------------------------------------
+  # In the folder of the respective docker compose environment ('hornet' or 'susee-poc')
+  # ------------------------------------------------------------------------------------
+  
+  # Dump logs of May into a text file
+  docker compose logs {SERVICENAME} --since 2024-05-01T00:00:00Z --until 2024-06-01T00:00:00Z > logs-{SERVICENAME}-2024-05.txt
+```
+
+To automate this procedure an appropriate *Logging Driver* (a
+[list of Logging Driver](https://docs.docker.com/config/containers/logging/configure/#supported-logging-drivers)
+is available on the docker website)
+can be chosen, to be integrated in an eventually available
+website monitoring tool.
+
+### Manual Node Health Check
+
+In the current version the health of a *SUSEE Node* can only
+be checked manually.
+To find out if a *SUSEE Node* is healthy, the following
+checks and expressions can be helpful.
+ 
+**Check the *IOTA Hornet* Dashboard**<br>
+Dashboard URL:  https://{your-iotabridge.domain.com}/dashboard/<br>
+Is the *IOTA Node* synced and healthy?
+
+**Check the *IOTA Bridge* logs**<br>
+
+```bash
+    # In the 'susee-poc' folder of your SUSEE-Node
+
+    # What happened in the last 30 minutes (append -f to follow log updates)
+    > docker compose logs iota-bridge --since 30m
+    # Show errors of the last day (remove -f if you don't want to follow log updates)
+    > docker compose logs iota-bridge --since 24h -f | grep "error"
+```
+
+**Check the `docker stats`**<br>
+In a shell as admin user on the *SUSEE Node* appliance.<br>
+The following expression sorts the `docker stats` table by the 4th column, which is 'MEM USAGE':
+```bash
+    > docker stats --no-stream --format "table {{.Name}}\t{{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}" | sort -k 4 -h
+    NAME                             CONTAINER      CPU %     MEM USAGE / LIMIT
+    inx-indexer                      ed4a7a9c48ef   0.00%     0B / 0B
+    inx-poi                          5330988eee2c   0.00%     13.43MiB / 16GiB
+    inx-mqtt                         b004b0d3c515   0.00%     13.52MiB / 16GiB
+    inx-dashboard                    7371c2105ea2   0.33%     19.28MiB / 16GiB
+    inx-spammer                      0489a2a751db   0.47%     19.33MiB / 16GiB
+--> susee-poc-iota-bridge-1          3093e79089a8   0.00%     23.61MiB / 16GiB
+    inx-participation                0eac489fc634   0.00%     29.17MiB / 16GiB
+--> inx-collector                    4eb436248406   0.02%     45.52MiB / 16GiB
+    traefik                          63e6ed8b06b9   0.03%     48.48MiB / 16GiB
+    susee-poc-management-console-1   dba98e018b1e   0.00%     148.7MiB / 16GiB
+--> minio                            8fa069fcef01   11.15%    3.069GiB / 16GiB
+--> hornet                           9e9a9d6dcf0b   2.29%     3.82GiB / 16GiB
+```
+
+Check if the following containers are listed (means running) and if the CPU load and MEM USAGE makes sense:
+* hornet
+* minio
+* susee-poc-iota-bridge-1
+* inx-collector
+
+**Check the available system memory with `free`**<br>
+The alternative command `top` will show too less information, so better use `free`:
+```bash
+    > free
+                   total        used        free      shared  buff/cache   available
+    Mem:        16777216     1859952       76564         956    14840700    14916308
+    Swap:              0           0           0
+```
+
+**Check the disk health with `df`:**<br>
+```bash
+    > df
+
+    Filesystem        1K-blocks     Used Available Use% Mounted on
+    /dev/ploop27901p1 495283928 34033880 440996820   8% /
+    ....
+    ....
+```
+Check if the available disk capacity is more than 80% resp. if the disk runs out of space.
+
+**Check the disk size usage of your containers**<br>
+The following expression will list the largest files and directories in
+`/var/lib/docker/containers` sort by needed disk space.<br>
+The size is shown in kilobytes (use "sudo du -am ...." for megabytes):
+```bash
+    > sudo du -a /var/lib/docker/containers | sort -n -r | head -n 10
+
+    190144  /var/lib/docker/containers
+    82452   /var/lib/docker/containers/9e9a9d6dcf0b0f239cf597af558feb6176e82eef7273b334c870725ba1a05afc
+    82412   /var/lib/docker/containers/9e9a9d6dcf0b0f239cf597af558feb6176e82eef7273b334c870725ba1a05afc/local-logs
+    35216   /var/lib/docker/containers/9e9a9d6dcf0b0f239cf597af558feb6176e82eef7273b334c870725ba1a05afc/local-logs/container.log
+    34132   /var/lib/docker/containers/ed4a7a9c48ef2206461151af46e35f7d1701b2bab4fcf1003d41a0f279b793e1
+    34096   /var/lib/docker/containers/ed4a7a9c48ef2206461151af46e35f7d1701b2bab4fcf1003d41a0f279b793e1/local-logs
+    33304   /var/lib/docker/containers/4eb43624840639bcf7e3bbfb5f86cfc29b67c0f6bbc2dbed942ffa830b6e1d3f
+    33264   /var/lib/docker/containers/4eb43624840639bcf7e3bbfb5f86cfc29b67c0f6bbc2dbed942ffa830b6e1d3f/local-logs
+    33260   /var/lib/docker/containers/4eb43624840639bcf7e3bbfb5f86cfc29b67c0f6bbc2dbed942ffa830b6e1d3f/local-logs/container.log
+    31224   /var/lib/docker/containers/0eac489fc63456ff9a294db6e76f4d71f34d97d1a2000cbb5841fe24b4cc9e11
+```
+
+**Check running docker containers with `docker ps`**<br>
+```bash
+    > docker ps
+
+    CONTAINER ID   IMAGE                                      COMMAND                  CREATED       STATUS                          PORTS                                                                                                                                             NAMES
+    8fa069fcef01   minio/minio                                "/usr/bin/docker-ent…"   2 weeks ago   Up 2 weeks                      0.0.0.0:9000-9001->9000-9001/tcp, :::9000-9001->9000-9001/tcp                                                                                     minio
+    0489a2a751db   iotaledger/inx-spammer:1.0                 "/app/inx-spammer --…"   2 weeks ago   Up 2 weeks                      9092/tcp                                                                                                                                          inx-spammer
+    5330988eee2c   iotaledger/inx-poi:1.0                     "/app/inx-poi --inx.…"   2 weeks ago   Up 2 weeks                                                                                                                                                                        inx-poi
+    ....
+    ....
+```
+Check if there are any services currently restarting ('STATUS' column). 
+
+**About manually health checks**<br>
+For a *Proof of Concept* (POC) System manually health checks are tolerable.
+For a production system an 
+[Automated Website Monitoring System](https://en.wikipedia.org/wiki/Website_monitoring)
+providing a
+[Docker Logging Driver](#local-file-logging-driver-and-log-archival),
+log file persistence & analysis, permanent health checks and
+alert infrastructure is mandatory.
 
 ### Node trouble shooting
 
-TODO: What to do if hornet gets unsynched
+If your *SUSEE Node* is not healthy, this will eventually be caused
+by an unhealthy or not synced *IOTA Hornet Node* resp. the `hornet`
+service of the 'hornet' docker compose environment.
+
+All services in the 'hornet' and 'susee-poc' docker compose environments
+are configured to restart automatically (unless they have been stopped),
+so most exceptions of services will be healed by an automatic service restart.
+
+As the *IOTA Hornet Node* manages a complex data structure, stored in
+two large database files
+(see [below](#hornet-service-stopps-due-to-corrupted-database))
+and is continously synchronizing its state with other *IOTA Nodes*,
+the node can end up in an unhealthy or unsynchronized state, that won't be fixed
+by a service restart.
+
+The following sections shall help with eventually problems. 
+
+#### Hornet service stopps after 'docker compose up'
+
+After having started the `hornet` docker compose environment using
+`docker compose up -d`, the *IOTA Hornet Node* will need several minutes
+to arrive in a healthy state.
+
+The first start of a hornet node can take a long time. 
+It's downloading and extracting a snapshot of around 1 GB,
+quite intensive for CPU, RAM and disk.
+Later on, if the `hornet` service is stopped & started
+(with docker compose stop + start) or deleted & recreated
+(with docker compose down + up), you usually won't need
+to wait for long, given that the downtime of the service
+has been in the range of one or two minutes.
+The longer the downtime lasts, the more data need to be
+synchronised from other peer *IOTA Nodes* until the node is
+synchronised.
+ 
+After having executed `docker compose up -d`, it's a good
+idea to open a second shell in the 'hornet' folder and check
+the hornet logs with `docker compose logs hornet -f`
+to review the *Hornet* startup.
+
+In general, if the `hornet` service is not listed as 'healthy'
+several minutes after `docker compose up -d`,
+a timeout could be exceeded, or the service
+could have exited due to an unhandled exception.
+Docker compose falsely reports failed timeouts as errors.
+
+Reviewing the *Hornet* logs during the startup, will help
+to find out the reason for eventually problems.
+
+If you have not reviewed the *Hornet* logs during the startup:
+
+* The easiest way to resolve an unhealthy `hornet` start
+  due to timeouts, is to try `docker compose up hornet -d`
+  again after approximately 5 Minutes.
+
+* If the `hornet` service stopps a few seconds after
+  `docker compose up -d` you should definetely have a look into
+  the *Hornet* logs as described above.
+  
+The *Hornet* logs will hopefully contain hints, usually at the end
+of the log, that help to find the reason for the issue.
+Several typical reasons are discussed in the following sections.
+
+#### Hornet service stopps due to a corrupted database
+
+If the `hornet` service can't be started
+due to a corrupted database, you need to 
+stop all containers with `docker compose down`
+and delete the corrupted database files:
+```bash
+    # In the 'hornet' folder of your SUSEE-Node
+    > docker compose down
+    ...
+    > sudo rm -r data/database/tangle
+    > sudo rm -r data/database/utxo
+```
+
+After having deleted the corrupted database files,
+you also need to remove the outdated snapshot files
+that have been downloaded while the hornet container
+has been successfully started the last time
+(otherwise *Hornet* would not sync later on because
+it has used these outdated snapshot files instead of
+downloading fresh ones):
+```bash
+    # In the 'hornet' folder of your SUSEE-Node
+    > sudo rm data/snapshots/full_snapshot.bin
+    > sudo rm data/snapshots/delta_snapshot.bin
+```
+
+#### Hornet service doesn't sync due to missing *INX Plugins*
+
+If the hornet dashboard is available
+(means you could open it in the browser) and the *Hornet Node* is not synced,
+make sure that all configured plugins have been successfully started.
+
+The following statement will list the running docker containers, sort by
+their container name:
+```bash
+    > docker stats
+
+    NAME                             CONTAINER      CPU %     MEM USAGE / LIMIT
+    hornet                           9e9a9d6dcf0b   2.00%     4.503GiB / 16GiB
+    inx-collector                    4eb436248406   0.01%     46.61MiB / 16GiB
+    inx-dashboard                    7371c2105ea2   0.28%     21.15MiB / 16GiB
+    inx-indexer                      ed4a7a9c48ef   0.00%     0B / 0B
+    inx-mqtt                         b004b0d3c515   0.00%     14.6MiB / 16GiB
+    inx-participation                0eac489fc634   0.00%     31.42MiB / 16GiB
+    inx-poi                          5330988eee2c   0.00%     14.37MiB / 16GiB
+    inx-spammer                      0489a2a751db   0.40%     18.99MiB / 16GiB
+    minio                            8fa069fcef01   69.60%    4.831GiB / 16GiB
+    susee-poc-iota-bridge-1          3093e79089a8   0.00%     26.41MiB / 16GiB
+    susee-poc-management-console-1   dba98e018b1e   0.00%     212.4MiB / 16GiB
+    traefik                          63e6ed8b06b9   0.03%     47.18MiB / 16GiB
+```
+Please check if all `inx-....` plugins listed above are listed in your console.
+If there is an *INX Plugin* missing, check its service log using
+`docker compose logs {SERVICENAME}`.
 
 ## Minio client services for backup tasks
 
@@ -770,8 +1079,9 @@ allows to use a *MINIO Client service* permanently,
 for example to backup the data contained in the *Minio*
 database of another *SUSEE Node*.
 
-The `docker-compose-minio-backup.yml` file contained
-in the `/susee-node/hornet-install-resources` folder,
+The
+[`docker-compose-minio-backup.yml`](hornet-install-resources/docker-compose-minio-backup.yml)
+file contained in the `/susee-node/hornet-install-resources` folder,
 can be used
 to create an independent docker compose environment
 for backup purposes.
@@ -782,7 +1092,7 @@ To set up such an environment:
 * Copy the `docker-compose-minio-backup.yml` file into the new folder
   and rename it to `docker-compose.yml`
 * In your new environment folder,
-  create a ./data/minio` subfolder with access rights so that
+  create a `./data/minio` subfolder with access rights, so that
   the docker daemon has write-access to that folder
   (for example via 'sudo chown 65532:65532 ./data/minio')
 * Create a .env file in the new folder, defining the

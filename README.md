@@ -549,6 +549,9 @@ The following technical components are needed for the SUSEE system to implement 
     REST API provided by the *IOTA Bridge* for this purpose
   * Sends LoRaWAN payloads to the *LoRaWAN Application Server* (e.g. via MQTT)
     that it has received by the *IOTA Bridge*
+  * For practical reasons, it makes sense that the *Application Server Connector* 
+    is developed,  deployed and maintained by the
+    *Energy provider or Metering point Operator*
 * [IOTA Tangle](https://wiki.iota.org/learn/about-iota/tangle/)
   * A distributed ledger consisting of a Directed Acyclic Graph (DAG)
     of [messages](https://wiki.iota.org/learn/about-iota/messages/)

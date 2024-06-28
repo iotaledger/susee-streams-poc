@@ -1,6 +1,7 @@
 import shutil
 import os
 import subprocess
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,7 +19,8 @@ for indx in range(0, number_of_sensors):
     print('Start Sensor in environment #' + str(indx))
     sensor_test_folder = workspace_folder + r"/sensor_" + str(indx)
     if indx < number_of_sensors - 1:
-        subprocess.Popen("./sensor --file-to-send \"../../../payloads/meter_reading_1_compact.json\" --use-lorawan-rest-api --iota-bridge-url " + iota_bridge_url + " 2>>run_multi_sensor_test.log", cwd=sensor_test_folder, shell=True)
+        subprocess.Popen("./sensor --random-msg-of-size 50 --use-lorawan-rest-api --iota-bridge-url " + iota_bridge_url + " --failover-iota-bridge-url " + failover_iota_bridge + " 2>>run_multi_sensor_test.log", cwd=sensor_test_folder, shell=True)
+        time.sleep(1)
     else:
         subprocess.run("./sensor --random-msg-of-size 50 --use-lorawan-rest-api --iota-bridge-url " + iota_bridge_url + " --failover-iota-bridge-url " + failover_iota_bridge + " 2>run_multi_sensor_test.log", cwd=sensor_test_folder, shell=True)
 

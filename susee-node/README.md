@@ -2,8 +2,9 @@
 
 ## About
 
-This folder contains resources to run single *SUSEE Node*
-instance and redundant *SUSEE Node* setups.
+This folder contains resources to set up and run a single *SUSEE Node*
+instance, a *Primary+Secondary SUSEE-Node Setup* and how to
+maintain *SUSEE Nodes*.
 
 A *SUSEE Node* provides all web services needed to 
 run the *SUSEE Streams POC* and send *Sensor*

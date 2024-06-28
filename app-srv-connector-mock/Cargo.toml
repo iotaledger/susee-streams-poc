@@ -6,6 +6,9 @@ readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = [] # Add "dump_payload" here to activate the feature
+dump_payload = []
 
 [dependencies]
 streams-tools = { version = "0.1.2", path = "../streams-tools" }

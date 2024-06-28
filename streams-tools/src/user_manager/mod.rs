@@ -3,11 +3,12 @@ pub mod compressed_state;
 
 #[cfg(feature = "std")]
 pub mod channel_manager;
-#[cfg(feature = "std")]
+#[cfg(feature = "dao")]
 pub mod multi_channel_management;
-#[cfg(feature = "std")]
+#[cfg(feature = "dao")]
 pub mod message_manager;
-
+#[cfg(feature = "std")]
+pub(crate) mod message_indexer;
 
 #[cfg(feature = "dao")]
 pub mod dao;
@@ -20,20 +21,22 @@ pub use {
 
 #[cfg(feature = "std")]
 pub use {
+    async_trait::async_trait,
     channel_manager::{
         ChannelManager,
         ChannelManagerPlainTextWallet,
-        Author,
     },
     subscriber_manager::{
         SubscriberManagerPlainTextWallet
-    },
-    message_manager::{
-        MessageManager,
     }
 };
 
 #[cfg(feature = "dao")]
-pub use dao::user::{
-    UserDataStore
+pub use {
+    message_manager::{
+        MessageManager,
+    },
+    dao::user::{
+        UserDataStore
+    }
 };

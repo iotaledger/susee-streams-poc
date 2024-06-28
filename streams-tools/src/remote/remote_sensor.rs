@@ -1,5 +1,6 @@
 use crate::{
     STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
+    STREAMS_TOOLS_CONST_ANY_DEV_EUI,
     http::http_protocol_command::RequestBuilderCommand,
     http::http_protocol_confirm::RequestBuilderConfirm,
     binary_persist::{
@@ -10,7 +11,7 @@ use crate::{
         SubscriberStatus,
         KeyloadRegistration,
         ClearClientState,
-        SendMessages
+        DevEuiHandshake
     }
 };
 
@@ -37,54 +38,66 @@ use std::{
     }
 };
 
-use log;
-
 type HttpClient = Client<HttpConnector, Body>;
 
-pub struct RemoteSensorOptions<'a> {
-    pub http_url: &'a str,
+#[derive(Clone)]
+pub struct RemoteSensorOptions {
+    pub http_url: String,
     pub confirm_fetch_wait_sec: u32,
+    pub dev_eui: String,
 }
 
-impl Default for RemoteSensorOptions<'_> {
+impl Default for RemoteSensorOptions {
     fn default() -> Self {
         Self {
-            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL,
+            http_url: STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL.to_string(),
             confirm_fetch_wait_sec: 5,
+            dev_eui: STREAMS_TOOLS_CONST_ANY_DEV_EUI.to_string(),
         }
     }
 }
 
-impl fmt::Display for RemoteSensorOptions<'_> {
+impl fmt::Display for RemoteSensorOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RemoteSensorOptions: http_url: {}", self.http_url)
+        write!(f, "RemoteSensorOptions:\n   http_url: {}\n   DevEUI: {}", self.http_url, self.dev_eui)
     }
 }
 
-pub struct RemoteSensor<'a> {
-    options: RemoteSensorOptions<'a>,
+pub struct RemoteSensor {
+    options: RemoteSensorOptions,
     http_client: HttpClient,
+    request_builder_command: RequestBuilderCommand,
+    request_builder_confirm: RequestBuilderConfirm,
 }
 
-impl<'a> RemoteSensor<'a> {
+impl RemoteSensor {
 
-    pub fn new(options: Option<RemoteSensorOptions<'a>>) -> Self {
+    pub fn new(options: Option<RemoteSensorOptions>) -> Self {
         let options = options.unwrap_or_default();
-        log::debug!("[RemoteSensor.new()] Initializing instance with options:\n       {}\n", options);
+        log::debug!("[fn new()] Initializing instance with options:\n       {}\n", options);
         Self {
-            options,
             http_client: HttpClient::new(),
+            request_builder_command: RequestBuilderCommand::new(
+                options.http_url.as_str(),
+                options.dev_eui.as_str(),
+                false
+            ),
+            request_builder_confirm: RequestBuilderConfirm::new(
+                options.http_url.as_str(),
+                options.dev_eui.as_str()
+            ),
+            options,
         }
     }
 
-    pub fn get_proxy_url(&self) -> &'a str { self.options.http_url }
+    pub fn get_proxy_url(&self) -> &str { self.options.http_url.as_str() }
+    pub fn get_dev_eui_command(&self) -> String { self.request_builder_command.get_dev_eui() }
+    pub fn get_dev_eui_confirm(&self) -> String { self.request_builder_confirm.get_dev_eui() }
 
-    fn get_request_builder_command(&self) -> RequestBuilderCommand {
-        RequestBuilderCommand::new(self.get_proxy_url())
-    }
-
-    fn get_request_builder_confirm(&self) -> RequestBuilderConfirm {
-        RequestBuilderConfirm::new(self.get_proxy_url())
+    pub fn set_dev_eui(&self, dev_eui: &str) {
+        log::debug!("[fn set_dev_eui()] Setting dev_eui for request_builder_command and request_builder_confirm to : '{}'", dev_eui);
+        self.request_builder_command.set_dev_eui(dev_eui);
+        self.request_builder_confirm.set_dev_eui(dev_eui);
     }
 
     async fn poll_confirmation<T>(&self) -> Result<T>
@@ -103,7 +116,7 @@ impl<'a> RemoteSensor<'a> {
                 if confirmation != Confirmation::NO_CONFIRMATION {
                     return self.process_confirmation::<T>(confirmation, buffer).await;
                 } else {
-                    println!("Received Confirmation::NO_CONFIRMATION    ");
+                    log::info!("DevEUI: {} - Received Confirmation::NO_CONFIRMATION", self.request_builder_confirm.get_dev_eui());
                 }
             } else {
                 log::error!("[fn poll_confirmation] fn call fetch_next_confirmation() failed.");
@@ -117,7 +130,7 @@ impl<'a> RemoteSensor<'a> {
     {
         if &confirm == T::INSTANCE {
             let confirmation_args = <T as BinaryPersist>::try_from_bytes(buffer.as_slice())?;
-            log::info!("[fn process_confirmation] processing confirmation: {}", confirmation_args);
+            log::info!("[fn process_confirmation()] processing confirmation: {}", confirmation_args);
             Ok(confirmation_args)
         } else {
             bail!("Received confirmation does not match the expected confirmation type")
@@ -126,44 +139,44 @@ impl<'a> RemoteSensor<'a> {
 
     async fn fetch_next_confirmation(&self) -> Result<(Confirmation, Vec<u8>)> {
         let response = self.http_client.request(
-            self.get_request_builder_confirm().fetch_next_confirmation()?
+            self.request_builder_confirm.fetch_next_confirmation()?
         ).await?;
 
         if response.status().is_success() {
-            log::debug!("[RemoteSensor.fetch_next_confirmation] StatusCode is successful: {}", response.status());
+            log::debug!("[fn fetch_next_confirmation()] StatusCode is successful: {}", response.status());
             let bytes = body::to_bytes(response.into_body()).await?;
             let confirmation = <Confirmation as BinaryPersist>::try_from_bytes(&bytes)?;
             Ok((confirmation, bytes.to_vec()))
         } else {
-            log::error!("[RemoteSensor.fetch_next_confirmation] HTTP Error. Status: {}", response.status());
+            log::error!("[fn fetch_next_confirmation()] HTTP Error. Status: {}", response.status());
             Ok((Confirmation::NO_CONFIRMATION, Vec::<u8>::default()))
         }
     }
 
     pub async fn subscribe_to_channel(&self, announcement_link_str: &str) -> Result<Subscription> {
         self.http_client.request(
-            self.get_request_builder_command().subscribe_to_announcement(announcement_link_str)?
+            self.request_builder_command.subscribe_to_announcement(announcement_link_str)?
         ).await?;
         self.poll_confirmation::<Subscription>().await
     }
 
     pub async fn register_keyload_msg(&self, keyload_msg_link_str: &str) -> Result<KeyloadRegistration> {
         self.http_client.request(
-            self.get_request_builder_command().register_keyload_msg(keyload_msg_link_str)?
+            self.request_builder_command.register_keyload_msg(keyload_msg_link_str)?
         ).await?;
         self.poll_confirmation::<KeyloadRegistration>().await
     }
 
-    pub async fn send_messages(&self, file_to_send: &str) -> Result<SendMessages> {
+    pub async fn send_messages_in_endless_loop(&self, file_to_send: &str) -> Result<()> {
         self.http_client.request(
-            self.get_request_builder_command().send_message(file_to_send)?
+            self.request_builder_command.send_message_in_endless_loop(file_to_send)?
         ).await?;
-        self.poll_confirmation::<SendMessages>().await
+        Ok(())
     }
 
     pub async fn println_subscriber_status(&self) -> Result<SubscriberStatus> {
         self.http_client.request(
-            self.get_request_builder_command().println_subscriber_status()?
+            self.request_builder_command.println_subscriber_status()?
         ).await?;
 
         self.poll_confirmation::<SubscriberStatus>().await
@@ -171,8 +184,18 @@ impl<'a> RemoteSensor<'a> {
 
     pub async fn clear_client_state(&self)  -> Result<ClearClientState> {
         self.http_client.request(
-            self.get_request_builder_command().clear_client_state()?
+            self.request_builder_command.clear_client_state()?
         ).await?;
         self.poll_confirmation::<ClearClientState>().await
+    }
+
+    pub async fn dev_eui_handshake(&self) -> Result<DevEuiHandshake> {
+        let handshake_request_builder_command = RequestBuilderCommand::new(
+            self.options.http_url.as_str(),
+            self.options.dev_eui.as_str(),
+            true
+        );
+        self.http_client.request(handshake_request_builder_command.dev_eui_handshake()?).await?;
+        self.poll_confirmation::<DevEuiHandshake>().await
     }
 }

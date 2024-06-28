@@ -10,11 +10,14 @@ streams-tools = { version = "0.1.2", path = "../streams-tools", features = ["dao
 susee-tools = { version = "0.1.2", path = "../susee-tools" }
 anyhow = "1.0.40"
 tokio = {version = "1.5"}
+log = "0.4.20"
 env_logger = "0.9"
+hex = {version = "0.4", default-features = false}
+async-trait = {version = "0.1", default-features = false}
 
-[dependencies.iota-streams]
+[dependencies.streams]
 git = "https://github.com/chrisgitiota/streams"
-branch="v1"
+branch="stardust-iota-sdk"
 
 [dependencies.clap]
 version = "3.0.14"

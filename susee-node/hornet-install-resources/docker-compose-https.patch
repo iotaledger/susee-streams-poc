@@ -1,0 +1,36 @@
+5a6
+> version: '3'
+34,42d34
+<       - "--certificatesresolvers.miniouiresolver.acme.tlschallenge=true"
+<       - "--certificatesresolvers.miniouiresolver.acme.email=${ACME_EMAIL}"
+<       - "--certificatesresolvers.miniouiresolver.acme.storage=/letsencrypt/minio-ui-acme.json"
+<       - "--certificatesresolvers.minioapiresolver.acme.tlschallenge=true"
+<       - "--certificatesresolvers.minioapiresolver.acme.email=${ACME_EMAIL}"
+<       - "--certificatesresolvers.minioapiresolver.acme.storage=/letsencrypt/minio-api-acme.json"
+<       - "--certificatesresolvers.collectorresolver.acme.tlschallenge=true"
+<       - "--certificatesresolvers.collectorresolver.acme.email=${ACME_EMAIL}"
+<       - "--certificatesresolvers.collectorresolver.acme.storage=/letsencrypt/collector-acme.json"
+82,104d73
+< 
+< ##################################################################
+< #  Minio                                                         #
+< ##################################################################
+< 
+<   minio:
+<     labels:
+<       - "traefik.http.routers.minioui.entrypoints=websecure"
+<       - "traefik.http.routers.minioui.tls=true"
+<       - "traefik.http.routers.minioui.tls.certresolver=miniouiresolver"
+<       - "traefik.http.routers.minioapi.entrypoints=websecure"
+<       - "traefik.http.routers.minioapi.tls=true"
+<       - "traefik.http.routers.minioapi.tls.certresolver=minioapiresolver"
+< 
+< ##################################################################
+< #  INX Collector                                                         #
+< ##################################################################
+< 
+<   inx-collector:
+<     labels:
+<       - "traefik.http.routers.collector.entrypoints=websecure"
+<       - "traefik.http.routers.collector.tls=true"
+<       - "traefik.http.routers.collector.tls.certresolver=collectorresolver"

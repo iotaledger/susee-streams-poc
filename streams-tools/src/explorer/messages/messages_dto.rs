@@ -1,3 +1,13 @@
+use std::str::{
+    from_utf8,
+    FromStr
+};
+
+use anyhow::{
+    Result,
+    anyhow,
+};
+
 use serde::{
     Deserialize,
     Serialize
@@ -8,11 +18,9 @@ use utoipa::{
     ToSchema
 };
 
-use iota_streams::{
-    app_channels::{
-        Bytes,
-        UnwrappedMessage,
-    }
+use streams::{
+    Message as StreamsMessage,
+    Address,
 };
 
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
@@ -20,23 +28,54 @@ pub struct Message {
     pub id: String,
     pub public_text: String,
     pub private_text_decrypted: String,
+    #[serde(with = "hex::serde")]
+    pub public_data: Vec<u8>,
+    #[serde(with = "hex::serde")]
+    pub private_data_decrypted: Vec<u8>,
+    pub msg_index: String,
+    pub streams_content: String,
 }
 
-impl From<UnwrappedMessage> for Message {
-    fn from(unw_msg: UnwrappedMessage) -> Self {
+impl From<StreamsMessage> for Message {
+    fn from(streams_msg: StreamsMessage) -> Self {
+        let streams_content = format!("{:?}", streams_msg.content());
+        let public_data = streams_msg
+            .public_payload()
+            .unwrap_or(&[])
+        ;
+        let private_data_decrypted = streams_msg
+            .masked_payload()
+            .unwrap_or(&[])
+        ;
+
         Message {
-            id: unw_msg.link.to_string(),
-            public_text: unw_msg.body
-                .public_payload()
-                .and_then(Bytes::as_str)
+            id: streams_msg.address.to_string(),
+            public_text: from_utf8(public_data)
                 .unwrap_or("")
                 .to_string(),
-            private_text_decrypted: unw_msg.body
-                .masked_payload()
-                .and_then(Bytes::as_str)
+            private_text_decrypted: from_utf8(private_data_decrypted)
                 .unwrap_or("")
-                .to_string()
+                .to_string(),
+            public_data: public_data.to_vec(),
+            private_data_decrypted: private_data_decrypted.to_vec(),
+            msg_index: hex::encode(streams_msg.address.to_msg_index()),
+            streams_content,
         }
+    }
+}
+
+impl Message {
+    pub fn new_from_id(id: String, pub_text: String, priv_text_decrypted: String) -> Result<Self> {
+        let address = Address::from_str(id.as_str()).map_err(|e| anyhow!(e))?;
+        Ok(Message {
+            id,
+            public_text: pub_text,
+            private_text_decrypted: priv_text_decrypted,
+            msg_index: hex::encode(address.to_msg_index()),
+            public_data: [].to_vec(),
+            private_data_decrypted: [].to_vec(),
+            streams_content: "".to_string(),
+        })
     }
 }
 

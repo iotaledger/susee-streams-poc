@@ -163,8 +163,9 @@ The console log will look like this:
     Previous message address now is 01dc8b65fa2174cf9bf4e565a601cd49af206734f7b00de790f57de3650a72ef0000000000000000:0d563a792cbd97cad4565739
 
 You may want to use the [message explorer](http://127.0.0.1:8080/swagger-ui/#/nodes)
-to view the channel of the streams channel of the sensor
-and to view the sensor messages. This is described
+to list existing *Streams Channels* (called 'nodes' in the *Message Explorer* API),
+view the *Streams Channel ID* of the node
+and to list the sensor messages of the node. This is described
 [here](../test/README.md#view-sensor-messages-using-the-message-explorer)
 in more detail.
 
@@ -222,7 +223,7 @@ app-srv-connector-mock:50001 from within other docker containers.
 It will connect the iota-bridge via the docker bridge network.
 
 The *AppServer Connector Mockup Tool* can be used together with the
-[ESP32 Sensor](../sensor/main-rust-esp-rs)
+[*Streams POC Library* test application](../sensor/streams-poc-lib)
 as been described in
 [Send messages using the Sensor](../test/README.md#send-messages---streams-poc-lib-test-application)
 section, because the port 50001 can be accessed via the external address of the docker host.
@@ -252,3 +253,79 @@ If you want to build the image for a specific application yourself, this can be 
 Please replace the --target and --tag value ('iota-bridge' in the example above) with the application name of your choice
 ('iota-bridge', 'sensor', 'management-console' or 'app-srv-connector-mock'). If no target is specified the default image 'iota-bridge'
 will be built.
+
+If you want to build images and provide them on [Docker Hub](https://hub.docker.com/) just follow these steps:
+```bash
+  # In the root folder of the repository:
+  > docker build --target iota-bridge --tag <docker-hub-account-name-goes-here>/iota-bridge -f docker/Dockerfile .
+  > docker login
+  > docker push <docker-hub-account-name-goes-here>/iota-bridge:latest
+```
+
+
+## Start IOTA Bridge and Message Explorer as public available service
+
+As part of the installation of a [SUSEE Node](../susee-node) the docker
+compose environment described above must be deployed to the *SUSEE Node*.
+The service of the *IOTA Bridge* is mandatory, but the activation of
+the *Message Explorer* is optional.
+
+The following installation steps have been tested with Ubuntu 22.04.
+
+To run the *IOTA Bridge* an *IOTA Node*, *INX Collector*
+an *MINIO DB* need to be run on the same
+host system. Please follow the steps described in the
+[SUSEE Node README](../susee-node) to provide these services.
+
+Prepare the server host system:
+```bash
+  # In the home folder of a sudo privileged user on the server system 
+  > sudo ufw allow 50000,50001,50002/tcp
+  > mkdir susee-poc
+  > cd susee-poc
+```
+
+Upload some resources needed for the installation process to the server host system
+(please replace username `<USER>` and domain name `<SERVER_HOST>` with their actual values):
+```bash
+  # In the folder where this README.md is located (docker folder)
+  > scp server-install-resources/* <USER>@<SERVER_HOST>:~/susee-poc
+```
+
+On the server host system, 
+please edit the `docker-compose.yml` file
+using an editor of you choice and, if needed,
+uncomment the `management-console` section and/or the
+`app-srv-connector-mock` section
+of the file.
+
+The `management-console` section needs to be uncommented if you
+want to use the
+[message explorer](../test/README.md#view-sensor-messages-using-the-message-explorer)
+to view the messages received by the *SUSEE Node*.
+
+The `app-srv-connector-mock` section needs to be uncommented if you
+want to use the *SUSEE Node* for testing the
+[*Streams POC Library* test application](../sensor/streams-poc-lib).
+
+Please also edit the file `~/susee-poc/env.example`
+and set the static ip address resp. domain name
+value for the `NODE_HOST` variable.
+
+```bash
+  # In the susee-poc folder we created above 
+  > nano docker-compose.yml
+
+  # After docker-compose.yml has been edited and stored
+  > nano env.example
+```
+
+Finally, follow the steps described below:
+```bash
+  # After env.example has been edited and stored,
+  # the .env file will be created by the following script execution
+  > sudo ./prepare_docker.sh
+  
+    # We are now ready to start the susee-poc services as in the background
+  > docker compose up -d
+```

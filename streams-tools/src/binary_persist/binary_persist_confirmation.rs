@@ -13,7 +13,7 @@ use anyhow::{
 use crate::binary_persist::{
     RangeIterator,
     BinaryPersist,
-    serialize_binary_persistable_and_streams_link,
+    serialize_binary_persistable_and_one_string,
     EnumeratedPersistable,
     EnumeratedPersistableInner,
     EnumeratedPersistableArgs,
@@ -22,6 +22,7 @@ use crate::binary_persist::{
     serialize_string,
     deserialize_string
 };
+use crate::streams_transport::streams_transport::STREAMS_TOOLS_CONST_DEV_EUI_NOT_DEFINED;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Confirmation(EnumeratedPersistableInner);
@@ -33,6 +34,7 @@ impl Confirmation {
     pub const CLEAR_CLIENT_STATE: Confirmation = Confirmation(EnumeratedPersistableInner(3));
     pub const SEND_MESSAGES: Confirmation = Confirmation(EnumeratedPersistableInner(4));
     pub const SUBSCRIBER_STATUS: Confirmation = Confirmation(EnumeratedPersistableInner(5));
+    pub const DEV_EUI_HANDSHAKE: Confirmation = Confirmation(EnumeratedPersistableInner(6));
 }
 
 impl EnumeratedPersistable for Confirmation {
@@ -46,8 +48,23 @@ impl EnumeratedPersistable for Confirmation {
             &Confirmation::CLEAR_CLIENT_STATE => "CLEAR_CLIENT_STATE",
             &Confirmation::SEND_MESSAGES => "SEND_MESSAGES",
             &Confirmation::SUBSCRIBER_STATUS => "SUBSCRIBER_STATUS",
+            &Confirmation::DEV_EUI_HANDSHAKE => "DEV_EUI_HANDSHAKE",
 
             _ => "Unknown Confirmation",
+        };
+    }
+
+
+    fn needs_to_wait_for_tangle_milestone(&self) -> bool {
+        return match self {
+            &Confirmation::NO_CONFIRMATION => false,
+            &Confirmation::SUBSCRIPTION => Subscription::NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE,
+            &Confirmation::KEYLOAD_REGISTRATION => KeyloadRegistration::NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE,
+            &Confirmation::CLEAR_CLIENT_STATE => ClearClientState::NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE,
+            &Confirmation::SEND_MESSAGES => SendMessages::NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE,
+            &Confirmation::SUBSCRIBER_STATUS => SubscriberStatus::NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE,
+            &Confirmation::DEV_EUI_HANDSHAKE => DevEuiHandshake::NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE,
+            _ => false,
         };
     }
 
@@ -93,6 +110,7 @@ impl Default for Subscription {
 
 impl EnumeratedPersistableArgs<Confirmation> for Subscription {
     const INSTANCE: &'static Confirmation = &Confirmation::SUBSCRIPTION;
+    const NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE: bool = true;
 
     fn set_str_arg(&mut self, str_arg: String) {
         self.subscription_link = str_arg;
@@ -101,17 +119,17 @@ impl EnumeratedPersistableArgs<Confirmation> for Subscription {
 
 impl BinaryPersist for Subscription {
     fn needed_size(&self) -> usize {
-        let mut ret_val = Confirmation::LENGTH_BYTES;             // CONFIRMATION_TYPE
-        ret_val += calc_string_binary_length(&self.subscription_link);  // SUBSCRIPTION_LINK
-        ret_val += calc_string_binary_length(&self.pup_key);            // PUP_KEY
-        ret_val += 1;                                                   // INITIALIZATION_CNT
+        let mut ret_val = Confirmation::LENGTH_BYTES;                   // CONFIRMATION_TYPE
+        ret_val += calc_string_binary_length(&self.subscription_link); // SUBSCRIPTION_LINK
+        ret_val += calc_string_binary_length(&self.pup_key);           // PUP_KEY
+        ret_val += 1;                                                        // INITIALIZATION_CNT
         ret_val
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
         let mut range: Range<usize> = RangeIterator::new(0);
         // CONFIRMATION_TYPE + SUBSCRIPTION_LINK
-        serialize_binary_persistable_and_streams_link(Self::INSTANCE.clone(), &self.subscription_link, buffer, &mut range)?;
+        serialize_binary_persistable_and_one_string(Self::INSTANCE.clone(), &self.subscription_link, buffer, &mut range)?;
         // PUP_KEY
         serialize_string(&self.pup_key, buffer, &mut range)?;
         // INITIALIZATION_CNT
@@ -160,6 +178,7 @@ impl Default for SubscriberStatus {
 
 impl EnumeratedPersistableArgs<Confirmation> for SubscriberStatus {
     const INSTANCE: &'static Confirmation = &Confirmation::SUBSCRIBER_STATUS;
+    const NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE: bool = false;
 
     fn set_str_arg(&mut self, str_arg: String) {
         self.previous_message_link = str_arg;
@@ -173,7 +192,7 @@ impl BinaryPersist for SubscriberStatus {
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
         let mut range: Range<usize> = RangeIterator::new(0);
-        serialize_binary_persistable_and_streams_link(Self::INSTANCE.clone(), &self.previous_message_link, buffer, &mut range)?;
+        serialize_binary_persistable_and_one_string(Self::INSTANCE.clone(), &self.previous_message_link, buffer, &mut range)?;
         range.increment(self.subscription.needed_size());
         self.subscription.to_bytes(&mut buffer[range.clone()])?;
         Ok(range.end)
@@ -200,6 +219,7 @@ pub struct SendMessages {
 
 impl EnumeratedPersistableArgs<Confirmation> for SendMessages {
     const INSTANCE: &'static Confirmation = &Confirmation::SEND_MESSAGES;
+    const NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE: bool = false;
 
     fn set_str_arg(&mut self, str_arg: String) {
         self.previous_message_link = str_arg;
@@ -213,7 +233,7 @@ impl BinaryPersist for SendMessages {
 
     fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
         let mut range: Range<usize> = RangeIterator::new(0);
-        serialize_binary_persistable_and_streams_link(Self::INSTANCE.clone(), &self.previous_message_link, buffer, &mut range)?;
+        serialize_binary_persistable_and_one_string(Self::INSTANCE.clone(), &self.previous_message_link, buffer, &mut range)?;
         Ok(range.end)
     }
 
@@ -235,6 +255,8 @@ macro_rules! confirmation_without_args {
     ($constant:path, $($name:tt)*) => {
         impl EnumeratedPersistableArgs<Confirmation> for $($name)* {
             const INSTANCE: &'static Confirmation = &$constant;
+            const NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE: bool = false;
+
             fn set_str_arg(&mut self, _str_arg: String) {}
         }
 
@@ -263,3 +285,50 @@ confirmation_without_args!(Confirmation::KEYLOAD_REGISTRATION, KeyloadRegistrati
 #[derive(Default)]
 pub struct ClearClientState {}
 confirmation_without_args!(Confirmation::CLEAR_CLIENT_STATE, ClearClientState);
+
+pub struct DevEuiHandshake {
+    pub dev_eui: String,
+}
+
+impl Default for DevEuiHandshake {
+    fn default() -> Self {
+        DevEuiHandshake {
+            dev_eui: STREAMS_TOOLS_CONST_DEV_EUI_NOT_DEFINED.to_string(),
+        }
+    }
+}
+
+impl EnumeratedPersistableArgs<Confirmation> for DevEuiHandshake {
+    const INSTANCE: &'static Confirmation = &Confirmation::DEV_EUI_HANDSHAKE;
+    const NEEDS_TO_WAIT_FOR_TANGLE_MILESTONE: bool = false;
+
+    fn set_str_arg(&mut self, str_arg: String) {
+        self.dev_eui = str_arg;
+    }
+}
+
+impl BinaryPersist for DevEuiHandshake {
+    fn needed_size(&self) -> usize {
+        Confirmation::LENGTH_BYTES + calc_string_binary_length(&self.dev_eui)
+    }
+
+    fn to_bytes(&self, buffer: &mut [u8]) -> Result<usize> {
+        let mut range: Range<usize> = RangeIterator::new(0);
+        serialize_binary_persistable_and_one_string(Self::INSTANCE.clone(), &self.dev_eui, buffer, &mut range)?;
+        Ok(range.end)
+    }
+
+    fn try_from_bytes(buffer: &[u8]) -> Result<Self> where Self: Sized {
+        let mut range: Range<usize> = RangeIterator::new(0);
+        let ret_val = deserialize_enumerated_persistable_arg_with_one_string::<DevEuiHandshake, Confirmation>(buffer, &mut range)?;
+        Ok(ret_val)
+    }
+}
+
+impl fmt::Display for DevEuiHandshake {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DevEuiHandshake: dev_eui: {}",
+               self.dev_eui,
+        )
+    }
+}

@@ -1,9 +1,7 @@
 mod cli;
 
-use cli::{
-    LoraWanAppServerMockCli,
-    ARG_KEYS,
-    get_arg_matches,
+use std::{
+    net::SocketAddr,
 };
 
 use anyhow::{
@@ -40,11 +38,22 @@ use streams_tools::{
     LoraWanRestClientOptions,
 };
 
-use std::{
-    net::SocketAddr,
+use susee_tools::set_env_rust_log_variable_if_not_defined_by_env;
+
+use cli::{
+    LoraWanAppServerMockCli,
+    ARG_KEYS,
+    get_arg_matches,
 };
 
-use log;
+#[cfg(feature = "dump_payload")]
+use std::{
+    fs::File,
+    io::{
+        BufWriter,
+        Write
+    }
+};
 
 const RECEIVE_IOTA_BRIDGE_REQUEST_BUFFER_SIZE: usize = 2048;
 
@@ -85,15 +94,44 @@ impl<'a> LoraWanRestClient {
     }
 }
 
+#[cfg(feature = "dump_payload")]
+static mut MSG_COUNTER: u32 = 0;
+
+#[cfg(feature = "dump_payload")]
+async fn dump_received_iota_bridge_request_to_file(dev_eui: u64, buf: &[u8]) {
+    let file_path_and_name;
+
+    unsafe {
+        file_path_and_name = String::from(format!("./msg_{}-{}.bin",
+              dev_eui,
+              MSG_COUNTER,
+        ));
+        MSG_COUNTER += 1;
+    }
+
+
+    let out_file = File::create(file_path_and_name.as_str())
+        .expect(format!("Create output file '{}' failed", file_path_and_name).as_str());
+    let mut writer = BufWriter::new(out_file);
+    writer.write_all(buf)
+        .expect(format!("Could not write into file '{}'", file_path_and_name).as_str());
+    println!("[LoraWanAppServerMock - fn dump_received_iota_bridge_request_to_file()] Dumped payload to file {}", file_path_and_name);
+}
+
+#[cfg(not(feature = "dump_payload"))]
+async fn dump_received_iota_bridge_request_to_file(_dev_eui: u64, _buf: &[u8]) {}
+
 async fn handle_received_iota_bridge_request(stream: &mut TcpStream, dev_eui: u64, buf: &[u8], iota_bridge_url: &str) {
     println!("[LoraWanAppServerMock - fn handle_received_iota_bridge_request()] Received {} bytes to be send to iota-bridge {}", buf.len(), iota_bridge_url);
+    dump_received_iota_bridge_request_to_file(dev_eui, buf).await;
     let lorawan_rest_client = LoraWanRestClient::new(
         Some(
             LoraWanRestClientOptions{iota_bridge_url}
         )
     );
 
-    match lorawan_rest_client.post_binary_request_to_iota_bridge(buf.to_vec(), dev_eui.to_string().as_str()).await {
+    let dev_eui_hex_str = format!("{:X}", dev_eui);
+    match lorawan_rest_client.post_binary_request_to_iota_bridge(buf.to_vec(), dev_eui_hex_str.as_str()).await {
         Ok(response) => {
             println!("[LoraWanAppServerMock - fn handle_received_iota_bridge_request()] Received {} bytes from iota-bridge. Sending bytes via socket back to client",
                      response.len());
@@ -218,6 +256,7 @@ async fn run_tcp_listener_loop(addr_str: &str, iota_bridge_url: &str) {
 
 #[tokio::main]
 async fn main() {
+    set_env_rust_log_variable_if_not_defined_by_env("info");
     env_logger::init();
     let matches_and_options = get_arg_matches();
     let cli = LoraWanAppServerMockCli::new(&matches_and_options, &ARG_KEYS) ;

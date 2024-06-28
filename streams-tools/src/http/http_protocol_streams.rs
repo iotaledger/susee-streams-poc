@@ -14,20 +14,18 @@ use base64::engine::{
     Engine,
 };
 
-use iota_streams::{
-    app::{
-        transport::tangle::{
-            TangleMessage,
-            TangleAddress,
-            AppInst
-        },
-    },
-    app_channels::api::DefaultF,
-    core::{
-        async_trait,
-        Errors,
-    },
+use streams::{
+    Address,
 };
+
+use lets::{
+    error::Error as LetsError,
+    address::{
+        AppAddr,
+    }
+};
+
+use async_trait::async_trait;
 
 use crate::{
     return_err_bad_request,
@@ -39,7 +37,6 @@ use crate::{
         binary_persist_iota_bridge_req::{
             IotaBridgeRequestParts,
             HttpMethod,
-            HeaderFlags,
         }
     },
     http::{
@@ -62,6 +59,12 @@ use super::{
 };
 
 use std::fmt::Display;
+use anyhow::anyhow;
+use crate::binary_persist::{
+    as_app_addr,
+    LinkedMessage
+};
+
 
 // TODO s:
 // * Create a enum based Uri and parameter management for API endpoints similar to
@@ -107,34 +110,48 @@ trait MapStreamsErrorsAssociations {
     const NOT_PROVIDED: &'static str;
 }
 
-pub struct MapStreamsErrors {}
+pub struct MapLetsError {}
 
-impl MapStreamsErrorsAssociations for MapStreamsErrors{
+impl MapStreamsErrorsAssociations for MapLetsError {
     const NOT_PROVIDED: &'static str = "Not provided";
 }
 
-impl MapStreamsErrors {
-    pub fn to_http_status_codes(streams_error: &Errors) -> StatusCode {
-        match streams_error {
-            Errors::MessageLinkNotFoundInTangle(_) => StatusCode::NOT_EXTENDED,
-            Errors::MessageNotUnique(_) => StatusCode::VARIANT_ALSO_NEGOTIATES,
+impl MapLetsError {
+    pub fn to_http_status_codes(lets_error: &LetsError) -> StatusCode {
+        match lets_error {
+            LetsError::AddressError(comment, _) => {
+                // TODO: Introduce a new 'More than one found' error in Streams to rid of string comparison
+                if "More than one found".eq(*comment)  {
+                    StatusCode::VARIANT_ALSO_NEGOTIATES
+                } else {
+                    StatusCode::NOT_EXTENDED
+                }
+            },
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
-    pub fn from_http_status_codes(http_error: StatusCode, comment: Option<String>) -> Errors {
-        let comment = comment.unwrap_or(String::from(MapStreamsErrors::NOT_PROVIDED));
-        match http_error {
-            StatusCode::NOT_EXTENDED => Errors::MessageLinkNotFoundInTangle(comment),
-            StatusCode::VARIANT_ALSO_NEGOTIATES => Errors::MessageNotUnique(comment),
-            _ => MapStreamsErrors::get_indicator_for_uninitialized(),
+    pub fn from_http_status_codes(http_error: StatusCode, address: Option<Address>, comment: Option<String>) -> LetsError {
+        let address = address.unwrap_or(Address::default());
+        // TODO: When the TODO (see above) has been resolved, evaluate if the comment is still needed
+        let _comment = comment.unwrap_or(String::from(MapLetsError::NOT_PROVIDED));
+        let reason_for_lets_err = match http_error {
+            StatusCode::NOT_EXTENDED => Some("Message not found in tangle"),
+            StatusCode::VARIANT_ALSO_NEGOTIATES => Some("More than one found"),
+            _ => None,
+        };
+
+        if let Some(reason) = reason_for_lets_err {
+            LetsError::AddressError(reason, address)
+        } else {
+            MapLetsError::get_indicator_for_uninitialized()
         }
     }
 
-    // Can be used to initialize a Errors variable and make sure that this specific value is not
+    // Can be used to initialize an Errors variable and make sure that this specific value is not
     // mapped by to_http_status_codes() to a specific http status code
-    pub fn get_indicator_for_uninitialized() -> Errors {
-        Errors::LengthMismatch(0, 0)
+    pub fn get_indicator_for_uninitialized() -> LetsError {
+        LetsError::External(anyhow!("UNINITIALIZED"))
     }
 }
 
@@ -157,7 +174,7 @@ impl RequestBuilderStreams {
         }
         let mut buffer: Vec<u8> = vec![0; message.needed_size()];
         message.to_bytes(buffer.as_mut_slice()).expect("Persisting into binary data failed");
-        let header_flags = RequestBuilderStreams::get_header_flags(is_compressed, HttpMethod::POST);
+        let header_flags = RequestBuilderTools::get_header_flags(is_compressed, HttpMethod::POST);
         Ok(IotaBridgeRequestParts::new(
             header_flags,
             uri,
@@ -165,7 +182,7 @@ impl RequestBuilderStreams {
         ))
     }
 
-    pub fn send_message(self: &Self, message: &TangleMessage) -> Result<Request<Body>> {
+    pub fn send_message(self: &Self, message: &LinkedMessage) -> Result<Request<Body>> {
         self.get_send_message_request_parts(message, EndpointUris::SEND_MESSAGE, false, None)?
             .into_request(RequestBuilderTools::get_request_builder())
     }
@@ -184,7 +201,7 @@ impl RequestBuilderStreams {
         if let Some(eui) = dev_eui {
             uri = format!("{}&{}={}", uri, QueryParameters::SEND_COMPRESSED_MESSAGE_DEV_EUI, eui)
         }
-        let header_flags = RequestBuilderStreams::get_header_flags(is_compressed, HttpMethod::GET);
+        let header_flags = RequestBuilderTools::get_header_flags(is_compressed, HttpMethod::GET);
         Ok(IotaBridgeRequestParts::new(
             header_flags,
             uri,
@@ -192,7 +209,7 @@ impl RequestBuilderStreams {
         ))
     }
 
-    pub fn receive_message_from_address(self: &Self, address: &TangleAddress) -> Result<Request<Body>> {
+    pub fn receive_message_from_address(self: &Self, address: &Address) -> Result<Request<Body>> {
         self.get_receive_message_from_address_request_parts(
             address,
             EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS,
@@ -214,16 +231,8 @@ impl RequestBuilderStreams {
         .into_request(RequestBuilderTools::get_request_builder())
     }
 
-    fn get_header_flags(is_compressed: bool, method: HttpMethod) -> HeaderFlags {
-        let mut header_flags = HeaderFlags::from(method);
-        if is_compressed {
-            header_flags.insert(HeaderFlags::NEEDS_REGISTERED_LORAWAN_NODE);
-        }
-        header_flags
-    }
-
     // @param request_key:  Received by the original REST call via response body.
-    pub fn retransmit(self: &Self, request_key: &Vec<u8>, channel_id: AppInst, initialization_cnt: u8) -> Result<Request<Body>> {
+    pub fn get_retransmit_request_parts(self: &Self, request_key: &Vec<u8>, channel_id: AppAddr, initialization_cnt: u8) -> Result<IotaBridgeRequestParts> {
         let mut uri = self.tools.get_uri(EndpointUris::RETRANSMIT);
         let request_key_b64 = STANDARD.encode(request_key);
         uri = format!("{uri}?{req_key_arg}={request_key_b64}&{int_cnt_arg}={initialization_cnt}",
@@ -231,32 +240,38 @@ impl RequestBuilderStreams {
                       int_cnt_arg = QueryParameters::RETRANSMIT_INITIALIZATION_CNT
         );
         let body_bytes = channel_id.as_bytes().to_owned();
-        RequestBuilderTools::get_request_builder()
-            .method("POST")
-            .uri(uri)
-            .body(Body::from(body_bytes.clone()))
+        let header_flags = RequestBuilderTools::get_header_flags(false, HttpMethod::POST);
+        Ok(IotaBridgeRequestParts::new(
+            header_flags,
+            uri,
+            body_bytes
+        ))
+    }
+
+    // @param request_key:  Received by the original REST call via response body.
+    pub fn retransmit(self: &Self, request_key: &Vec<u8>, channel_id: AppAddr, initialization_cnt: u8) -> Result<Request<Body>> {
+        let req_parts = self.get_retransmit_request_parts(request_key, channel_id, initialization_cnt)?;
+        req_parts.into_request(RequestBuilderTools::get_request_builder())
     }
 }
 
 #[async_trait(?Send)]
 pub trait ServerDispatchStreams: ScopeConsume {
     fn get_uri_prefix(&self) -> &'static str;
-    async fn send_message<F: 'static + core::marker::Send + core::marker::Sync>(
-        self: &mut Self, message: &TangleMessage) -> Result<Response<Body>>;
-    async fn receive_message_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>>;
-    async fn receive_messages_from_address(self: &mut Self, address_str: &str) -> Result<Response<Body>>;
-    async fn send_compressed_message<F: 'static + core::marker::Send + core::marker::Sync>(
-        self: &mut Self, message: &TangleMessageCompressed) -> Result<Response<Body>>;
-    async fn receive_compressed_message_from_address(self: &mut Self, cmpr_addr: &str, dev_eui_str: &str) -> Result<Response<Body>>;
-    async fn retransmit(self: &mut Self, request_key: String, channel_id: AppInst, initialization_cnt: u8) -> Result<Response<Body>>;
+    async fn send_message(&mut self, message: &LinkedMessage) -> Result<Response<Body>>;
+    async fn receive_message_from_address(&mut self, address_str: &str) -> Result<Response<Body>>;
+    async fn receive_messages_from_address(&mut self, address_str: &str) -> Result<Response<Body>>;
+    async fn send_compressed_message(&mut self, message: &TangleMessageCompressed) -> Result<Response<Body>>;
+    async fn receive_compressed_message_from_address(&mut self, cmpr_addr: &str, dev_eui_str: &str) -> Result<Response<Body>>;
+    async fn retransmit(&mut self, request_key: String, channel_id: AppAddr, initialization_cnt: u8) -> Result<Response<Body>>;
 }
 
 pub async fn dispatch_request_streams(req_parts: &DispatchedRequestParts, callbacks: &mut impl ServerDispatchStreams ) -> Result<Response<Body>> {
     match (&req_parts.method, req_parts.path.as_str()) {
 
         (&Method::POST, EndpointUris::SEND_MESSAGE) => {
-            let tangle_msg: TangleMessage = TangleMessage::try_from_bytes(&req_parts.binary_body).unwrap();
-            callbacks.send_message::<DefaultF>(&tangle_msg).await
+            let tangle_msg: LinkedMessage = LinkedMessage::try_from_bytes(&req_parts.binary_body).unwrap();
+            callbacks.send_message(&tangle_msg).await
         },
 
         (&Method::POST, EndpointUris::SEND_COMPRESSED_MESSAGE) => {
@@ -266,9 +281,8 @@ pub async fn dispatch_request_streams(req_parts: &DispatchedRequestParts, callba
             } else {
                 ok_or_bail_http_response!(get_query_param_send_compressed_message_dev_eui(req_parts))
             };
-            compressed_tangle_msg.dev_eui = get_dev_eui_from_str(dev_eui_str.as_str(), "RECEIVE_MESSAGE_FROM_ADDRESS",
-                                                                 QueryParameters::SEND_COMPRESSED_MESSAGE_DEV_EUI)?;
-            callbacks.send_compressed_message::<DefaultF>(&compressed_tangle_msg).await
+            compressed_tangle_msg.dev_eui = get_dev_eui_from_str(dev_eui_str.as_str())?;
+            callbacks.send_compressed_message(&compressed_tangle_msg).await
         },
 
         (&Method::GET, EndpointUris::RECEIVE_MESSAGE_FROM_ADDRESS) => {
@@ -291,7 +305,7 @@ pub async fn dispatch_request_streams(req_parts: &DispatchedRequestParts, callba
 
         (&Method::POST, EndpointUris::RETRANSMIT) => {
             let request_key_ad_init_cnt = ok_or_bail_http_response!(get_retransmit_query_params_req_key_and_init_cnt(req_parts));
-            let channel_id: AppInst = AppInst::from(req_parts.binary_body.as_slice());
+            let channel_id: AppAddr = as_app_addr(req_parts.binary_body.as_slice());
 
             callbacks.retransmit(request_key_ad_init_cnt.0, channel_id, request_key_ad_init_cnt.1).await
         },
@@ -432,7 +446,7 @@ mod tests {
     #[tokio::test]
     async fn test_request_builder_streams_retransmit() {
         let req_builder = RequestBuilderStreams::new(URI_PREFIX);
-        let channel_id: AppInst = AppInst::from_str("83cedf5cd9b605cc457ec7cb7c5d6f3c2fa339ae864246e8854782185413fd9d0000000000000000").unwrap();
+        let channel_id: AppAddr = AppAddr::from_str("83cedf5cd9b605cc457ec7cb7c5d6f3c2fa339ae864246e8854782185413fd9d0000000000000000").unwrap();
         const REQUST_KEY_BYTES: [u8;8] = [1, 2, 3, 4, 5, 6, 7, 8];
         let request_key_str = STANDARD.encode(REQUST_KEY_BYTES);
         let init_cnt = 100 as u8;
@@ -447,7 +461,7 @@ mod tests {
                                    QueryParameters::RETRANSMIT_REQUEST_KEY,
                                    QueryParameters::RETRANSMIT_INITIALIZATION_CNT
         );
-        println!("Expected URI is '{}'", expected_uri);
+        log::info!("Expected URI is '{}'", expected_uri);
 
         assert_eq!(body_bytes, channel_id_bytes);
         assert_eq!(parts.uri.to_string(), expected_uri);

@@ -151,10 +151,10 @@ impl<F> StreamsTransportFile<F>
                     return Ok(file_result);
                 }
             } else {
-                println!("[StreamsTransportFile.send_message] Could not find file name");
+                log::error!("[fn search_file_in_input_folder()] Could not find file name");
             }
         }
-        panic!("[StreamsTransportFile.send_message] Could not find message file for address {}", link.to_string());
+        panic!("[fn search_file_in_input_folder()] Could not find message file for address {}", link.to_string());
     }
 
     fn read_message_from_file(&mut self, link: &TangleAddress) -> Result<TangleMessage<F>> {
@@ -188,7 +188,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for StreamsTransportFile<F>
         F: 'static + core::marker::Send + core::marker::Sync,
 {
     async fn send_message(&mut self, msg: &TangleMessage<F>) -> Result<()> {
-        println!("[StreamsTransportFile.send_message] Sending message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string());
+        log::info!("[fn send_message()] Sending message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string());
         self.write_message_to_file(msg)
     }
 
@@ -197,7 +197,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for StreamsTransportFile<F>
         match ret_val.as_ref() {
             Ok(msg_vec) => {
                 for (idx, msg) in msg_vec.iter().enumerate() {
-                    println!("[StreamsTransportFile.recv_messages] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, msg.binary.body.bytes.len(), msg.binary.to_string())
+                    log::info!("[fn recv_messages()] - idx {}: Receiving message with {} bytes payload:\n{}\n", idx, msg.binary.body.bytes.len(), msg.binary.to_string())
                 }
             },
             _ => ()
@@ -208,7 +208,7 @@ impl<F> Transport<TangleAddress, TangleMessage<F>> for StreamsTransportFile<F>
     async fn recv_message(&mut self, link: &TangleAddress) -> Result<TangleMessage<F>> {
         let ret_val = self.read_message_from_file(link);
         match ret_val.as_ref() {
-            Ok(msg) => println!("[StreamsTransportFile.recv_message] Receiving message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string()),
+            Ok(msg) => log::info!("[fn recv_message()] Receiving message with {} bytes payload:\n{}\n", msg.binary.body.bytes.len(), msg.binary.to_string()),
             _ => ()
         }
         ret_val

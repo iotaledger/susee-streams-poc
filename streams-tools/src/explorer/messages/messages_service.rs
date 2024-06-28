@@ -1,13 +1,20 @@
 use std::str::FromStr;
 
+use async_trait::async_trait;
+
 use hyper::http::StatusCode;
 
-use iota_streams::{
-    core::async_trait,
-    app::transport::tangle::TangleAddress,
+use streams::{
+    Address,
 };
 
+use lets::transport::tangle::Client;
+
 use crate::{
+    threading_helpers::{
+        Worker,
+        run_worker_in_own_thread,
+    },
     explorer::{
         app_state::{
             AppState,
@@ -17,13 +24,11 @@ use crate::{
             Result,
             AppError,
         },
-        threading_helpers::{
-            Worker,
-            run_worker_in_own_thread,
-        },
         shared::PagingOptions,
     },
     user_manager::{
+        dao::message::MessageDataStoreOptions,
+        message_indexer::MessageIndexer,
         multi_channel_management::{
             MultiChannelManagerOptions,
             get_channel_manager_for_channel_id
@@ -43,11 +48,13 @@ use super::{
 };
 
 impl MessagesState {
-    fn as_multi_channel_manager_options(&self) -> MultiChannelManagerOptions {
+    pub(crate) fn as_multi_channel_manager_options(&self) -> MultiChannelManagerOptions {
         MultiChannelManagerOptions{
-            iota_node_url: self.iota_node_url.clone(),
+            iota_node: self.iota_node_url.clone(),
             wallet_filename: self.wallet_filename.clone(),
-            streams_user_serialization_password: self.streams_user_serialization_password.clone()
+            streams_user_serialization_password: self.streams_user_serialization_password.clone(),
+            message_data_store_for_msg_caching: None,
+            inx_collector_access_throttle_sleep_time_millisecs: None
         }
     }
 }
@@ -72,10 +79,15 @@ struct IndexWorkerOptions {
 
 impl IndexWorkerOptions {
     pub fn new(messages: &MessagesState, user_store: &UserDataStore, channel_id: &str, paging_opt: Option<PagingOptions>) -> IndexWorkerOptions {
+        let mut multi_channel_mngr_opt = messages.as_multi_channel_manager_options();
+        multi_channel_mngr_opt.message_data_store_for_msg_caching = Some(MessageDataStoreOptions {
+            file_path_and_name: messages.db_file_name.clone(),
+            streams_channel_id: channel_id.to_string()
+        });
         IndexWorkerOptions{
             channel_id: channel_id.to_string(),
             u_store: user_store.clone(),
-            multi_channel_mngr_opt: messages.as_multi_channel_manager_options(),
+            multi_channel_mngr_opt,
             db_file_name: messages.db_file_name.clone(),
             paging_opt,
         }
@@ -88,6 +100,7 @@ struct IndexWorker;
 impl Worker for IndexWorker {
     type OptionsType = IndexWorkerOptions;
     type ResultType = (MessageList, usize);
+    type ErrorType = AppError;
 
     async fn run(opt: IndexWorkerOptions) -> Result<(MessageList, usize)> {
         let mut channel_manager = match get_channel_manager_for_channel_id(
@@ -100,9 +113,9 @@ impl Worker for IndexWorker {
                 return Err(AppError::ChannelDoesNotExist(opt.channel_id))
             }
         };
-        if let Some(author) = channel_manager.author.as_mut() {
-            let mut msg_mngr = MessageManager::new(
-                author,
+        if let Some(user) = channel_manager.user.as_mut() {
+            let mut msg_mngr = MessageManager::<Client<MessageIndexer>>::new(
+                user,
                 opt.channel_id.clone(),
                 opt.db_file_name
             );
@@ -113,14 +126,14 @@ impl Worker for IndexWorker {
                 for msg_meta_data in msg_meta_data_list {
                     let address = get_tangle_address_from_strings(opt.channel_id.as_str(), msg_meta_data.message_id.as_str())
                         .expect("get_tangle_address_from_strings error");
-                    if let Ok(unwrapped_msg) = author.receive_msg(&address).await{
-                        ret_val.push(unwrapped_msg.into());
+                    if let Ok(lets_msg) = user.receive_message(address).await{
+                        ret_val.push(lets_msg.into());
                     } else {
-                        ret_val.push(Message {
-                            id: address.to_string(),
-                            public_text: "Error could not receive message from tangle".to_string(),
-                            private_text_decrypted: "".to_string()
-                        });
+                        ret_val.push(Message::new_from_id(
+                            address.to_string(),
+                            "Error could not receive message from tangle".to_string(),
+                            "".to_string()
+                        ).expect(format!("Error on creating Message::new_from_id with id {}", opt.channel_id).as_str()));
                     }
                 }
                 Ok((ret_val, items_count_total))
@@ -136,7 +149,7 @@ impl Worker for IndexWorker {
 }
 
 pub(crate) async fn get(messages: &MessagesState, user_store: &UserDataStore, message_id: &str) -> Result<Message> {
-    if let Ok(tangle_address) = TangleAddress::from_str(message_id) {
+    if let Ok(tangle_address) = Address::from_str(message_id) {
         run_worker_in_own_thread::<GetWorker>(GetWorkerOptions::new(
             tangle_address,
             messages,
@@ -152,17 +165,22 @@ pub(crate) async fn get(messages: &MessagesState, user_store: &UserDataStore, me
 
 #[derive(Clone)]
 struct GetWorkerOptions {
-    tangle_address: TangleAddress,
+    tangle_address: Address,
     u_store: UserDataStore,
     multi_channel_mngr_opt: MultiChannelManagerOptions,
 }
 
 impl GetWorkerOptions {
-    pub fn new(tangle_address: TangleAddress, messages: &MessagesState, user_store: &UserDataStore) -> GetWorkerOptions {
+    pub fn new(tangle_address: Address, messages: &MessagesState, user_store: &UserDataStore) -> GetWorkerOptions {
+        let mut multi_channel_mngr_opt = messages.as_multi_channel_manager_options();
+        multi_channel_mngr_opt.message_data_store_for_msg_caching = Some(MessageDataStoreOptions {
+            file_path_and_name: messages.db_file_name.clone(),
+            streams_channel_id: tangle_address.base().to_string(),
+        });
         GetWorkerOptions{
             tangle_address,
             u_store: user_store.clone(),
-            multi_channel_mngr_opt: messages.as_multi_channel_manager_options(),
+            multi_channel_mngr_opt,
         }
     }
 }
@@ -173,15 +191,16 @@ struct GetWorker;
 impl Worker for GetWorker {
     type OptionsType = GetWorkerOptions;
     type ResultType = Message;
+    type ErrorType = AppError;
 
     async fn run(opt: GetWorkerOptions) -> Result<Message> {
         let mut channel_manager = get_channel_manager_for_channel_id(
-            &opt.tangle_address.appinst.to_string(),
+            &opt.tangle_address.base().to_string(),
             &opt.u_store,
             &opt.multi_channel_mngr_opt,
         ).await?;
-        if let Some(author) = channel_manager.author.as_mut() {
-            if let Ok(unwrapped_msg) = author.receive_msg(&opt.tangle_address).await {
+        if let Some(author) = channel_manager.user.as_mut() {
+            if let Ok(unwrapped_msg) = author.receive_message(opt.tangle_address).await {
                 Ok(unwrapped_msg.into())
             } else {
                 Err(AppError::GenericWithMessage(
@@ -190,7 +209,7 @@ impl Worker for GetWorker {
                 ))
             }
         } else {
-            Err(AppError::ChannelDoesNotExist(opt.tangle_address.appinst.to_string()))
+            Err(AppError::ChannelDoesNotExist(opt.tangle_address.base().to_string()))
         }
     }
 }

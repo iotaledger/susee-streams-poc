@@ -3,10 +3,11 @@ mod messages;
 mod nodes;
 mod app_state;
 mod router;
-mod error;
-mod threading_helpers;
 
+pub mod error;
 pub mod explorer;
+pub mod payload;
+pub mod sync_channels_loop;
 
 pub use {
     explorer::*,

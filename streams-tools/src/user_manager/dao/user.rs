@@ -29,7 +29,7 @@ use crate::{
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default, Clone)]
 pub struct User {
     pub streams_channel_id: String,
-    pub streams_user_state: Vec<u8>,
+    pub streams_client_state: Vec<u8>,
     pub seed_derivation_phrase: String,
     pub name: String,
     pub external_id: String,
@@ -80,7 +80,7 @@ impl DaoManager for UserDaoManager {
     fn init_db_schema(&self) -> Result<()> {
         self.connection.execute(format!("CREATE TABLE {} (\
             {} TEXT NOT NULL PRIMARY KEY,\
-            streams_user_state BLOB NOT NULL,\
+            streams_client_state BLOB NOT NULL,\
             seed_derivation_phrase TEXT NOT NULL,\
             name TEXT,\
             external_id TEXT\
@@ -108,9 +108,9 @@ impl DaoManager for UserDaoManager {
 
     fn write_item_to_db(&self, item: &User) -> Result<Self::PrimaryKeyType> {
         let _rows = self.connection.execute(format!(
-            "INSERT OR REPLACE INTO {} (streams_channel_id, streams_user_state, seed_derivation_phrase, name, external_id) VALUES (\
+            "INSERT OR REPLACE INTO {} (streams_channel_id, streams_client_state, seed_derivation_phrase, name, external_id) VALUES (\
                                 :streams_channel_id,\
-                                :streams_user_state,\
+                                :streams_client_state,\
                                 :seed_derivation_phrase,\
                                 :name,\
                                 :external_id\
@@ -125,10 +125,10 @@ impl DaoManager for UserDaoManager {
         let seed_derive_phrase = item.seed_derivation_phrase.clone();
         let name = item.name.clone();
         let external_id = item.external_id.clone();
-        Box::new( move |streams_channel_id: String, user_state: Vec<u8>| -> Result<usize> {
+        Box::new( move |streams_channel_id: String, streams_client_state: Vec<u8>| -> Result<usize> {
             let mut new_user = User::default();
-            let ret_val = user_state.len();
-            new_user.streams_user_state = user_state;
+            let ret_val = streams_client_state.len();
+            new_user.streams_client_state = streams_client_state;
             new_user.streams_channel_id = streams_channel_id;
             new_user.seed_derivation_phrase = seed_derive_phrase.clone();
             new_user.name = name.clone();

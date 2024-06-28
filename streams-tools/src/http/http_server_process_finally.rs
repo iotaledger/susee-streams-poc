@@ -11,7 +11,7 @@ use crate::http::{
     http_tools::DispatchedRequestParts,
 };
 
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 #[async_trait(?Send)]
 pub trait ServerProcessFinally {

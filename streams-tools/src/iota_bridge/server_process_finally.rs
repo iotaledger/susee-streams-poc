@@ -1,3 +1,7 @@
+use async_trait::async_trait;
+
+use anyhow::Result as AnyResult;
+
 use hyper::{
     Body,
     http::{
@@ -17,29 +21,35 @@ use crate::{
             get_response_500,
         }
     },
+    binary_persist::{
+        BinaryPersist,
+        LinkedMessage
+    }
 };
 
 use super::{
     LoraWanNodeDataStore,
+    BufferedMessageDataStore,
     dao::{
         LoraWanNode,
+        BufferedMessage,
     },
     helpers::{
         DispatchScopeKey
     },
 };
 
-use iota_streams::core::async_trait;
-
 #[derive(Clone)]
 pub struct ProcessFinally {
     lorawan_nodes: LoraWanNodeDataStore,
+    buffered_messages: BufferedMessageDataStore,
 }
 
 impl ProcessFinally {
-    pub fn new(lorawan_nodes: LoraWanNodeDataStore) -> Self {
+    pub fn new(lorawan_nodes: LoraWanNodeDataStore, buffered_messages: BufferedMessageDataStore) -> Self {
         Self {
             lorawan_nodes,
+            buffered_messages,
         }
     }
 
@@ -91,12 +101,29 @@ impl ProcessFinally {
             self.lorawan_nodes.write_item_to_db(&existing_node).map(|_| ())
         }
     }
+
+    fn handle_add_buffered_message_to_db(&self, ret_val: Response<Body>, scope: &dyn DispatchScope) -> Result<Response<Body>> {
+        if scope.contains_key(DispatchScopeKey::ADD_BUFFERED_MESSAGE_TO_DB) {
+            let buffered_message = ok_or_bail_internal_error_response_500!(self.get_buffered_msg_from_scope(scope));
+            log::debug!("[fn handle_add_buffered_message_to_db] Writing message {} to db", buffered_message.link);
+            let _id = ok_or_bail_internal_error_response_500!(self.buffered_messages.write_item_to_db(&buffered_message));
+        }
+        Ok(ret_val)
+    }
+
+    fn get_buffered_msg_from_scope(&self, scope: &dyn DispatchScope) -> AnyResult<BufferedMessage>{
+        let message_to_be_buffered = LinkedMessage::try_from_bytes(
+            scope.get_vec_u8(DispatchScopeKey::ADD_BUFFERED_MESSAGE_TO_DB)?.as_slice()
+        )?;
+        Ok(BufferedMessage::new(message_to_be_buffered))
+    }
 }
 
 #[async_trait(?Send)]
 impl ServerProcessFinally for ProcessFinally {
     async fn process(&self, ret_val: Response<Body>, _req_parts: &DispatchedRequestParts, scope: &dyn DispatchScope) -> Result<Response<Body>> {
-        let ret_val = self.handle_add_new_lorawan_node_to_db(ret_val, scope)?;
+        let mut ret_val = self.handle_add_new_lorawan_node_to_db(ret_val, scope)?;
+        ret_val = self.handle_add_buffered_message_to_db(ret_val, scope)?;
         Ok(ret_val)
     }
 }
@@ -106,20 +133,20 @@ impl ServerProcessFinally for ProcessFinally {
 //
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-    use rusqlite::Connection;
-    use crate::http::ScopeProvide;
-    use crate::iota_bridge::ServerScopeProvide;
-    use super::*;
     use hyper::http::StatusCode;
+    use super::*;
+    use crate::{
+        http::ScopeProvide,
+        iota_bridge::ServerScopeProvide,
+        dao_helpers::DbFileBasedDaoManagerOptions
+    };
 
     #[test]
     fn test_handle_add_new_lorawan_node_to_db() {
-        let lorawan_nodes = LoraWanNodeDataStore::new_from_connection(
-            Rc::new(Connection::open_in_memory().unwrap()),
-            None,
-        );
-        let process_finally = ProcessFinally::new(lorawan_nodes);
+        let options = DbFileBasedDaoManagerOptions { file_path_and_name: "not used".to_string() };
+        let lorawan_nodes = LoraWanNodeDataStore::new(options.clone());
+        let buffered_messages = BufferedMessageDataStore::new(options);
+        let process_finally = ProcessFinally::new(lorawan_nodes, buffered_messages);
 
         let mut scope_provide = ServerScopeProvide::new();
         let scope = scope_provide.create_new_scope();

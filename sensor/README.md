@@ -27,7 +27,7 @@ There are three different Sensor applications for different purposes:
 | Application  |  Platform | Purpose                       | Progr. Language |
 |--------------|-----------|-------------------------------|-----------------|
 | *streams-poc-lib* test application | ESP32  | Test the streams-poc-lib functionality using its C binding| C |
-| *ESP32 Sensor*                     | ESP32  | Test the Rust code that builds the foundation of the streams-poc-lib without the limitations of a foreign function interface | Rust |
+| *ESP32 Sensor* **DEPRECATED**      | ESP32  | Test the Rust code that builds the foundation of the streams-poc-lib without the limitations of a foreign function interface | Rust |
 | *x86/PC Sensor*            | x86/PC | Test the *Sensor* Rust code on x86/PC platforms and mock *ESP32 Sensors* for integration tests on x86/PCs | Rust |
 
 In addition to the common CLI options described in the
@@ -45,6 +45,12 @@ all Sensor applications provide CLI commands to manage the Streams usage:
             A message file that will be encrypted and send using the streams channel.
             The message will be resend every 10 Seconds in an endless loop.
             Use CTRL-C to stop processing.
+
+    -g, --random-msg-of-size <MSG_SIZE>
+            A random message of the specified length in bytes will be created,
+            encrypted and send using the streams channel.
+            A new random message will be resend every 5 Seconds in an endless loop.
+            Use CTRL-C to stop processing.
             
     -p, --println-subscriber-status
             Print information about the current client status of the sensor.
@@ -55,22 +61,43 @@ all Sensor applications provide CLI commands to manage the Streams usage:
             Deletes the current client status of the sensor so that
             all subscriptions get lost and the sensor can be used to subscribe to a new Streams
             channel.
-            TODO: In future versions the seed will also be replaced by a new generated seed.
             TODO: -----------------------------
                   --------  WARNING  ---------- Currently there is no confirmation cli dialog
                   -----------------------------       use this option carefully!
                               
+### Specifying the *IOTA Bridge*
+The *x86/PC Sensor* directly accesses the *IOTA Bridge*. Use the following
+arguments to manage *IOTA Bridge* usage:
+
+    -b, --iota-bridge-url <IOTA_BRIDGE_URL>
+            The url of the iota-bridge to connect to.
+            Default value is http://localhost:50000
+            
+            Example: iota-bridge-url="http://192.168.47.11:50000"
+            
+    -o, --failover-iota-bridge-url <FAILOVER_IOTA_BRIDGE_URL>
+            Specifies a secondary iota-bridge used for failover.
+            In case the primary iota-bridge (specified by the CLI argument '--iota-bridge-url')
+            returns an erroneous http response, the sensor will try to use a secondary
+            iota-bridge instance specified by this argument.
+            The implemented failover-handling is very simple: The secondary iota-bridge is only
+            called in case of errors and only once (per error).
+            
+            If this argument is not provided, no failover is done.
+            
+            The error response behavior of the iota-bridge is designed to allow failover-handling
+            run on an application-server-connector. Therefore this argument must be used together
+            with the --use-lorawan-rest-api argument. In theory, it would be possible to use
+            --failover-iota-bridge-url while accessing iota-bridge API functions directly,
+            but this would break the communication between the iota-bridge and the Sensor.
+            
+            Example: --failover-iota-bridge-url="http://192.168.47.11:50000"
+
 ### Remote Control CLI commands
 As all Sensor applications running on ESP32 do not provide an interactive terminal, the 
 *x86/PC Sensor* can be used to remote control the ESP32
 applications. The x86/PC Sensor provides following CLI commands to manage the
 remote control functionality:
-
-    -t, --iota-bridge-url <IOTA_BRIDGE_URL>
-            The url of the iota-bridge to connect to.
-            Default value is http://localhost:50000
-            
-            Example: iota-bridge-url="http://192.168.47.11:50000"
 
     -c, --act-as-remote-control
             Use this argument to remotely control a running sensor application on
@@ -92,14 +119,17 @@ remote control functionality:
             Therefore in case you are using 'act-as-remote-control' you will also need to use
             the 'iota-bridge' option to connect to the iota-bridge.
 
-The *streams-poc-lib* test application can only bee remote controlled if the streams channel has
+The *streams-poc-lib* test application can only bee remote controlled if the *Streams Channel* has
 not already been initialized (further details can be found in the
 [streams-poc-lib README](../sensor/streams-poc-lib/README.md)).
 
-The x86/PC Sensor application can also be used to act as a remote controlled Sensor or let's say
-to mock (or imitate) an ESP32 Sensor application.
-This is especially usefull to test the *IOTA Bridge* and the *Management Console*
-without the need to run ESP32 Hardware. The CLI command to mock an ESP32 Sensor is:
+The x86/PC Sensor application can also be used to act as a remote controlled
+Sensor or let's say to mock (or imitate) the test application
+for the *Streams POC Library* in the 
+[uninitialized mode](../sensor/streams-poc-lib/README.md#uninitialized-mode).
+This is especially useful to test the *IOTA Bridge* and the *Management Console*
+without the need to run ESP32 Hardware. The CLI command to mock the
+*Streams POC Library* test application is:
 
     -m, --act-as-remote-controlled-sensor
             Imitate a remote sensor resp. an ESP32-Sensor awaiting remote control commands.
@@ -170,7 +200,7 @@ This can be achieved using the `--dev-eui` argument:
 #### Compressed Streams Messages
 To reduce the LoRaWAN payload size, compressed streams messages can be used to communicate
 between a *Sensor* and the *IOTA Bridge*.
-Compressed messages do not contain Streams Channel IDs and other data that can be restored by the
+Compressed messages do not contain *Streams Channel IDs* and other data that can be restored by the
 *IOTA Bridge*.
 
 **IMPORTANT NOTE:** To restore the omitted data of a compressed message, the *IOTA Bridge*
@@ -182,12 +212,12 @@ because in the SUSEE project the encryption key never leaves the
 
 #### Sensor to Bridge Pairing
 The usage of compressed messages is only possible after one or more normal streams messages have
-been send using the *IOTA Bridge*. The *IOTA Bridge* then learns which Streams Channel ID is used
+been send using the *IOTA Bridge*. The *IOTA Bridge* then learns which *Streams Channel ID* is used
 by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI.
 Using LoraWAN, the DevEUI is available via the protocol automatically and does not need 
 to be transferred as message payload.
 
-The mapping of LoraWAN DevEUI to Streams Channel ID is stored in a 
+The mapping of LoraWAN DevEUI to *Streams Channel ID* is stored in a 
 [local SQLite3 database](../iota-bridge/README.md#caching-of-lorawan-deveuis-and-streams-channel-meta-data)
 managed by the *IOTA Bridge*.
 
@@ -195,9 +225,9 @@ In case the *IOTA Bridge* added a *Sensor* to its mapping database, the response
 REST call that caused the new *Sensor* database entry will have a `208 - ALREADY_REPORTED` http status.
 All *Sensor* applications recognise this http response status and will only use compressed
 messages further on. The Sensor applications store the state whether to use compressed
-messages or not in their local user-state serialization files.
+messages or not in their local client-state serialization files.
 
-The process decribed above is called *Sensor to Bridge Pairing*.
+The process described above is called *Sensor to Bridge Pairing*.
 
 The following sequence diagram shows the *Sensor to Bridge Pairing* in more detail:
 <img src="Initial Sensor to IOTA-Bridge pairing.png" alt="Initial Sensor to IOTA-Bridge pairing" width="800"/>
@@ -239,11 +269,11 @@ During the [*Sensor Reinitialization* workflow](../README.md#sensor-reinitializa
 to a new *IOTA Streams Channel* while the *Sensor* DevEUI remains unchanged.
 
 The *Initialization Count* property of the SUSEE http protocol allows *IOTA Bridges* to detect reinitialized
-sensors and to update the cached *IOOTA Streams* channel-id to the new channel-id via the
+sensors and to update the cached *IOTA Streams Channel*-id to the new channel-id via the
 `messages/transmit` endpoint.
 
 The *Initialization Count* is stored in the *Sensor* wallet file and is incremented when the sensor
-subscribes to a new *Streams* channel.
+subscribes to a new *Streams Channel*.
 
 The *IOTA Bridge* stores the *Initialization Count* together with the channel-id in its
 [local SQLite3 database](../iota-bridge/README.md#caching-of-lorawan-deveuis-and-streams-channel-meta-data)
@@ -261,7 +291,7 @@ management logic is needed.
 In case the maximum number of *Initialization Counts* is reached there are several possible solutions to proceed:
 1. Allow a counter reset to zero. This includes the risk that *IOTA Bridges* with a very outdated cache will
    not detect a reinitialized *Sensor* which will lead to erroneous communication until another *IOTA Bridge*
-   is used that detects the new *Streams* channel-id.
+   is used that detects the new *Streams Channel*-id.
 2. Use the [`lorawan-node` endpoint](../iota-bridge/README.md#lorawan-node-endpoints) of all *IOTA Bridge*
    instances to delete the specific *Sensor* from the cache.
    This is the safest option, but a central management logic is needed to send the *IOTA Bridge*
@@ -291,15 +321,10 @@ and how the DevEUI is transfered to the *IOTA Bridge*:
   <br><br>
 * **x86/PC Sensor**<br>
   The LoRaWAN DevEUI is mocked using a persistent random value. The random value is stored
-  in the wallet file together with the Streams channel
+  in the wallet file together with the *Streams Channel*
   [plain text seed](../README.md#common-file-persistence).
   The *x86/PC Sensor* application does not use the 
   [AppServer Connector Mockup Tool](../app-srv-connector-mock)
   to access the `/lorawan-rest` endpoints of the *IOTA Bridge*. Instead, it uses the
   `/lorawan-rest` endpoints directly in case the `--use-lorawan-rest-api` CLI argument
   is used.
-  <br><br>
-* **ESP32 Sensor**<br>
-  Currently the *ESP32 Sensor* does not use `/lorawan-rest` endpoints of the *IOTA Bridge*
-  and therefore does not need a mocked LoRaWAN DevEUI.
-

@@ -13,7 +13,12 @@ use streams_tools::STREAMS_TOOLS_CONST_IOTA_BRIDGE_URL;
 use susee_tools::cli_base::CliOptions;
 
 static FILE_TO_SEND_ABOUT: &str = "A message file that will be encrypted and send using the streams channel.
-The message will be resend every 10 Seconds in an endless loop.
+The message will be resend every 5 Seconds in an endless loop.
+Use CTRL-C to stop processing.";
+
+static RANDOM_MSG_OF_SIZE_ABOUT: &str = "A random message of the specified length in bytes will be created,
+encrypted and send using the streams channel.
+A new random message will be resend every 5 Seconds in an endless loop.
 Use CTRL-C to stop processing.";
 
 static SUBSCRIBE_ANNOUNCEMENT_LINK_ABOUT: &str = "Subscribe to the channel via the specified announcement link.
@@ -51,6 +56,21 @@ This command is used to test the iota-bridge and the management-console applicat
 in case there are not enough ESP32 devices available. The sensor application will
 periodically fetch and process commands from the iota-bridge.
 
+The only usecase for this CLI argument currently is to initialize a sensor
+fully automatically using the --init-sensor argument of the management-console.
+Therefore the sensor will do a DevEUI-Handshake with the management-console
+via the iota-bridge at the beginning of the command fetch process.
+
+To perform the DevEUI-Handshake the sensor will use the dev_eui 'ANY'
+to fetch a DevEuiHandshake command from the iota-bridge.
+It will not accept any other type of command and will fetch commands
+until a DevEuiHandshake command has been received.
+After a DevEuiHandshake command has been received, the sensor
+will send its real dev_eui to the management-console with the
+DevEuiHandshake confirmation via the iota-bridge. This is followed by
+fetch command, process command and confirm sequences using the dev_eui
+of the sensor.
+
 If the iota-bridge runs on the same machine as this application, they can
 communicate over the loopback IP address (localhost). In case the sensor
 iota-bridge listens to the ip address of the network interface (the ip
@@ -80,6 +100,25 @@ Default value is {}
 
 Example: --iota-bridge-url=\"http://192.168.47.11:50000\"";
 
+static FAILOVER_IOTA_BRIDGE_URL_ABOUT: &str = "\
+Specifies a secondary iota-bridge used for failover.
+In case the primary iota-bridge (specified by the CLI argument '--iota-bridge-url')
+returns an erroneous http response, the sensor will try to use a secondary
+iota-bridge instance specified by this argument.
+The implemented failover-handling is very simple: The secondary iota-bridge is only
+called in case of errors and only once (per error).
+
+If this argument is not provided, no failover is done.
+
+The error response behavior of the iota-bridge is designed to allow failover-handling
+run on an application-server-connector. Therefore this argument must be used together
+with the --use-lorawan-rest-api argument. In theory, it would be possible to use
+--failover-iota-bridge-url while accessing iota-bridge API functions directly,
+but this would break the communication between the iota-bridge and the Sensor.
+
+Example: --failover-iota-bridge-url=\"http://192.168.47.11:50000\"
+";
+
 static PRINTLN_SUBSCRIBER_STATUS_ABOUT: &str = "Print information about the current client status of the sensor.
 In streams the sensor is a subscriber so that this client status is called subscriber status.
 ";
@@ -98,7 +137,6 @@ Example: --dev-eui=12345678
 
 static CLEAR_CLIENT_STATE_ABOUT: &str = "Deletes the current client status of the sensor so that
 all subscriptions get lost and the sensor can be used to subscribe to a new Streams channel.
-TODO: In future versions the seed will also be replaced by a new generated seed.
 TODO: -----------------------------
       --------  WARNING  ---------- Currently there is no confirmation cli dialog
       -----------------------------       use this option carefully!
@@ -108,6 +146,7 @@ pub struct ArgKeys {
     pub base: &'static BaseArgKeys,
     pub dev_eui: &'static str,
     pub files_to_send: &'static str,
+    pub random_msg_of_size: &'static str,
     pub subscribe_announcement_link: &'static str,
     pub register_keyload_msg: &'static str,
     pub act_as_remote_control: &'static str,
@@ -116,6 +155,7 @@ pub struct ArgKeys {
     pub clear_client_state: &'static str,
     pub iota_bridge_url: &'static str,
     pub use_lorawan_rest_api: &'static str,
+    pub failover_iota_bridge_url: &'static str,
     pub exit_after_successful_initialization: &'static str,
 }
 
@@ -125,11 +165,13 @@ pub static ARG_KEYS: ArgKeys = ArgKeys {
     base: &BASE_ARG_KEYS,
     dev_eui: "dev-eui",
     files_to_send: "file-to-send",
+    random_msg_of_size: "random-msg-of-size",
     subscribe_announcement_link: "subscribe-announcement-link",
     register_keyload_msg: "register-keyload-msg",
     act_as_remote_control: "act-as-remote-control",
     act_as_remote_controlled_sensor: "act-as-remote-controlled-sensor",
     iota_bridge_url: "iota-bridge-url",
+    failover_iota_bridge_url: "failover-iota-bridge-url",
     clear_client_state: "clear-client-state",
     println_subscriber_status: "println-subscriber-status",
     use_lorawan_rest_api: "use-lorawan-rest-api",
@@ -143,6 +185,7 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
 
     let cli_opt = CliOptions {
         use_node: false,
+        use_data_dir: false,
         use_wallet: true,
     };
 
@@ -174,6 +217,16 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
                 .long_help(FILE_TO_SEND_ABOUT)
                 .multiple_occurrences(true)
                 .min_values(0)
+                .conflicts_with(ARG_KEYS.random_msg_of_size)
+                .conflicts_with(ARG_KEYS.subscribe_announcement_link)
+                .conflicts_with(ARG_KEYS.register_keyload_msg)
+            )
+            .arg(Arg::new(ARG_KEYS.random_msg_of_size)
+                .long(ARG_KEYS.random_msg_of_size)
+                .short('g')
+                .value_name("MSG_SIZE")
+                .long_help(RANDOM_MSG_OF_SIZE_ABOUT)
+                .conflicts_with(ARG_KEYS.files_to_send)
                 .conflicts_with(ARG_KEYS.subscribe_announcement_link)
                 .conflicts_with(ARG_KEYS.register_keyload_msg)
             )
@@ -196,6 +249,13 @@ pub fn get_arg_matches() -> ArgMatchesAndOptions {
                 .short('b')
                 .value_name("IOTA_BRIDGE_URL")
                 .help(iota_bridge_url_about.as_str())
+            )
+            .arg(Arg::new(ARG_KEYS.failover_iota_bridge_url)
+                .long(ARG_KEYS.failover_iota_bridge_url)
+                .short('o')
+                .value_name("FAILOVER_IOTA_BRIDGE_URL")
+                .requires(ARG_KEYS.use_lorawan_rest_api)
+                .help(FAILOVER_IOTA_BRIDGE_URL_ABOUT)
             )
             .arg(Arg::new(ARG_KEYS.dev_eui)
                 .long(ARG_KEYS.dev_eui)

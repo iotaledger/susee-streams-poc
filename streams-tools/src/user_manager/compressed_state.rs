@@ -11,7 +11,7 @@ use std::{
 // until the iota-bridge indicates that it has stored all needed data to use
 // compressed massages further on (see streams-tools/src/iota_bridge/server_dispatch_streams.rs
 // for more details).
-// The SubscriberManager persists the use_compressed_msg state in its user state
+// The SubscriberManager persists the use_compressed_msg state in its Streams Client State
 // serialization file so that the state will not get lost.
 //
 // As the iota-bridge indicates the use_compressed_msg state using the specific transport

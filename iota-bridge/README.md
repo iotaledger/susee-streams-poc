@@ -3,7 +3,7 @@
 The *IOTA Bridge* is a REST service for messages transferred between the following list of actors:
 
 * *Management Console*
-* All kinds of *Sensor* applications like *ESP32 Sensor* and *x86/PC Sensor*
+* All kinds of *Sensor* applications like *Streams POC Library* test application and *x86/PC Sensor*
 * *IOTA Tangle* nodes
 * Services accessing the LoRaWAN AP-Server (a.k.a. *Application Server Connector*)
 
@@ -15,36 +15,105 @@ It provides a REST API to:
 * Send remote control confirmations from a *Sensor* application to the *x86/PC Sensor*
   or *Management Console* application
 * Receive IotaBridgeRequest packages containing one of the above described REST API requests as
-  a binary serialized package which can be used to interact with the IOTA Bridge e.g. via LoRaWAN
+  a binary serialized package which can be used to interact with the *IOTA Bridge* e.g. via LoRaWAN
 
 ## Prerequisites and Build
-Please have a look at the [Prerequisites](../README.md#prerequisites)
+Please have a look at the [Prerequisites](../README.md#build-prerequisites)
 and [Build](../README.md#build) section of the main README of this repository.
 
 ## IOTA-Bridge Console CLI
 
 In addition to the common CLI options described in the
 [CLI API section of the main README file](../README.md#common-cli-options)
-the *IOTA-Bridge* offers the following CLI arguments.
+the *IOTA Bridge* offers the following CLI arguments.
 
     -l, --listener-ip-address <LISTENER_IP_ADDRESS_PORT>
             IP address and port to listen to.
             Example: listener-ip-address="192.168.47.11:50000"
-            
 
     -n, --node <NODE_URL>
-            The url of the iota node to connect to.
-            Use 'https://chrysalis-nodes.iota.org' for the mainnet.
+            The IP or domain name of the SUSEE Node to connect to.
+            Set this value to the domain name or static ip address of the SUSEE Node
+            which provides the IOTA Node, inx-collector and inx-poi web services.
+            See folder 'susee-node' for more details.
             
-            As there are several testnets have a look at
-                https://wiki.iota.org/learn/networks/testnets
-            for alternative testnet urls.
+            The IOTA Node and inx-collector API will be accessed using their
+            standard ports (14265 and 9030) automatically.
             
-            Example:
-                The iota chrysalis devnet:
-                https://api.lb-0.h.chrysalis-devnet.iota.cafe
-             [default: https://chrysalis-nodes.iota.org]
+            The default settings will connect to the private tangle that can be run
+            for development purposes (see folder 'susee-node' for more details).
             
+            Examples:
+                --node="195.90.200.153"
+                -n="example.com"
+             [default: 127.0.0.1]
+
+#### Error Handling
+The `--error-handling` argument can be used to control the handling of SUSEE-Node service
+errors. For more details please see the
+[IOTA Bridge Error Handling](#iota-bridge-error-handling-for-lorawan-node-endpoints)
+section below.
+             
+    -e, --error-handling <ERROR_HANDLING>
+            Defines how errors occurring during 'lorawan-rest/binary_request'
+            endpoint processing are handled.
+            
+            Existing values are:
+                always-return-errors,
+                    All internal errors are immediately returned to the client.
+                    The client is responsible to handle the error for example
+                    by doing a failover to another iota-bridge instance or
+                    by buffering the payload and later retrial.
+                    Use this option if there are multiple redundant iota-bridge
+                    instances run.
+                buffer-messages-on-validation-errors
+                    In case the validation of a send message fails, the
+                    iota-bridge will buffer the message and will later retry
+                    to send the message via the tangle.
+                    This option is only suitable if only one iota-bridge
+                    instance is run.
+            
+            
+            Internal errors of the iota-bridge are provided via http error status codes:
+            
+                | ------------------------------ | --------------------------- |
+                | Error Type                     | HTTP Error Status           |
+                | ------------------------------ | --------------------------- |
+                | *SUSEE Node* health error      | 503 - Service Unavailable   |
+                | Message send validation error  | 507 - Insufficient Storage  |
+                | Other error                    | 500 - Internal Server Error |
+                | ------------------------------ | --------------------------- |
+            
+            For more details regarding the different error types please see the
+            iota-bridge Readme.md file.
+             [default: always-return-errors]         
+
+#### Send messages not using *IOTA Tangle*
+
+In case of an IOTA protocol update in the IOTA mainnet or Shimmernet, the deployed
+*IOTA Bridge* will not be able to communicate with an *IOTA Node* anymore.
+The `--do-not-use-tangle-transport` argument can be used to bypass the *IOTA Node*
+and to send the Sensor messages directly to the deployed
+[INX Collector](../susee-node/README.md#susee-node-resources).
+This option may be used as a workaround until the new protocol version has been integrated in the
+*IOTA Bridge* and other *susee-streams-poc* applications (in other words: Until the
+*susee-streams-poc* has been updated to the new protocol version).
+
+Using the `--do-not-use-tangle-transport` argument means that no 
+[Proof of Inclusion Validation](../README.md#proof-of-inclusion-or-why-is-iota-distributed-ledger-used)
+can be done later on. 
+
+    -t, --do-not-use-tangle-transport
+            If this argument is NOT specified, the IOTA tangle
+            will be used for Sensor message transport.
+            If this argument is specified, the messages will be send directly
+            via the inx-collector to the database.
+            
+            Example for sending messages directly to the inx-collector:
+            
+                    ./iota-bridge --do-not-use-tangle-transport -n="my-susee-node-domain.com"
+
+
 ## IOTA Bridge REST API
 
 Most of the REST API is used internally by the accompanying susee-streams-poc applications.
@@ -78,7 +147,8 @@ in your C code you will receive a binary package via the `lorawan_send_callback`
 to specify to call send_message(). You'll transmit this binary package e.g. via LoRaWAN. In your LoRaWAN Application
 Server you can use the `lorawan-rest/binary_request` endpoint of the *IOTA Bridge* to hand the binary package over to it. 
 
-The body of the resulting HTTP Resonse needs to be returned to the *ESP32 Sensor* via the `response_callback`
+The body of the resulting HTTP Resonse needs to be returned to your *Sensor* Application
+which then needs to transmit it to the streams-poc-lib via the `response_callback`
 function that is provided by the streams-poc-lib.
 
 Have a look into the following documentation for more details:
@@ -91,6 +161,76 @@ The *AppServer Connector Mockup Tool* implements this process but uses a WIFI
 socket connection instead of a LoRaWAN connection. For further details please
 have a look into the
 [*AppServer Connector Mockup Tool* README](../app-srv-connector-mock/README.md).
+
+### IOTA Bridge Error Handling for lorawan-rest Endpoints
+
+The `--error-handling` argument described above, can be used to specify
+how internal errors of the *SUSEE Node* are handled when
+the `lorawan-rest/binary_request` endpoint is used.
+
+There are three
+types of errors which are indicated with specific http
+error status values:
+
+| Error Type                     | HTTP Error Status           |
+| ------------------------------ | --------------------------- |
+| *SUSEE Node* health error      | 503 - Service Unavailable   |
+| Message send validation error  | 507 - Insufficient Storage  |
+| Other error                    | 500 - Internal Server Error |
+
+
+More details regarding these errors can be found in the following sections.
+
+#### SUSEE-Node health error
+
+Before any access to the IOTA Tangle is processed the *IOTA Bridge*
+performs a service health check for the following services:
+* *IOTA Node*
+* *INX Collector*
+* *MINIO* Object Database.
+
+If any of these services is not healthy the
+*IOTA Bridge* will return a `503 - Service Unavailable` http error
+for a `/lorawan-rest` request.
+
+#### Message send validation error
+
+After a *Sensor* message has been send via the *IOTA Tangle*
+the resulting block and it's POI must be archived by the *INX Collector*
+in the *MINIO* object database. In case of errors the block might not
+have been stored in the *MINIO* database.
+
+To make sure that the *Sensor* message has been successfully send and the
+resulting block exists in the *MINIO* database, the *IOTA Bridge* will validate
+the block existence after each message send process.
+
+In case this validation fails the behavior of the *IOTA Bridge* depends on
+the `--error-handling` argument:
+
+**--error-handling = always-return-errors**
+
+The *IOTA Bridge* will return a
+`507 - Insufficient Storage` http error
+for a `/lorawan-rest` request.
+
+Use this option if there are multiple redundant iota-bridge
+instances run.
+
+For production environments we recommend to run at least two *SUSEE Nodes*,
+each providing an independently working *IOTA Bridge* instance.
+The available instances can be run behind a load balancer or the
+*Application Server Connector* can do a simple failover.
+
+**--error-handling = buffer-messages-on-validation-errors**
+
+The *IOTA Bridge* will buffer the *Sensor* message in its local SQLite database
+and will try to send the message in the future.
+
+The *IOTA Bridge* then will respond with a
+`200 - OK` http status to the `/lorawan-rest` request.
+
+This option is only suitable if only one iota-bridge
+instance is run for test purposes.
 
 ### lorawan-node Endpoints
 To allow [compressed Streams message](../sensor/README.md#deveuis-and-compressed-streams-messages)
@@ -165,19 +305,19 @@ As been descibed in the
 compressed streams messages can be used to
 reduce the LoRaWAN payload size.
 The usage of compressed messages is only possible after one or more normal streams messages have
-been send. The *IOTA Bridge* then learns which Streams Channel ID is used
+been send. The *IOTA Bridge* then learns which *Streams Channel ID* is used
 by which *Sensor* where the *Sensor* is identified by its 64 bit LoraWAN DevEUI.
 Additionally the [initialization count](../sensor/README.md#initialization-count)
-is stored to allow [*Sensor* reinitialization detection](../test/README.md#sensor-reinitialization).
+is stored to allow [*Sensor Reinitialization* detection](../test/README.md#sensor-reinitialization).
 
-The mapping of LoraWAN DevEUI to Streams Channel meta data is stored in a local SQLite3 database.
+The mapping of LoraWAN DevEUI to *Streams Channel* meta data is stored in a local SQLite3 database.
 The database file "iota-bridge.sqlite3" is stored in the directory where the
-*IOTA-Bridge* is started.
+*IOTA Bridge* is started.
 
 To review the data stored in the local SQLite3 database we recommend the
 [DB Browser for SQLite](https://sqlitebrowser.org/) application.
 
-## Use in Production
+#### Use in Production
 
 A network of LoRaWAN connected *Sensors* can consist of multiple millions of *Sensors*.
 Given these *Sensors* would send messages every 15 minutes this leads to ~1.11 K request/s
@@ -195,5 +335,123 @@ high availability data storage solution like (e.g. mariadb, postgres, mongodb, c
 Alternatively to handle thousands of requests per second using a high performance *IOTA Bridge*
 the service could run on edge devices to handle only dozens or hundreds of requests in a specific
 region resp. sector oft the LoRaWAN network. 
+
+## Commands and Confirmations
+
+Behind the scenes *Commands* and *Confirmations* are used by the 
+*Management Console* and a *Sensor* to communicate with each other.
+The *Commands* and *Confirmations* are send via the *IOTA Bridge*
+which provides all needed web API endpoints for the communication process.
+
+The *IOTA Bridge* acts as a simple proxy without interfering in the process
+controlled by the *Management Console*.
+
+Commands are created by the *Management Console* via the *IOTA Bridge* web API
+and fetched by a *Sensor* through cyclic HTTP REST polling.
+Confirmations are created by a *Sensor* via the *IOTA Bridge* web API
+and fetched by the *Management Console* through cyclic HTTP REST polling.
+Although currently not used a *Sensor* can connect to the *IOTA Bridge*
+web API for *Commands* and *Confirmations* via the LoRaWAN communication
+infrastructure by using the `lorawan-rest/binary_request`
+[endpoint](#lorawan-rest-endpoints) of the *IOTA Bridge*.
+
+Cyclic HTTP REST polling is very slow compared to other web communication
+protocols (for example *WebRTC* or *HTTP/2* features) but is used here
+because of its simplicity and reliability in usage scenarios with very
+slow and unreliable connections.
+  
+The properties that are communicated between *Management Console* and 
+*Sensor* are basic data types like integers, UTF8 strings or binary data
+packages.
+
+*Commands* and *Confirmations* are mainly used for the
+[Automatic Sensor Initialization](../management-console/README.md#automatic-sensor-initialization)
+and
+[Multiple Parallel Automatic Sensor Initialization](../management-console/README.md#multiple-parallel-automatic-sensor-initialization).
+
+One *Management Console* can communicate with multiple *Sensors*
+in parallel, where each *Command* can have only one receiving *Sensor*
+and each *Confirmation* only one *Sensor* as originator.
+The *Sensor* being the receiver or originator
+is identified by its *DevEUI*.
+At the beginning of an automatic
+*Sensor* initialization, the *DevEUI* of a Sensor is determined using a
+[DevEUI Handshake](../management-console/README.md#deveui-handshake).
+ 
+#### Commands
+
+Commands are created by the *Management Console* using one of the following
+*IOTA Bridge* API endpoints:
+
+| Method| Path                                        | *Command Type*     |
+|------ |---------------------------------------------|--------------------|
+|POST   | command/subscribe_to_announcement/{dev_eui} | SUBSCRIBE_TO_ANNOUNCEMENT_LINK |
+|POST   | command/register_keyload_msg/{dev_eui}      | REGISTER_KEYLOAD_MESSAGE |
+|GET    | command/dev_eui_handshake/{dev_eui}         | DEV_EUI_HANDSHAKE |
+|GET    | command/clear_client_state/{dev_eui}        | CLEAR_CLIENT_STATE |
+|POST   | command/send_messages/{dev_eui}             | START_SENDING_MESSAGES |
+|GET    | command/println_subscriber_status/{dev_eui} | PRINTLN_SUBSCRIBER_STATUS |
+
+Commands are fetched by a *Sensor* using the GET `command/next/{dev_eui}` endpoint.
+
+List of existing *Commands*:
+
+| *Command Type*                | Comment            |
+|-------------------------------|--------------------|
+|NO_COMMAND                     | Returned to *Sensor* in case no *Command* is available |
+|SUBSCRIBE_TO_ANNOUNCEMENT_LINK | *Sensor* shall subscribe to an announcement link |
+|REGISTER_KEYLOAD_MESSAGE       | *Sensor* shall register a keyload message |
+|DEV_EUI_HANDSHAKE              | *Management Console* wants to perform a *DevEUI Handshake* with a *Sensor* |
+|CLEAR_CLIENT_STATE             | *Sensor* shall clear its client state |
+|PRINTLN_SUBSCRIBER_STATUS      | *Sensor* shall print its subscriber status to the console log |
+|START_SENDING_MESSAGES         | *Sensor* shall send messages in an endless loop |
+|STOP_FETCHING_COMMANDS         | Internally used inside the *Sensor* to stop *Command* polling |
+
+<br>
+
+Diagram of the existing *Commands* in the representation used for transport via LoRaWAN:
+
+<br>
+
+<img src="commands-uml-diagram.png" alt="Commands used for Management Console to Sensor communication" width="800"/>
+
+<br>
+
+#### Confirmations
+
+*Confirmations* are created by a *Sensor* using one of the following
+*IOTA Bridge* API endpoints:
+
+| Method| Path                                    | *Confirmation Type* |
+|------ |-----------------------------------------|---------------------|
+|POST   | confirm/subscription/{dev_eui}          | SUBSCRIPTION |
+|POST   | confirm/keyload_registration/{dev_eui}  | KEYLOAD_REGISTRATION |
+|POST   | confirm/dev_eui_handshake/{dev_eui}     | DEV_EUI_HANDSHAKE |
+|POST   | confirm/clear_client_state/{dev_eui}    | CLEAR_CLIENT_STATE |
+|POST   | confirm/subscriber_status/{dev_eui}     | SUBSCRIBER_STATUS |
+|POST   | confirm/send_messages/{dev_eui}         | SEND_MESSAGES |
+
+*Confirmations* are fetched by the *Management Console* using the 
+GET `confirm/next/{dev_eui}` endpoint.
+
+List of existing *Confirmations*:
+
+| *Confirmation Type* | Comment            |
+|---------------------|--------------------|
+|NO_CONFIRMATION      | Returned to *Management Console* in case no *Confirmation* is available |
+|SUBSCRIPTION         | *Sensor* confirms successful *Streams Channel* subscription |
+|KEYLOAD_REGISTRATION | *Sensor* confirms successful registration of a keyload link |
+|DEV_EUI_HANDSHAKE    | *Sensor* confirms accepting a *DevEUI Handshake* |
+|CLEAR_CLIENT_STATE   | *Sensor* confirms successfully having cleared its client state |
+|SUBSCRIBER_STATUS    | *Sensor* confirms having printed its subscriber status to the console log |
+|SEND_MESSAGES        | *Sensor* will never use this as the messages are send in an endless loop |
+
+<br>
+
+Diagram of the existing *Confirmations* in the representation used for transport via LoRaWAN:
+
+<br>
+
+<img src="confirmations-uml-diagram.png" alt="Confirmations used for Sensor to Management Console communication" width="1000"/>
 
 

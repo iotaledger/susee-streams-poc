@@ -1,3 +1,4 @@
+pub mod iota_bridge_error;
 pub mod http_tools;
 pub mod http_dispatch_scope;
 pub mod http_protocol_streams;
@@ -11,7 +12,7 @@ pub mod http_server_process_finally;
 pub use {
     http_protocol_streams::{
         RequestBuilderStreams,
-        MapStreamsErrors,
+        MapLetsError,
     },
     http_server_dispatch::dispatch_request,
     http_dispatch_scope::{

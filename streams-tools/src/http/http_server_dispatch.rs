@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use hyper::{
     Body,
     http::{
@@ -6,6 +8,10 @@ use hyper::{
         Result,
         status,
     }
+};
+
+use crate::{
+    binary_persist::binary_persist_iota_bridge_req::IotaBridgeResponseParts,
 };
 
 use super::{
@@ -24,7 +30,8 @@ use super::{
     },
     http_protocol_lorawan_rest::{
         ServerDispatchLorawanRest,
-        dispatch_request_lorawan_rest
+        dispatch_request_lorawan_rest,
+        translate_lorawan_rest_error,
     },
     http_protocol_lorawan_node::{
         ServerDispatchLoraWanNode,
@@ -39,11 +46,8 @@ use super::{
     http_dispatch_scope::{
         DispatchScope,
         ScopeProvide
-    }
+    },
 };
-
-use crate::binary_persist::binary_persist_iota_bridge_req::IotaBridgeResponseParts;
-use std::rc::Rc;
 
 pub struct NormalDispatchCallbacks<'a, Scope, Streams, Command, Confirm, LorawanNode, Finally>
     where
@@ -91,7 +95,7 @@ pub async fn dispatch_request<'a, Scope, Streams, Command, Confirm, LorawanNode,
 
         ret_val = normal_callbacks.finally.process(ret_val, &req_parts, scope.as_ref()).await?;
     } else {
-        log::debug!("[dispatch_request] Could not create DispatchedRequestParts from hyper request. Returning 500");
+        log::debug!("[fn dispatch_request()] Could not create DispatchedRequestParts from hyper request. Returning 500");
         ret_val = get_response_500("Error on initial deserialization of your request")?;
     }
 
@@ -115,23 +119,28 @@ async fn dispatch_lorawan_rest_request<'a, Scope, Streams, Command, Confirm, Lor
         Ok(req_parts_inner) => {
             match req_parts_inner.status {
                 DispatchedRequestStatus::DeserializedLorawanRest => {
-                    log::debug!("[dispatch_lorawan_rest_request] Processing DeserializedLorawanRest now");
+                    log::debug!("[fn dispatch_request_lorawan_rest()] Processing DeserializedLorawanRest now");
                     let response = normal_callbacks.dispatch(&req_parts_inner).await?;
+                    let response_status = translate_lorawan_rest_error(response.status());
                     let response_parts = IotaBridgeResponseParts::from_hyper_response(response).await;
-                    println!("[dispatch_lorawan_rest_request] Returning response for dev_eui '{}'\n{}", req_parts_inner.dev_eui, response_parts);
-                    response_parts.persist_to_hyper_response_200()
+                    log::info!("[dispatch_request_lorawan_rest] DevEUI: {} - Returning response {} for lorawan_rest request:\n{}",
+                               req_parts_inner.dev_eui,
+                               response_status,
+                               response_parts
+                    );
+                    response_parts.persist_to_hyper_response(response_status)
                 }
                 DispatchedRequestStatus::LorawanRest404 => {
                     get_response_404("The lorawan-rest API function addressed by the requested URL does not exist")
                 },
                 _ => {
-                    log::debug!("[dispatch_lorawan_rest_request] Unexpected DispatchedRequestStatus: '{}'. Returning 500", req_parts_inner.status);
+                    log::debug!("[fn dispatch_request_lorawan_rest()] Unexpected DispatchedRequestStatus: '{}'. Returning 500", req_parts_inner.status);
                     get_response_500("The lorawan-rest request resulted in an unexpected status")
                 }
             }
         },
         Err(e) => {
-            log::error!("[dispatch_lorawan_rest_request] Fatal error on dispatching lorawan rest request. Returning 500. Error is: {}", e);
+            log::error!("[fn dispatch_request_lorawan_rest()] Fatal error on dispatching lorawan rest request. Returning 500. Error is: {}", e);
             get_response_500("Error on deserialization of your lorawan-rest request")
         }
     }
@@ -148,7 +157,7 @@ impl<'a, Scope, Streams, Command, Confirm, LorawanNode, Finally> NormalDispatchC
 {
     pub async fn dispatch(&mut self, req_parts: &DispatchedRequestParts) -> Result<Response<Body>> {
         let mut ret_val: Option<Response<Body>> = None;
-        log::debug!("[dispatch_normal_request] Dispatching request.path '{}'", req_parts.path);
+        log::debug!("[NormalDispatchCallbacks.dispatch] Dispatching request.path '{}'", req_parts.path);
         if req_parts.path.starts_with(self.streams.get_uri_prefix()) {
             ret_val = Some(dispatch_request_streams(&req_parts, self.streams).await?);
         }
@@ -162,14 +171,16 @@ impl<'a, Scope, Streams, Command, Confirm, LorawanNode, Finally> NormalDispatchC
             ret_val = Some(dispatch_request_lorawan_node(&req_parts, self.lorawan_node).await?);
         }
 
-        log::debug!("[dispatch_normal_request] Exiting function");
+        log::debug!("[NormalDispatchCallbacks.dispatch] Exiting function");
+        if ret_val.is_none() {
+            log::debug!("[NormalDispatchCallbacks.dispatch] ret_val is None. Returning 404");
+            ret_val = Some( Response::builder()
+                .status(status::StatusCode::NOT_FOUND)
+                .body(Default::default())?
+            );
+        }
         ret_val.ok_or_else(|| {
-            if let Err(e) = status::StatusCode::from_u16(404) {
-                log::debug!("[dispatch_normal_request] ret_val is Err. Returning 404");
-                e.into()
-            } else {
-                panic!("Should never happen");
-            }
+            panic!("[NormalDispatchCallbacks.dispatch] Should never happen");
         })
     }
 

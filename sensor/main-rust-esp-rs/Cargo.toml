@@ -3,26 +3,29 @@ name = "main-rust-esp-rs"
 version = "0.1.0"
 authors = ["chrisgitiota <christof.gerritsma@iota.org>"]
 edition = "2018"
+resolver = "2"
 
 [features]
-default = ["native"]
+default = ["no-native"]
 native = ["esp-idf-sys/native"]
+no-native = []
 
 [dependencies]
-esp-idf-sys = { version = "0.32.1", features = ["binstart"] }
-esp-idf-svc = { version = "0.45.0", features = ["experimental"] }
+esp-idf-sys = { version = "0.33.2", features = ["binstart"] }
+esp-idf-svc = { version = "0.46.2", features = ["experimental"] }
+futures-lite = { version = "1.12.0" }
 smol = { version = "1.2"}
 streams-tools = { version = "0.1.2", path = "../../streams-tools", default-features = false, features=["smol_rt", "esp_idf"] }
 sensor-lib = { version = "0.1.2", path = "../sensor-lib", default-features = false, features = ["smol_rt", "esp_idf"] }
 log = "0.4"
 anyhow = "1.0.40"
 
-[dependencies.iota-streams]
+[dependencies.streams]
 git = "https://github.com/chrisgitiota/streams"
-branch="v1"
+branch="stardust-iota-sdk"
 default-features = false
-features = ["std", "tangle"]
+features = ["no-client"]
 
 [build-dependencies]
-embuild = "0.28"
+embuild = "0.31.2"
 anyhow = "1"

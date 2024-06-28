@@ -1,3 +1,17 @@
+use std::{
+    fmt,
+    fmt::Formatter,
+    result::Result as StdResult,
+};
+
+use url::Url;
+
+use anyhow::{
+    Result as AnyhowResult,
+    bail,
+    anyhow,
+};
+
 use hyper::{
     Body,
     body,
@@ -17,21 +31,8 @@ use hyper::{
 use crate::binary_persist::{
     BinaryPersist,
     EnumeratedPersistable,
-};
-
-use url::{
-    Url,
-};
-use std::{
-    fmt,
-    fmt::Formatter,
-    str::FromStr,
-    result::Result as StdResult,
-};
-
-use anyhow::{
-    Result as AnyhowResult,
-    bail,
+    HeaderFlags,
+    binary_persist_iota_bridge_req::HttpMethod
 };
 
 #[derive(Clone)]
@@ -48,6 +49,14 @@ impl RequestBuilderTools {
 
     pub fn get_request_builder() -> Builder {
         Request::builder().header("User-Agent", "streams-client/1.0")
+    }
+
+    pub fn get_header_flags(is_compressed: bool, method: HttpMethod) -> HeaderFlags {
+        let mut header_flags = HeaderFlags::from(method);
+        if is_compressed {
+            header_flags.insert(HeaderFlags::NEEDS_REGISTERED_LORAWAN_NODE);
+        }
+        header_flags
     }
 
     pub fn get_uri(self: &Self, path: &str) -> String {
@@ -75,6 +84,14 @@ pub(crate) fn get_response_404(description: &str) -> Result<Response<Body>,Error
 
 pub(crate) fn get_response_500(description: &str) -> Result<Response<Body>,Error> {
     get_response_with_status_code(StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error", description)
+}
+
+pub(crate) fn get_response_503(description: &str) -> Result<Response<Body>,Error> {
+    get_response_with_status_code(StatusCode::SERVICE_UNAVAILABLE, "Service Unavailable", description)
+}
+
+pub(crate) fn get_response_507(description: &str) -> Result<Response<Body>,Error> {
+    get_response_with_status_code(StatusCode::INSUFFICIENT_STORAGE, "Insufficient Storage", description)
 }
 
 pub(crate) fn get_response_with_status_code(status_code: StatusCode, body_text: &str, description: &str) -> Result<Response<Body>,Error> {
@@ -235,15 +252,39 @@ impl<'a> DispatchedRequestParts {
     }
 }
 
-pub fn get_dev_eui_from_str(dev_eui_str: &str, api_endpoint_name: &str, query_param_name: &str) -> Result<Vec<u8>, Error>{
-    let dev_eui_u64 = u64::from_str(dev_eui_str).expect(format!(
-        "[http_protocoll - {}] Query parameter {} could not be parsed into a u64 value.\
-                                                                     Make sure to use only positiv numbers.\n Value is '{}'",
-        api_endpoint_name,
-        query_param_name,
-        dev_eui_str,
-    ).as_str());
-    Ok(dev_eui_u64.to_le_bytes().to_vec())
+impl fmt::Display for DispatchedRequestParts {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let query_params = match Url::parse(self.req_url.as_str()){
+            Ok(url) => {
+                if let Some(qry) = url.query(){
+                    qry.to_string()
+                } else {
+                    "".to_string()
+                }
+            },
+            Err(_) => "".to_string()
+        };
+
+        write!(f, "{{ dev_eui: {}, status: {}, method: {}, path: {}, query: {}, body-length: {} }}",
+            self.dev_eui,
+            self.status,
+            self.method,
+            self.path,
+            query_params,
+            self.binary_body.len(),
+        )
+    }
+}
+
+pub fn get_dev_eui_from_str(dev_eui_str: &str) -> Result<Vec<u8>, Error>{
+    Ok(dev_eui_str.as_bytes().to_vec())
+}
+
+pub async fn get_string_from_response_body(mut response: Response<Body>) -> AnyhowResult<String> {
+    let body_bytes = body::to_bytes(response.body_mut()).await?;
+    String::from_utf8(body_bytes.to_vec()).map_err(|e|
+        anyhow!("Error on parsing bytes into utf8 string. Error: {}", e)
+    )
 }
 
 #[derive(Clone)]

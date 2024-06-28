@@ -9,8 +9,8 @@ resolver = "2"
 crate-type = ["staticlib"]
 
 [dependencies]
-esp-idf-sys = { version = "0.32.1", features = ["native"] }
-esp-idf-svc = { version = "0.45.0", features = ["experimental"] }
+esp-idf-sys = { version = "0.33.2", features = ["native"] }
+esp-idf-svc = { version = "0.46.2", features = ["experimental"] }
 futures-lite = { version = "1.12.0" }
 smol = { version = "1.2"}
 streams-tools = { version = "0.1.2", path = "../../../../streams-tools", default-features = false, features=["smol_rt", "esp_idf"] }
@@ -18,12 +18,13 @@ sensor-lib = { version = "0.1.2", path = "../../../sensor-lib", default-features
 log = "0.4"
 anyhow = "1.0.40"
 cty = "0.2.2"
+libc = "0.2.153"
 
-[dependencies.iota-streams]
+[dependencies.streams]
 git = "https://github.com/chrisgitiota/streams"
-branch="v1"
+branch="stardust-iota-sdk"
 default-features = false
-features = ["std", "tangle"]
+features = ["no-client"]
 
 [build-dependencies]
 bindgen = "0.58"
@@ -43,14 +44,25 @@ opt-level = "s"
 panic = "unwind"
 
 [patch.crates-io]
+#socket2 = { git = "https://github.com/chrisgitiota/socket2", branch="for-susee" }
+#socket2 = { path = "/home/christof/Develop/chrisgitiota/socket2" }
 socket2 = { git = "https://github.com/esp-rs-compat/socket2" }
 getrandom1 = { version = "0.1", git = "https://github.com/esp-rs-compat/getrandom", package = "getrandom", branch="0.1"}
 getrandom = { version = "0.2", git = "https://github.com/rust-random/getrandom.git" }
 smol = { git = "https://github.com/esp-rs-compat/smol" }
+#async-process = {version = "1.7.0", git = "https://github.com/smol-rs/async-process", rev="07165c72f5a257a0973663004a923799f8fa3c3b"}
+async-io = {version = "1.12.0", git = "https://github.com/smol-rs/async-io", tag="v1.12.0"}
+#signal-hook-registry = { version = "1.4", path = "/home/christof/Develop/chrisgitiota/signal-hook/signal-hook-registry" }
+
 polling = { git = "https://github.com/esp-rs-compat/polling" }
 time = { version = "=0.3.4", git = "https://github.com/time-rs/time", rev="8ec5f4ef2f63321b3dbbec3b4a6c4001fdf26de6" }
 iota-crypto = { version = "0.9.1", git = "https://github.com/iotaledger/crypto.rs.git", rev="6840d43f98ad1a991571268f7a9543025200ca4f" }
-#esp-idf-sys = { version = "0.32.1", path = "/home/christof/Develop/esp-rs/esp-idf-sys/" }
+#esp-idf-sys = { version = "0.33.2", path = "/home/christof/Develop/esp-rs/esp-idf-sys/" }
 #esp-idf-hal = { version = "0.38.0", path = "/home/christof/Develop/esp-rs/esp-idf-hal/" }
 #esp-idf-svc = { version = "0.45.0", path = "/home/christof/Develop/esp-rs/esp-idf-svc/" }
 # futures-lite = { version = "1.12.0", path = "/home/christof/Develop/smol-rs/futures-lite/" }
+
+#[patch."https://github.com/chrisgitiota/streams"]
+#streams = { version = "0.2.0", path = "/home/christof/Develop/chrisgitiota/streams/streams" }
+#lets = { version = "0.2.0", path = "/home/christof/Develop/chrisgitiota/streams/lets" }
+#spongos = { version = "0.2.0", path = "/home/christof/Develop/chrisgitiota/streams/spongos" }

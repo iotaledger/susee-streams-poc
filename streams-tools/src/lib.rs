@@ -21,6 +21,12 @@ pub mod dao_helpers;
 #[cfg(feature = "explorer")]
 pub mod explorer;
 
+#[cfg(test)]
+pub (crate) mod test_helpers;
+
+#[cfg(any(feature = "explorer", feature = "iota_bridge"))]
+pub mod threading_helpers;
+
 pub use {
     wallet::{
         dummy_wallet::DummyWallet,

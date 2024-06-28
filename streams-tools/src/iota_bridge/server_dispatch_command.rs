@@ -1,10 +1,8 @@
 use std::{
-    clone::Clone,
-    collections::VecDeque,
     rc::Rc,
 };
 
-use iota_streams::core::async_trait;
+use async_trait::async_trait;
 
 use hyper::{
     Body,
@@ -30,27 +28,27 @@ use crate::{
     },
 };
 
-static mut FIFO_QUEUE: Option<VecDeque<Vec<u8>>> = None;
+use super::{
+    fifo_queue::{
+        FifoQueueMap,
+        FifoQueueElement,
+        fifo_queue_pop_front,
+        get_new_fifo_queue_map,
+        create_new_fifo_queue_if_not_exist,
+    },
+};
+
+static mut FIFO_QUEUES: Option<FifoQueueMap> = None;
 
 pub struct DispatchCommand<'a> {
-    fifo: &'a mut VecDeque<Vec<u8>>,
+    fifos: &'a mut FifoQueueMap,
     scope: Option<Rc<dyn DispatchScope>>,
 }
 
 impl<'a> Clone for DispatchCommand<'a> {
     fn clone(&self) -> DispatchCommand<'a> {
-        let fifo_queue: & mut VecDeque::<Vec<u8>>;
-        unsafe {
-            // TODO: This unsafe code needs to be replaced by a thread safe shared queue instance
-            //       based on Arc::new(Mutex::new(......)) as been described here
-            //       https://stackoverflow.com/questions/60996488/passing-additional-state-to-rust-hyperserviceservice-fn
-            if FIFO_QUEUE.is_none() {
-                FIFO_QUEUE = Some(VecDeque::<Vec<u8>>::new());
-            }
-            fifo_queue = FIFO_QUEUE.as_mut().unwrap()
-        }
         Self {
-            fifo: fifo_queue,
+            fifos: Self::get_fifo_queues_ref_mut(),
             scope: self.scope.clone()
         }
     }
@@ -58,20 +56,29 @@ impl<'a> Clone for DispatchCommand<'a> {
 
 impl<'a> DispatchCommand<'a>
 {
-    pub fn new() -> Self {
-        let fifo_queue: & mut VecDeque::<Vec<u8>>;
+    fn get_fifo_queues_ref_mut() -> &'a mut FifoQueueMap {
         unsafe {
-            // TODO: This unsafe code needs to be replaced by ... (See comment in the unsafe scope above)
-            if FIFO_QUEUE.is_none() {
-                FIFO_QUEUE = Some(VecDeque::<Vec<u8>>::new());
+            // TODO: This unsafe code needs to be replaced by a thread safe shared queue instance
+            //       based on Arc::new(Mutex::new(......)) as been described here
+            //       https://stackoverflow.com/questions/60996488/passing-additional-state-to-rust-hyperserviceservice-fn
+            if FIFO_QUEUES.is_none() {
+                FIFO_QUEUES = Some(get_new_fifo_queue_map());
             }
-            fifo_queue = FIFO_QUEUE.as_mut().unwrap()
+            FIFO_QUEUES.as_mut().unwrap()
         }
+    }
 
+    pub fn new() -> Self {
         Self {
-            fifo: fifo_queue,
+            fifos: Self::get_fifo_queues_ref_mut(),
             scope: None,
         }
+    }
+
+    fn get_no_command_response() -> Result<Response<Body>> {
+        let mut buffer: [u8; Command::LENGTH_BYTES] = [0; Command::LENGTH_BYTES];
+        Command::NO_COMMAND.to_bytes(&mut buffer).unwrap();
+        Ok(Response::new(Body::from(buffer.to_vec())))
     }
 }
 
@@ -80,33 +87,51 @@ impl<'a> ServerDispatchCommand for DispatchCommand<'a> {
 
     fn get_uri_prefix(&self) -> &'static str { URI_PREFIX_COMMAND }
 
-    async fn fetch_next_command(self: &mut Self) -> Result<Response<Body>> {
-        if let Some(req_body_binary) = self.fifo.pop_front() {
-            let cmd = Command::try_from_bytes(req_body_binary.as_slice()).expect("Could not deserialize command from outgoing binary http body.");
-            println!("[IOTA-Bridge - DispatchCommand] fetch_next_command() - Returning command {}.\nBlob length: {}\nQueue length: {}",
-                    cmd,
-                    req_body_binary.len(),
-                    self.fifo.len(),
+    async fn fetch_next_command(self: &mut Self, dev_eui: &str) -> Result<Response<Body>> {
+        if let Some(fifo) = self.fifos.get_mut(dev_eui).as_deref_mut() {
+            log::debug!("[fn fetch_next_command()] DevEUI: {} - Found FifoQueue with length {}",
+                dev_eui, fifo.len()
             );
-            Ok(Response::new(req_body_binary.into()))
+            if let Some(req_body_binary) = fifo_queue_pop_front(fifo ) {
+                let cmd = Command::try_from_bytes(req_body_binary.payload.as_slice()).expect("Could not deserialize command from outgoing binary http body.");
+                log::info!("[fn fetch_next_command()] Returning command {}.\nBlob length: {}\nQueue length: {}",
+                    cmd,
+                    req_body_binary.payload.len(),
+                    fifo.len(),
+                );
+                Ok(Response::new(req_body_binary.payload.into()))
+            } else {
+                log::debug!("[fn fetch_next_command()] No command available");
+                log::info!("[fn fetch_next_command()] Returning Command::NO_COMMAND");
+                Self::get_no_command_response()
+            }
         } else {
-            println!("[IOTA-Bridge - DispatchCommand] fetch_next_command() - No command available. Returning Command::NO_COMMAND.\n");
-            let mut buffer: [u8; Command::LENGTH_BYTES] = [0; Command::LENGTH_BYTES];
-            Command::NO_COMMAND.to_bytes(&mut buffer).unwrap();
-            Ok(Response::new(Body::from(buffer.to_vec())))
+            log::info!("[fn fetch_next_command()] DevEUI not known - Returning Command::NO_COMMAND");
+            Self::get_no_command_response()
         }
     }
 
-    async fn register_remote_command(self: &mut Self, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>> {
-        self.fifo.push_back(req_body_binary.to_vec());
-        let cmd = Command::try_from_bytes(req_body_binary).expect("Could not deserialize command from incoming binary http body.");
-        println!("[IOTA-Bridge - DispatchCommand] {}() - Received command {}.\nBinary length: {}\nQueue length: {}",
+    async fn register_remote_command(self: &mut Self, dev_eui: &str, req_body_binary: &[u8], api_fn_name: &str) -> Result<Response<Body>> {
+        create_new_fifo_queue_if_not_exist(&self.fifos, dev_eui);
+        if let Some(fifo) = self.fifos.get_mut(dev_eui).as_deref_mut() {
+            let cmd = Command::try_from_bytes(req_body_binary).expect("Could not deserialize command from incoming binary http body.");
+            fifo.push_back( FifoQueueElement::from_binary(
+                req_body_binary, cmd.needs_to_wait_for_tangle_milestone()
+            ));
+            log::info!("[fn {}()] Received command {}.\nBinary length: {}\nQueue length: {}",
                  api_fn_name,
                  cmd,
                  req_body_binary.len(),
-                 self.fifo.len(),
-        );
-        Ok(Response::new(Default::default()))
+                 fifo.len(),
+            );
+            Ok(Response::new(Default::default()))
+        } else {
+            log::error!("[fn register_remote_command()] DevEUI: {} - Could not create FiFoQueue - Returning error 500", dev_eui);
+            Ok(Response::builder()
+                .status(500)
+                .body(Default::default())
+                .unwrap())
+        }
     }
 }
 

@@ -18,17 +18,23 @@ use std::{
     ops::Range,
     str::FromStr,
     ptr,
-    ffi::CStr,
+    ffi::{
+        CStr,
+        c_char,
+    },
 };
 
-use crate::binary_persist::{
-    BinaryPersist,
-    USIZE_LEN,
-    RangeIterator,
-    deserialize_string,
-    serialize_vec_u8,
-    deserialize_vec_u8,
-    serialize_string
+use crate::{
+    STREAMS_TOOLS_CONST_DEV_EUI_NOT_DEFINED,
+    binary_persist::{
+        BinaryPersist,
+        USIZE_LEN,
+        RangeIterator,
+        deserialize_string,
+        serialize_vec_u8,
+        deserialize_vec_u8,
+        serialize_string,
+    }
 };
 
 use anyhow::bail;
@@ -107,6 +113,7 @@ impl From<HttpMethod> for HeaderFlags {
     }
 }
 
+#[derive(Clone)]
 pub struct IotaBridgeRequestParts {
     pub method: HttpMethod,
     pub uri: String,
@@ -119,7 +126,13 @@ impl IotaBridgeRequestParts {
     pub fn new(header_flags: HeaderFlags, uri: String, body_bytes: Vec<u8>) -> Self {
         let method = HttpMethod::from(header_flags);
         let uri_bytes = uri.clone().into_bytes();
-        Self {method, uri, body_bytes, uri_bytes, header_flags}
+        Self {
+            method,
+            uri,
+            body_bytes,
+            uri_bytes,
+            header_flags
+        }
     }
 
     pub async fn from_request(request: Request<Body>, needs_registered_lorawan_node: bool) -> Self {
@@ -129,7 +142,13 @@ impl IotaBridgeRequestParts {
         let uri_bytes = uri.clone().into_bytes();
         let mut header_flags = HeaderFlags::from(method.clone());
         header_flags.set(HeaderFlags::NEEDS_REGISTERED_LORAWAN_NODE, needs_registered_lorawan_node);
-        Self {method, uri, body_bytes, uri_bytes, header_flags}
+        Self {
+            method,
+            uri,
+            body_bytes,
+            uri_bytes,
+            header_flags
+        }
     }
 
     pub fn into_request(self: Self, request_builder: Builder) -> Result<Request<Body>> {
@@ -165,11 +184,8 @@ impl IotaBridgeRequestParts {
 
 impl fmt::Display for IotaBridgeRequestParts {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "IotaBridgeRequestParts:
-                     method: {}
-                     uri: {}
-                     body length: {}
-                ", self.method, self.uri, self.body_bytes.len())
+        write!(f, "IotaBridgeRequestParts: method: {}, uri: {}, body length: {}",
+               self.method, self.uri, self.body_bytes.len())
     }
 }
 
@@ -267,13 +283,13 @@ impl IotaBridgeResponseParts {
         }
     }
 
-    pub fn persist_to_hyper_response_200(self: Self) -> Result<HyperResponse<Body>> {
+    pub fn persist_to_hyper_response(self: Self, response_status: StatusCode) -> Result<HyperResponse<Body>> {
         let mut buffer: Vec<u8> = vec![0; self.needed_size()];
         self.to_bytes(buffer.as_mut_slice()).expect("Could not serialize IotaBridgeResponseParts into buffer");
         log::debug!("[persist_to_hyper_response_200()] Serialized this IotaBridgeResponseParts to binary data:\
         \n    length:{}\n    bytes:{:02X?}", buffer.len(), buffer.as_slice());
         HyperResponse::builder()
-            .status(StatusCode::from_u16(200u16)?)
+            .status(response_status)
             .body(Body::from(buffer))
     }
 }
@@ -316,10 +332,7 @@ impl BinaryPersist for IotaBridgeResponseParts {
 
 impl fmt::Display for IotaBridgeResponseParts {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "IotaBridgeResponseParts:
-                     status: {}
-                     body length: {}
-                ", self.status_code, self.body_bytes.len())
+        write!(f, "IotaBridgeResponseParts: status: {}, body length: {}", self.status_code, self.body_bytes.len())
     }
 }
 
@@ -333,14 +346,14 @@ pub mod streams_poc_lib_ffi {
     #[allow(non_camel_case_types)]
     #[repr(C)]
     pub struct iota_bridge_tcpip_proxy_options_t {
-        pub dev_eui: u64,
+        pub dev_eui: *const c_char,
         pub iota_bridge_url: *const c_char,
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct IotaBridgeTcpIpProxySettings {
-    pub dev_eui: u64,
+    pub dev_eui: String,
     pub iota_bridge_url: String,
 }
 
@@ -350,9 +363,15 @@ impl IotaBridgeTcpIpProxySettings {
             return None
         }
 
-        let dev_eui: u64 = unsafe{ (*iota_bridge_proxy_opt).dev_eui };
-        let iota_bridge_url = if unsafe{ (*iota_bridge_proxy_opt).iota_bridge_url } != ptr::null() {
-            let cstr_in: &CStr = unsafe { CStr::from_ptr((*iota_bridge_proxy_opt).iota_bridge_url) };
+        let dev_eui  = Self::convert_c_str_to_string(unsafe{(*iota_bridge_proxy_opt).dev_eui}, STREAMS_TOOLS_CONST_DEV_EUI_NOT_DEFINED);
+        let iota_bridge_url = Self::convert_c_str_to_string(unsafe{(*iota_bridge_proxy_opt).iota_bridge_url}, "");
+
+        Some(Self { dev_eui, iota_bridge_url })
+    }
+
+    fn convert_c_str_to_string(c_str_ptr: *const c_char, default_val: &str) -> String {
+        let ret_val = if c_str_ptr != ptr::null() {
+            let cstr_in: &CStr = unsafe { CStr::from_ptr(c_str_ptr) };
             match cstr_in.to_str() {
                 Ok(utf8_str_in) => {
                     String::from(utf8_str_in)
@@ -360,18 +379,17 @@ impl IotaBridgeTcpIpProxySettings {
                 Err(e) => format!("Utf8Error: {}", e)
             }
         } else {
-            "".to_string()
+            default_val.to_string()
         };
-
-        Some(Self { dev_eui, iota_bridge_url })
+        ret_val
     }
 }
 
 impl BinaryPersist for IotaBridgeTcpIpProxySettings {
     fn needed_size(&self) -> usize {
-        // dev_eui: u64 -> 8 byte
+        // dev_eui: u64 -> USIZE_LEN + string_data
         // iota_bridge_url: USIZE_LEN + string_data
-        8 + USIZE_LEN + self.iota_bridge_url.len()
+        USIZE_LEN + self.dev_eui.len() + USIZE_LEN + self.iota_bridge_url.len()
     }
 
     fn to_bytes(&self, buffer: &mut [u8]) -> anyhow::Result<usize> {
@@ -380,8 +398,8 @@ impl BinaryPersist for IotaBridgeTcpIpProxySettings {
                     the provided buffer length is only {} bytes.", self.needed_size(), buffer.len());
         }
         // dev_eui
-        let mut range: Range<usize> = RangeIterator::new(8);
-        self.dev_eui.to_bytes(&mut buffer[range.clone()])?;
+        let mut range: Range<usize> = RangeIterator::new(0);
+        serialize_string(&self.dev_eui, buffer, &mut range)?;
         // iota_bridge_url
         serialize_string(&self.iota_bridge_url, buffer, &mut range)?;
 
@@ -389,9 +407,9 @@ impl BinaryPersist for IotaBridgeTcpIpProxySettings {
     }
 
     fn try_from_bytes(buffer: &[u8]) -> anyhow::Result<Self> where Self: Sized {
-        let mut range: Range<usize> = RangeIterator::new(8);
+        let mut range: Range<usize> = RangeIterator::new(0);
         // dev_eui
-        let dev_eui = u64::try_from_bytes(&buffer[range.clone()])?;
+        let dev_eui = deserialize_string(&buffer, &mut range)?;
         // iota_bridge_url
         let iota_bridge_url = deserialize_string(&buffer, &mut range)?;
 

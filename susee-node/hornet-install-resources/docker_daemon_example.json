@@ -1,0 +1,15 @@
+{
+   "bip": "172.30.0.1/24",
+   "fixed-cidr": "172.30.0.0/25",
+   "default-address-pools":[
+      {
+         "base": "172.30.1.1/24",
+         "size": 28
+      }
+   ],
+   "log-driver": "local",
+   "log-opts": {
+      "max-size": "50m",
+      "max-file": "20"
+   }
+}

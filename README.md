@@ -1,5 +1,15 @@
 # SUSEE Streams POC
 
+    ===========================================================================
+    ===                                                                     ===
+    ===                         IMPORTANT NOTE                              ===
+    ===                                                                     ===
+    ===       THE MAIN BRANCH IS OUTDATED                                   ===
+    ===       PLEASE SEE STARDUST BRANCH FOR THE CURRENT VERSION            ===
+    ===       OF THE SUSEE STREAMS POC APPLICATIONS AND LIBRARY             ===
+    ===                                                                     ===
+    ===========================================================================
+
 ## About
 This repository provides a static library for the ESP32-C3 platform,
 called the *Streams POC Library*, which can be used to encrypt and

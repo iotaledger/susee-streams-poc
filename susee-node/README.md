@@ -115,7 +115,7 @@ the deploment of these services is described
 
 ### Use in production
 
-As the inx-collector system includes a Hornet Node which communicates with other Nodes in
+As the *SUSEE Node* includes a Hornet Node which communicates with other Nodes in
 the IOTA- or Shimmer-network,
 the system needs a publicly available domain name.
 All test systems have been run using an IPv4 address, so we recommend using an
@@ -247,11 +247,11 @@ finished:
 
 #### Install the Hornet docker environment 
 
-Upload the content of the `inx-collector/hornet-install-resources` folder to your host system.
+Upload the content of the `susee-node/hornet-install-resources` folder to your host system.
 Please replace `<NODE_HOST>` with the domain name or static ip of your host system and enter the password for the
 admin user when scp is executed.
 ```bash
-  # In the folder where this README.md is located (inx-collector folder)
+  # In the folder where this README.md is located ('susee-node' folder)
   > scp hornet-install-resources/* admin@<NODE_HOST>:~
 ```
 Please login as admin user via ssh. The following steps are equivalent 
@@ -366,9 +366,9 @@ section below):
     # Uncomment and edit the following line, if you are using a 'Primary+Secondary SUSEE-Node' setup.
     # The URL must include the "http" or "https" scheme.
     # Examples:
-    #        PEERCOLLECTOR_URL=https://my-other-susse-node.org
+    #        PEERCOLLECTOR_URL=https://my-other-susee-node.org
     #        PEERCOLLECTOR_URL=http://127.0.0.1:9030
-    #PEERCOLLECTOR_URL=https://my-other-susse-node.org
+    #PEERCOLLECTOR_URL=https://my-other-susee-node.org
 ```
 
 After having saved the `env_template` file in your editor
@@ -653,8 +653,8 @@ these features can be used for synchronization tasks of optional
 additional nodes, for example for backup purposes.
 
 For example the
-[Minio client services for backup tasks](#minio-client-services-for-backup-tasks)
-can be used to setup a backup appliance.
+[Minio client services for backup tasks](#minio-client-services-for-backup-tasks),
+that can be used to setup a backup appliance.
 
 Alternatively you can choose from several AWS S3 compatible paid
 cloud services.

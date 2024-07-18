@@ -125,16 +125,28 @@ The *Streams Channel* used for the SUSEE project generally can be described as f
 ### For x86/PC
 
 To build the applications for x86/PC platforms, you need the following:
+
 - Rust - Please use the [official install script from rust-lang.org](https://www.rust-lang.org/tools/install)
   to have an up to date rust compiler (rustc). Do not use install packages provided with you OS because your
   rustc could be too old to build this project.
 
-- (Optional) An IDE that supports Rust autocompletion. We recommend [Visual Studio Code](https://code.visualstudio.com/Download) with the [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer) extension
+- (Optional) An IDE that supports Rust autocompletion. We recommend
+[Visual Studio Code](https://code.visualstudio.com/Download) with the 
+[rust-analyzer](https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer) extension
 
-We also recommend updating Rust to the [latest stable version](https://github.com/rust-lang/rustup.rs#keeping-rust-up-to-date):
+After having installed Rust, it's a good idea to update Rust to the
+[latest stable version](https://github.com/rust-lang/rustup.rs#keeping-rust-up-to-date):
 
 ```bash
 rustup update stable
+```
+
+To build the *SUSEE Streams POC* applications you need to
+install the rust nightly toolchain and set the nightly
+toolchain to be the default toolchain:
+```bash
+rustup toolchain install nightly
+rustup default nightly
 ```
 
 ### For ESP32
